@@ -1,0 +1,28 @@
+/* Fonts are loaded in the shared App Router root, not a pages route. */
+/* eslint-disable next/no-page-custom-font */
+import type { Metadata } from 'next';
+import './globals.css';
+export const metadata: Metadata = {
+  title: 'Noctgram — лента и диалоги',
+  icons: { icon: '/favicon.svg' },
+  description:
+    'Публикации, фотографии, опросы и личные диалоги. Твоё пространство в Noctgram.',
+};
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="ru" className="dark">
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap"
+        />
+      </head>
+      <body>{children}</body>
+    </html>
+  );
+}
+

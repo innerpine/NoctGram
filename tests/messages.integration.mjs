@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+const base='http://127.0.0.1:8787';
+const a='qa_alice',b='qa_bob',c='qa_carol';
+async function api(user,query='',body){const r=await fetch(base+'/api/social'+query,{headers:{'oai-authenticated-user-id':user,'oai-authenticated-user-email':user+'@example.com','Content-Type':'application/json'},...(body?{method:'POST',body:JSON.stringify(body)}:{})});return {status:r.status,data:await r.json()};}
+for(const u of[a,b,c])assert.equal((await api(u,'?action=bootstrap')).status,200);
+assert.equal((await api(a,'',{action:'message',id:b,text:'private-message-'+Date.now()})).status,200);
+const inbox=(await api(b,'?action=threads')).data;assert.equal(inbox.find(p=>p.id===a).unread,1);
+const read=(await api(b,'?action=messages&peer='+a)).data;assert.ok(read.length);assert.equal(read.at(-1).sender,a);
+assert.equal((await api(a,'?action=messages&peer='+b)).data.at(-1).read,1);
+assert.equal((await api(c,'?action=messages&peer='+b)).data.length,0);
+assert.equal((await api(c,'?action=threads')).data.length,0);
+assert.equal((await api(a,'',{action:'message',id:c,text:''})).status,400);
+assert.equal((await api(a,'',{action:'follow',id:b,value:true})).status,200);
+assert.equal((await api(b,'?action=profile')).data.followers,1);
+const tag='multi_'+Date.now();await api(b,'',{action:'post',text:tag});const post=(await api(a,'?action=feed&mode=following&q='+tag)).data[0];assert.ok(post);
+assert.equal((await api(c,'',{action:'delete',id:post.id})).status,403);
+assert.equal((await api(c,'',{action:'handle',handle:(await api(a,'?action=profile')).data.handle})).status,409);
+await api(b,'',{action:'delete',id:post.id});await api(a,'',{action:'follow',id:b,value:false});
+assert.equal((await fetch(base+'/')).status,200);
+console.log('PASS: production Worker HTTP export, three-user private messaging, read receipts, subscriptions and cross-user authorization.');
