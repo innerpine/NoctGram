@@ -1,0 +1,16 @@
+{
+  "name": "Noctgram",
+  "short_name": "Noctgram",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0b0d",
+  "theme_color": "#0b0b0d",
+  "icons": [
+    {
+      "src": "/assets/noctgram-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

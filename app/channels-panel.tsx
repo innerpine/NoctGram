@@ -196,6 +196,11 @@ export function ChannelsPanel({
             <small>
               @{c.handle} · {c.followers.toLocaleString('ru-RU')} подписчиков
             </small>
+            {c.channelRole && c.channelRole !== 'owner' && (
+              <small>
+                {c.channelRole === 'admin' ? 'Администратор' : 'Редактор'}
+              </small>
+            )}
             {c.bio && <p>{c.bio}</p>}
             {c.restriction && (
               <small className="channel-restriction-label">

@@ -23,9 +23,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
-import { StarsIcon, NoctLogo } from './stars-icon';
+import { Avatar, DisplayName } from './profile-identity';
+export { Avatar } from './profile-identity';
+import { StarsIcon } from './stars-icon';
 import { CodeBlock } from './code-block';
-import type { Person, Post, Media } from '@/lib/client';
+import { MusicLinkCard } from './music-link-card';
+import type { Post, Media } from '@/lib/client';
 import {
   useEffect,
   useRef,
@@ -33,33 +36,6 @@ import {
   type ReactNode,
   type CSSProperties,
 } from 'react';
-export function Avatar({
-  person,
-  size = 40,
-}: {
-  person: Pick<Person, 'name' | 'avatar'>;
-  size?: number;
-}) {
-  const words = person.name.trim().split(/\s+/);
-  const initials =
-    words.length > 1
-      ? words[0].slice(0, 1) + words[words.length - 1].slice(0, 1)
-      : person.name.slice(0, 2);
-  return (
-    <span
-      className="avatar"
-      style={{ width: size, height: size, fontSize: size / 2.8 }}
-    >
-      {person.avatar ? (
-        <img src={person.avatar} alt="" />
-      ) : person.name === 'Noctgram' ? (
-        <NoctLogo size={size * 1.08} />
-      ) : (
-        initials.toUpperCase()
-      )}
-    </span>
-  );
-}
 export function Stamp({
   time,
   compact = false,
@@ -154,6 +130,7 @@ export function PostCard({
   const article = useRef<HTMLElement>(null),
     recorded = useRef(false);
   const mine = p.userId === me || p.ownerId === me;
+  const canManage = mine || !!p.canManagePosts;
   useEffect(() => {
     if (!me || mine || recorded.current || !article.current) return;
     let visible = false;
@@ -233,7 +210,7 @@ export function PostCard({
         )}
         <div className="post-author">
           <button className="author-button" onClick={() => onProfile(p.userId)}>
-            {p.name}
+            <DisplayName person={p} />
           </button>
           {p.userId === 'noctgram' && (
             <span className="verified" title="Официальный аккаунт">
@@ -256,7 +233,7 @@ export function PostCard({
                 <Link size={15} />
                 Скопировать ссылку
               </DropdownMenuItem>
-              {mine ? (
+              {canManage ? (
                 <>
                   <DropdownMenuItem
                     disabled={busy}
@@ -321,6 +298,7 @@ export function PostCard({
             {expanded ? 'Свернуть' : 'Ещё'}
           </button>
         )}
+        <MusicLinkCard text={p.text} />
         {p.code && <CodeBlock code={p.code} language={p.codeLang} />}
         {p.media.length > 0 && (
           <div

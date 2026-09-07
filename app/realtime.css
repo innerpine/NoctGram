@@ -1,0 +1,548 @@
+/* Shared dark surfaces; dialog entrance/exit stays in dialog-motion.css. */
+.realtime-form {
+  display: grid;
+  gap: 16px;
+}
+.realtime-form input,
+.realtime-form textarea,
+.scheduled-row input,
+.schedule-editor input,
+.realtime-search input {
+  background: #19191c;
+  color: var(--text, #eee);
+  border: 1px solid #303036;
+  border-radius: 12px;
+  padding: 12px;
+  min-width: 0;
+  width: 100%;
+  font: inherit;
+  outline: none;
+}
+.realtime-form input:focus-visible,
+.realtime-form textarea:focus-visible,
+.scheduled-row input:focus-visible,
+.schedule-editor input:focus-visible,
+.realtime-search input:focus-visible {
+  border-color: #a390d5;
+  box-shadow: 0 0 0 3px #a390d51a;
+}
+.realtime-error {
+  color: #eea6b3;
+  font-size: 13px;
+  padding: 8px 0;
+}
+.realtime-empty {
+  color: #898891;
+  text-align: center;
+  padding: 30px 16px;
+  font-size: 14px;
+}
+.realtime-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  min-width: 0;
+}
+.realtime-person > span:not(.grow) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.realtime-person small {
+  display: block;
+  color: #92919b;
+  font-size: 12px;
+  margin-top: 3px;
+}
+.realtime-search {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: #999;
+}
+.channel-tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+}
+.channel-tools .secondary {
+  font-size: 12px;
+}
+.schedule-editor {
+  margin: 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px;
+  border: 1px solid #36313f;
+  border-radius: 12px;
+  background: #a390d509;
+  font-size: 13px;
+}
+.schedule-editor label {
+  display: grid;
+  gap: 7px;
+  flex: 1;
+  min-width: 180px;
+}
+.schedule-list {
+  display: grid;
+  gap: 12px;
+}
+.scheduled-row {
+  border: 1px solid #2b2b30;
+  background: #141417;
+  border-radius: 16px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+.scheduled-row p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 140px;
+  overflow: auto;
+  font-size: 14px;
+}
+.scheduled-row strong {
+  font-size: 13px;
+}
+.scheduled-row .row {
+  flex-wrap: wrap;
+}
+.scheduled-row input {
+  flex: 1;
+  min-width: 170px;
+}
+.realtime-person .secondary {
+  white-space: nowrap;
+  font-size: 12px;
+}
+.stories-strip {
+  display: flex;
+  gap: 17px;
+  align-items: center;
+  overflow: auto;
+  padding: 17px 20px 20px;
+  scrollbar-width: thin;
+  border-bottom: 1px solid #202024;
+}
+.stories-strip > button {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  flex: 0 0 66px;
+  min-width: 0;
+}
+.stories-strip small {
+  font-size: 11px;
+  max-width: 68px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.story-add > span,
+.story-person > span {
+  height: 58px;
+  width: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid #3c3943;
+  background: #17161b;
+}
+.story-person.unseen > span {
+  border: 2px solid #af9add;
+  box-shadow: 0 0 15px #9e87d41a;
+}
+.story-add > span {
+  color: #c2afe9;
+  border-style: dashed;
+}
+.stories-strip > button:hover > span {
+  background: #292331;
+}
+.stories-strip > button:focus-visible {
+  outline: 2px solid #af9add;
+  outline-offset: 5px;
+  border-radius: 12px;
+}
+.stories-strip > p {
+  font-size: 12px;
+}
+.story-bg-night {
+  background: radial-gradient(ellipse at 30% 0%, #363444, #15141c 80%);
+}
+.story-bg-violet {
+  background: linear-gradient(145deg, #776487, #292036);
+}
+.story-bg-blue {
+  background: linear-gradient(145deg, #486e83, #172633);
+}
+.story-bg-ember {
+  background: linear-gradient(145deg, #966f66, #39282d);
+}
+.story-swatches {
+  display: flex;
+  gap: 7px;
+}
+.story-swatches button {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #ffffff26;
+}
+.story-swatches button[aria-pressed='true'] {
+  outline: 2px solid #d7c4f0;
+  outline-offset: 3px;
+}
+.story-preview {
+  position: relative;
+  min-height: 210px;
+  border-radius: 16px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  color: #dfdce4;
+}
+.story-preview > img,
+.story-preview > video {
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+}
+.story-preview > span {
+  padding: 36px;
+  font-size: 22px;
+  opacity: 0.6;
+}
+.story-preview > .icon-button {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  background: #0008;
+  z-index: 1;
+}
+.story-preview textarea {
+  background: #0002;
+  border: none;
+  border-radius: 0;
+  min-height: 90px;
+  text-align: center;
+  color: white;
+  resize: vertical;
+}
+.story-preview textarea::placeholder {
+  color: #ffffff80;
+}
+.story-dialog.noct-dialog {
+  padding: 0 !important;
+  width: min(440px, calc(100vw - 24px)) !important;
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+  border-radius: 24px;
+}
+.story-view {
+  position: relative;
+  height: min(740px, calc(100dvh - 26px));
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+}
+.story-progress {
+  display: flex;
+  gap: 4px;
+  padding: 14px 12px 8px;
+}
+.story-progress > span {
+  height: 3px;
+  border-radius: 4px;
+  background: #ffffff30;
+  overflow: hidden;
+  flex: 1;
+}
+.story-progress i {
+  display: block;
+  height: 100%;
+  background: #eee;
+  transform-origin: left;
+}
+.story-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  z-index: 2;
+}
+.story-heading strong {
+  font-size: 14px;
+}
+.story-heading small {
+  display: block;
+  font-size: 11px;
+  color: #ccc;
+  margin-top: 3px;
+}
+.story-media {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+.story-media > img,
+.story-media > video {
+  object-fit: contain;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  max-height: 100%;
+}
+.story-media > p {
+  white-space: pre-wrap;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  text-align: center;
+  padding: 20px 30px;
+  font-size: 20px;
+  line-height: 1.5;
+  max-height: 50%;
+  text-shadow: 0 2px 12px #0004;
+}
+.story-media > p:only-child {
+  max-height: 100%;
+  font-size: 25px;
+}
+.story-prev,
+.story-next {
+  position: absolute;
+  top: 48%;
+  background: #0003;
+  border-radius: 50%;
+}
+.story-prev {
+  left: 6px;
+}
+.story-next {
+  right: 6px;
+}
+.story-footer {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  align-items: center;
+  background: #0002;
+}
+.story-footer .secondary {
+  font-size: 11px;
+  background: #ffffff10;
+  border-color: #ffffff20;
+  color: white;
+}
+.story-sheet {
+  position: absolute;
+  z-index: 3;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: 65%;
+  overflow: auto;
+  background: #18171cf5;
+  border-top: 1px solid #ffffff20;
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  box-shadow: 0 -12px 30px #0004;
+}
+.story-view > .realtime-error {
+  background: #1c151b;
+  margin: 0;
+  padding: 12px;
+}
+.push-settings {
+  padding: 16px;
+  border: 1px solid #323037;
+  background: linear-gradient(130deg, #201c29, #151417);
+  border-radius: 16px;
+  display: grid;
+  gap: 11px;
+}
+.push-settings p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.push-settings strong {
+  font-size: 14px;
+}
+.push-settings .secondary {
+  justify-self: start;
+}
+.notifications-bell {
+  position: relative;
+}
+.notifications-bell i {
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  border-radius: 7px;
+  background: #ad96d8;
+  color: #131018;
+  font-size: 9px;
+  padding: 2px 4px;
+  font-style: normal;
+  font-weight: 700;
+}
+.notification-list {
+  display: grid;
+  gap: 4px;
+}
+.notification-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 14px 8px;
+  border-radius: 12px;
+  width: 100%;
+}
+.notification-row:hover,
+.notification-row.unread {
+  background: #ffffff05;
+}
+.notification-row > span {
+  flex: 1;
+  min-width: 0;
+}
+.notification-row strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.notification-row small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #96939d;
+  margin-top: 4px;
+}
+.notification-row time {
+  font-size: 11px;
+  color: #77737f;
+}
+.call-dialog.noct-dialog {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px !important;
+  gap: 14px;
+}
+.call-avatar {
+  margin: 18px 0 10px;
+  position: relative;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 12px #a78ac609,
+    0 0 0 27px #a78ac605;
+}
+.call-avatar.calling:before {
+  content: '';
+  position: absolute;
+  inset: -16px;
+  border: 1px solid #b597d43b;
+  border-radius: 50%;
+  animation: call-ring 2.4s ease-out infinite;
+}
+.call-dialog h2 {
+  font-size: 24px;
+  letter-spacing: -0.5px;
+}
+.call-dialog > p {
+  color: #9995a0;
+  font-size: 13px;
+}
+.call-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  margin: 15px 0;
+}
+.call-actions > button {
+  height: 54px;
+  min-width: 54px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.call-actions > .secondary:last-child {
+  border-radius: 18px;
+  padding: 0 24px;
+}
+.call-hangup {
+  background: #9c4f60;
+  color: #fff;
+}
+.call-accept {
+  background: #558b72;
+  color: #fff;
+}
+.call-hangup:hover {
+  background: #b86074;
+}
+.call-accept:hover {
+  background: #64a284;
+}
+.chat-header .call-button {
+  margin-left: auto;
+}
+.chat-header .call-button + .chat-block {
+  margin-left: 0;
+}
+@keyframes call-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+@media (max-width: 500px) {
+  .stories-strip {
+    gap: 11px;
+    padding: 14px;
+  }
+  .story-dialog.noct-dialog {
+    border-radius: 18px;
+  }
+  .realtime-person {
+    flex-wrap: wrap;
+  }
+  .call-dialog.noct-dialog {
+    padding: 24px !important;
+  }
+  .channel-tools {
+    padding: 10px 14px;
+  }
+  .schedule-editor {
+    gap: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .call-avatar.calling:before {
+    animation: none;
+  }
+  .story-progress i {
+    transition: none;
+  }
+}

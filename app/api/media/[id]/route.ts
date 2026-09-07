@@ -1,8 +1,5 @@
-import {
-  assertReadable,
-  assertAccountVisible,
-  assertUploadAvailable,
-} from '@/lib/account-access';
+import { assertMediaRead } from '@/lib/media-access';
+import { assertReadable, assertUploadAvailable } from '@/lib/account-access';
 import { bucket, db, viewer, ApiError, failure } from '@/lib/server';
 export async function GET(
   req: Request,
@@ -28,9 +25,8 @@ export async function GET(
       (!account?.onboardingComplete || !upload.onboardingComplete)
     )
       throw new ApiError(403, 'Завершите настройку профиля.');
-    if (upload.userId !== me || upload.onboardingComplete)
-      await assertAccountVisible(upload.userId);
     await assertUploadAvailable(id);
+    await assertMediaRead(id, me, upload.userId);
     const range = req.headers.get('range');
     const object = await bucket().get(
       id,

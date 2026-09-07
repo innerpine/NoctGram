@@ -39,6 +39,7 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+/bot/data/
 
 *.tsbuildinfo
 *.log

@@ -5,10 +5,10 @@ import {
   requireModerator,
 } from './account-access';
 
-type TargetType = 'post' | 'comment';
+type TargetType = 'post' | 'comment' | 'story';
 function targetType(value: unknown): TargetType {
-  if (value !== 'post' && value !== 'comment')
-    throw new ApiError(400, 'Выберите пост или комментарий');
+  if (value !== 'post' && value !== 'comment' && value !== 'story')
+    throw new ApiError(400, 'Выберите пост, комментарий или историю');
   return value;
 }
 function reportStatus(value: unknown) {
@@ -21,7 +21,9 @@ async function content(type: TargetType, id: string) {
     .prepare(
       type === 'post'
         ? 'SELECT p.*,u.ownerId FROM posts p JOIN users u ON u.id=p.userId WHERE p.id=?'
-        : 'SELECT c.* FROM comments c WHERE c.id=?',
+        : type === 'story'
+          ? 'SELECT s.* FROM stories s WHERE s.id=? AND s.deletedAt=0'
+          : 'SELECT c.* FROM comments c WHERE c.id=?',
     )
     .bind(id)
     .first<{
@@ -59,6 +61,7 @@ export async function contentModerationGet(
   const rows = await db()
     .prepare(`SELECT r.*,u.name,u.kind,h.handle,rh.handle AS reporterHandle,mh.handle AS reviewerHandle,
     CASE WHEN r.targetType='post' THEN EXISTS(SELECT 1 FROM posts p WHERE p.id=r.targetId)
+      WHEN r.targetType='story' THEN EXISTS(SELECT 1 FROM stories s WHERE s.id=r.targetId AND s.deletedAt=0 AND s.expiresAt>strftime('%s','now')*1000)
       WHEN r.targetType='message' THEN EXISTS(SELECT 1 FROM messages m WHERE m.id=r.targetId)
       ELSE EXISTS(SELECT 1 FROM comments c WHERE c.id=r.targetId) END AS available
     FROM content_reports r JOIN users u ON u.id=r.authorId
@@ -149,10 +152,11 @@ export async function contentModerationPost(
     reason = clean(b.reason, 500, true);
   const row = await content(type, id);
   if (!row) throw new ApiError(409, 'Контент уже удалён. Обновите список.');
-  const table = type === 'post' ? 'posts' : 'comments';
+  const table =
+    type === 'post' ? 'posts' : type === 'story' ? 'stories' : 'comments';
   const eventId = crypto.randomUUID(),
     now = Date.now(),
-    postId = type === 'post' ? id : row.postId!;
+    postId = type === 'post' ? id : type === 'story' ? '' : row.postId!;
   const statements = [
     d
       .prepare(`INSERT OR IGNORE INTO content_removals
@@ -181,10 +185,18 @@ export async function contentModerationPost(
         .bind(eventId, id, eventId),
     );
   }
+  if (type === 'story')
+    statements.push(
+      d
+        .prepare(
+          `INSERT OR IGNORE INTO moderated_uploads(uploadId,removalId) SELECT mediaId,? FROM stories WHERE id=? AND mediaId IS NOT NULL AND EXISTS(SELECT 1 FROM content_removals WHERE id=?)`,
+        )
+        .bind(eventId, id, eventId),
+    );
   statements.push(
     d
       .prepare(`UPDATE content_reports SET status='closed',reviewNote=?,reviewedBy=?,updated=?
-    WHERE ${type === 'post' ? 'postId=?' : "targetType='comment' AND targetId=?"}
+    WHERE ${type === 'post' ? 'postId=?' : `targetType='${type}' AND targetId=?`}
     AND status<>'closed' AND EXISTS(SELECT 1 FROM content_removals WHERE id=?)`)
       .bind(reason, me, now, id, eventId),
   );

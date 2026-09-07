@@ -8,7 +8,7 @@ import { ContentDecisionForm } from './content-decision-form';
 type Status = 'new' | 'reviewing' | 'closed';
 type Report = {
   id: string;
-  targetType: 'post' | 'comment' | 'message';
+  targetType: 'post' | 'comment' | 'message' | 'story';
   targetId: string;
   postId: string;
   authorId: string;
@@ -164,13 +164,15 @@ export function ModerationReports({
           <div className="moderation-editor-title">
             <strong>
               @{r.handle} ·{' '}
-              {r.targetType === 'message'
-                ? 'Личное сообщение'
-                : r.targetType === 'comment'
-                  ? 'Комментарий'
-                  : r.kind === 'channel'
-                    ? 'Пост канала'
-                    : 'Пост'}
+              {r.targetType === 'story'
+                ? 'История'
+                : r.targetType === 'message'
+                  ? 'Личное сообщение'
+                  : r.targetType === 'comment'
+                    ? 'Комментарий'
+                    : r.kind === 'channel'
+                      ? 'Пост канала'
+                      : 'Пост'}
             </strong>
             <span className={'report-status report-status--' + r.status}>
               {states[r.status]}
@@ -185,7 +187,7 @@ export function ModerationReports({
           </small>
           {!r.available && (
             <p className="account-note">
-              Контент удалён. Сохранён текст на момент жалобы.
+              Контент недоступен. Сохранён текст на момент жалобы.
             </p>
           )}
           <div className="account-actions">
@@ -196,24 +198,31 @@ export function ModerationReports({
             >
               Найти автора
             </button>
-            {!!r.available && r.targetType !== 'message' && (
-              <a
-                className="secondary"
-                href={'/?post=' + encodeURIComponent(r.postId)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLink size={14} />
-                Открыть пост
-              </a>
-            )}
+            {!!r.available &&
+              r.targetType !== 'message' &&
+              r.targetType !== 'story' && (
+                <a
+                  className="secondary"
+                  href={'/?post=' + encodeURIComponent(r.postId)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink size={14} />
+                  Открыть пост
+                </a>
+              )}
             {!!r.available && r.targetType !== 'message' && !removing && (
               <button
                 className="danger"
                 disabled={busy}
                 onClick={() => setRemoving(r)}
               >
-                Удалить {r.targetType === 'post' ? 'пост' : 'комментарий'}
+                Удалить{' '}
+                {r.targetType === 'post'
+                  ? 'пост'
+                  : r.targetType === 'story'
+                    ? 'историю'
+                    : 'комментарий'}
               </button>
             )}
           </div>
@@ -353,8 +362,12 @@ export function RemovalHistory() {
         <article key={r.id}>
           <strong>
             <ShieldCheck size={15} />{' '}
-            {r.targetType === 'post' ? 'Пост' : 'Комментарий'} @{r.handle}{' '}
-            удалён
+            {r.targetType === 'post'
+              ? 'Пост'
+              : r.targetType === 'story'
+                ? 'История'
+                : 'Комментарий'}{' '}
+            @{r.handle} удалён
           </strong>
           <p className="moderation-evidence">
             {r.text || 'Публикация с медиа или кодом'}

@@ -1,3 +1,4 @@
+import { appearanceColumns } from '@/lib/premium-access';
 import { db, clean, ApiError } from './server';
 import { assertReadable, visibleAccount } from './account-access';
 
@@ -12,7 +13,7 @@ export function contentPreference(alias: string) {
 }
 // Used inside the write statement as well as the UI read: blocking/settings and
 // message insertion serialize in SQLite, without a check-then-send race.
-const messageAllowed = `NOT EXISTS(SELECT 1 FROM user_blocks WHERE
+export const messageAllowed = `NOT EXISTS(SELECT 1 FROM user_blocks WHERE
   (blocker=s.id AND blocked=r.id) OR (blocker=r.id AND blocked=s.id))
   AND (COALESCE((SELECT messagePolicy FROM user_privacy WHERE userId=r.id),'everyone')='everyone'
   OR ((SELECT messagePolicy FROM user_privacy WHERE userId=r.id)='following'
@@ -33,16 +34,23 @@ export async function sendPrivateMessage(
   recipient: string,
   text: string,
 ) {
-  const result = await db()
-    .prepare(`INSERT INTO messages(id,sender,recipient,text,created)
+  const id = crypto.randomUUID();
+  const results = await db().batch([
+    db()
+      .prepare(`INSERT INTO messages(id,sender,recipient,text,created)
     SELECT ?,s.id,r.id,?,? FROM users s,users r
     WHERE s.id=? AND r.id=? AND s.id<>r.id AND r.kind='person'
     AND ${visibleAccount('s')} AND ${visibleAccount('r')}
     AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=s.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
     AND ${messageAllowed}`)
-    .bind(crypto.randomUUID(), text, Date.now(), me, recipient)
-    .run();
-  if (!result.meta.changes)
+      .bind(id, text, Date.now(), me, recipient),
+    db()
+      .prepare(
+        "INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created) SELECT ?,recipient,sender,'message',id,created FROM messages WHERE id=?",
+      )
+      .bind('message:' + id, id),
+  ]);
+  if (!results[0].meta.changes)
     throw new ApiError(
       403,
       'Отправка сообщений недоступна из-за настроек приватности',
@@ -61,7 +69,7 @@ export async function privacyGet(
       .bind(me)
       .first();
     const blocked = await db()
-      .prepare(`SELECT u.id,u.name,u.avatar,h.handle,b.created FROM user_blocks b
+      .prepare(`SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,b.created FROM user_blocks b
       JOIN users u ON u.id=b.blocked LEFT JOIN handles h ON h.userId=u.id AND h.main=1
       WHERE b.blocker=? ORDER BY b.created DESC,b.blocked`)
       .bind(me)
@@ -76,7 +84,7 @@ export async function privacyGet(
     const q = clean(s.get('q') || '', 100).replace(/^@/, '');
     if (!q) return Response.json([]);
     const rows = await db()
-      .prepare(`SELECT u.id,u.name,u.avatar,h.handle,
+      .prepare(`SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,
       EXISTS(SELECT 1 FROM user_blocks WHERE blocker=? AND blocked=u.id) AS blockedByMe
       FROM users u JOIN handles h ON h.userId=u.id AND h.main=1
       WHERE u.kind='person' AND u.id<>? AND ${visibleAccount('u')}

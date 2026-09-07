@@ -10,7 +10,7 @@ export function ContentDecisionForm({
   onCancel,
 }: {
   id: string;
-  type: 'post' | 'comment' | 'message';
+  type: 'post' | 'comment' | 'message' | 'story';
   action: 'remove' | 'report';
   text: string;
   onDone: () => void;
@@ -36,9 +36,11 @@ export function ContentDecisionForm({
               ? 'removeContent'
               : type === 'post'
                 ? 'report'
-                : type === 'message'
-                  ? 'reportMessage'
-                  : 'reportComment',
+                : type === 'story'
+                  ? 'reportStory'
+                  : type === 'message'
+                    ? 'reportMessage'
+                    : 'reportComment',
             id,
             targetType: type,
             reason,
@@ -64,7 +66,9 @@ export function ContentDecisionForm({
         <p className="account-note">
           {type === 'post'
             ? 'Пост, его комментарии и вложения станут недоступны.'
-            : 'Комментарий будет удалён из обсуждения.'}{' '}
+            : type === 'story'
+              ? 'История и её вложение станут недоступны.'
+              : 'Комментарий будет удалён из обсуждения.'}{' '}
           Решение и причина сохранятся в истории. Восстановление не
           предусмотрено.
         </p>

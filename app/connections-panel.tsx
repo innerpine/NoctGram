@@ -1,4 +1,5 @@
 'use client';
+import { DisplayName } from './profile-identity';
 /* The effect loads this profile's relations and ignores replies after it closes. */
 /* eslint-disable react/react-compiler */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -89,7 +90,9 @@ export function ConnectionsPanel({
             >
               <Avatar person={person} size={44} />
               <span className="connection-person-copy">
-                <strong>{person.name}</strong>
+                <strong>
+                  <DisplayName person={person} />
+                </strong>
                 <small>
                   @{person.handle}
                   {person.kind === 'channel' && ' · канал'}

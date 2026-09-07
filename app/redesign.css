@@ -697,6 +697,43 @@ textarea::placeholder {
   color: #fff;
   font-size: 15px;
 }
+.profile-saved-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff04;
+  color: #ffffffd9;
+  font-size: 14px;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.profile-saved-link span {
+  flex: 1;
+}
+.profile-saved-link > svg:last-child {
+  color: #ffffff70;
+}
+.profile-saved-link:hover,
+.profile-saved-link:focus-visible {
+  background: #ffffff0b;
+  border-color: #ffffff30;
+}
+.saved-back {
+  min-height: 44px;
+  margin: 4px 16px;
+  font-size: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-saved-link {
+    transition: none;
+  }
+}
 .profile-presence {
   display: flex;
   align-items: center;

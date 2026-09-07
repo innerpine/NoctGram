@@ -1,3 +1,4 @@
+import { appearanceColumns } from '@/lib/premium-access';
 import { db, profile, clean, ApiError } from './server';
 import { restriction, requireModerator, isModerator } from './account-access';
 import {
@@ -85,7 +86,7 @@ export async function moderationGet(
     const rows = (
       await d
         .prepare(
-          `SELECT u.id,u.name,u.avatar,u.kind,u.ownerId,h.handle,
+          `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},u.kind,u.ownerId,h.handle,
             ou.name AS ownerName,oh.handle AS ownerHandle,
             r.mode,r.reason,r.expiresAt,r.created AS restrictedAt,
             EXISTS(SELECT 1 FROM moderators m WHERE m.userId=u.id) AS moderator
@@ -243,6 +244,15 @@ export async function moderationPost(
             'INSERT INTO account_restrictions(userId,eventId,mode,reason,expiresAt,created) VALUES(?,?,?,?,?,?) ON CONFLICT(userId) DO UPDATE SET eventId=excluded.eventId,mode=excluded.mode,reason=excluded.reason,expiresAt=excluded.expiresAt,created=excluded.created',
           )
           .bind(id, eventId, mode, reason, until, now),
+    ...(mode === 'active'
+      ? []
+      : [
+          d
+            .prepare(
+              'UPDATE posts SET cancelledAt=? WHERE cancelledAt=0 AND publishAt>? AND (userId=? OR publisherId=? OR userId IN(SELECT id FROM users WHERE ownerId=?))',
+            )
+            .bind(now, now, id, id, id),
+        ]),
   ]);
   return Response.json({ ok: true });
 }

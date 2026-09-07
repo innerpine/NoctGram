@@ -105,7 +105,21 @@ assert.equal(
 );
 assert.deepEqual(
   Object.keys(first.people[0]).sort((a, b) => a.localeCompare(b)),
-  ['id', 'name', 'avatar', 'handle', 'kind'].sort((a, b) => a.localeCompare(b)),
+  [
+    'id',
+    'name',
+    'avatar',
+    'handle',
+    'kind',
+    'premium',
+    'profileTheme',
+    'nameGradient',
+    'ringText',
+    'chromeFlow',
+    'chromeTempo',
+    'avatarMotion',
+    'avatarMotionType',
+  ].sort((a, b) => a.localeCompare(b)),
 );
 await follow(first.people[0].id, owner, false);
 assert.deepEqual(

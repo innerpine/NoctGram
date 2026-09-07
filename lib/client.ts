@@ -1,4 +1,6 @@
-export type Person = {
+import type { Appearance } from './appearance';
+import { readApiJson } from './http-response';
+export type Person = Appearance & {
   id: string;
   name: string;
   avatar: string;
@@ -32,6 +34,11 @@ export type AccountAppeal = {
   created: number;
 };
 export type Profile = Person & {
+  channelRole?: 'owner' | 'admin' | 'editor' | null;
+  canPublish?: boolean;
+  canEditProfile?: boolean;
+  canManagePosts?: boolean;
+  canManageMembers?: boolean;
   restriction?: AccountRestriction | null;
   appeal?: AccountAppeal | null;
   canModerate?: boolean;
@@ -47,7 +54,11 @@ export type Profile = Person & {
   postCount: number;
 };
 export type Media = { id: string; type: string; name: string; url?: string };
-export type Post = {
+export type Post = Appearance & {
+  publishAt?: number;
+  publisherId?: string;
+  cancelledAt?: number;
+  canManagePosts?: boolean;
   id: string;
   userId: string;
   name: string;
@@ -73,7 +84,7 @@ export type Post = {
   voted: number | null;
   votes: { option: number; count: number }[];
 };
-export type Comment = {
+export type Comment = Appearance & {
   id: string;
   userId: string;
   name: string;
@@ -142,7 +153,7 @@ export async function request<T>(query: string, body?: unknown): Promise<T> {
         }
       : { cache: 'no-store' },
   );
-  const data = (await response.json()) as T & { error?: string; code?: string };
+  const data = await readApiJson<T>(response, 'Не удалось загрузить данные');
   if (data.code === 'ONBOARDING_REQUIRED' && typeof window !== 'undefined')
     window.location.replace('/welcome');
   if (
@@ -165,14 +176,14 @@ export async function upload(file: File): Promise<Media> {
   const data = new FormData();
   data.set('file', file);
   const r = await fetch('/api/upload', { method: 'POST', body: data });
-  const body = (await r.json()) as Media & { error?: string; code?: string };
+  const body = await readApiJson<Media>(r, 'Не удалось загрузить файл');
   if (!r.ok && ['ACCOUNT_BLOCKED', 'READ_ONLY'].includes(body.code || ''))
     window.dispatchEvent(new Event('noctgram:restriction'));
   if (!r.ok) throw new Error(body.error || 'Не удалось загрузить файл');
   return body;
 }
 
-export type StarTransaction = {
+export type StarTransaction = Appearance & {
   id: string;
   sender: string | null;
   recipient: string;
@@ -189,5 +200,7 @@ export type Wallet = {
   testMode: boolean;
   received: number;
   sent: number;
+  topupCount: number;
+  topupTotal: number;
   transactions: StarTransaction[];
 };
