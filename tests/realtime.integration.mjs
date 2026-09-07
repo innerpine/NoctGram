@@ -244,7 +244,14 @@ assert.ok(
 assert.ok(
   !(await ok(reader, '?action=stories')).some((s) => s.id === expiring.id),
 );
-const notices = await ok(reader, '?action=notifications');
+// Fanout drains 20 posts per batch. Other suites can leave work in this QA DB.
+let notices = await ok(reader, '?action=notifications');
+for (
+  let batch = 0;
+  batch < 30 && !notices.some((n) => n.targetId === owned.id);
+  batch++
+)
+  notices = await ok(reader, '?action=notifications');
 assert.equal(
   notices.filter((n) => n.kind === 'post' && n.targetId === owned.id).length,
   1,

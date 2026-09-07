@@ -1,3 +1,4 @@
+import { appearanceColumns } from '@/lib/premium-access';
 import { db, clean, ApiError } from './server';
 import { assertReadable, visibleAccount } from './account-access';
 
@@ -68,7 +69,7 @@ export async function privacyGet(
       .bind(me)
       .first();
     const blocked = await db()
-      .prepare(`SELECT u.id,u.name,u.avatar,h.handle,b.created FROM user_blocks b
+      .prepare(`SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,b.created FROM user_blocks b
       JOIN users u ON u.id=b.blocked LEFT JOIN handles h ON h.userId=u.id AND h.main=1
       WHERE b.blocker=? ORDER BY b.created DESC,b.blocked`)
       .bind(me)
@@ -83,7 +84,7 @@ export async function privacyGet(
     const q = clean(s.get('q') || '', 100).replace(/^@/, '');
     if (!q) return Response.json([]);
     const rows = await db()
-      .prepare(`SELECT u.id,u.name,u.avatar,h.handle,
+      .prepare(`SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,
       EXISTS(SELECT 1 FROM user_blocks WHERE blocker=? AND blocked=u.id) AS blockedByMe
       FROM users u JOIN handles h ON h.userId=u.id AND h.main=1
       WHERE u.kind='person' AND u.id<>? AND ${visibleAccount('u')}

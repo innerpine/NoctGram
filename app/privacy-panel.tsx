@@ -1,4 +1,5 @@
 'use client';
+import { DisplayName, AnimationPreference } from './profile-identity';
 /* Async effects load private settings and cancel stale search results. */
 /* eslint-disable react/react-compiler */
 import { useEffect, useId, useRef, useState } from 'react';
@@ -138,6 +139,7 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
       {settings && (
         <>
           <PushSettings />
+          <AnimationPreference />
           <form
             className="edit-form"
             onSubmit={(e) => {
@@ -299,7 +301,9 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
                 <div className="privacy-person" key={p.id}>
                   <Avatar person={p} size={36} />
                   <span>
-                    <strong>{p.name}</strong>
+                    <strong>
+                      <DisplayName person={p} />
+                    </strong>
                     <small>@{p.handle}</small>
                   </span>
                   <button

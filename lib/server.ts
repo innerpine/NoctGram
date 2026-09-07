@@ -1,3 +1,4 @@
+import { appearanceColumns } from '@/lib/premium-access';
 import { published, channelRights } from './channel-access';
 import { personalVisibility, contentPreference } from './privacy';
 import {
@@ -106,7 +107,7 @@ export async function profile(id: string, me: string) {
   const d = db();
   const user = await d
     .prepare(
-      `SELECT *, (SELECT id FROM posts WHERE userId=users.id AND cancelledAt=0 AND publishAt<=strftime('%s','now')*1000 AND pinned=1 LIMIT 1) as pinnedPostId, (SELECT handle FROM handles WHERE userId=users.id AND main=1 LIMIT 1) as handle, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.follower WHERE f.following=users.id AND ${visibleAccount('fu')}) as followers, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.following WHERE f.follower=users.id AND ${visibleAccount('fu')}) as following, (SELECT COUNT(*) FROM posts WHERE userId=users.id AND cancelledAt=0 AND publishAt<=strftime('%s','now')*1000) as postCount, EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=users.id) as followed FROM users WHERE id=?`,
+      `SELECT users.*,${appearanceColumns('users')}, (SELECT id FROM posts WHERE userId=users.id AND cancelledAt=0 AND publishAt<=strftime('%s','now')*1000 AND pinned=1 LIMIT 1) as pinnedPostId, (SELECT handle FROM handles WHERE userId=users.id AND main=1 LIMIT 1) as handle, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.follower WHERE f.following=users.id AND ${visibleAccount('fu')}) as followers, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.following WHERE f.follower=users.id AND ${visibleAccount('fu')}) as following, (SELECT COUNT(*) FROM posts WHERE userId=users.id AND cancelledAt=0 AND publishAt<=strftime('%s','now')*1000) as postCount, EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=users.id) as followed FROM users WHERE id=?`,
     )
     .bind(me, id)
     .first();
@@ -221,7 +222,7 @@ export async function feed(
   args.push(me, me);
   const rows = await d
     .prepare(
-      `SELECT p.*,u.name,u.avatar,u.ownerId,u.kind,h.handle,(SELECT COUNT(*) FROM post_views WHERE postId=p.id) as views,(SELECT COALESCE(SUM(amount),0) FROM star_transfers WHERE postId=p.id AND kind='support') as stars,(SELECT COALESCE(SUM(amount),0) FROM star_transfers WHERE postId=p.id AND sender=? AND kind='support') as mySupport,(SELECT COUNT(*) FROM likes WHERE postId=p.id) as likes,(SELECT COUNT(*) FROM comments c JOIN users cu ON cu.id=c.userId WHERE c.postId=p.id AND ${visibleAccount('cu')} AND ${personalVisibility('cu')}) as comments,EXISTS(SELECT 1 FROM likes WHERE postId=p.id AND userId=?) as liked,EXISTS(SELECT 1 FROM bookmarks WHERE postId=p.id AND userId=?) as saved,(SELECT option FROM votes WHERE postId=p.id AND userId=?) as voted FROM posts p JOIN users u ON u.id=p.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${where} ORDER BY p.created DESC,p.id DESC LIMIT 30`,
+      `SELECT p.*,u.name,u.avatar,${appearanceColumns('u')},u.ownerId,u.kind,h.handle,(SELECT COUNT(*) FROM post_views WHERE postId=p.id) as views,(SELECT COALESCE(SUM(amount),0) FROM star_transfers WHERE postId=p.id AND kind='support') as stars,(SELECT COALESCE(SUM(amount),0) FROM star_transfers WHERE postId=p.id AND sender=? AND kind='support') as mySupport,(SELECT COUNT(*) FROM likes WHERE postId=p.id) as likes,(SELECT COUNT(*) FROM comments c JOIN users cu ON cu.id=c.userId WHERE c.postId=p.id AND ${visibleAccount('cu')} AND ${personalVisibility('cu')}) as comments,EXISTS(SELECT 1 FROM likes WHERE postId=p.id AND userId=?) as liked,EXISTS(SELECT 1 FROM bookmarks WHERE postId=p.id AND userId=?) as saved,(SELECT option FROM votes WHERE postId=p.id AND userId=?) as voted FROM posts p JOIN users u ON u.id=p.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${where} ORDER BY p.created DESC,p.id DESC LIMIT 30`,
     )
     .bind(...args)
     .all();

@@ -560,3 +560,25 @@ export const pushDeliveries = sqliteTable(
     index('push_delivery_retry').on(t.state, t.retryAt),
   ],
 );
+
+export const premiumEntitlements = sqliteTable('premium_entitlements', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  startsAt: integer().notNull(),
+  expiresAt: integer().notNull(),
+  revokedAt: integer().notNull().default(0),
+  source: text().notNull(),
+  created: integer().notNull(),
+});
+export const profileAppearance = sqliteTable('profile_appearance', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  theme: text().notNull().default('iris'),
+  nameGradient: integer().notNull().default(0),
+  ringText: text().notNull().default(''),
+  avatarMotion: text().notNull().default(''),
+  avatarMotionType: text().notNull().default(''),
+  updated: integer().notNull(),
+});

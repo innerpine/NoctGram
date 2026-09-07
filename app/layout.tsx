@@ -9,6 +9,7 @@ import './auth.css';
 import './content-moderation.css';
 import './privacy.css';
 import './realtime.css';
+import './profile-design.css';
 import './dialog-motion.css';
 export const metadata: Metadata = {
   title: 'Noctgram — лента и диалоги',

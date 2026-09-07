@@ -1,3 +1,4 @@
+import { appearanceColumns } from '@/lib/premium-access';
 import { assertMediaRead, mediaPermission } from '@/lib/media-access';
 import { db, clean, ApiError } from './server';
 import {
@@ -29,7 +30,7 @@ export async function storiesGet(
 ): Promise<Response | null> {
   if (action === 'stories') {
     const rows = await db()
-      .prepare(`SELECT s.*,u.name,u.avatar,h.handle,up.type,up.name AS mediaName,
+      .prepare(`SELECT s.*,u.name,u.avatar,${appearanceColumns('u')},h.handle,up.type,up.name AS mediaName,
       EXISTS(SELECT 1 FROM story_views WHERE storyId=s.id AND userId=?) AS viewed,
       CASE WHEN s.userId=? THEN (SELECT COUNT(*) FROM story_views WHERE storyId=s.id AND userId<>s.userId) ELSE NULL END AS views
       FROM stories s JOIN users u ON u.id=s.userId JOIN handles h ON h.userId=u.id AND h.main=1
@@ -45,7 +46,7 @@ export async function storiesGet(
     if (r.userId !== me) throw new ApiError(403, 'Просмотры доступны автору');
     const rows = await db()
       .prepare(
-        `SELECT u.id,u.name,u.avatar,h.handle,v.created FROM story_views v JOIN users u ON u.id=v.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE v.storyId=? AND v.userId<>? AND ${visibleAccount('u')} ORDER BY v.created DESC LIMIT 100`,
+        `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,v.created FROM story_views v JOIN users u ON u.id=v.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE v.storyId=? AND v.userId<>? AND ${visibleAccount('u')} ORDER BY v.created DESC LIMIT 100`,
       )
       .bind(id, me)
       .all();

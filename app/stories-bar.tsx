@@ -1,4 +1,5 @@
 'use client';
+import { DisplayName } from './profile-identity';
 /* eslint-disable next/no-img-element, react/react-compiler, jsx-a11y/media-has-caption */
 /* Uploaded videos have no caption track supplied by their author. */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -389,7 +390,9 @@ export function StoriesBar({
               <div className="story-heading">
                 <Avatar person={current} size={34} />
                 <div>
-                  <strong>{current.name}</strong>
+                  <strong>
+                    <DisplayName person={current} />
+                  </strong>
                   <small>
                     {new Date(current.created).toLocaleTimeString('ru-RU', {
                       hour: '2-digit',
@@ -548,7 +551,7 @@ export function StoriesBar({
                       <div className="realtime-person" key={p.id}>
                         <Avatar person={p} size={32} />
                         <span>
-                          {p.name}
+                          <DisplayName person={p} />
                           <small>@{p.handle}</small>
                         </span>
                       </div>

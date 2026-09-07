@@ -1,3 +1,4 @@
+import { appearanceColumns } from '@/lib/premium-access';
 import { db, clean, ApiError } from './server';
 import {
   allowed,
@@ -32,7 +33,7 @@ export async function channelFeatureGet(
   if (action === 'channelTeam') {
     const rows = await db()
       .prepare(
-        `SELECT u.id,u.name,u.avatar,h.handle,cm.role FROM channel_members cm JOIN users u ON u.id=cm.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE cm.channelId=? ORDER BY cm.created,u.id`,
+        `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,cm.role FROM channel_members cm JOIN users u ON u.id=cm.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE cm.channelId=? ORDER BY cm.created,u.id`,
       )
       .bind(id)
       .all();

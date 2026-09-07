@@ -1,3 +1,5 @@
+import { assertStaticAvatar } from './avatar-media';
+import { appearanceColumns } from '@/lib/premium-access';
 import { assertMediaRead, mediaAssignment } from '@/lib/media-access';
 import {
   allowed,
@@ -81,7 +83,7 @@ export async function featureGet(
     const rows = (
       await d
         .prepare(
-          'SELECT u.id,u.name,u.avatar,u.kind,h.handle FROM follows f JOIN users u ON u.id=f.' +
+          `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},u.kind,h.handle FROM follows f JOIN users u ON u.id=f.` +
             personColumn +
             ' JOIN handles h ON h.userId=u.id AND h.main=1 WHERE f.' +
             profileColumn +
@@ -121,9 +123,9 @@ export async function featureGet(
     const before = Number(s.get('before')) || Date.now() + 1;
     const rows = await d
       .prepare(
-        "SELECT t.*,CASE WHEN t.sender=? THEN r.name ELSE COALESCE(u.name,'Noct Stars') END AS name,CASE WHEN t.sender=? THEN r.avatar ELSE COALESCE(u.avatar,'') END AS avatar FROM star_transfers t LEFT JOIN users u ON u.id=t.sender JOIN users r ON r.id=t.recipient WHERE (t.sender=? OR t.recipient=?) AND (t.created<? OR(t.created=? AND t.id<?)) ORDER BY t.created DESC,t.id DESC LIMIT 50",
+        `WITH viewer AS(SELECT ? AS id) SELECT t.*,COALESCE(a.name,'Noct Stars') AS name,COALESCE(a.avatar,'') AS avatar,${appearanceColumns('a')} FROM star_transfers t CROSS JOIN viewer v LEFT JOIN users a ON a.id=CASE WHEN t.sender=v.id THEN t.recipient ELSE t.sender END WHERE (t.sender=v.id OR t.recipient=v.id) AND (t.created<? OR(t.created=? AND t.id<?)) ORDER BY t.created DESC,t.id DESC LIMIT 50`,
       )
-      .bind(me, me, me, me, before, before, s.get('beforeId') || '')
+      .bind(me, before, before, s.get('beforeId') || '')
       .all();
     const totals = await d
       .prepare(
@@ -166,6 +168,7 @@ export async function featurePost(
       bio = clean(b.bio || '', 300),
       h = handle(b.handle),
       avatar = await validImage(b.avatar, me);
+    if (avatar) await assertStaticAvatar(avatar);
     const channelId = 'channel_' + crypto.randomUUID();
     try {
       await d.batch([
@@ -212,6 +215,7 @@ export async function featurePost(
       bio = clean(b.bio, 300),
       avatar = await validImage(b.avatar, me, current?.avatar),
       cover = await validImage(b.cover, me, current?.cover);
+    if (avatar && avatar !== current?.avatar) await assertStaticAvatar(avatar);
     const statements = [];
     // mediaAssignment repeats its expressions; use an input CTE to bind each value once.
     const eligibility = `WITH input AS(SELECT ? AS actor,? AS avatar,? AS cover),eligible AS(SELECT u.id FROM users u,input i WHERE u.id=? AND ${mediaAssignment('u.avatar', 'i.avatar', 'i.actor')} AND ${mediaAssignment('u.cover', 'i.cover', 'i.actor')})`;
@@ -274,6 +278,13 @@ export async function featurePost(
           me,
           me,
         ),
+    );
+    statements.unshift(
+      d
+        .prepare(
+          `${eligibility} UPDATE profile_appearance SET avatarMotion='',avatarMotionType='' WHERE userId=? AND EXISTS(SELECT 1 FROM users u WHERE u.id=profile_appearance.userId AND u.avatar<>? AND u.id IN(SELECT id FROM eligible) AND ${channelPermission('u', 'profile')} AND ${writableTarget('u')})`,
+        )
+        .bind(...eligibilityArgs, target, avatar, me, me, me, me),
     );
     try {
       const result = await d.batch(statements);

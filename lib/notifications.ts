@@ -1,3 +1,4 @@
+import { appearanceColumns } from '@/lib/premium-access';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
 import { cookies } from 'next/headers';
 import { db, clean, ApiError } from './server';
@@ -116,7 +117,7 @@ export async function notificationsGet(
   await fanoutPosts();
   const rows = await db()
     .prepare(
-      `SELECT n.*,u.name,u.avatar,h.handle FROM notifications n JOIN users u ON u.id=n.actorId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE n.userId=? AND ${notificationVisible()} ORDER BY n.created DESC,n.id DESC LIMIT 50`,
+      `SELECT n.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM notifications n JOIN users u ON u.id=n.actorId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE n.userId=? AND ${notificationVisible()} ORDER BY n.created DESC,n.id DESC LIMIT 50`,
     )
     .bind(me)
     .all();

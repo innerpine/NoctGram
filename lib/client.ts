@@ -1,4 +1,5 @@
-export type Person = {
+import type { Appearance } from './appearance';
+export type Person = Appearance & {
   id: string;
   name: string;
   avatar: string;
@@ -52,7 +53,7 @@ export type Profile = Person & {
   postCount: number;
 };
 export type Media = { id: string; type: string; name: string; url?: string };
-export type Post = {
+export type Post = Appearance & {
   publishAt?: number;
   publisherId?: string;
   cancelledAt?: number;
@@ -82,7 +83,7 @@ export type Post = {
   voted: number | null;
   votes: { option: number; count: number }[];
 };
-export type Comment = {
+export type Comment = Appearance & {
   id: string;
   userId: string;
   name: string;
@@ -181,7 +182,7 @@ export async function upload(file: File): Promise<Media> {
   return body;
 }
 
-export type StarTransaction = {
+export type StarTransaction = Appearance & {
   id: string;
   sender: string | null;
   recipient: string;

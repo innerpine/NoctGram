@@ -1,4 +1,5 @@
 'use client';
+import { DisplayName } from './profile-identity';
 /* eslint-disable react/react-compiler */
 import { useEffect, useRef, useState } from 'react';
 import { Clock3, UsersRound, Trash2, Check, Search } from 'lucide-react';
@@ -142,7 +143,7 @@ export function ChannelTools({
                 <div className="realtime-person" key={p.id}>
                   <Avatar person={p} size={36} />
                   <span>
-                    {p.name}
+                    <DisplayName person={p} />
                     <small>@{p.handle}</small>
                   </span>
                   <span className="grow" />
@@ -219,7 +220,7 @@ export function ChannelTools({
                       <div key={p.id} className="realtime-person">
                         <Avatar person={p} size={32} />
                         <span>
-                          {p.name}
+                          <DisplayName person={p} />
                           <small>@{p.handle}</small>
                         </span>
                         <span className="grow" />

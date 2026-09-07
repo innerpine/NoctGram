@@ -1,3 +1,4 @@
+import { appearanceColumns, appearanceFrom } from '@/lib/premium-access';
 import { db, clean, ApiError } from './server';
 import { assertReadable, visibleAccount } from './account-access';
 import { messageAllowed } from './privacy';
@@ -78,7 +79,7 @@ export async function callsGet(
     id = s.get('id');
   const row = await db()
     .prepare(
-      `SELECT c.*,u.name,u.avatar,h.handle FROM calls c JOIN users u ON u.id=CASE WHEN c.caller=? THEN c.callee ELSE c.caller END LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE (c.caller=? OR c.callee=?) AND ${id ? 'c.id=?' : "c.status<>'ended'"} AND (c.status='ended' OR EXISTS(SELECT 1 FROM users s,users r WHERE s.id=c.caller AND r.id=c.callee AND ${callAllowed()})) ORDER BY c.created DESC LIMIT 1`,
+      `SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM calls c JOIN users u ON u.id=CASE WHEN c.caller=? THEN c.callee ELSE c.caller END LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE (c.caller=? OR c.callee=?) AND ${id ? 'c.id=?' : "c.status<>'ended'"} AND (c.status='ended' OR EXISTS(SELECT 1 FROM users s,users r WHERE s.id=c.caller AND r.id=c.callee AND ${callAllowed()})) ORDER BY c.created DESC LIMIT 1`,
     )
     .bind(me, me, me, ...(id ? [id] : []))
     .first();
@@ -107,6 +108,7 @@ export async function callsGet(
       : [];
   return Response.json({
     call: {
+      ...appearanceFrom(row),
       id: row.id,
       caller: row.caller,
       callee: row.callee,

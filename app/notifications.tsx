@@ -1,4 +1,5 @@
 'use client';
+import { DisplayName } from './profile-identity';
 /* eslint-disable react/react-compiler */
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -236,7 +237,9 @@ export function NotificationsBell({
                 >
                   <Avatar person={n} size={38} />
                   <span>
-                    <strong>{n.name}</strong>
+                    <strong>
+                      <DisplayName person={n} />
+                    </strong>
                     <small>
                       {n.kind === 'call' ? (
                         <Phone size={13} />

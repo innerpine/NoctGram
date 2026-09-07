@@ -1,4 +1,5 @@
 'use client';
+import { DisplayName } from './profile-identity';
 /* The subscription starts an asynchronous request and updates its loading state. */
 /* eslint-disable react/react-compiler */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -140,7 +141,9 @@ export function CommentsPanel({
       <div className="comment-context">
         <Avatar person={post} size={32} />
         <div>
-          <strong>{post.name}</strong>
+          <strong>
+            <DisplayName person={post} />
+          </strong>
           <p>{post.text}</p>
         </div>
       </div>
@@ -172,7 +175,9 @@ export function CommentsPanel({
             <Avatar person={c} size={32} />
             <div>
               <div className="row">
-                <strong>{c.name}</strong>
+                <strong>
+                  <DisplayName person={c} />
+                </strong>
                 <span className="grow" />
                 <Stamp time={c.created} compact />
                 {c.userId === me.id && !readOnly && (

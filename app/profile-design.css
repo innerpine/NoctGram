@@ -1,0 +1,330 @@
+.display-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+.display-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.gradient-name {
+  color: var(--profile-first);
+  background: linear-gradient(
+    105deg,
+    var(--profile-first),
+    var(--profile-second)
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.noct-premium-badge {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  min-width: 14px;
+  min-height: 14px;
+  flex: 0 0 auto;
+  background: linear-gradient(
+    135deg,
+    var(--profile-first),
+    var(--profile-second)
+  );
+  mask: url('/assets/noct-premium.png') center / contain no-repeat;
+  -webkit-mask: url('/assets/noct-premium.png') center / contain no-repeat;
+}
+.avatar > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.avatar.profile-identity-avatar {
+  position: relative;
+  overflow: visible;
+  background: transparent;
+  isolation: isolate;
+}
+.profile-identity-avatar > .avatar {
+  width: 100% !important;
+  height: 100% !important;
+}
+.profile-identity-avatar.has-text-ring > .avatar {
+  box-shadow: 0 0 0 2px var(--profile-first);
+}
+.profile-text-ring {
+  position: absolute;
+  inset: -23%;
+  width: 146%;
+  height: 146%;
+  overflow: visible;
+  pointer-events: none;
+  animation: profile-text-orbit 24s linear infinite;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+.profile-avatar-line:has(.has-text-ring) {
+  padding-bottom: 22px;
+}
+.profile-avatar-line > .has-text-ring {
+  margin-left: 20px;
+  margin-right: 18px;
+}
+.profile-card:has(.has-text-ring) .profile-cover {
+  overflow: hidden;
+}
+.profile-card[style] .profile-info {
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--profile-wash) 8%, transparent),
+    transparent 60%
+  );
+}
+.profile-design {
+  display: grid;
+  gap: 22px;
+  padding-top: 10px;
+}
+.design-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--profile-first) 25%, #28282d);
+  border-radius: 18px;
+  padding: 46px 24px 22px;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse at 50% -40%,
+      color-mix(in srgb, var(--profile-wash) 35%, transparent),
+      transparent 80%
+    ),
+    #111114;
+}
+.design-preview-label {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  color: #a3a0ac;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+.design-preview > .avatar {
+  margin: 8px 0 27px;
+}
+.design-preview h3 {
+  font-size: 24px;
+  margin: 0 0 3px;
+  max-width: 100%;
+}
+.design-preview p {
+  color: #a6a3ad;
+  font-size: 12px;
+  margin: 12px 0 0;
+  overflow-wrap: anywhere;
+}
+.design-fields {
+  display: grid;
+  gap: 20px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  margin: 0;
+}
+.design-section-heading {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 13px;
+}
+.design-section-heading svg {
+  color: #a8a3b2;
+}
+.profile-palette {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+  margin: -7px 0 0;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.palette-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 9px 2px;
+  transition:
+    background 0.18s,
+    border-color 0.18s;
+}
+.palette-option:hover {
+  background: #ffffff08;
+}
+.palette-option[aria-pressed='true'] {
+  border-color: #ffffff25;
+  background: #ffffff06;
+}
+.palette-option > span {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #28232d;
+  box-shadow: inset 0 0 0 1px #ffffff30;
+}
+.palette-option small {
+  font-size: 10px;
+  color: #aaa6b2;
+}
+.appearance-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  padding: 16px 0;
+  border-top: 1px solid #ffffff0c;
+  border-bottom: 1px solid #ffffff0c;
+  cursor: pointer;
+}
+.appearance-switch > span {
+  display: grid;
+  gap: 5px;
+}
+.appearance-switch small {
+  color: #929099;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.appearance-switch .privacy-switch {
+  flex-shrink: 0;
+}
+.appearance-switch .privacy-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 48px;
+  height: 28px;
+  flex: 0 0 48px;
+  padding: 3px;
+  border: 0;
+  border-radius: 999px;
+  background: #3a393f;
+  box-shadow: inset 0 0 0 1px #ffffff09;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.appearance-switch .privacy-switch[data-checked] {
+  background: #b8a0e7;
+}
+.appearance-switch .privacy-switch:focus-visible {
+  outline: 2px solid #b8a0e7;
+  outline-offset: 4px;
+}
+.appearance-switch .privacy-switch[data-disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+.design-ring-label {
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+}
+.design-ring-label > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.design-ring-label > span small {
+  margin-left: auto;
+  color: #85818e;
+}
+.design-ring-label input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: #18181c;
+  border: 1px solid #303036;
+  padding: 12px 14px;
+}
+.design-ring-label input:focus {
+  border-color: #8d829f;
+  outline: none;
+}
+.design-motion {
+  display: grid;
+  gap: 12px;
+  padding-top: 3px;
+}
+.design-motion p {
+  margin: 0;
+  line-height: 1.6;
+}
+.design-motion .row {
+  flex-wrap: wrap;
+}
+.design-motion label {
+  cursor: pointer;
+}
+.design-motion .is-disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.design-save {
+  width: 100%;
+  justify-content: center;
+  margin-top: 2px;
+}
+.premium-test-activate {
+  width: 100%;
+  justify-content: center;
+  margin-top: 12px;
+}
+.premium-bottom .error {
+  font-size: 12px;
+  text-align: center;
+}
+@keyframes profile-text-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-text-ring {
+    animation: none;
+  }
+}
+@media (forced-colors: active) {
+  .gradient-name {
+    -webkit-text-fill-color: currentColor;
+    background: none;
+  }
+  .noct-premium-badge {
+    background: CanvasText;
+  }
+}
+@media (max-width: 440px) {
+  .profile-palette {
+    gap: 2px;
+  }
+  .palette-option small {
+    font-size: 9px;
+  }
+  .profile-avatar-line > .has-text-ring {
+    margin-left: 16px;
+    margin-right: 10px;
+  }
+}

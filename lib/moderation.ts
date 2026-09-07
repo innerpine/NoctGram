@@ -1,3 +1,4 @@
+import { appearanceColumns } from '@/lib/premium-access';
 import { db, profile, clean, ApiError } from './server';
 import { restriction, requireModerator, isModerator } from './account-access';
 import {
@@ -85,7 +86,7 @@ export async function moderationGet(
     const rows = (
       await d
         .prepare(
-          `SELECT u.id,u.name,u.avatar,u.kind,u.ownerId,h.handle,
+          `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},u.kind,u.ownerId,h.handle,
             ou.name AS ownerName,oh.handle AS ownerHandle,
             r.mode,r.reason,r.expiresAt,r.created AS restrictedAt,
             EXISTS(SELECT 1 FROM moderators m WHERE m.userId=u.id) AS moderator

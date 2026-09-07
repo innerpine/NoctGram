@@ -1,4 +1,5 @@
 'use client';
+import { DisplayName } from './profile-identity';
 /* eslint-disable react/react-compiler, jsx-a11y/media-has-caption */
 /* Live audio has no prerecorded captions. */
 import { useEffect, useRef, useState } from 'react';
@@ -10,8 +11,9 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { request, type Person } from '@/lib/client';
+import type { Appearance } from '@/lib/appearance';
 import { Avatar } from './post-card';
-type Call = {
+type Call = Appearance & {
   id: string;
   caller: string;
   callee: string;
@@ -124,6 +126,7 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
     operation.current = true;
     const token = ++generation.current;
     const c: Call = {
+      ...peer,
       id: crypto.randomUUID(),
       caller: me,
       callee: peer.id,
@@ -482,7 +485,9 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
               >
                 <Avatar person={call} size={88} />
               </div>
-              <h2>{call.name}</h2>
+              <h2>
+                <DisplayName person={call} />
+              </h2>
               <output>
                 {status}
                 {seconds > 0 && call.status !== 'ended'

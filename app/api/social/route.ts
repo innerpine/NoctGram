@@ -1,3 +1,5 @@
+import { premiumGet, premiumPost } from '@/lib/premium';
+import { appearanceColumns } from '@/lib/premium-access';
 import { assertMediaRead, mediaPermission } from '@/lib/media-access';
 import { callsGet, callsPost } from '@/lib/calls';
 import { notificationsGet, notificationsPost } from '@/lib/notifications';
@@ -59,6 +61,8 @@ export async function GET(req: Request) {
         posts: [],
       });
     await assertReadable(me);
+    const premium = await premiumGet(action, me);
+    if (premium) return premium;
     const d = db();
     const realtime =
       (await callsGet(action, s, me)) || (await notificationsGet(action, me));
@@ -74,7 +78,7 @@ export async function GET(req: Request) {
     if (action === 'bootstrap') {
       const people = await d
         .prepare(
-          `SELECT u.id,u.name,u.avatar,h.handle,EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=u.id) as followed FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND u.kind='person' AND u.id<>? ORDER BY u.created DESC LIMIT 15`,
+          `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=u.id) as followed FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND u.kind='person' AND u.id<>? ORDER BY u.created DESC LIMIT 15`,
         )
         .bind(me, me, me)
         .all();
@@ -137,7 +141,7 @@ export async function GET(req: Request) {
         (
           await d
             .prepare(
-              `SELECT u.id,u.name,u.avatar,h.handle FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND u.kind='person' AND u.id<>? AND (u.name LIKE ? OR h.handle LIKE ? OR EXISTS(SELECT 1 FROM handles WHERE userId=u.id AND handle LIKE ?)) LIMIT 30`,
+              `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND u.kind='person' AND u.id<>? AND (u.name LIKE ? OR h.handle LIKE ? OR EXISTS(SELECT 1 FROM handles WHERE userId=u.id AND handle LIKE ?)) LIMIT 30`,
             )
             .bind(me, me, '%' + q + '%', '%' + q + '%', '%' + q + '%')
             .all()
@@ -157,7 +161,7 @@ export async function GET(req: Request) {
         (
           await d
             .prepare(
-              `SELECT * FROM (SELECT c.*,u.name,u.avatar,h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND c.postId=? AND (c.created<? OR (c.created=? AND c.id<?)) ORDER BY c.created DESC,c.id DESC LIMIT 50) ORDER BY created,id`,
+              `SELECT * FROM (SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND c.postId=? AND (c.created<? OR (c.created=? AND c.id<?)) ORDER BY c.created DESC,c.id DESC LIMIT 50) ORDER BY created,id`,
             )
             .bind(
               me,
@@ -175,7 +179,7 @@ export async function GET(req: Request) {
         (
           await d
             .prepare(
-              `SELECT u.id,u.name,u.avatar,h.handle,(SELECT text FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
+              `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,(SELECT text FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
             )
             .bind(me, me, me, me, me, me, me)
             .all()
@@ -218,6 +222,8 @@ export async function POST(req: Request) {
     const action = typeof b.action === 'string' ? b.action : '';
     const call = await callsPost(action, b, me);
     if (call) return call;
+    const premium = await premiumPost(String(action), b, me);
+    if (premium) return premium;
     const notification = await notificationsPost(action, b, me);
     if (notification) return notification;
     const privacy = await privacyPost(action, b, me);
@@ -464,7 +470,7 @@ export async function POST(req: Request) {
         return Response.json(
           await d
             .prepare(
-              'SELECT c.*,u.name,u.avatar,h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE c.id=?',
+              `SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE c.id=?`,
             )
             .bind(commentId)
             .first(),

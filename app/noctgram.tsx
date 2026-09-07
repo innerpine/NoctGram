@@ -55,6 +55,12 @@ import {
 import { Avatar, Empty, PostCard, PostSkeleton } from './post-card';
 import { CommentsPanel } from './comments-panel';
 import { ContentDecisionForm } from './content-decision-form';
+import { ProfileDesign } from './profile-design';
+import {
+  DisplayName,
+  ProfileAvatar,
+  appearanceStyle,
+} from './profile-identity';
 import { PremiumPanel } from './premium-panel';
 import { PremiumIcon } from './premium-icon';
 import { StarsIcon, NoctLogo } from './stars-icon';
@@ -118,7 +124,9 @@ export default function Noctgram() {
     [topics, setTopics] = useState<{ tag: string; count: number }[]>([]),
     [toastLeaving, setToastLeaving] = useState(false),
     [privacyVersion, setPrivacyVersion] = useState(0);
-  const [editTab, setEditTab] = useState<'profile' | 'privacy'>('profile'),
+  const [editTab, setEditTab] = useState<'profile' | 'privacy' | 'design'>(
+      'profile',
+    ),
     [reportedMessage, setReportedMessage] = useState<Message | null>(null),
     [messageAccess, setMessageAccess] = useState<{
       allowed: boolean;
@@ -755,14 +763,14 @@ export default function Noctgram() {
   const profilePublisher = profileOwned || !!profile?.canPublish;
   const channelRestricted =
     profile?.kind === 'channel' && !!profile.restriction;
-  const edit = () => {
+  const edit = (tab: 'profile' | 'design' = 'profile', own = false) => {
     if (!me || accountBlocked) return;
-    if (profileEditable && channelRestricted) {
+    if (!own && profileEditable && channelRestricted) {
       notify('Редактирование канала ограничено модератором');
       return;
     }
-    const target = profileEditable && profile ? profile : me;
-    setEditTab(readOnly && target.id === me.id ? 'privacy' : 'profile');
+    const target = !own && profileEditable && profile ? profile : me;
+    setEditTab(readOnly && target.id === me.id ? 'privacy' : tab);
     setEditId(target.id);
     setEditName(target.name);
     setEditBio(target.bio);
@@ -771,6 +779,30 @@ export default function Noctgram() {
     setEditHandle(target.handle);
     setEditAliases(target.handles.filter((h) => h !== target.handle));
     setModal('edit');
+  };
+  const applyAppearance = (updated: Profile) => {
+    setMe(updated);
+    setProfile((current) => (current?.id === updated.id ? updated : current));
+    const appearance = {
+      premium: updated.premium,
+      profileTheme: updated.profileTheme,
+      nameGradient: updated.nameGradient,
+      ringText: updated.ringText,
+      avatar: updated.avatar,
+      avatarMotion: updated.avatarMotion,
+      avatarMotionType: updated.avatarMotionType,
+    };
+    setPosts((rows) =>
+      rows.map((row) =>
+        row.userId === updated.id ? { ...row, ...appearance } : row,
+      ),
+    );
+    setThreads((rows) =>
+      rows.map((row) =>
+        row.id === updated.id ? { ...row, ...appearance } : row,
+      ),
+    );
+    void latestRefresh.current();
   };
   const saveProfile = () =>
     void run(async () => {
@@ -1140,7 +1172,7 @@ export default function Noctgram() {
             >
               <PremiumIcon size={23} />
               <span>Noct Premium</span>
-              <span className="badge">скоро</span>
+              <span className="badge">{me?.premium ? 'активен' : 'новое'}</span>
             </button>
           </div>
           <div className="premium-nav-shell stars-nav-shell">
@@ -1160,7 +1192,9 @@ export default function Noctgram() {
               <button className="account" onClick={() => navigate('profile')}>
                 <Avatar person={me} />
                 <span>
-                  <strong>{me.name}</strong>
+                  <strong>
+                    <DisplayName person={me} />
+                  </strong>
                   <small>@{me.handle}</small>
                 </span>
               </button>
@@ -1386,6 +1420,7 @@ export default function Noctgram() {
         {page === 'profile' && profile && !profile.blocked && (
           <>
             <section
+              style={profile.premium ? appearanceStyle(profile) : undefined}
               className={
                 'profile-card ' +
                 (profile.kind === 'channel' ? 'channel-profile' : '')
@@ -1411,7 +1446,7 @@ export default function Noctgram() {
                     className="cover-edit"
                     disabled={readOnly || channelRestricted}
                     aria-label="Изменить обложку"
-                    onClick={edit}
+                    onClick={() => edit()}
                   >
                     <Camera size={17} />
                   </button>
@@ -1420,7 +1455,7 @@ export default function Noctgram() {
               </div>
               <div className="profile-info">
                 <div className="profile-avatar-line">
-                  <Avatar person={profile} size={96} />
+                  <ProfileAvatar person={profile} size={96} />
                   <span className="grow" />
                   {profileEditable ? (
                     <>
@@ -1430,14 +1465,18 @@ export default function Noctgram() {
                           channelRestricted ||
                           (readOnly && profile?.id !== me?.id)
                         }
-                        onClick={edit}
+                        onClick={() => edit()}
                       >
                         Редактировать
                       </button>
                       <button
                         className="icon-button cosmetic"
                         aria-label="Оформление профиля"
-                        onClick={() => navigate('premium')}
+                        onClick={() =>
+                          profile.id === me?.id
+                            ? edit('design')
+                            : navigate('premium')
+                        }
                       >
                         <PremiumIcon size={21} />
                       </button>
@@ -1465,7 +1504,7 @@ export default function Noctgram() {
                   )}
                 </div>
                 <h2>
-                  {profile.name}
+                  <DisplayName person={profile} />
                   {profile.id === 'noctgram' && (
                     <span className="verified">
                       <Check size={12} />
@@ -1619,7 +1658,14 @@ export default function Noctgram() {
           />
         )}
         {page === 'premium' && (
-          <PremiumPanel me={me} onBack={() => setPage(premiumReturn.current)} />
+          <PremiumPanel
+            me={me}
+            onBack={() => setPage(premiumReturn.current)}
+            onUpdate={applyAppearance}
+            onDesign={() => {
+              if (auth()) edit('design', true);
+            }}
+          />
         )}
         {!['messages', 'premium', 'stars', 'channels', 'moderation'].includes(
           page,
@@ -1700,7 +1746,9 @@ export default function Noctgram() {
                 >
                   <Avatar person={t} size={38} />
                   <span className="thread-copy">
-                    <strong>{t.name}</strong>
+                    <strong>
+                      <DisplayName person={t} />
+                    </strong>
                     <small>{t.lastText}</small>
                   </span>
                   {!!t.unread && <span className="unread">{t.unread}</span>}
@@ -1732,7 +1780,9 @@ export default function Noctgram() {
                     <button onClick={() => void openProfile(peer.id)}>
                       <Avatar person={peer} size={34} />
                       <span>
-                        <strong>{peer.name}</strong>
+                        <strong>
+                          <DisplayName person={peer} />
+                        </strong>
                         <small>@{peer.handle}</small>
                       </span>
                     </button>
@@ -1954,7 +2004,9 @@ export default function Noctgram() {
                 <button onClick={() => void openProfile(person.id)}>
                   <Avatar person={person} size={36} />
                   <span>
-                    <strong>{person.name}</strong>
+                    <strong>
+                      <DisplayName person={person} />
+                    </strong>
                     <small>@{person.handle}</small>
                   </span>
                 </button>
@@ -2068,12 +2120,38 @@ export default function Noctgram() {
                 Профиль
               </button>
               <button
+                aria-pressed={editTab === 'design'}
+                disabled={uploading || busy}
+                onClick={() => setEditTab('design')}
+              >
+                Дизайн
+              </button>
+              <button
                 aria-pressed={editTab === 'privacy'}
                 disabled={uploading || busy}
                 onClick={() => setEditTab('privacy')}
               >
                 Приватность
               </button>
+            </div>
+          )}
+          {modal === 'edit' && me && editId === me.id && (
+            <div hidden={editTab !== 'design'}>
+              <ProfileDesign
+                me={me}
+                disabled={readOnly}
+                onBusy={setUploading}
+                onSaved={(updated) => {
+                  applyAppearance(updated);
+                  setEditAvatar(updated.avatar);
+                  setModal('');
+                  notify('Оформление сохранено');
+                }}
+                onPremium={() => {
+                  setModal('');
+                  navigate('premium');
+                }}
+              />
             </div>
           )}
           {modal === 'edit' && editTab === 'privacy' && editId === me?.id && (
@@ -2131,7 +2209,7 @@ export default function Noctgram() {
                     <input
                       className="hidden"
                       type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      accept="image/jpeg,image/png,image/webp"
                       disabled={uploading}
                       onChange={(e) => {
                         const f = e.target.files?.[0];
@@ -2377,7 +2455,9 @@ export default function Noctgram() {
                     >
                       <Avatar person={p} size={38} />
                       <span>
-                        <strong>{p.name}</strong>
+                        <strong>
+                          <DisplayName person={p} />
+                        </strong>
                         <small>@{p.handle}</small>
                       </span>
                     </button>

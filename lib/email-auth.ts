@@ -1,3 +1,4 @@
+import { assertStaticAvatar } from './avatar-media';
 import { identity as currentIdentity } from './auth-session';
 import { removePushDevice } from './notifications';
 import { db } from './storage';
@@ -383,6 +384,7 @@ export async function finishOnboarding(b: Record<string, unknown>) {
         .first()))
   )
     throw new ApiError(400, 'Загрузите свою аватарку ещё раз.');
+  if (avatar) await assertStaticAvatar(avatar);
   try {
     await db().batch([
       db()

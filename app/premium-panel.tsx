@@ -1,5 +1,7 @@
 'use client';
-import { useState } from 'react';
+/* Async entitlement fetch is cancelled when the panel closes. */
+/* eslint-disable react/react-compiler */
+import { useEffect, useState } from 'react';
 import { StarScene } from './star-scene';
 import {
   Camera,
@@ -16,9 +18,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { Avatar } from './post-card';
 import { PremiumIcon } from './premium-icon';
-import type { Profile } from '@/lib/client';
+import { request, type Profile } from '@/lib/client';
 
 const features = [
   {
@@ -27,7 +28,7 @@ const features = [
     title: 'Анимированные аватары',
     text: 'Профиль, в котором больше тебя.',
     detail:
-      'Анимация аватара и дополнительные варианты рамок. Эти возможности появятся с запуском Noct Premium.',
+      'GIF и видео вместо обычного аватара — в профиле, публикациях, комментариях и диалогах. Без звука и с неподвижным превью, когда анимации отключены.',
   },
   {
     id: 'themes',
@@ -35,28 +36,28 @@ const features = [
     title: 'Оформление профиля',
     text: 'Особенные рамки, обложки и акценты.',
     detail:
-      'Подбирай тему профиля и сочетай её со своей обложкой. Пример оформления можно посмотреть ниже.',
+      'Шесть палитр, собственный вращающийся текст вокруг аватара и цветной акцент профиля. Всё настраивается во вкладке «Дизайн».',
   },
   {
     id: 'status',
     Icon: Smile,
-    title: 'Значок и эмодзи-статусы',
+    title: 'Твой значок Premium',
     text: 'Маленькие детали с твоим настроением.',
     detail:
-      'Фирменный значок Noct Premium рядом с именем и коллекция эмодзи-статусов для профиля.',
+      'Фирменный значок появляется справа от имени автоматически. Его цвет подстраивается под палитру твоего профиля.',
   },
   {
     id: 'posts',
     Icon: Palette,
-    title: 'Больше стиля в публикациях',
-    text: 'Косметика для твоих мыслей и историй.',
+    title: 'Градиентный ник',
+    text: 'Имя с твоим оттенком.',
     detail:
-      'Дополнительное оформление публикаций и эффекты реакций — в планах Noct Premium.',
+      'Мягкий градиент из цветов профиля. Включается одним переключателем и виден рядом с твоими публикациями и сообщениями.',
   },
   {
     id: 'usernames',
     Icon: AtSign,
-    title: 'Коллекционные юзернеймы',
+    title: 'Коллекционные юзернеймы · позже',
     text: 'Имена, которые хочется сохранить.',
     detail:
       'Покупка и передача коллекционных имён появятся позже. Обычные юзернеймы уже можно добавлять бесплатно в профиле.',
@@ -66,12 +67,38 @@ const features = [
 export function PremiumPanel({
   me,
   onBack,
+  onUpdate,
+  onDesign,
 }: {
   me: Profile | null;
   onBack: () => void;
+  onUpdate: (profile: Profile) => void;
+  onDesign: () => void;
 }) {
-  const [preview, setPreview] = useState(false);
+  const [state, setState] = useState<{
+    premium: boolean | number;
+    expiresAt: number | null;
+    testMode: boolean;
+  } | null>(null);
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState('');
   const [feature, setFeature] = useState('');
+  const userId = me?.id,
+    isPremium = me?.premium;
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    request<NonNullable<typeof state>>('?action=premium')
+      .then((value) => {
+        if (active) setState(value);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [userId, isPremium]);
   return (
     <section className="premium-page" aria-label="Noct Premium">
       <div className="premium-page-controls">
@@ -96,8 +123,15 @@ export function PremiumPanel({
         <p>Больше способов быть собой.</p>
         <span className="premium-status">
           <span />
-          Скоро в Noctgram
+          {me?.premium
+            ? 'Premium активен'
+            : 'Твоя индивидуальность — в деталях'}
         </span>
+        {!!state?.premium && state.expiresAt && (
+          <p className="meta">
+            До {new Date(state.expiresAt).toLocaleDateString('ru-RU')}
+          </p>
+        )}
       </div>
       <ul className="premium-features">
         {features.map(({ id, Icon, title, text, detail }) => (
@@ -124,44 +158,40 @@ export function PremiumPanel({
         ))}
       </ul>
       <div className="premium-bottom">
-        <div
-          className="premium-preview-region"
-          id="premium-profile-preview"
-          hidden={!preview}
-        >
-          {preview && (
-            <div className="premium-profile-preview">
-              <div className="premium-preview-cover">
-                <span>n.</span>
-              </div>
-              <div className="premium-preview-body">
-                <div className="premium-preview-avatar">
-                  <Avatar
-                    person={me || { name: 'Noctgram', avatar: '' }}
-                    size={64}
-                  />
-                </div>
-                <span className="badge preview-label">Предпросмотр</span>
-                <h3>
-                  {me?.name || 'Твоё имя'} <PremiumIcon size={22} />
-                </h3>
-                <span className="meta">@{me?.handle || 'yourname'}</span>
-                <p>{me?.bio || 'Твои мысли. Твоё оформление.'}</p>
-              </div>
-            </div>
-          )}
-        </div>
-        <button
-          className="primary premium-cta"
-          aria-expanded={preview}
-          aria-controls="premium-profile-preview"
-          onClick={() => setPreview((v) => !v)}
-        >
+        <button className="primary premium-cta" onClick={onDesign}>
           <PremiumIcon size={21} />
-          {preview ? 'Скрыть предпросмотр' : 'Посмотреть оформление'}
+          {me?.premium ? 'Настроить оформление' : 'Примерить оформление'}
         </button>
+        {state?.testMode && !me?.premium && (
+          <button
+            className="secondary premium-test-activate"
+            disabled={busy || !!me?.restriction}
+            onClick={async () => {
+              setBusy(true);
+              setError('');
+              try {
+                onUpdate(
+                  await request<Profile>('', { action: 'activatePremiumTest' }),
+                );
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? 'Активируем…' : 'Активировать на 30 дней бесплатно'}
+          </button>
+        )}
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
         <p className="premium-note">
-          Подписка ещё не запущена. Оформление доступно для предпросмотра.
+          {state?.testMode
+            ? 'Тестовый Premium без оплаты. Один период на аккаунт, без автопродления.'
+            : 'Платная подписка появится позже.'}
         </p>
       </div>
     </section>

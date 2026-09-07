@@ -1,4 +1,5 @@
 'use client';
+import { DisplayName } from './profile-identity';
 /* eslint-disable react/react-compiler */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, ShieldCheck, X, RefreshCw } from 'lucide-react';
@@ -426,7 +427,9 @@ export function ModerationPanel({ onChanged }: { onChanged: () => void }) {
               >
                 <Avatar person={p} size={40} />
                 <span>
-                  <strong>{p.name}</strong>
+                  <strong>
+                    <DisplayName person={p} />
+                  </strong>
                   <small>
                     @{p.handle}
                     {p.kind === 'channel' ? ' · Канал' : ''}

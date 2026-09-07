@@ -1,4 +1,5 @@
 'use client';
+import { DisplayName } from './profile-identity';
 /* Loading effects subscribe to the API; the React compiler is not enabled. */
 /* eslint-disable react/react-compiler */
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -155,7 +156,13 @@ export function StarsPanel({
               <Avatar person={t} size={38} />
             )}
             <div>
-              <strong>{t.kind === 'grant' ? 'Тестовый баланс' : t.name}</strong>
+              <strong>
+                {t.kind === 'grant' ? (
+                  'Тестовый баланс'
+                ) : (
+                  <DisplayName person={t} />
+                )}
+              </strong>
               <span>
                 {t.kind === 'grant'
                   ? 'Стартовые звёзды'
@@ -249,7 +256,9 @@ export function SupportPanel({
       }}
     >
       <Avatar person={post} size={54} />
-      <h3>{post.name}</h3>
+      <h3>
+        <DisplayName person={post} />
+      </h3>
       <p className="meta">
         За эту публикацию можно отправить ещё {num(remaining)} звёзд.
       </p>

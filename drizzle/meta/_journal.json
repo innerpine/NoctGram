@@ -57,6 +57,13 @@
       "when": 1788774407113,
       "tag": "0007_organic_slipstream",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788778725034,
+      "tag": "0008_spotty_madame_web",
+      "breakpoints": true
     }
   ]
 }
