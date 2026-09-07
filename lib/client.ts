@@ -200,5 +200,7 @@ export type Wallet = {
   testMode: boolean;
   received: number;
   sent: number;
+  topupCount: number;
+  topupTotal: number;
   transactions: StarTransaction[];
 };

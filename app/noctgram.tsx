@@ -1144,7 +1144,8 @@ export default function Noctgram() {
             ['profile', 'Профиль', UserRound],
           ].map(([id, label, Icon]) => {
             const NavIcon = Icon as typeof Home;
-            const active = page === id || (id === 'profile' && page === 'saved');
+            const active =
+              page === id || (id === 'profile' && page === 'saved');
             return (
               <button
                 key={String(id)}
@@ -1673,7 +1674,11 @@ export default function Noctgram() {
           </>
         )}
         {page === 'stars' && me && (
-          <StarsPanel me={me} onBack={() => setPage(starsReturn.current)} />
+          <StarsPanel
+            key={me.id}
+            me={me}
+            onBack={() => setPage(starsReturn.current)}
+          />
         )}
         {page === 'channels' && me && (
           <ChannelsPanel

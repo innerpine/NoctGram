@@ -16,8 +16,26 @@ import { Avatar, Empty, Stamp } from './post-card';
 import { StarScene } from './star-scene';
 import { StarsIcon } from './stars-icon';
 import { TelegramLink } from './telegram-link';
+import { StarsTopupCelebration } from './stars-topup-celebration';
+import { observeTopups, type TopupCursor } from '@/lib/stars-topup';
 import { request, type Wallet, type Profile, type Post } from '@/lib/client';
 const num = (n: number) => n.toLocaleString('ru-RU');
+function readTopupCursor(userId: string): TopupCursor | null {
+  try {
+    const cursor = JSON.parse(
+      sessionStorage.getItem('noctgram:topup-animation:' + userId) || 'null',
+    );
+    return cursor &&
+      Number.isSafeInteger(cursor.count) &&
+      cursor.count >= 0 &&
+      Number.isSafeInteger(cursor.total) &&
+      cursor.total >= 0
+      ? cursor
+      : null;
+  } catch {
+    return null;
+  }
+}
 export function StarsPanel({
   me,
   onBack,
@@ -29,12 +47,25 @@ export function StarsPanel({
     [filter, setFilter] = useState('all'),
     [loading, setLoading] = useState(false),
     [error, setError] = useState(''),
-    [more, setMore] = useState(false);
+    [more, setMore] = useState(false),
+    [celebration, setCelebration] = useState<{
+      id: string;
+      amount: number;
+    } | null>(null);
   const live = useRef(false),
-    generation = useRef(0);
+    generation = useRef(0),
+    requesting = useRef(false),
+    walletSnapshot = useRef<Wallet | null>(null),
+    topupCursor = useRef<TopupCursor | null>(null);
+  const finishCelebration = useCallback(() => setCelebration(null), []);
   const load = useCallback(
-    async (append = false, cursor?: { created: number; id: string }) => {
+    async (
+      append = false,
+      cursor?: { created: number; id: string },
+      background = false,
+    ) => {
       const gen = ++generation.current;
+      requesting.current = true;
       setLoading(true);
       setError('');
       try {
@@ -45,8 +76,41 @@ export function StarsPanel({
         }
         const next = await request<Wallet>('?' + q);
         if (live.current && gen === generation.current) {
-          setMore(next.transactions.length === 50);
-          setWallet((old) =>
+          if (!append && !document.hidden) {
+            const credit = observeTopups(
+              topupCursor.current || readTopupCursor(me.id),
+              next,
+            );
+            topupCursor.current = credit.cursor;
+            // This is only an animation acknowledgement; the server owns the balance.
+            try {
+              sessionStorage.setItem(
+                'noctgram:topup-animation:' + me.id,
+                JSON.stringify(credit.cursor),
+              );
+            } catch {
+              /* Storage can be disabled; the in-memory cursor still deduplicates. */
+            }
+            if (credit.amount > 0) {
+              setCelebration((old) => ({
+                id: credit.id,
+                amount: credit.amount + (old?.amount || 0),
+              }));
+            }
+          }
+          const old = walletSnapshot.current;
+          // A full page without overlap means we missed a history segment;
+          // restart pagination from the new head instead of skipping that gap.
+          const historyGap =
+            background &&
+            old &&
+            next.transactions.length === 50 &&
+            !next.transactions.some((t) =>
+              old.transactions.some((v) => v.id === t.id),
+            );
+          if (!background || !old || historyGap)
+            setMore(next.transactions.length === 50);
+          const updated =
             append && old
               ? {
                   ...next,
@@ -57,22 +121,42 @@ export function StarsPanel({
                     ),
                   ],
                 }
-              : next,
-          );
+              : background && old && !historyGap
+                ? {
+                    ...next,
+                    transactions: [
+                      ...next.transactions,
+                      ...old.transactions.filter(
+                        (t) => !next.transactions.some((v) => v.id === t.id),
+                      ),
+                    ],
+                  }
+                : next;
+          walletSnapshot.current = updated;
+          setWallet(updated);
         }
       } catch (e) {
-        if (live.current) setError((e as Error).message);
+        if (live.current && gen === generation.current)
+          setError((e as Error).message);
       } finally {
-        if (live.current && gen === generation.current) setLoading(false);
+        if (live.current && gen === generation.current) {
+          requesting.current = false;
+          setLoading(false);
+        }
       }
     },
-    [],
+    [me.id],
   );
   useEffect(() => {
     live.current = true;
     void load();
+    const poll = window.setInterval(() => {
+      if (!document.hidden && !requesting.current)
+        void load(false, undefined, true);
+    }, 8000);
     return () => {
       live.current = false;
+      window.clearInterval(poll);
     };
   }, [load]);
   const rows =
@@ -83,6 +167,13 @@ export function StarsPanel({
     ) || [];
   return (
     <section className="premium-page stars-page">
+      {celebration && (
+        <StarsTopupCelebration
+          key={celebration.id}
+          amount={celebration.amount}
+          onComplete={finishCelebration}
+        />
+      )}
       <div className="premium-page-controls">
         <button className="icon-button" onClick={onBack} aria-label="Назад">
           <ArrowLeft size={20} />
@@ -99,7 +190,12 @@ export function StarsPanel({
         <StarScene variant="stars" />
         <h2>Noct Stars</h2>
         <p>Поддерживай авторов и их публикации.</p>
-        <div className="stars-balance">
+        <div
+          key={celebration?.id || 'balance'}
+          className={
+            'stars-balance' + (celebration ? ' stars-balance--credited' : '')
+          }
+        >
           <StarsIcon size={30} />
           <strong>{wallet ? num(wallet.balance) : '—'}</strong>
         </div>
@@ -123,7 +219,7 @@ export function StarsPanel({
           </span>
         </div>
       </div>
-      <TelegramLink onWalletChange={() => void load()} />
+      <TelegramLink onWalletChange={() => void load(false, undefined, true)} />
       <div className="stars-history">
         <div className="row">
           <h3>История операций</h3>

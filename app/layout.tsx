@@ -11,6 +11,7 @@ import './privacy.css';
 import './realtime.css';
 import './profile-design.css';
 import './telegram-stars.css';
+import './stars-topup.css';
 import './dialog-motion.css';
 export const metadata: Metadata = {
   title: 'Noctgram — лента и диалоги',
