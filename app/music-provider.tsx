@@ -25,6 +25,7 @@ import {
   type Widget,
 } from '@/lib/soundcloud-widget';
 import { MusicPlayerView, type PlayerTrack } from './music-player-view';
+import { loadSpotifySDK, SpotifyPlayback } from '@/lib/spotify-player';
 import {
   MusicListenTracker,
   adjacentPlayable,
@@ -53,6 +54,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [sound, setSound] = useState<SoundCloudSound | null>(null);
   const [localTrack, setLocalTrack] = useState<MusicTrack | null>(null);
   const audio = useRef<HTMLAudioElement>(null);
+  const spotify = useRef<SpotifyPlayback | null>(null);
   const [playing, setPlaying] = useState(false),
     [ready, setReady] = useState(false);
   const [error, setError] = useState(''),
@@ -116,6 +118,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     generation.current++;
     widget.current?.pause();
     audio.current?.pause();
+    spotify.current?.dispose();
+    spotify.current = null;
     desired.current = null;
     soundUrl.current = '';
     clearStats();
@@ -129,8 +133,17 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setReady(false);
   }, []);
   const play = useCallback((next: MusicLink, nextQueue?: MusicLink[]) => {
-    const valid = parseMusicLink(next.url);
-    if (!valid) return;
+    const parsed = parseMusicLink(next.url);
+    if (!parsed) return;
+    const valid = {
+      ...next,
+      ...parsed,
+      playback:
+        parsed.provider === 'spotify'
+          ? next.playback ||
+            ((next as MusicTrack).audioUrl ? 'file' : 'spotify')
+          : undefined,
+    } as MusicLink;
     if (nextQueue) {
       queueRef.current = nextQueue;
       setQueue(nextQueue);
@@ -138,13 +151,28 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       queueRef.current = [valid];
       setQueue([valid]);
     }
-    if (desired.current?.url === valid.url && widget.current) {
+    if (
+      desired.current?.url === valid.url &&
+      desired.current.playback === valid.playback &&
+      widget.current
+    ) {
       widget.current.play();
       return;
     }
     if (
       desired.current?.url === valid.url &&
+      desired.current.playback === 'spotify' &&
+      valid.playback === 'spotify' &&
+      spotify.current
+    ) {
+      spotify.current.resume();
+      return;
+    }
+    if (
+      desired.current?.url === valid.url &&
       valid.provider === 'spotify' &&
+      valid.playback === 'file' &&
+      desired.current.playback === 'file' &&
       audio.current?.currentSrc
     ) {
       void audio.current
@@ -157,6 +185,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     generation.current++;
     widget.current?.pause();
     audio.current?.pause();
+    spotify.current?.dispose();
+    spotify.current = null;
     clearStats();
     soundUrl.current = '';
     desired.current = valid;
@@ -173,6 +203,80 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setPlaylistSounds([]);
     setLink(valid);
   }, []);
+  useEffect(() => {
+    const disconnected = (event: Event) => {
+      if (
+        (event as CustomEvent).detail === 'spotify' &&
+        desired.current?.playback === 'spotify'
+      )
+        stop();
+    };
+    window.addEventListener('noctgram:music-disconnect', disconnected);
+    return () =>
+      window.removeEventListener('noctgram:music-disconnect', disconnected);
+  }, [stop]);
+  useEffect(() => {
+    if (link?.provider !== 'spotify' || link.playback !== 'spotify') return;
+    clearStats();
+    setListening({ status: 'excluded', seconds: 0 });
+    let active = true;
+    let engine: SpotifyPlayback | null = null;
+    void loadSpotifySDK()
+      .then(async (sdk) => {
+        if (!active) return;
+        engine = new SpotifyPlayback(sdk, link.url, volumeRef.current / 100, {
+          ready: () => {
+            if (active) {
+              setReady(true);
+              setError('');
+            }
+          },
+          state: (state) => {
+            if (active) {
+              setPlaying(state.playing);
+              setPosition(state.position);
+              setDuration(state.duration);
+              setLocalTrack(state.track);
+              setError('');
+            }
+          },
+          error: (message) => {
+            if (active) {
+              setPlaying(false);
+              setError(message);
+            }
+          },
+          autoplayBlocked: () => {
+            if (active) {
+              setReady(true);
+              setPlaying(false);
+              setError('');
+            }
+          },
+          ended: () => {
+            if (!active) return;
+            const index = queueRef.current.findIndex(
+              (item) => item.url === link.url,
+            );
+            const next = queueRef.current
+              .slice(index + 1)
+              .find((item) => item.provider === 'spotify');
+            if (next) play({ ...next, playback: 'spotify' });
+            else engine?.repeat();
+          },
+        });
+        spotify.current = engine;
+        await engine.connect();
+      })
+      .catch((error) => {
+        if (active) setError((error as Error).message);
+      });
+    return () => {
+      active = false;
+      engine?.dispose();
+      if (spotify.current === engine) spotify.current = null;
+    };
+  }, [link, retry, play]);
   useEffect(() => {
     if (link?.provider !== 'soundcloud' || !frame.current) return;
     soundUrl.current = '';
@@ -330,7 +434,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     };
   }, [link, retry, play]);
   useEffect(() => {
-    if (link?.provider !== 'spotify' || !audio.current) return;
+    if (
+      link?.provider !== 'spotify' ||
+      link.playback !== 'file' ||
+      !audio.current
+    )
+      return;
     const element = audio.current;
     const token = ++generation.current;
     const controller = new AbortController();
@@ -471,17 +580,28 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     };
   }, [link, retry, play]);
   const queueIndex = queue.findIndex((x) => x.url === link?.url);
+  const adjacent = (direction = 1) => {
+    if (link?.playback !== 'spotify')
+      return adjacentPlayable(queue, link?.url || '', direction);
+    for (
+      let index = queueIndex + direction;
+      index >= 0 && index < queue.length;
+      index += direction
+    )
+      if (queue[index].provider === 'spotify')
+        return { ...queue[index], playback: 'spotify' as const };
+  };
   const previous = () => {
     if (link?.kind === 'playlist') widget.current?.prev();
     else {
-      const item = adjacentPlayable(queue, link?.url || '', -1);
+      const item = adjacent(-1);
       if (item) play(item);
     }
   };
   const next = () => {
     if (link?.kind === 'playlist') widget.current?.next();
     else {
-      const item = adjacentPlayable(queue, link?.url || '');
+      const item = adjacent();
       if (item) play(item);
     }
   };
@@ -558,20 +678,19 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             listening={listening}
             playerRef={playerElement}
             previousEnabled={
-              link.kind === 'playlist'
-                ? playlistIndex > 0
-                : !!adjacentPlayable(queue, link.url, -1)
+              link.kind === 'playlist' ? playlistIndex > 0 : !!adjacent(-1)
             }
             nextEnabled={
               link.kind === 'playlist'
                 ? playlistIndex + 1 < playlistLength
-                : !!adjacentPlayable(queue, link.url)
+                : !!adjacent()
             }
             onPrevious={previous}
             onNext={next}
             onSelect={select}
             onToggle={() => {
-              if (link.provider === 'spotify' && audio.current) {
+              if (link.playback === 'spotify') spotify.current?.toggle();
+              else if (link.provider === 'spotify' && audio.current) {
                 if (playing) audio.current.pause();
                 else
                   void audio.current
@@ -588,7 +707,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
               const value = Math.max(0, Math.min(ms, duration));
               tracker.current?.resetPosition();
               setPosition(value);
-              if (link.provider === 'spotify' && audio.current)
+              if (link.playback === 'spotify') spotify.current?.seek(value);
+              else if (link.provider === 'spotify' && audio.current)
                 audio.current.currentTime = value / 1000;
               else widget.current?.seekTo(value);
             }}
@@ -599,7 +719,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
               } catch {
                 /* Optional. */
               }
-              if (link.provider === 'spotify' && audio.current)
+              if (link.playback === 'spotify')
+                spotify.current?.volume(value / 100);
+              else if (link.provider === 'spotify' && audio.current)
                 audio.current.volume = value / 100;
               else widget.current?.setVolume(value);
             }}
@@ -612,9 +734,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           />
           {/* Keep one engine mounted outside the dialog: collapsing never restarts audio. */}
           {link.provider === 'spotify' ? (
-            // Lyrics, when available, are rendered in the accessible Text pane.
-            // eslint-disable-next-line jsx-a11y/media-has-caption
-            <audio ref={audio} preload="metadata" />
+            link.playback === 'file' ? (
+              // Lyrics, when available, are rendered in the accessible Text pane.
+              // eslint-disable-next-line jsx-a11y/media-has-caption
+              <audio ref={audio} preload="metadata" />
+            ) : null
           ) : (
             <iframe
               key={link.url + ':' + retry}

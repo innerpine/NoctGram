@@ -31,6 +31,7 @@ import {
 } from '@/lib/music-service-types';
 import { parseMusicLink, type MusicTrack } from '@/lib/music-links';
 import { useMusic } from './music-provider';
+import { MusicYandex } from './music-yandex';
 
 async function serviceRequest<T>(
   path: string,
@@ -149,7 +150,7 @@ export function MusicServices({
     setNext(null);
     setQuery('');
     setView('playlists');
-    if (!connected) return;
+    if (!connected || provider === 'yandex') return;
     setBusy(true);
     Promise.all([
       serviceRequest<ServicePage>(`/${provider}/playlists`),
@@ -193,6 +194,9 @@ export function MusicServices({
     setError('');
     try {
       await serviceRequest(`/${provider}/disconnect`, {});
+      window.dispatchEvent(
+        new CustomEvent('noctgram:music-disconnect', { detail: provider }),
+      );
       setNotice('Подключение и импортированные плейлисты удалены из Noctgram.');
       await refresh();
     } catch (e) {
@@ -308,314 +312,348 @@ export function MusicServices({
           {notice}
         </output>
       )}
-      <section className="service-connection-card">
-        <div className="service-card-top">
-          <span>{name}</span>
-          <span className={'service-state ' + (connected ? 'connected' : '')}>
-            {loading
-              ? 'Проверяем…'
-              : connected
-                ? 'Подключён'
-                : current?.status === 'expired'
-                  ? 'Нужен повторный вход'
-                  : 'Не подключён'}
-          </span>
-        </div>
-        {connected ? (
-          <div className="service-connected">
-            <ServiceMark provider={provider} size={38} />
-            <div>
-              <h3>{current.displayName}</h3>
-              {current.profileUrl && (
-                <a
-                  href={current.profileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Профиль в {name} <ArrowUpRight size={14} />
-                </a>
-              )}
+      {provider === 'yandex' ? (
+        <MusicYandex signedIn={signedIn} readOnly={readOnly} />
+      ) : (
+        <>
+          <section className="service-connection-card">
+            <div className="service-card-top">
+              <span>{name}</span>
+              <span
+                className={'service-state ' + (connected ? 'connected' : '')}
+              >
+                {loading
+                  ? 'Проверяем…'
+                  : connected
+                    ? 'Подключён'
+                    : current?.status === 'expired'
+                      ? 'Нужен повторный вход'
+                      : 'Не подключён'}
+              </span>
             </div>
-            <button
-              className="secondary"
-              onClick={() => void disconnect()}
-              disabled={busy}
-            >
-              <LogOut size={16} />
-              Отключить
-            </button>
-          </div>
-        ) : (
-          <div className="service-login">
-            <ServiceMark provider={provider} size={46} />
-            <h3>Войти через {name}</h3>
-            <p>
-              {provider === 'spotify'
-                ? 'Ваши плейлисты из Spotify — в личной коллекции.'
-                : 'Подключите аккаунт для доступа к своим плейлистам.'}
-            </p>
-            {!signedIn ? (
-              <Link href="/login" className="primary">
-                Сначала войти в Noctgram <ChevronRight size={16} />
-              </Link>
-            ) : (
-              <button
-                className="primary service-login-button"
-                onClick={() => void connect()}
-                disabled={busy || loading || readOnly || !current?.configured}
-              >
-                {busy ? (
-                  <LoaderCircle className="spin" size={17} />
-                ) : (
-                  <Link2 size={17} />
-                )}
-                {current?.status === 'expired'
-                  ? 'Подключить заново'
-                  : 'Подключить ' + name}
-                <ArrowUpRight size={16} />
-              </button>
-            )}
-            {signedIn && !loading && !current?.configured && (
-              <p className="service-setup-note">
-                {supported
-                  ? 'Вход через этот сервис ещё не настроен владельцем Noctgram.'
-                  : 'Подключение этого сервиса пока недоступно.'}
-              </p>
-            )}
-            {current?.displayName && (
-              <button
-                className="secondary"
-                disabled={busy}
-                onClick={() => void disconnect()}
-              >
-                <LogOut size={16} />
-                Удалить сохранённое подключение
-              </button>
-            )}
-          </div>
-        )}
-        <p className="service-privacy">
-          <ShieldCheck size={15} />
-          Плейлисты из аккаунта видны только вам. Подключение можно отключить в
-          любое время.
-        </p>
-      </section>
-      <section className="service-capabilities">
-        <h3>Возможности подключения</h3>
-        <div>
-          {[
-            [
-              'Вход в аккаунт',
-              supported ? 'После подключения' : 'Недоступно',
-              ShieldCheck,
-            ],
-            [
-              'Ваши плейлисты',
-              supported ? 'После подключения' : 'Недоступно',
-              Library,
-            ],
-            [
-              'Поиск треков',
-              provider === 'soundcloud' ? 'После подключения' : 'Недоступно',
-              Search,
-            ],
-            [
-              'Воспроизведение',
-              provider === 'soundcloud' ? 'В Noctgram' : 'В самом сервисе',
-              Play,
-            ],
-          ].map(([label, state, Icon]) => {
-            const Mark = Icon as typeof Play;
-            return (
-              <div className="service-capability" key={String(label)}>
-                <Mark size={17} />
-                <span>{String(label)}</span>
-                <small>
-                  {connected && state === 'После подключения'
-                    ? 'Доступно'
-                    : String(state)}
-                </small>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-      {connected && (
-        <section className="service-library">
-          <div className="service-library-heading">
-            <h3>Музыка из {name}</h3>
-            <button
-              className="icon-button"
-              aria-label="Проверить подключение"
-              disabled={busy}
-              onClick={() => void refresh()}
-            >
-              <RefreshCw size={16} />
-            </button>
-          </div>
-          <Tabs value={view} onValueChange={(v) => setView(String(v))}>
-            <TabsList>
-              <TabsTrigger value="playlists">Мои плейлисты</TabsTrigger>
-              <TabsTrigger value="imports">
-                Импортировано · {imports.length}
-              </TabsTrigger>
-              {provider === 'soundcloud' && (
-                <TabsTrigger value="search">Поиск</TabsTrigger>
-              )}
-            </TabsList>
-          </Tabs>
-          {view === 'search' ? (
-            <>
-              <form
-                className="service-search"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void search();
-                }}
-              >
-                <input
-                  aria-label="Найти трек в SoundCloud"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Трек или исполнитель"
-                  maxLength={150}
-                />
-                <button className="primary" disabled={busy || !query.trim()}>
-                  <Search size={17} />
-                  Найти
+            {connected ? (
+              <div className="service-connected">
+                <ServiceMark provider={provider} size={38} />
+                <div>
+                  <h3>{current.displayName}</h3>
+                  {current.profileUrl && (
+                    <a
+                      href={current.profileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Профиль в {name} <ArrowUpRight size={14} />
+                    </a>
+                  )}
+                </div>
+                <button
+                  className="secondary"
+                  onClick={() => void disconnect()}
+                  disabled={busy}
+                >
+                  <LogOut size={16} />
+                  Отключить
                 </button>
-              </form>
-              {tracks.map((track) => (
-                <div className="service-playlist-row" key={track.id}>
+                {provider === 'spotify' && (
                   <button
-                    className="service-artwork"
-                    aria-label={'Слушать ' + track.title}
-                    onClick={() => music?.play(track, tracks)}
+                    className="secondary"
+                    disabled={busy || readOnly}
+                    onClick={() => void connect()}
                   >
-                    {track.artwork ? (
-                      <img src={track.artwork} alt="" />
-                    ) : (
-                      <Play size={19} />
-                    )}
+                    Обновить разрешения плеера
                   </button>
-                  <div>
-                    <strong>{track.title}</strong>
+                )}
+              </div>
+            ) : (
+              <div className="service-login">
+                <ServiceMark provider={provider} size={46} />
+                <h3>Войти через {name}</h3>
+                <p>
+                  {provider === 'spotify'
+                    ? 'Ваши плейлисты и воспроизведение в Noctgram. Для музыки нужен Spotify Premium на вашем аккаунте.'
+                    : 'Подключите аккаунт для доступа к своим плейлистам.'}
+                </p>
+                {!signedIn ? (
+                  <Link href="/login" className="primary">
+                    Сначала войти в Noctgram <ChevronRight size={16} />
+                  </Link>
+                ) : (
+                  <button
+                    className="primary service-login-button"
+                    onClick={() => void connect()}
+                    disabled={
+                      busy || loading || readOnly || !current?.configured
+                    }
+                  >
+                    {busy ? (
+                      <LoaderCircle className="spin" size={17} />
+                    ) : (
+                      <Link2 size={17} />
+                    )}
+                    {current?.status === 'expired'
+                      ? 'Подключить заново'
+                      : 'Подключить ' + name}
+                    <ArrowUpRight size={16} />
+                  </button>
+                )}
+                {signedIn && !loading && !current?.configured && (
+                  <p className="service-setup-note">
+                    {supported
+                      ? 'Вход через этот сервис ещё не настроен владельцем Noctgram.'
+                      : 'Подключение этого сервиса пока недоступно.'}
+                  </p>
+                )}
+                {current?.displayName && (
+                  <button
+                    className="secondary"
+                    disabled={busy}
+                    onClick={() => void disconnect()}
+                  >
+                    <LogOut size={16} />
+                    Удалить сохранённое подключение
+                  </button>
+                )}
+              </div>
+            )}
+            <p className="service-privacy">
+              <ShieldCheck size={15} />
+              Плейлисты из аккаунта видны только вам. Подключение можно
+              отключить в любое время.
+            </p>
+          </section>
+          <section className="service-capabilities">
+            <h3>Возможности подключения</h3>
+            <div>
+              {[
+                [
+                  'Вход в аккаунт',
+                  supported ? 'После подключения' : 'Недоступно',
+                  ShieldCheck,
+                ],
+                [
+                  'Ваши плейлисты',
+                  supported ? 'После подключения' : 'Недоступно',
+                  Library,
+                ],
+                [
+                  'Поиск треков',
+                  provider === 'soundcloud'
+                    ? 'После подключения'
+                    : 'Недоступно',
+                  Search,
+                ],
+                [
+                  'Воспроизведение',
+                  provider === 'soundcloud'
+                    ? 'В Noctgram'
+                    : provider === 'spotify'
+                      ? 'В Noctgram · Premium'
+                      : 'В самом сервисе',
+                  Play,
+                ],
+              ].map(([label, state, Icon]) => {
+                const Mark = Icon as typeof Play;
+                return (
+                  <div className="service-capability" key={String(label)}>
+                    <Mark size={17} />
+                    <span>{String(label)}</span>
                     <small>
-                      {track.artist} ·{' '}
-                      <a
-                        className="music-source"
-                        href={track.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        SoundCloud
-                      </a>
+                      {connected && state === 'После подключения'
+                        ? 'Доступно'
+                        : String(state)}
                     </small>
                   </div>
-                </div>
-              ))}
-            </>
-          ) : (
-            <>
-              {rows.map((p) => (
-                <div className="service-playlist-row" key={p.id}>
-                  <span className="service-artwork">
-                    {p.artwork ? (
-                      <img src={p.artwork} alt="" loading="lazy" />
-                    ) : (
-                      <Library size={22} />
-                    )}
-                  </span>
-                  <div>
-                    <strong>{p.title}</strong>
-                    <small>
-                      {p.trackCount} треков ·{' '}
-                      {provider === 'soundcloud' ? (
+                );
+              })}
+            </div>
+          </section>
+          {connected && (
+            <section className="service-library">
+              <div className="service-library-heading">
+                <h3>Музыка из {name}</h3>
+                <button
+                  className="icon-button"
+                  aria-label="Проверить подключение"
+                  disabled={busy}
+                  onClick={() => void refresh()}
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </div>
+              <Tabs value={view} onValueChange={(v) => setView(String(v))}>
+                <TabsList>
+                  <TabsTrigger value="playlists">Мои плейлисты</TabsTrigger>
+                  <TabsTrigger value="imports">
+                    Импортировано · {imports.length}
+                  </TabsTrigger>
+                  {provider === 'soundcloud' && (
+                    <TabsTrigger value="search">Поиск</TabsTrigger>
+                  )}
+                </TabsList>
+              </Tabs>
+              {view === 'search' ? (
+                <>
+                  <form
+                    className="service-search"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void search();
+                    }}
+                  >
+                    <input
+                      aria-label="Найти трек в SoundCloud"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Трек или исполнитель"
+                      maxLength={150}
+                    />
+                    <button
+                      className="primary"
+                      disabled={busy || !query.trim()}
+                    >
+                      <Search size={17} />
+                      Найти
+                    </button>
+                  </form>
+                  {tracks.map((track) => (
+                    <div className="service-playlist-row" key={track.id}>
+                      <button
+                        className="service-artwork"
+                        aria-label={'Слушать ' + track.title}
+                        onClick={() => music?.play(track, tracks)}
+                      >
+                        {track.artwork ? (
+                          <img src={track.artwork} alt="" />
+                        ) : (
+                          <Play size={19} />
+                        )}
+                      </button>
+                      <div>
+                        <strong>{track.title}</strong>
+                        <small>
+                          {track.artist} ·{' '}
+                          <a
+                            className="music-source"
+                            href={track.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            SoundCloud
+                          </a>
+                        </small>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {rows.map((p) => (
+                    <div className="service-playlist-row" key={p.id}>
+                      <span className="service-artwork">
+                        {p.artwork ? (
+                          <img src={p.artwork} alt="" loading="lazy" />
+                        ) : (
+                          <Library size={22} />
+                        )}
+                      </span>
+                      <div>
+                        <strong>{p.title}</strong>
+                        <small>
+                          {p.trackCount} треков ·{' '}
+                          {provider === 'soundcloud' ? (
+                            <a
+                              className="music-source"
+                              href={p.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              SoundCloud
+                            </a>
+                          ) : (
+                            name
+                          )}
+                        </small>
+                      </div>
+                      {p.playable && (
+                        <button
+                          className="icon-button"
+                          aria-label={'Слушать ' + p.title}
+                          onClick={() => {
+                            const link = parseMusicLink(p.url);
+                            if (link) music?.play(link);
+                          }}
+                        >
+                          <Play size={17} />
+                        </button>
+                      )}
+                      {provider !== 'soundcloud' && (
                         <a
-                          className="music-source"
                           href={p.url}
                           target="_blank"
                           rel="noopener noreferrer"
+                          aria-label={'Открыть плейлист в ' + name}
                         >
-                          SoundCloud
+                          <ArrowUpRight size={18} />
                         </a>
-                      ) : (
-                        name
                       )}
-                    </small>
-                  </div>
-                  {p.playable && (
+                      {view === 'playlists' && (
+                        <button
+                          className="secondary service-import-button"
+                          disabled={busy || readOnly || p.imported}
+                          onClick={() => void importPlaylist(p)}
+                        >
+                          {p.imported ? (
+                            <Check size={16} />
+                          ) : (
+                            <Library size={16} />
+                          )}
+                          {p.imported ? 'Добавлен' : 'Импорт'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {next && view === 'playlists' && (
                     <button
-                      className="icon-button"
-                      aria-label={'Слушать ' + p.title}
-                      onClick={() => {
-                        const link = parseMusicLink(p.url);
-                        if (link) music?.play(link);
-                      }}
+                      className="secondary load-more"
+                      onClick={() => void loadMore()}
+                      disabled={busy}
                     >
-                      <Play size={17} />
+                      Загрузить ещё
                     </button>
                   )}
-                  {provider !== 'soundcloud' && (
-                    <a
-                      href={p.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={'Открыть плейлист в ' + name}
-                    >
-                      <ArrowUpRight size={18} />
-                    </a>
+                  {!rows.length && !busy && (
+                    <div className="music-empty">
+                      <Library size={27} />
+                      <p>
+                        {view === 'imports'
+                          ? 'Выберите плейлист и нажмите «Импорт».'
+                          : 'В этом аккаунте пока нет доступных плейлистов.'}
+                      </p>
+                    </div>
                   )}
-                  {view === 'playlists' && (
-                    <button
-                      className="secondary service-import-button"
-                      disabled={busy || readOnly || p.imported}
-                      onClick={() => void importPlaylist(p)}
-                    >
-                      {p.imported ? <Check size={16} /> : <Library size={16} />}
-                      {p.imported ? 'Добавлен' : 'Импорт'}
-                    </button>
-                  )}
-                </div>
-              ))}
-              {next && view === 'playlists' && (
-                <button
-                  className="secondary load-more"
-                  onClick={() => void loadMore()}
-                  disabled={busy}
-                >
-                  Загрузить ещё
-                </button>
+                </>
               )}
-              {!rows.length && !busy && (
-                <div className="music-empty">
-                  <Library size={27} />
-                  <p>
-                    {view === 'imports'
-                      ? 'Выберите плейлист и нажмите «Импорт».'
-                      : 'В этом аккаунте пока нет доступных плейлистов.'}
-                  </p>
-                </div>
+              {busy && (
+                <output className="service-loading">
+                  <LoaderCircle className="spin" size={18} />
+                  Загружаем…
+                </output>
               )}
-            </>
+              <p className="service-library-note">
+                Импорт сохраняет плейлист в личной коллекции Noctgram. Состав и
+                аудио остаются в {name}.
+                {provider === 'spotify' &&
+                  ' Отдельные треки можно добавить по ссылке и слушать в плеере Noctgram с Premium.'}
+              </p>
+            </section>
           )}
-          {busy && (
-            <output className="service-loading">
-              <LoaderCircle className="spin" size={18} />
-              Загружаем…
-            </output>
-          )}
-          <p className="service-library-note">
-            Импорт сохраняет плейлист в личной коллекции Noctgram. Состав и
-            аудио остаются в {name}.
-            {provider === 'spotify' && ' Прослушивание открывается в Spotify.'}
-          </p>
-        </section>
+          <div className="service-footer">
+            <Unplug size={15} />
+            Пароль музыкального аккаунта вводится только на странице самого
+            сервиса.
+          </div>
+        </>
       )}
-      <div className="service-footer">
-        <Unplug size={15} />
-        Пароль музыкального аккаунта вводится только на странице самого сервиса.
-      </div>
     </div>
   );
 }

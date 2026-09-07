@@ -2,6 +2,7 @@ export type MusicLink = {
   url: string;
   kind: 'track' | 'playlist';
   provider: 'soundcloud' | 'spotify';
+  playback?: 'file' | 'spotify';
 };
 export type MusicTrack = MusicLink & {
   id: string;

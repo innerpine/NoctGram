@@ -24,6 +24,7 @@ import {
 } from '@/lib/music-links';
 import { useMusic } from './music-provider';
 import { MusicAudioUpload } from './music-audio-upload';
+import { MusicSearch } from './music-search';
 import { Avatar } from './post-card';
 import type { Person } from '@/lib/client';
 
@@ -175,7 +176,6 @@ export function MusicPanel({
             <button
               className="music-track-play"
               aria-label={'Слушать ' + track.title}
-              disabled={track.provider === 'spotify' && !track.audioUrl}
               onClick={() => music?.play(track, tracks)}
             >
               {track.artwork ? (
@@ -188,10 +188,7 @@ export function MusicPanel({
               </span>
             </button>
             <div className="music-track-text">
-              <button
-                disabled={track.provider === 'spotify' && !track.audioUrl}
-                onClick={() => music?.play(track, tracks)}
-              >
+              <button onClick={() => music?.play(track, tracks)}>
                 {track.title}
               </button>
               <span className="music-track-artist">{track.artist}</span>
@@ -208,8 +205,18 @@ export function MusicPanel({
                 <small className="music-audio-caption">
                   {track.audioUrl
                     ? 'Ваш аудиофайл'
-                    : 'Добавьте файл для прослушивания'}
+                    : 'Прослушивание с Spotify Premium'}
                 </small>
+              )}
+              {track.provider === 'spotify' && track.audioUrl && (
+                <button
+                  className="music-source"
+                  onClick={() =>
+                    music?.play({ ...track, playback: 'spotify' }, tracks)
+                  }
+                >
+                  Слушать через Spotify Premium
+                </button>
               )}
             </div>
             {ranked && (
@@ -308,11 +315,16 @@ export function MusicPanel({
         </form>
         <p>
           SoundCloud — прослушивание по ссылке и публикация в открытиях. Spotify
-          — название, исполнитель и обложка в вашей коллекции. Добавьте свой
-          аудиофайл, чтобы слушать без Premium: MP3, WAV, OGG или FLAC до 25 МБ.
-          Файл доступен только вам.
+          — прослушивание в нашем плеере с подключённым аккаунтом Premium. Также
+          можно прикрепить собственный аудиофайл в «Моей музыке».
         </p>
       </section>
+      <MusicSearch
+        signedIn={signedIn}
+        readOnly={readOnly}
+        savedUrls={(data?.library || []).map((track) => track.url)}
+        onSaved={() => void refresh()}
+      />
       {error && (
         <p className="music-error" role="alert">
           {error}

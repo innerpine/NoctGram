@@ -8,6 +8,7 @@ import {
   authCookie,
 } from './auth-session';
 import { assertWritable } from './account-access';
+import { yandexStatus } from './yandex-music';
 import { parseMusicLink } from './music-links';
 import {
   MUSIC_SERVICES,
@@ -25,7 +26,10 @@ type Tokens = {
   access_token: string;
   refresh_token: string;
   expires_in: number;
+  scope?: string;
 };
+export const SPOTIFY_PLAYBACK_SCOPES =
+  'streaming user-read-email user-read-private user-modify-playback-state';
 type Connection = {
   userId: string;
   provider: OAuthMusicService;
@@ -151,6 +155,7 @@ async function exchange(
   provider: OAuthMusicService,
   fields: Record<string, string>,
   previousRefresh = '',
+  previousScope = '',
 ): Promise<Tokens> {
   const c = config(provider);
   const data = await requestJSON(endpoints[provider].token, {
@@ -179,6 +184,7 @@ async function exchange(
     access_token: access,
     refresh_token: refresh,
     expires_in: Math.min(data.expires_in, 86400),
+    scope: text(data.scope, 2000) || previousScope,
   };
 }
 const authHeaders = (provider: OAuthMusicService, access: string) => ({
@@ -210,6 +216,7 @@ async function connection(user: string, provider: OAuthMusicService) {
 export async function musicServiceStatus(
   user: string,
 ): Promise<ServiceStatus[]> {
+  const yandex = await yandexStatus(user);
   const rows = await db()
     .prepare(
       'SELECT provider,displayName,profileUrl,status FROM music_connections WHERE userId=?',
@@ -217,6 +224,7 @@ export async function musicServiceStatus(
     .bind(user)
     .all<Connection>();
   return MUSIC_SERVICES.map((provider) => {
+    if (provider === 'yandex') return yandex;
     if (provider !== 'soundcloud' && provider !== 'spotify')
       return { provider, configured: false, status: 'unavailable' };
     const row = rows.results.find((r) => r.provider === provider),
@@ -285,7 +293,11 @@ export async function connectMusic(
     code_challenge: await musicPKCE(verifier),
     code_challenge_method: 'S256',
     ...(provider === 'spotify'
-      ? { scope: 'playlist-read-private playlist-read-collaborative' }
+      ? {
+          scope:
+            'playlist-read-private playlist-read-collaborative ' +
+            SPOTIFY_PLAYBACK_SCOPES,
+        }
       : {}),
   }).toString();
   return Response.json(
@@ -448,7 +460,12 @@ async function access(user: string, provider: OAuthMusicService) {
     tokenContext(user, provider),
   );
   if (row.expiresAt > Date.now() + 60000)
-    return { access: tokens.access_token, connectionId: row.id };
+    return {
+      access: tokens.access_token,
+      connectionId: row.id,
+      scope: tokens.scope || '',
+      expiresAt: row.expiresAt,
+    };
   const lease = randomToken();
   const claimed = await db()
     .prepare(
@@ -466,6 +483,7 @@ async function access(user: string, provider: OAuthMusicService) {
       provider,
       { grant_type: 'refresh_token', refresh_token: tokens.refresh_token },
       provider === 'spotify' ? tokens.refresh_token : '',
+      tokens.scope,
     );
     const updated = await db()
       .prepare(
@@ -487,7 +505,12 @@ async function access(user: string, provider: OAuthMusicService) {
       .first();
     if (!updated)
       throw new ApiError(409, 'Подключение изменилось. Обновите страницу.');
-    return { access: next.access_token, connectionId: row.id };
+    return {
+      access: next.access_token,
+      connectionId: row.id,
+      scope: next.scope || '',
+      expiresAt: Date.now() + next.expires_in * 1000,
+    };
   } catch (error) {
     // A timeout may have consumed a single-use refresh token. Never blindly retry it.
     await db()
@@ -554,7 +577,7 @@ function playlist(
   )
     return null;
   const images = Array.isArray(raw.images) ? (raw.images as Data[]) : [];
-  const tracks = raw.tracks as Data | undefined;
+  const tracks = (raw.items || raw.tracks) as Data | undefined;
   const count = provider === 'soundcloud' ? raw.track_count : tracks?.total;
   return {
     id,
@@ -725,13 +748,20 @@ export async function searchServiceTracks(
         q: query.trim(),
         limit: '20',
         linked_partitioning: 'true',
-        access: 'playable,preview',
+        access: 'playable',
       }),
   );
   const collection = Array.isArray(data.collection)
     ? (data.collection as Data[])
     : [];
   return collection.flatMap((row) => {
+    if (
+      row.access === 'preview' ||
+      row.access === 'blocked' ||
+      row.sharing === 'private' ||
+      row.streamable === false
+    )
+      return [];
     const link = parseMusicLink(row.permalink_url),
       author = row.user as Data | undefined;
     return link?.provider === 'soundcloud' && link.kind === 'track'
@@ -743,6 +773,10 @@ export async function searchServiceTracks(
             artist: text(author?.username),
             artwork: artwork(row.artwork_url),
             authorUrl: profileURL(provider, author?.permalink_url),
+            durationMs:
+              typeof row.duration === 'number' && Number.isFinite(row.duration)
+                ? Math.max(0, row.duration)
+                : undefined,
           },
         ]
       : [];
@@ -765,4 +799,24 @@ export async function disconnectMusic(
       .bind(user, provider),
   ]);
   return { ok: true };
+}
+
+// Only the short-lived SDK credential leaves the server; refresh tokens remain sealed.
+export async function spotifyPlaybackToken(user: string) {
+  const auth = await access(user, 'spotify');
+  if (
+    !SPOTIFY_PLAYBACK_SCOPES.split(' ').every((scope) =>
+      auth.scope.split(' ').includes(scope),
+    )
+  )
+    throw new ApiError(
+      409,
+      'Переподключите Spotify в сервисах, чтобы разрешить воспроизведение.',
+      'MUSIC_RECONNECT',
+    );
+  const current = await connection(user, 'spotify');
+  if (current.id !== auth.connectionId || current.status !== 'connected')
+    throw new ApiError(409, 'Подключение изменилось. Войдите заново.');
+  // The SDK verifies Premium. GET /me no longer exposes product in development mode.
+  return { accessToken: auth.access, expiresAt: auth.expiresAt };
 }

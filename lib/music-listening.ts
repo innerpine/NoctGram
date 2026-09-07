@@ -1,7 +1,14 @@
 import type { MusicLink, MusicTrack } from './music-links';
 
 export type ListenState = {
-  status: 'idle' | 'checking' | 'off' | 'tracking' | 'counted' | 'error';
+  status:
+    | 'idle'
+    | 'checking'
+    | 'off'
+    | 'tracking'
+    | 'counted'
+    | 'error'
+    | 'excluded';
   seconds: number;
 };
 type Reply = { session?: string | null; counted?: boolean };

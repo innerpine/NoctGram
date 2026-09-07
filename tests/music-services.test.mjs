@@ -57,7 +57,7 @@ globalThis.__musicFixture = {
 const result = await build({
   stdin: {
     contents:
-      "export * from './lib/music-services'; export * from './lib/music-token-crypto';",
+      "export * from './lib/music-services'; export * from './lib/music-token-crypto'; export * from './lib/yandex-music';",
     resolveDir: new URL('..', import.meta.url).pathname.replace(
       /^\/([A-Z]:)/,
       '$1',
@@ -179,6 +179,10 @@ globalThis.fetch = async (input, init) => {
       access_token: 'access-' + tokensIssued,
       refresh_token: 'refresh-' + tokensIssued,
       expires_in: 3600,
+      ...(target.includes('spotify') &&
+      body.get('grant_type') !== 'refresh_token'
+        ? { scope: service.SPOTIFY_PLAYBACK_SCOPES }
+        : {}),
     });
   }
   assert.match(init.headers.Authorization, /^(OAuth|Bearer) access-/);
@@ -188,6 +192,30 @@ globalThis.fetch = async (input, init) => {
       username: 'QA Owner',
       permalink_url: 'https://soundcloud.com/qa-owner',
     });
+  if (target.startsWith('https://api.soundcloud.com/tracks?')) {
+    const query = new URL(target).searchParams;
+    assert.equal(query.get('q'), 'vendetta');
+    assert.equal(query.get('access'), 'playable');
+    const track = {
+      id: 12,
+      title: 'Vendetta!',
+      duration: 107000,
+      access: 'playable',
+      permalink_url: 'https://soundcloud.com/sadfriendd/vendetta',
+      user: {
+        username: 'Sadfriendd',
+        permalink_url: 'https://soundcloud.com/sadfriendd',
+      },
+    };
+    return Response.json({
+      collection: [
+        track,
+        { ...track, access: 'preview' },
+        { ...track, sharing: 'private' },
+        { ...track, permalink_url: 'https://evil.example/track' },
+      ],
+    });
+  }
   if (target === 'https://api.spotify.com/v1/me')
     return Response.json({
       id: 'qa-spotify',
@@ -202,7 +230,7 @@ globalThis.fetch = async (input, init) => {
     id: 'abc123',
     name: 'Spotify personal',
     external_urls: { spotify: 'https://open.spotify.com/playlist/abc123' },
-    tracks: { total: 4 },
+    items: { total: 4 },
   };
   if (target.startsWith('https://api.spotify.com/v1/me/playlists'))
     return Response.json({ items: [spPlaylist], next: null });
@@ -274,6 +302,21 @@ try {
     'disconnected',
   );
   const page = await service.servicePlaylists('alice', provider, '');
+  const searched = await service.searchServiceTracks(
+    'alice',
+    provider,
+    ' vendetta ',
+  );
+  assert.equal(searched.length, 1);
+  assert.equal(searched[0].durationMs, 107000);
+  await assert.rejects(
+    service.searchServiceTracks('bob', provider, 'vendetta'),
+    (error) => error.code === 'MUSIC_NOT_CONNECTED',
+  );
+  await assert.rejects(
+    service.searchServiceTracks('alice', provider, 'x'.repeat(151)),
+    (error) => error.status === 400,
+  );
   assert.equal(page.items[0].playable, false);
   assert.ok(page.next && !page.next.includes('api.soundcloud.com'));
   await service.servicePlaylists('alice', provider, page.next);
@@ -331,11 +374,164 @@ try {
   );
   const sp = await service.servicePlaylists('alice', 'spotify', '');
   assert.equal(sp.items[0].playable, false);
+  assert.equal(sp.items[0].trackCount, 4, '2026 Spotify playlist items field');
+  const playbackToken = await service.spotifyPlaybackToken('alice');
+  assert.ok(playbackToken.accessToken.startsWith('access-'));
+  assert.deepEqual(Object.keys(playbackToken).sort(), [
+    'accessToken',
+    'expiresAt',
+  ]);
+  await assert.rejects(
+    service.spotifyPlaybackToken('bob'),
+    (e) => e.code === 'MUSIC_NOT_CONNECTED',
+  );
+  const spotifyRow = sqlite
+    .prepare(
+      "SELECT * FROM music_connections WHERE userId='alice' AND provider='spotify'",
+    )
+    .get();
+  const oldTokens = await service.openMusicToken(
+    spotifyRow.sealedTokens,
+    settings.MUSIC_TOKEN_KEY,
+    JSON.stringify(['music', 'alice', 'spotify']),
+  );
+  const oldSealed = await service.sealMusicToken(
+    { ...oldTokens, scope: 'playlist-read-private' },
+    settings.MUSIC_TOKEN_KEY,
+    JSON.stringify(['music', 'alice', 'spotify']),
+  );
+  sqlite
+    .prepare(
+      "UPDATE music_connections SET sealedTokens=? WHERE userId='alice' AND provider='spotify'",
+    )
+    .run(oldSealed);
+  await assert.rejects(
+    service.spotifyPlaybackToken('alice'),
+    (e) => e.code === 'MUSIC_RECONNECT',
+  );
+  sqlite
+    .prepare(
+      "UPDATE music_connections SET sealedTokens=?,expiresAt=0 WHERE userId='alice' AND provider='spotify'",
+    )
+    .run(spotifyRow.sealedTokens);
+  assert.ok(
+    (await service.spotifyPlaybackToken('alice')).expiresAt > Date.now(),
+  );
   await service.importServicePlaylist('alice', 'spotify', 'abc123');
   await service.disconnectMusic('alice', 'spotify');
   assert.equal((await service.importedPlaylists('alice', 'spotify')).length, 0);
+  await assert.rejects(
+    service.spotifyPlaybackToken('alice'),
+    (e) => e.code === 'MUSIC_NOT_CONNECTED',
+  );
+  let yandexList = [
+    {
+      kind: 3,
+      title: 'Personal',
+      trackCount: 1,
+      owner: { uid: 123 },
+      cover: { uri: 'avatars.yandex.net/get-music-content/1/%%' },
+    },
+  ];
+  let pauseYandex = null;
+  let unauthorized = false;
+  globalThis.fetch = async (url, init) => {
+    assert.ok(url.startsWith('https://api.music.yandex.net/'));
+    assert.equal(init.headers.Authorization, 'OAuth own-yandex-token-test');
+    assert.equal(init.redirect, 'manual');
+    if (pauseYandex) {
+      const callback = pauseYandex;
+      pauseYandex = null;
+      await callback();
+    }
+    if (unauthorized) return new Response(null, { status: 401 });
+    if (url.endsWith('/account/status'))
+      return Response.json({
+        result: { account: { uid: 123, displayName: 'Yandex Owner' } },
+      });
+    if (url.endsWith('/users/123/playlists/list'))
+      return Response.json({ result: yandexList });
+    if (url.endsWith('/users/123/playlists/3'))
+      return Response.json({
+        result: {
+          kind: 3,
+          tracks: [
+            {
+              track: {
+                id: 42,
+                title: 'Recording',
+                artists: [{ name: 'Artist' }],
+                durationMs: 107000,
+              },
+            },
+          ],
+        },
+      });
+    throw new Error('Unexpected Yandex path');
+  };
+  await assert.rejects(
+    service.connectYandex('alice', 'bad\r\ntoken'),
+    (e) => e.status === 400,
+  );
+  await service.connectYandex('alice', 'own-yandex-token-test');
+  assert.equal((await service.yandexStatus('alice')).status, 'connected');
+  assert.equal(
+    (await service.musicServiceStatus('alice')).find(
+      (x) => x.provider === 'yandex',
+    ).status,
+    'connected',
+  );
+  assert.ok(
+    !JSON.stringify(
+      sqlite
+        .prepare("SELECT * FROM music_connections WHERE provider='yandex'")
+        .get(),
+    ).includes('own-yandex-token-test'),
+  );
+  await service.syncYandex('alice');
+  assert.equal((await service.yandexPlaylists('alice')).length, 1);
+  assert.equal((await service.yandexPlaylists('bob')).length, 0);
+  assert.equal(
+    (await service.yandexTracks('alice', '3')).items[0].title,
+    'Recording',
+  );
+  await assert.rejects(
+    service.yandexTracks('bob', '3'),
+    (e) => e.code === 'MUSIC_NOT_CONNECTED',
+  );
+  await assert.rejects(
+    service.yandexTracks('alice', '../account/status'),
+    (e) => e.status === 400,
+  );
+  for (const bad of [
+    'https://evil.example/cover',
+    'https://avatars.yandex.net.evil.example/cover',
+    'https://token@avatars.yandex.net/cover',
+  ])
+    assert.equal(service.yandexArtwork(bad), '');
+  yandexList = [];
+  await service.syncYandex('alice');
+  assert.equal(
+    (await service.yandexPlaylists('alice')).length,
+    0,
+    'Deleted playlists disappear on sync',
+  );
+  unauthorized = true;
+  await assert.rejects(
+    service.syncYandex('alice'),
+    (e) => e.code === 'MUSIC_RECONNECT',
+  );
+  assert.equal((await service.yandexStatus('alice')).status, 'expired');
+  unauthorized = false;
+  await service.connectYandex('alice', 'own-yandex-token-test');
+  pauseYandex = () => service.disconnectYandex('alice');
+  await assert.rejects(service.syncYandex('alice'));
+  assert.equal((await service.yandexPlaylists('alice')).length, 0);
+  pauseYandex = () => service.disconnectYandex('alice');
+  await assert.rejects(service.connectYandex('alice', 'own-yandex-token-test'));
+  assert.equal((await service.yandexStatus('alice')).status, 'disconnected');
   console.log(
-    'Music services passed: PKCE, encrypted tokens, state replay/browser/user binding, private import, signed pagination, single refresh, disconnect races, and Spotify metadata-only behavior.',
+    'Music services passed: PKCE, encrypted tokens, private imports, refresh/disconnect races, Spotify SDK scopes/tokens and experimental Yandex playlist sync.',
   );
 } finally {
   globalThis.fetch = realFetch;

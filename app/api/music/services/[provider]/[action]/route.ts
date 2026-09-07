@@ -10,6 +10,7 @@ import {
   importedPlaylists,
   importServicePlaylist,
   searchServiceTracks,
+  spotifyPlaybackToken,
 } from '@/lib/music-services';
 export const dynamic = 'force-dynamic';
 type Params = { params: Promise<{ provider: string; action: string }> };
@@ -98,6 +99,8 @@ export async function POST(req: Request, { params }: Params) {
         Response.json(await disconnectMusic(user, provider)),
       );
     await assertWritable(user);
+    if (provider === 'spotify' && action === 'playback-token')
+      return privateResponse(Response.json(await spotifyPlaybackToken(user)));
     if (action === 'connect')
       return privateResponse(await connectMusic(req, user, provider));
     if (action === 'import')

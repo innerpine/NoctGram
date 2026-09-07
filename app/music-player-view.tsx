@@ -44,10 +44,10 @@ import {
   defaultAppearance,
   playerArtwork,
   readAppearance,
-  readLyrics,
   type PlayerAppearance,
   type TrackLyrics,
 } from '@/lib/music-player';
+import { findTrackLyrics, LyricsRateLimit } from '@/lib/music-lyrics-search';
 
 export type PlayerTrack = {
   url: string;
@@ -113,6 +113,7 @@ function Lyrics({
     error?: boolean;
   } | null>(null);
   const [follow, setFollow] = useState(true);
+  const [attempt, setAttempt] = useState(0);
   const container = useRef<HTMLDivElement>(null);
   const activeLine = useRef<HTMLButtonElement>(null);
   const key = `${track.url}:${track.artist}:${track.title}:${Math.round(duration)}`;
@@ -134,43 +135,19 @@ function Lyrics({
     const timeout = setTimeout(() => controller.abort(), 12000);
     let cancelled = false;
     // Only metadata for the open lyrics pane is sent. No library, account or tokens.
-    void fetch(
-      'https://lrclib.net/api/get?' +
-        new URLSearchParams({
-          track_name: track.title,
-          artist_name: track.artist,
-          duration: String(duration / 1000),
-        }),
-      {
-        signal: controller.signal,
-        credentials: 'omit',
-        referrerPolicy: 'no-referrer',
-      },
+    void findTrackLyrics(
+      { title: track.title, artist: track.artist, duration },
+      controller.signal,
     )
-      .then(async (response) => {
-        if (response.status === 429) {
-          const header = response.headers.get('Retry-After') || '60';
-          const seconds = Number(header);
-          lyricCooldown = Math.max(
-            Date.now() + 60000,
-            Number.isFinite(seconds)
-              ? Date.now() + seconds * 1000
-              : Date.parse(header) || 0,
-          );
-        }
-        if (!response.ok && response.status !== 404)
-          throw new Error('Lyrics unavailable');
-        const found =
-          response.status === 404
-            ? null
-            : readLyrics(await response.json(), duration);
+      .then((found) => {
         if (cancelled) return;
         if (lyricCache.size >= 30)
           lyricCache.delete(lyricCache.keys().next().value!);
         lyricCache.set(key, { lyrics: found, until: Date.now() + 600000 });
         setResult({ key, lyrics: found });
       })
-      .catch(() => {
+      .catch((error) => {
+        if (error instanceof LyricsRateLimit) lyricCooldown = error.until;
         if (!cancelled) setResult({ key, lyrics: null, error: true });
       })
       .finally(() => clearTimeout(timeout));
@@ -179,7 +156,7 @@ function Lyrics({
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [key, enabled, duration, track.artist, track.title]);
+  }, [key, enabled, duration, track.artist, track.title, attempt]);
 
   useEffect(() => {
     if (!enabled || !follow || !container.current || !activeLine.current)
@@ -222,6 +199,17 @@ function Lyrics({
         <button onClick={onQueue}>
           <ListMusic size={17} /> Открыть очередь
         </button>
+        {!lyrics?.instrumental && (
+          <button
+            onClick={() => {
+              lyricCache.delete(key);
+              setResult(null);
+              setAttempt((value) => value + 1);
+            }}
+          >
+            Повторить поиск текста
+          </button>
+        )}
       </div>
     );
   return (
@@ -464,6 +452,9 @@ export function MusicPlayerView(p: Props) {
   const error = p.error && (
     <div className="music-error" role="alert">
       {p.error} <button onClick={p.onRetry}>Повторить</button>
+      {p.track.provider === 'spotify' && (
+        <Link href="/music/services?provider=spotify">Подключение Spotify</Link>
+      )}
     </div>
   );
   const sourceName = p.track.provider === 'spotify' ? 'Spotify' : 'SoundCloud';
@@ -545,7 +536,9 @@ export function MusicPlayerView(p: Props) {
                   ? 'Учёт недоступен'
                   : p.listening.status === 'checking'
                     ? 'Проверяем учёт…'
-                    : 'Участвовать в чарте'}
+                    : p.listening.status === 'excluded'
+                      ? 'Spotify · без учёта в чарте'
+                      : 'Участвовать в чарте'}
           </Link>
           <div className="music-mini-volume">
             <button
