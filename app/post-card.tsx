@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { StarsIcon, NoctLogo } from './stars-icon';
 import { CodeBlock } from './code-block';
+import { MusicLinkCard } from './music-link-card';
 import type { Person, Post, Media } from '@/lib/client';
 import {
   useEffect,
@@ -321,6 +322,7 @@ export function PostCard({
             {expanded ? 'Свернуть' : 'Ещё'}
           </button>
         )}
+        <MusicLinkCard text={p.text} />
         {p.code && <CodeBlock code={p.code} language={p.codeLang} />}
         {p.media.length > 0 && (
           <div

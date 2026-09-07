@@ -3,6 +3,10 @@
    Async subscription effects intentionally set loading state; no React compiler is enabled. */
 /* eslint-disable next/no-img-element, next/no-html-link-for-pages, react/react-compiler */
 import { PrivacyPanel } from './privacy-panel';
+import { MusicPanel } from './music-panel';
+import { MusicLinkCard } from './music-link-card';
+import { MusicAccountGuard } from './music-provider';
+import { Music2 } from 'lucide-react';
 import { Ban, Flag } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -74,8 +78,12 @@ import {
   type Post,
   type Message,
 } from '@/lib/client';
-export default function Noctgram() {
-  const [page, setPage] = useState('feed'),
+export default function Noctgram({
+  initialPage = 'feed',
+}: {
+  initialPage?: 'feed' | 'music';
+}) {
+  const [page, setPage] = useState<string>(initialPage),
     [me, setMe] = useState<Profile | null>(null),
     [profile, setProfile] = useState<Profile | null>(null),
     [people, setPeople] = useState<Person[]>([]),
@@ -297,9 +305,14 @@ export default function Noctgram() {
         !myId ||
         accountBlocked ||
         (page === 'profile' && profile?.blocked) ||
-        ['premium', 'stars', 'channels', 'messages', 'moderation'].includes(
-          page,
-        )
+        [
+          'premium',
+          'stars',
+          'channels',
+          'messages',
+          'moderation',
+          'music',
+        ].includes(page)
       )
         return;
       const version = ++requestVersion.current;
@@ -378,7 +391,14 @@ export default function Noctgram() {
       !myId ||
       accountBlocked ||
       (page === 'profile' && profile?.blocked) ||
-      ['premium', 'stars', 'channels', 'messages', 'moderation'].includes(page)
+      [
+        'premium',
+        'stars',
+        'channels',
+        'messages',
+        'moderation',
+        'music',
+      ].includes(page)
     )
       return;
     setPosts([]);
@@ -1018,11 +1038,14 @@ export default function Noctgram() {
   const online = !!profile?.lastSeen && Date.now() - profile.lastSeen < 120000;
   if (accountBlocked && me)
     return (
-      <BlockedAccount
-        me={me}
-        onUpdate={updateAccount}
-        onRefresh={refreshAccount}
-      />
+      <>
+        <MusicAccountGuard blocked />
+        <BlockedAccount
+          me={me}
+          onUpdate={updateAccount}
+          onRefresh={refreshAccount}
+        />
+      </>
     );
   return (
     <div className="app-shell">
@@ -1039,6 +1062,7 @@ export default function Noctgram() {
             ['search', 'Поиск', Search],
             ['messages', 'Сообщения', Mail],
             ['channels', 'Каналы', Megaphone],
+            ['music', 'Музыка', Music2],
             ['saved', 'Сохранённое', Bookmark],
             ['profile', 'Профиль', UserRound],
           ].map(([id, label, Icon]) => {
@@ -1122,23 +1146,25 @@ export default function Noctgram() {
       >
         <header className="page-header">
           <h1>
-            {page === 'moderation'
-              ? 'Модерация'
-              : page === 'profile'
-                ? profile?.name || 'Профиль'
-                : page === 'channels'
-                  ? 'Каналы'
-                  : page === 'stars'
-                    ? 'Noct Stars'
-                    : page === 'messages'
-                      ? 'Сообщения'
-                      : page === 'search'
-                        ? 'Поиск'
-                        : page === 'premium'
-                          ? 'Noct Premium'
-                          : page === 'saved'
-                            ? 'Сохранённое'
-                            : 'Noctgram'}
+            {page === 'music'
+              ? 'Музыка'
+              : page === 'moderation'
+                ? 'Модерация'
+                : page === 'profile'
+                  ? profile?.name || 'Профиль'
+                  : page === 'channels'
+                    ? 'Каналы'
+                    : page === 'stars'
+                      ? 'Noct Stars'
+                      : page === 'messages'
+                        ? 'Сообщения'
+                        : page === 'search'
+                          ? 'Поиск'
+                          : page === 'premium'
+                            ? 'Noct Premium'
+                            : page === 'saved'
+                              ? 'Сохранённое'
+                              : 'Noctgram'}
           </h1>
           <span className="grow" />
           {me?.canModerate && (
@@ -1172,7 +1198,9 @@ export default function Noctgram() {
             className="icon-button"
             aria-label="Обновить"
             onClick={() => {
-              if (me && page === 'messages') {
+              if (page === 'music') {
+                window.dispatchEvent(new Event('noctgram:music-refresh'));
+              } else if (me && page === 'messages') {
                 void loadThreads().catch((e) => notify(e.message));
                 void loadMessages().catch((e) => notify(e.message));
               } else if (me) void refresh();
@@ -1510,6 +1538,13 @@ export default function Noctgram() {
               composer}
           </>
         )}
+        {page === 'music' && (
+          <MusicPanel
+            signedIn={!!me}
+            readOnly={!!readOnly}
+            onProfile={(id) => void openProfile(id)}
+          />
+        )}
         {page === 'stars' && me && (
           <StarsPanel me={me} onBack={() => setPage(starsReturn.current)} />
         )}
@@ -1523,9 +1558,14 @@ export default function Noctgram() {
         {page === 'premium' && (
           <PremiumPanel me={me} onBack={() => setPage(premiumReturn.current)} />
         )}
-        {!['messages', 'premium', 'stars', 'channels', 'moderation'].includes(
-          page,
-        ) &&
+        {![
+          'messages',
+          'premium',
+          'stars',
+          'channels',
+          'moderation',
+          'music',
+        ].includes(page) &&
           !(page === 'profile' && profile?.blocked) && (
             <>
               {loading && !posts.length ? (
@@ -1683,6 +1723,7 @@ export default function Noctgram() {
                         key={m.id}
                       >
                         <p>{m.text}</p>
+                        <MusicLinkCard text={m.text} />
                         <span className="message-time">
                           {m.sender !== me?.id && (
                             <button

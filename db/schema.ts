@@ -405,3 +405,67 @@ export const userBlocks = sqliteTable(
     index('user_blocks_reverse').on(t.blocked, t.blocker),
   ],
 );
+
+export const musicTracks = sqliteTable('music_tracks', {
+  id: text().primaryKey(),
+  url: text().notNull().unique(),
+  kind: text().notNull(),
+  provider: text().notNull().default('soundcloud'),
+  title: text().notNull(),
+  artist: text().notNull(),
+  artwork: text().notNull().default(''),
+  authorUrl: text().notNull(),
+  created: integer().notNull(),
+});
+export const musicLibrary = sqliteTable(
+  'music_library',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    trackId: text()
+      .notNull()
+      .references(() => musicTracks.id, { onDelete: 'cascade' }),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.trackId] }),
+    index('music_library_track').on(t.trackId),
+  ],
+);
+export const musicPreferences = sqliteTable('music_preferences', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  participate: integer().notNull().default(0),
+});
+// One active session per listener prevents parallel tabs from multiplying scores.
+export const musicSessions = sqliteTable('music_sessions', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  id: text().notNull().unique(),
+  trackId: text()
+    .notNull()
+    .references(() => musicTracks.id, { onDelete: 'cascade' }),
+  created: integer().notNull(),
+  updated: integer().notNull(),
+  totalMs: integer().notNull().default(0),
+});
+export const musicListens = sqliteTable(
+  'music_listens',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    trackId: text()
+      .notNull()
+      .references(() => musicTracks.id, { onDelete: 'cascade' }),
+    day: integer().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.trackId, t.day] }),
+    index('music_listens_recent').on(t.created, t.trackId),
+  ],
+);

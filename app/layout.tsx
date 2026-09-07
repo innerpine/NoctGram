@@ -9,6 +9,8 @@ import './auth.css';
 import './content-moderation.css';
 import './privacy.css';
 import './dialog-motion.css';
+import './music.css';
+import { MusicProvider } from './music-provider';
 export const metadata: Metadata = {
   title: 'Noctgram — лента и диалоги',
   icons: { icon: '/assets/noctgram-logo.png' },
@@ -28,7 +30,9 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <MusicProvider>{children}</MusicProvider>
+      </body>
     </html>
   );
 }
