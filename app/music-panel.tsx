@@ -28,7 +28,7 @@ import {
   parseMusicLink,
   type MusicTrack,
 } from '@/lib/music-links';
-import { useMusic } from './music-provider';
+import { useMusic } from '@/lib/music-context';
 import { MusicAudioUpload } from './music-audio-upload';
 import { MusicLeaderboard, type ListenerScore } from './music-leaderboard';
 import type { Person } from '@/lib/client';

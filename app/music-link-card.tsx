@@ -1,7 +1,7 @@
 'use client';
 import { Play } from 'lucide-react';
 import { findMusicLink, musicLabel } from '@/lib/music-links';
-import { useMusic } from './music-provider';
+import { useMusic } from '@/lib/music-context';
 
 export function MusicLinkCard({ text }: { text: string }) {
   // Reading a private message does not send its URL to SoundCloud.

@@ -2,9 +2,7 @@
 /* Provider subscriptions update state from real SoundCloud events. */
 /* eslint-disable react/react-compiler, next/no-img-element */
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -26,22 +24,13 @@ import {
 } from '@/lib/soundcloud-widget';
 import { MusicPlayerView, type PlayerTrack } from './music-player-view';
 import { loadSpotifySDK, SpotifyPlayback } from '@/lib/spotify-player';
+import { MusicContext, useMusic } from '@/lib/music-context';
 import {
   MusicListenTracker,
   adjacentPlayable,
   type ListenState,
 } from '@/lib/music-listening';
 
-type Context = {
-  play: (link: MusicLink, queue?: MusicLink[]) => void;
-  currentUrl: string;
-  playing: boolean;
-  stop: () => void;
-};
-const MusicContext = createContext<Context | null>(null);
-export function useMusic() {
-  return useContext(MusicContext);
-}
 export function MusicAccountGuard({ blocked }: { blocked: boolean }) {
   const stop = useMusic()?.stop;
   useEffect(() => {

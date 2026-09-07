@@ -18,7 +18,7 @@ import {
   musicRequest,
   type MusicTrack,
 } from '@/lib/music-links';
-import { useMusic } from './music-provider';
+import { useMusic } from '@/lib/music-context';
 
 export function MusicSearch({
   signedIn,

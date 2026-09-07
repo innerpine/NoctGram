@@ -30,7 +30,7 @@ import {
   type ServiceStatus,
 } from '@/lib/music-service-types';
 import { parseMusicLink, type MusicTrack } from '@/lib/music-links';
-import { useMusic } from './music-provider';
+import { useMusic } from '@/lib/music-context';
 import { MusicYandex } from './music-yandex';
 
 async function serviceRequest<T>(

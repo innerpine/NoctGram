@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { FileAudio, LoaderCircle } from 'lucide-react';
 import type { MusicTrack } from '@/lib/music-links';
-import { useMusic } from './music-provider';
+import { useMusic } from '@/lib/music-context';
 
 export function MusicAudioUpload({
   track,
