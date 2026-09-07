@@ -15,3 +15,5 @@ INSERT INTO music_listens(userId,trackId,day,created) VALUES
 ('chart_qa_period','chart_qa_2d',CAST(strftime('%s','now','-2 days') AS INTEGER)/86400,strftime('%s','now','-2 days')*1000),
 ('chart_qa_period','chart_qa_10d',CAST(strftime('%s','now','-10 days') AS INTEGER)/86400,strftime('%s','now','-10 days')*1000),
 ('chart_qa_period','chart_qa_40d',CAST(strftime('%s','now','-40 days') AS INTEGER)/86400,strftime('%s','now','-40 days')*1000);
+
+UPDATE music_preferences SET participate=0 WHERE userId='zz_chart_qa_me';

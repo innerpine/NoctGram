@@ -81,8 +81,18 @@ async function api(token: string, path: string): Promise<unknown> {
       429,
       'Яндекс временно ограничил запросы. Попробуйте позже.',
     );
+  if (response.status === 451)
+    throw new ApiError(
+      502,
+      'Доступ к плейлистам Яндекс Музыки ограничен (HTTP 451). Проверьте регион и подключение сервера Noctgram: VPN только в браузере не меняет этот запрос. Подключённый аккаунт и сохранённые плейлисты не удалены.',
+      'YANDEX_ACCESS_RESTRICTED',
+    );
   if (!response.ok)
-    throw new ApiError(502, 'Не удалось получить данные Яндекс Музыки.');
+    throw new ApiError(
+      502,
+      `Яндекс Музыка не смогла выполнить запрос (HTTP ${response.status}). Повторите синхронизацию позже.`,
+      'YANDEX_HTTP_' + response.status,
+    );
   let payload: Data;
   try {
     payload = object(await response.json());

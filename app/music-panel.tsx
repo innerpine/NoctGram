@@ -1,7 +1,13 @@
 'use client';
 /* Async subscriptions intentionally update loading state; provider artwork keeps its attribution. */
 /* eslint-disable react/react-compiler, next/no-img-element, next/no-html-link-for-pages */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -10,13 +16,13 @@ import {
   Link2,
   LoaderCircle,
   Play,
+  Plus,
   RefreshCw,
   Sparkles,
   Trophy,
   X,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
 import {
   musicRequest,
   parseMusicLink,
@@ -24,13 +30,12 @@ import {
 } from '@/lib/music-links';
 import { useMusic } from './music-provider';
 import { MusicAudioUpload } from './music-audio-upload';
-import { MusicSearch } from './music-search';
-import { Avatar } from './post-card';
+import { MusicLeaderboard, type ListenerScore } from './music-leaderboard';
 import type { Person } from '@/lib/client';
 
 type RankedTrack = MusicTrack & { plays: number };
 type MusicData = {
-  participate: boolean;
+  profile: Person | null;
   library: MusicTrack[];
   discoveries: MusicTrack[];
   tracks: RankedTrack[];
@@ -42,12 +47,7 @@ type MusicData = {
     provider: string;
   }[];
   listeners: (Person & { plays: number; tracks: number })[];
-  mine: {
-    rank: number | null;
-    plays: number;
-    tracks: number;
-    participants: number;
-  } | null;
+  mine: ListenerScore | null;
   period: string;
   updatedAt: number;
 };
@@ -62,7 +62,7 @@ export function MusicPanel({
   onProfile: (id: string) => void;
 }) {
   const [tab, setTab] = useState('discover'),
-    [chart, setChart] = useState('tracks');
+    [chart, setChart] = useState('listeners');
   const [period, setPeriod] = useState('7');
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get('tab');
@@ -84,6 +84,7 @@ export function MusicPanel({
     try {
       const result = await musicRequest<MusicData>('home', undefined, {
         charts: tab === 'charts' ? '1' : '0',
+        leaders: '1',
         period,
       });
       if (version === requestVersion.current) setData(result);
@@ -97,7 +98,7 @@ export function MusicPanel({
     void refresh();
   }, [refresh]);
   useEffect(() => {
-    if (tab !== 'charts' || !signedIn) return;
+    if (!signedIn) return;
     const update = () => {
       if (document.visibilityState === 'visible') void refresh();
     };
@@ -136,19 +137,6 @@ export function MusicPanel({
       setBusy(false);
     }
   }
-  async function participate(value: boolean) {
-    setBusy(true);
-    setError('');
-    try {
-      await musicRequest('preferences', { participate: value });
-      window.dispatchEvent(new Event('noctgram:music-preferences'));
-      await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
   async function remove(id: string) {
     setBusy(true);
     setError('');
@@ -167,7 +155,11 @@ export function MusicPanel({
     return (
       <div className="music-track-list">
         {tracks.map((track, i) => (
-          <div className="music-track" key={track.id}>
+          <div
+            className="music-track"
+            key={track.id}
+            style={{ '--row-index': Math.min(i, 7) } as CSSProperties}
+          >
             {ranked && (
               <span className="music-rank">
                 {String(i + 1).padStart(2, '0')}
@@ -203,9 +195,7 @@ export function MusicPanel({
               </a>
               {track.provider === 'spotify' && (
                 <small className="music-audio-caption">
-                  {track.audioUrl
-                    ? 'Ваш аудиофайл'
-                    : 'Прослушивание с Spotify Premium'}
+                  {track.audioUrl ? 'Ваш аудиофайл' : 'Spotify Premium'}
                 </small>
               )}
               {track.provider === 'spotify' && track.audioUrl && (
@@ -230,6 +220,7 @@ export function MusicPanel({
                 {track.provider === 'spotify' && (
                   <MusicAudioUpload
                     track={track}
+                    compact
                     disabled={busy || readOnly}
                     onSaved={() => void refresh()}
                     onError={setError}
@@ -288,43 +279,37 @@ export function MusicPanel({
           <TabsTrigger value="library">Моя музыка</TabsTrigger>
         </TabsList>
       </Tabs>
-      <section className="music-add card">
-        <label htmlFor="music-link">
-          <Link2 size={16} /> Добавить музыку по ссылке
-        </label>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void save();
-          }}
+      <form
+        className="music-link-search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <Link2 size={19} aria-hidden="true" />
+        <input
+          id="music-link"
+          type="url"
+          aria-label="Добавить музыку по ссылке"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="Вставьте ссылку на музыку"
+          disabled={busy || readOnly || !signedIn}
+          autoComplete="off"
+        />
+        <button
+          className="music-link-submit"
+          aria-label="Добавить музыку"
+          title="Добавить музыку"
+          disabled={busy || readOnly || !signedIn || !url.trim()}
         >
-          <input
-            id="music-link"
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="Ссылка SoundCloud или Spotify"
-            disabled={busy || readOnly || !signedIn}
-          />
-          <button
-            className="primary"
-            disabled={busy || readOnly || !signedIn || !url.trim()}
-          >
-            {busy ? <LoaderCircle className="spin" size={16} /> : 'Добавить'}
-          </button>
-        </form>
-        <p>
-          SoundCloud — прослушивание по ссылке и публикация в открытиях. Spotify
-          — прослушивание в нашем плеере с подключённым аккаунтом Premium. Также
-          можно прикрепить собственный аудиофайл в «Моей музыке».
-        </p>
-      </section>
-      <MusicSearch
-        signedIn={signedIn}
-        readOnly={readOnly}
-        savedUrls={(data?.library || []).map((track) => track.url)}
-        onSaved={() => void refresh()}
-      />
+          {busy ? (
+            <LoaderCircle className="spin" size={18} />
+          ) : (
+            <Plus size={20} />
+          )}
+        </button>
+      </form>
       {error && (
         <p className="music-error" role="alert">
           {error}
@@ -347,32 +332,15 @@ export function MusicPanel({
       ) : (
         data && (
           <>
-            <section className="music-participation card">
-              <div>
-                <h3>
-                  {data.participate
-                    ? 'Вы участвуете в чарте'
-                    : 'Участвовать в чарте'}
-                </h3>
-                <p>
-                  Ваше имя и число прослушиваний появятся в рейтинге, а песни и
-                  исполнители — в общем топе. Аудиофайлы остаются личными.
-                  Выключение удаляет историю участия.
-                </p>
-              </div>
-              <Switch
-                aria-label="Участвовать в музыкальном чарте"
-                checked={data.participate}
-                disabled={busy || (readOnly && !data.participate)}
-                onCheckedChange={(v) => void participate(v)}
-              />
-            </section>
             {tab === 'charts' ? (
-              <section className="music-chart card">
+              <section
+                className="music-chart music-content-enter card"
+                key="charts"
+              >
                 <div className="music-section-heading">
                   <Trophy size={18} />
                   <h3>На повторе у Noctgram</h3>
-                  <span>Топ 30</span>
+                  <span>{chart === 'listeners' ? 'Топ 25' : 'Топ 30'}</span>
                 </div>
                 <Tabs
                   value={period}
@@ -384,28 +352,6 @@ export function MusicPanel({
                     <TabsTrigger value="30">30 дней</TabsTrigger>
                   </TabsList>
                 </Tabs>
-                <div className="music-my-ranking" aria-busy={loading}>
-                  <div>
-                    <strong>
-                      {data.mine?.rank ? `#${data.mine.rank}` : '—'}
-                    </strong>
-                    <small>ваше место</small>
-                  </div>
-                  <div>
-                    <strong>{data.mine?.plays || 0}</strong>
-                    <small>прослушиваний</small>
-                  </div>
-                  <div>
-                    <strong>{data.mine?.participants || 0}</strong>
-                    <small>участников</small>
-                  </div>
-                </div>
-                {!data.participate && (
-                  <p className="music-footnote">
-                    Включите участие выше, затем слушайте музыку в плеере. Учёт
-                    начнётся с этого момента.
-                  </p>
-                )}
                 <Tabs value={chart} onValueChange={(v) => setChart(String(v))}>
                   <TabsList>
                     <TabsTrigger value="tracks">Треки</TabsTrigger>
@@ -413,70 +359,56 @@ export function MusicPanel({
                     <TabsTrigger value="listeners">Слушатели</TabsTrigger>
                   </TabsList>
                 </Tabs>
-                {chart === 'tracks' && trackRows(data.tracks, true)}
-                {chart === 'artists' &&
-                  data.artists.map((artist, i) => (
-                    <div
-                      className="music-ranking-row"
-                      key={artist.provider + artist.authorUrl + artist.artist}
-                    >
-                      <span className="music-rank">
-                        {String(i + 1).padStart(2, '0')}
-                      </span>
-                      <span className="music-avatar">
-                        <Headphones size={20} />
-                      </span>
-                      <span>
-                        <strong>{artist.artist}</strong>
-                        <small>
-                          {artist.provider === 'spotify'
-                            ? 'Spotify · личное аудио'
-                            : 'SoundCloud'}{' '}
-                          · треков: {artist.tracks}
-                        </small>
-                      </span>
-                      <b>{artist.plays}</b>
-                    </div>
-                  ))}
-                {chart === 'listeners' &&
-                  data.listeners.map((person, i) => (
-                    <button
-                      className="music-ranking-row"
-                      key={person.id}
-                      onClick={() => onProfile(person.id)}
-                    >
-                      <span className="music-rank">
-                        {String(i + 1).padStart(2, '0')}
-                      </span>
-                      <Avatar person={person} />
-                      <span>
-                        <strong>{person.name}</strong>
-                        <small>
-                          @{person.handle} · треков: {person.tracks}
-                        </small>
-                      </span>
-                      <b>{person.plays}</b>
-                    </button>
-                  ))}
-                {(chart === 'tracks'
-                  ? data.tracks
-                  : chart === 'artists'
-                    ? data.artists
-                    : data.listeners
-                ).length === 0 && (
-                  <div className="music-empty">
-                    <Trophy size={28} />
-                    <h3>Первое место ещё свободно</h3>
-                    <p>Чарт появится после первых прослушиваний участников.</p>
-                  </div>
-                )}
+                <div className="music-content-enter" key={chart + data.period}>
+                  {chart === 'tracks' && trackRows(data.tracks, true)}
+                  {chart === 'artists' &&
+                    data.artists.map((artist, i) => (
+                      <div
+                        className="music-ranking-row"
+                        key={artist.provider + artist.authorUrl + artist.artist}
+                      >
+                        <span className="music-rank">
+                          {String(i + 1).padStart(2, '0')}
+                        </span>
+                        <span className="music-avatar">
+                          <Headphones size={20} />
+                        </span>
+                        <span>
+                          <strong>{artist.artist}</strong>
+                          <small>
+                            {artist.provider === 'spotify'
+                              ? 'Spotify · личное аудио'
+                              : 'SoundCloud'}{' '}
+                            · треков: {artist.tracks}
+                          </small>
+                        </span>
+                        <b>{artist.plays}</b>
+                      </div>
+                    ))}
+                  {chart === 'listeners' && (
+                    <MusicLeaderboard
+                      listeners={data.listeners}
+                      profile={data.profile}
+                      mine={data.mine}
+                      period={data.period}
+                      onProfile={onProfile}
+                    />
+                  )}
+                  {chart !== 'listeners' &&
+                    (chart === 'tracks' ? data.tracks : data.artists).length ===
+                      0 && (
+                      <div className="music-empty">
+                        <Trophy size={28} />
+                        <h3>Первое место ещё свободно</h3>
+                        <p>
+                          Чарт появится после первых прослушиваний участников.
+                        </p>
+                      </div>
+                    )}
+                </div>
                 <p className="music-footnote">
-                  Засчитываем 30 секунд воспроизведения в Noctgram: один трек от
-                  одного участника — раз в сутки по UTC. Переход по ссылке не
-                  считается. Повтор песни продолжает музыку, но не увеличивает
-                  счёт повторно. Рейтинг учитывает настройки видимости профилей;
-                  при равном счёте порядок постоянный. Сегодня — с 00:00 UTC,
-                  остальные периоды — последние 7 или 30 дней.
+                  Прослушивание от 30 секунд · один трек в сутки (UTC) от
+                  слушателя.
                 </p>
                 <p className="music-footnote">
                   {loading
@@ -485,7 +417,10 @@ export function MusicPanel({
                 </p>
               </section>
             ) : (
-              <section className="music-collection card">
+              <section
+                className="music-collection music-content-enter card"
+                key={tab}
+              >
                 <div className="music-section-heading">
                   <Sparkles size={18} />
                   <h3>
@@ -511,6 +446,17 @@ export function MusicPanel({
                   </div>
                 )}
               </section>
+            )}
+            {tab === 'discover' && (
+              <div className="music-content-enter card">
+                <MusicLeaderboard
+                  listeners={data.listeners}
+                  profile={data.profile}
+                  mine={data.mine}
+                  period={data.period}
+                  onProfile={onProfile}
+                />
+              </div>
             )}
           </>
         )

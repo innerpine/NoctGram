@@ -15,9 +15,10 @@ import {
 
 export const dynamic = 'force-dynamic';
 const DAY = 86400000;
-// These predicates run inside score writes too, closing preference/moderation races.
-const eligible = `EXISTS(SELECT 1 FROM music_preferences mp JOIN users u ON u.id=mp.userId
-  WHERE mp.userId=? AND mp.participate=1 AND ${visibleAccount('u')}
+// Listening is automatic. Check account eligibility again inside score writes
+// so a restriction added during playback still prevents a new score.
+const eligible = `EXISTS(SELECT 1 FROM users u
+  WHERE u.id=? AND ${visibleAccount('u')}
   AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=u.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000)))`;
 
 async function resolveTrack(link: MusicLink): Promise<MusicTrack> {
@@ -146,18 +147,21 @@ export async function GET(req: Request) {
     if (!['today', '7', '30'].includes(period))
       throw new ApiError(400, 'Неизвестный период чарта');
     const chart = params.get('charts') !== '0';
+    const leaders = chart || params.get('leaders') === '1';
     const d = db(),
       since =
         period === 'today'
           ? Math.floor(Date.now() / DAY) * DAY
           : Date.now() - Number(period) * DAY;
     const visibility = `${visibleAccount('u')} AND ${personalVisibility('u')}`;
-    const [pref, library, discoveries, tracks, artists, listeners, mine] =
+    const [profile, library, discoveries, tracks, artists, listeners, mine] =
       await Promise.all([
         d
-          .prepare('SELECT participate FROM music_preferences WHERE userId=?')
+          .prepare(
+            'SELECT u.id,u.name,u.avatar,h.handle FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE u.id=?',
+          )
           .bind(me)
-          .first<{ participate: number }>(),
+          .first(),
         d
           .prepare(
             "SELECT t.*, CASE WHEN a.objectKey IS NOT NULL THEN '/api/music/audio/' || t.id ELSE NULL END AS audioUrl FROM music_library l JOIN music_tracks t ON t.id=l.trackId LEFT JOIN music_audio a ON a.userId=l.userId AND a.trackId=t.id WHERE l.userId=? ORDER BY l.created DESC,t.id LIMIT 100",
@@ -173,7 +177,7 @@ export async function GET(req: Request) {
         chart
           ? d
               .prepare(
-                `SELECT t.*,COUNT(*) as plays,COUNT(DISTINCT l.userId) as listeners FROM music_listens l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId JOIN music_preferences mp ON mp.userId=u.id WHERE l.created>=? AND mp.participate=1 AND ${visibility} GROUP BY t.id ORDER BY plays DESC,t.id LIMIT 30`,
+                `SELECT t.*,COUNT(*) as plays,COUNT(DISTINCT l.userId) as listeners FROM music_listens l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId WHERE l.created>=? AND ${visibility} GROUP BY t.id ORDER BY plays DESC,t.id LIMIT 30`,
               )
               .bind(since, me)
               .all()
@@ -181,27 +185,26 @@ export async function GET(req: Request) {
         chart
           ? d
               .prepare(
-                `SELECT t.artist,t.authorUrl,t.provider,COUNT(*) as plays,COUNT(DISTINCT t.id) as tracks FROM music_listens l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId JOIN music_preferences mp ON mp.userId=u.id WHERE l.created>=? AND mp.participate=1 AND ${visibility} GROUP BY t.provider,t.authorUrl,t.artist ORDER BY plays DESC,t.provider,t.authorUrl,t.artist LIMIT 30`,
+                `SELECT t.artist,t.authorUrl,t.provider,COUNT(*) as plays,COUNT(DISTINCT t.id) as tracks FROM music_listens l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId WHERE l.created>=? AND ${visibility} GROUP BY t.provider,t.authorUrl,t.artist ORDER BY plays DESC,t.provider,t.authorUrl,t.artist LIMIT 30`,
               )
               .bind(since, me)
               .all()
           : { results: [] },
-        chart
+        leaders
           ? d
               .prepare(
-                `SELECT u.id,u.name,u.avatar,h.handle,COUNT(*) as plays,COUNT(DISTINCT l.trackId) as tracks FROM music_listens l JOIN users u ON u.id=l.userId JOIN handles h ON h.userId=u.id AND h.main=1 JOIN music_preferences mp ON mp.userId=u.id WHERE l.created>=? AND mp.participate=1 AND ${visibility} GROUP BY u.id ORDER BY plays DESC,u.id LIMIT 30`,
+                `SELECT u.id,u.name,u.avatar,h.handle,COUNT(*) as plays,COUNT(DISTINCT l.trackId) as tracks FROM music_listens l JOIN users u ON u.id=l.userId JOIN handles h ON h.userId=u.id AND h.main=1 WHERE l.created>=? AND ${visibility} GROUP BY u.id ORDER BY plays DESC,u.id LIMIT 25`,
               )
               .bind(since, me)
               .all()
           : { results: [] },
-        chart
+        leaders
           ? d
               .prepare(`WITH ranked AS (
           SELECT u.id,COUNT(*) AS plays,COUNT(DISTINCT l.trackId) AS tracks,
           ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC,u.id) AS rank
           FROM music_listens l JOIN users u ON u.id=l.userId JOIN handles h ON h.userId=u.id AND h.main=1
-          JOIN music_preferences mp ON mp.userId=u.id
-          WHERE l.created>=? AND mp.participate=1 AND ${visibility} GROUP BY u.id
+          WHERE l.created>=? AND ${visibility} GROUP BY u.id
         ) SELECT COALESCE(r.plays,0) AS plays,COALESCE(r.tracks,0) AS tracks,r.rank,
           (SELECT COUNT(*) FROM ranked) AS participants FROM (SELECT 1) LEFT JOIN ranked r ON r.id=?`)
               .bind(since, me, me)
@@ -210,7 +213,7 @@ export async function GET(req: Request) {
       ]);
     return Response.json(
       {
-        participate: !!pref?.participate,
+        profile,
         library: library.results,
         discoveries: discoveries.results,
         tracks: tracks.results.map((track) => ({
@@ -245,26 +248,11 @@ export async function POST(req: Request) {
     const body = await readJsonBody(req, 4096),
       d = db(),
       now = Date.now();
-    if (body.action === 'preferences') {
-      if (typeof body.participate !== 'boolean')
-        throw new ApiError(400, 'Некорректная настройка');
-      // Read-only users can still revoke consent.
-      if (body.participate) await assertWritable(me);
-      const statements = [
-        d
-          .prepare(
-            'INSERT INTO music_preferences(userId,participate) VALUES(?,?) ON CONFLICT(userId) DO UPDATE SET participate=excluded.participate',
-          )
-          .bind(me, body.participate ? 1 : 0),
-      ];
-      if (!body.participate)
-        statements.push(
-          d.prepare('DELETE FROM music_sessions WHERE userId=?').bind(me),
-          d.prepare('DELETE FROM music_listens WHERE userId=?').bind(me),
-        );
-      await d.batch(statements);
-      return Response.json({ ok: true });
-    }
+    if (body.action === 'preferences')
+      throw new ApiError(
+        400,
+        'Прослушивания учитываются автоматически. Обновите страницу.',
+      );
     await assertWritable(me);
     if (body.action === 'save' || body.action === 'start') {
       const link = parseMusicLink(body.url);
@@ -276,11 +264,6 @@ export async function POST(req: Request) {
       if (body.action === 'start') {
         if (link.kind !== 'track')
           throw new ApiError(400, 'Засчитываются отдельные треки');
-        const pref = await d
-          .prepare('SELECT participate FROM music_preferences WHERE userId=?')
-          .bind(me)
-          .first<{ participate: number }>();
-        if (!pref?.participate) return Response.json({ session: null });
         if (
           link.provider === 'spotify' &&
           !(await d

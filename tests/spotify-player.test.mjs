@@ -160,6 +160,28 @@ resolveToken(
 );
 await assert.rejects(connect, (error) => error.name === 'AbortError');
 assert.equal(device.disconnected, 1);
+// Browser fetch is receiver-sensitive. The default transport must call it on
+// globalThis, never with SpotifyPlayback as its receiver (Illegal invocation).
+const originalFetch = globalThis.fetch;
+let defaultCalls = 0;
+globalThis.fetch = async function (...args) {
+  assert.equal(this, globalThis);
+  defaultCalls++;
+  return request(...args);
+};
+const defaultPlayer = new SpotifyPlayback({ Player: Device }, url, 0.5, hooks);
+try {
+  await defaultPlayer.connect();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(
+    defaultCalls,
+    2,
+    'Both token and playback requests use the bound transport',
+  );
+} finally {
+  defaultPlayer.dispose();
+  globalThis.fetch = originalFetch;
+}
 console.log(
   'Spotify device: official playback, token lifecycle, transport, Premium/autoplay failures, pause versus finish and late cancellation passed.',
 );

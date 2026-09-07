@@ -1,8 +1,8 @@
 'use client';
+import Link from 'next/link';
 /* eslint-disable react/react-compiler, next/no-img-element */
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Library, LoaderCircle, Search } from 'lucide-react';
+import { ArrowLeft, Library, LoaderCircle } from 'lucide-react';
 import type { YandexPlaylist, YandexTrack } from '@/lib/yandex-music';
 import type { ServiceStatus } from '@/lib/music-service-types';
 import { formatMusicTime } from '@/lib/music-links';
@@ -292,9 +292,7 @@ export function MusicYandex({
           {selected ? (
             <>
               <p className="service-library-note">
-                Состав загружается из Яндекса при открытии. Поиск в SoundCloud
-                предлагает отдельные записи — сверяйте исполнителя и версию
-                песни.
+                Состав плейлиста из Яндекс Музыки.
               </p>
               {partial && (
                 <p className="service-library-note">
@@ -319,18 +317,6 @@ export function MusicYandex({
                   {!!track.duration && (
                     <small>{formatMusicTime(track.duration)}</small>
                   )}
-                  <Link
-                    className="icon-button"
-                    aria-label={'Найти в SoundCloud: ' + track.title}
-                    href={
-                      '/music?search=' +
-                      encodeURIComponent(
-                        (track.artist + ' ' + track.title).slice(0, 150),
-                      )
-                    }
-                  >
-                    <Search size={18} />
-                  </Link>
                 </div>
               ))}
               {!busy && !tracks.length && (

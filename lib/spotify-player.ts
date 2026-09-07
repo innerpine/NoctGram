@@ -103,7 +103,7 @@ export class SpotifyPlayback {
     private url: string,
     volume: number,
     private hooks: Hooks,
-    private request = fetch,
+    private request: typeof fetch = (...args) => globalThis.fetch(...args),
     private now = () => performance.now(),
   ) {
     this.device = new sdk.Player({

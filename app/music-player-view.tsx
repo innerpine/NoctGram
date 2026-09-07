@@ -538,7 +538,7 @@ export function MusicPlayerView(p: Props) {
                     ? 'Проверяем учёт…'
                     : p.listening.status === 'excluded'
                       ? 'Spotify · без учёта в чарте'
-                      : 'Участвовать в чарте'}
+                      : 'Чарт прослушиваний'}
           </Link>
           <div className="music-mini-volume">
             <button

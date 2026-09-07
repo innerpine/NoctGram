@@ -435,6 +435,7 @@ try {
   ];
   let pauseYandex = null;
   let unauthorized = false;
+  let playlistStatus = 200;
   globalThis.fetch = async (url, init) => {
     assert.ok(url.startsWith('https://api.music.yandex.net/'));
     assert.equal(init.headers.Authorization, 'OAuth own-yandex-token-test');
@@ -449,6 +450,8 @@ try {
       return Response.json({
         result: { account: { uid: 123, displayName: 'Yandex Owner' } },
       });
+    if (url.endsWith('/users/123/playlists/list') && playlistStatus !== 200)
+      return new Response(null, { status: playlistStatus });
     if (url.endsWith('/users/123/playlists/list'))
       return Response.json({ result: yandexList });
     if (url.endsWith('/users/123/playlists/3'))
@@ -491,6 +494,27 @@ try {
   await service.syncYandex('alice');
   assert.equal((await service.yandexPlaylists('alice')).length, 1);
   assert.equal((await service.yandexPlaylists('bob')).length, 0);
+  playlistStatus = 451;
+  await assert.rejects(
+    service.syncYandex('alice'),
+    (e) => e.code === 'YANDEX_ACCESS_RESTRICTED',
+  );
+  assert.equal(
+    (await service.yandexStatus('alice')).status,
+    'connected',
+    'Regional denial does not invalidate the token',
+  );
+  assert.equal(
+    (await service.yandexPlaylists('alice')).length,
+    1,
+    'Failed sync preserves the existing library',
+  );
+  playlistStatus = 503;
+  await assert.rejects(
+    service.syncYandex('alice'),
+    (e) => e.code === 'YANDEX_HTTP_503',
+  );
+  playlistStatus = 200;
   assert.equal(
     (await service.yandexTracks('alice', '3')).items[0].title,
     'Recording',

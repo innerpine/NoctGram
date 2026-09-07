@@ -6,11 +6,13 @@ import { useMusic } from './music-provider';
 
 export function MusicAudioUpload({
   track,
+  compact = false,
   disabled,
   onSaved,
   onError,
 }: {
   track: MusicTrack;
+  compact?: boolean;
   disabled: boolean;
   onSaved: () => void;
   onError: (error: string) => void;
@@ -19,16 +21,25 @@ export function MusicAudioUpload({
   const music = useMusic();
   return (
     <label
-      className={'music-audio-upload' + (busy || disabled ? ' disabled' : '')}
-      title={track.audioUrl ? 'Заменить аудиофайл' : 'Добавить аудиофайл'}
+      className={
+        'music-audio-upload' +
+        (compact ? ' music-audio-upload-compact' : '') +
+        (busy || disabled ? ' disabled' : '')
+      }
+      title={
+        track.audioUrl
+          ? 'Заменить свой аудиофайл'
+          : 'Прикрепить свой аудиофайл (необязательно)'
+      }
     >
       <input
         className="sr-only"
         type="file"
         accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/flac,.mp3,.wav,.ogg,.flac"
         aria-label={
-          (track.audioUrl ? 'Заменить аудио: ' : 'Добавить аудио: ') +
-          track.title
+          (track.audioUrl
+            ? 'Заменить свой аудиофайл: '
+            : 'Прикрепить свой аудиофайл (необязательно): ') + track.title
         }
         disabled={busy || disabled}
         onChange={async (event) => {
@@ -65,8 +76,8 @@ export function MusicAudioUpload({
       ) : (
         <FileAudio size={17} />
       )}
-      <span>
-        {busy ? 'Загрузка…' : track.audioUrl ? 'Заменить' : 'Добавить аудио'}
+      <span className={compact ? 'sr-only' : undefined}>
+        {busy ? 'Загрузка…' : track.audioUrl ? 'Заменить' : 'Свой аудиофайл'}
       </span>
     </label>
   );

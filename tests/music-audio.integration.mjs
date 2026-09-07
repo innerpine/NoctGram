@@ -40,10 +40,6 @@ assert.equal(
   (await api(bob)).data.library.some((t) => t.id === id),
   false,
 );
-assert.deepEqual((await api(alice, { action: 'start', url })).data, {
-  session: null,
-});
-await api(alice, { action: 'preferences', participate: true });
 assert.equal((await api(alice, { action: 'start', url })).status, 400);
 const wav = new Uint8Array(8044);
 const view = new DataView(wav.buffer),
@@ -93,7 +89,6 @@ assert.equal(
 assert.equal((await upload(alice, wav)).status, 200);
 const listen = await api(alice, { action: 'start', url });
 assert.ok(listen.data.session, JSON.stringify(listen));
-await api(bob, { action: 'preferences', participate: true });
 assert.equal((await api(bob, { action: 'start', url })).status, 400);
 assert.equal(
   (
@@ -133,8 +128,11 @@ assert.equal(
   ).plays >= 1,
   true,
 );
-await api(alice, { action: 'preferences', participate: false });
-assert.equal((await api(alice)).data.mine.plays, 0);
+assert.equal(
+  (await api(alice, { action: 'preferences', participate: false })).status,
+  400,
+);
+assert.equal((await api(alice)).data.mine.plays, 1);
 assert.equal(
   (await api(alice)).data.library.find((t) => t.id === id).audioUrl,
   path,

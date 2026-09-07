@@ -39,12 +39,22 @@ assert.equal(
       participate: false,
     })
   ).status,
-  200,
+  400,
 );
-assert.equal((await api(alice)).data.participate, false);
-assert.deepEqual((await api(alice, { action: 'start', url })).data, {
-  session: null,
-});
+assert.equal(
+  (await api('music_qa_readonly', { action: 'start', url })).status,
+  403,
+);
+assert.equal('participate' in (await api(alice)).data, false);
+assert.equal((await api(alice)).data.profile.id, alice);
+assert.ok(
+  (await api(alice, { action: 'start', url })).data.session,
+  'A new user is counted without setting any preference',
+);
+assert.ok(
+  (await api('music_qa_legacy', { action: 'start', url })).data.session,
+  'Old disabled preference no longer suppresses tracking',
+);
 assert.equal(
   (await api(alice, { action: 'save', url: 'https://example.com/track' }))
     .status,
@@ -68,7 +78,6 @@ assert.equal(
 );
 await api(bob, { action: 'remove', id: 'music_qa_track' });
 assert.equal((await api(alice)).data.library.length, 1);
-await api(alice, { action: 'preferences', participate: true });
 const first = (await api(alice, { action: 'start', url })).data.session;
 const session = (await api(alice, { action: 'start', url })).data.session;
 assert.ok(session && session !== first);
@@ -93,7 +102,7 @@ assert.equal(
   200,
 );
 console.log(
-  'Auth, privacy, library ownership, opt-in, superseded sessions and early-event checks passed. Waiting for the server-time threshold…',
+  'Auth, privacy, library ownership, automatic tracking, superseded sessions and early-event checks passed. Waiting for the server-time threshold…',
 );
 await sleep(31000);
 const counts = await Promise.all(
@@ -107,7 +116,7 @@ const before = data.tracks.find((t) => t.id === 'music_qa_track').plays;
 const ownIndex = data.listeners.findIndex((p) => p.id === alice);
 assert.equal(data.mine.plays, 1);
 if (ownIndex >= 0) assert.equal(data.mine.rank, ownIndex + 1);
-else assert.ok(data.mine.rank > 30);
+else assert.ok(data.mine.rank > 25);
 assert.ok(data.mine.participants >= 1);
 assert.equal(
   data.artists.find((a) => a.authorUrl === 'https://soundcloud.com/noctgram-qa')
@@ -136,19 +145,22 @@ assert.equal(
   (await api(alice, { action: 'progress', session, totalMs: 30000 })).status,
   409,
 );
-await api(alice, { action: 'preferences', participate: false });
+assert.equal(
+  (await api(alice, { action: 'preferences', participate: false })).status,
+  400,
+);
 assert.equal(
   (await api(alice, { action: 'progress', session, totalMs: 30000 })).status,
   409,
 );
 data = (await api(alice)).data;
 assert.equal(
-  data.listeners.some((p) => p.id === alice),
-  false,
+  data.mine.plays,
+  1,
+  'An old client preference request cannot erase listening history',
 );
-assert.equal(data.participate, false);
 await api(alice, { action: 'remove', id: 'music_qa_track' });
 assert.equal((await api(alice)).data.library.length, 0);
 console.log(
-  'Music integration passed: concurrent/repeated progress counts once; consent withdrawal erases the listener history.',
+  'Music integration passed: concurrent/repeated progress counts once; automatic accounting and obsolete preference requests preserve listener history.',
 );
