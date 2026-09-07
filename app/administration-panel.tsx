@@ -1,16 +1,22 @@
 'use client';
 /* eslint-disable react/react-compiler */
 import { useEffect, useRef, useState } from 'react';
-import { Search, ShieldCheck, Gift, ChevronLeft } from 'lucide-react';
 import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from '@/components/ui/select';
+  Search,
+  ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
+  Star,
+  Sparkles,
+  BadgeCheck,
+  History,
+  Check,
+  ArrowUpRight,
+  RefreshCw,
+} from 'lucide-react';
 import { request, type Person } from '@/lib/client';
 import { Avatar, DisplayName } from './profile-identity';
+import { StaffSelect } from './staff-select';
 type AdminPerson = Person & {
   administrator: number;
   moderator: number;
@@ -24,12 +30,21 @@ type Event = Person & {
   created: number;
   actorName: string;
 };
-const labels: Record<string, string> = {
-  stars: 'Выдать Stars',
-  premium: 'Выдать Premium',
-  verified: 'Верификация',
-  moderator: 'Роль модератора',
-};
+const actions = [
+  { value: 'stars', label: 'Выдать Stars', icon: Star },
+  { value: 'premium', label: 'Выдать Premium', icon: Sparkles },
+  { value: 'verified', label: 'Верификация', icon: BadgeCheck },
+  { value: 'moderator', label: 'Роль модератора', icon: ShieldCheck },
+];
+function roleLabel(person: AdminPerson) {
+  return person.administrator
+    ? 'Администратор'
+    : person.moderator
+      ? 'Модератор'
+      : person.kind === 'channel'
+        ? 'Канал'
+        : 'Пользователь';
+}
 export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
   const [query, setQuery] = useState(''),
     [people, setPeople] = useState<AdminPerson[]>([]),
@@ -54,6 +69,7 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
       )
         .then((r) => {
           if (live) {
+            setError('');
             setPeople(r.people);
             setEvents(r.events);
             setSelected((old) =>
@@ -102,14 +118,42 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
       setBusy(false);
     }
   };
+  const stateOptions =
+    kind === 'verified'
+      ? [
+          { value: '1', label: 'Подтвердить аккаунт' },
+          { value: '0', label: 'Снять верификацию' },
+        ]
+      : [
+          { value: '1', label: 'Назначить модератором' },
+          { value: '0', label: 'Снять роль модератора' },
+        ];
+  const ActionIcon = actions.find((a) => a.value === kind)?.icon || ShieldCheck;
+  const submitLabel =
+    kind === 'stars'
+      ? 'Выдать Stars'
+      : kind === 'premium'
+        ? 'Выдать Premium'
+        : stateOptions.find((o) => o.value === amount)?.label || 'Сохранить';
   return (
     <section className="administration-panel">
       <div className="account-section-heading">
-        <ShieldCheck size={21} />
+        <span className="staff-heading-icon">
+          <ShieldCheck size={21} />
+        </span>
         <div>
           <h3>Администрирование</h3>
           <p>Stars, Premium и полномочия пользователей</p>
         </div>
+        <button
+          className="icon-button"
+          aria-label="Обновить администрирование"
+          title="Обновить"
+          disabled={loading || busy}
+          onClick={() => setVersion((v) => v + 1)}
+        >
+          <RefreshCw size={16} />
+        </button>
       </div>
       {error && (
         <p className="form-error" role="alert">
@@ -119,7 +163,7 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
       {notice && <output className="moderation-notice">{notice}</output>}
       {!selected ? (
         <>
-          <label className="moderation-search">
+          <label className="staff-search">
             <Search size={17} />
             <input
               aria-label="Найти получателя"
@@ -136,30 +180,28 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
                 className="admin-person"
                 onClick={() => {
                   setSelected(p);
+                  if (p.kind === 'channel') {
+                    setKind('verified');
+                    setAmount('1');
+                  }
                   setError('');
                   setNotice('');
                 }}
               >
                 <Avatar person={p} />
-                <span>
+                <span className="staff-person-copy">
                   <DisplayName person={p} />
-                  <small>
-                    @{p.handle} ·{' '}
-                    {p.administrator
-                      ? 'Администратор'
-                      : p.moderator
-                        ? 'Модератор'
-                        : p.kind === 'channel'
-                          ? 'Канал'
-                          : 'Пользователь'}
-                  </small>
+                  <small>@{p.handle}</small>
                 </span>
-                <Gift size={18} />
+                <span className="staff-status">{roleLabel(p)}</span>
+                <ChevronRight size={16} />
               </button>
             ))}
           </div>
           {!loading && !people.length && (
-            <p className="meta">Никого не нашли. Попробуйте другой юзернейм.</p>
+            <p className="moderation-empty">
+              Никого не нашли. Попробуйте другой юзернейм.
+            </p>
           )}
         </>
       ) : (
@@ -183,114 +225,121 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
             </button>
             <div className="admin-target">
               <Avatar person={selected} size={48} />
-              <div>
+              <div className="staff-person-copy">
                 <DisplayName person={selected} />
-                <p>
-                  @{selected.handle} ·{' '}
-                  {selected.balance.toLocaleString('ru-RU')} Stars
-                </p>
+                <p>@{selected.handle}</p>
+                <span className="staff-status">{roleLabel(selected)}</span>
               </div>
+              {selected.kind !== 'channel' && (
+                <div className="admin-balance">
+                  <span>
+                    <Star size={14} />
+                    {selected.balance.toLocaleString('ru-RU')}
+                  </span>
+                  <small>баланс Stars</small>
+                </div>
+              )}
             </div>
-            <label className="account-field" htmlFor="admin-action">
-              Действие
-              <Select
+            <div className="staff-field-grid">
+              <StaffSelect
+                label="Действие"
                 value={kind}
-                onValueChange={(v) => {
-                  setKind(String(v));
+                options={
+                  selected.kind === 'channel'
+                    ? actions.filter((a) => a.value === 'verified')
+                    : actions
+                }
+                disabled={busy}
+                onChange={(v) => {
+                  setKind(v);
                   setAmount(
                     v === 'stars' ? '1000' : v === 'premium' ? '30' : '1',
                   );
                   setNotice('');
                 }}
-              >
-                <SelectTrigger
-                  id="admin-action"
-                  aria-label="Административное действие"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(labels).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-            {kind === 'stars' || kind === 'premium' ? (
-              <label className="account-field">
-                {kind === 'stars' ? 'Количество Stars' : 'Дней Premium'}
-                <input
-                  type="number"
-                  min={1}
-                  max={kind === 'stars' ? 1000000 : 365}
-                  step={1}
-                  required
+              />
+              {kind === 'stars' || kind === 'premium' ? (
+                <label className="account-field">
+                  {kind === 'stars' ? 'Количество Stars' : 'Дней Premium'}
+                  <input
+                    type="number"
+                    min={1}
+                    max={kind === 'stars' ? 1000000 : 365}
+                    step={1}
+                    required
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </label>
+              ) : (
+                <StaffSelect
+                  label="Состояние"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  options={stateOptions}
+                  onChange={setAmount}
+                  disabled={busy}
                 />
-              </label>
-            ) : (
-              <label className="account-field" htmlFor="admin-state">
-                Состояние
-                <Select
-                  value={amount}
-                  onValueChange={(v) => setAmount(String(v))}
-                >
-                  <SelectTrigger
-                    id="admin-state"
-                    aria-label="Состояние роли или верификации"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">
-                      {kind === 'verified'
-                        ? 'Подтвердить аккаунт'
-                        : 'Назначить модератором'}
-                    </SelectItem>
-                    <SelectItem value="0">
-                      {kind === 'verified'
-                        ? 'Снять верификацию'
-                        : 'Снять роль модератора'}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </label>
-            )}
+              )}
+            </div>
             <label className="account-field">
-              Причина
+              <span className="staff-field-caption">
+                Причина <small>{reason.length}/500</small>
+              </span>
               <textarea
                 required
                 maxLength={500}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="Например, награда за помощь в тестировании"
+                rows={3}
+                placeholder={
+                  kind === 'stars' || kind === 'premium'
+                    ? 'Например, награда за помощь в тестировании'
+                    : kind === 'verified'
+                      ? 'Например, подтверждён официальный аккаунт автора'
+                      : 'Например, назначение в команду модерации'
+                }
               />
             </label>
-            <p className="admin-grant-summary">
-              {kind === 'stars'
-                ? `@${selected.handle} получит ${Number(amount || 0).toLocaleString('ru-RU')} Stars.`
-                : kind === 'premium'
-                  ? `Premium для @${selected.handle} будет продлён на ${amount} дн.`
-                  : kind === 'verified'
-                    ? `${amount === '1' ? 'Подтвердить' : 'Снять подтверждение'} @${selected.handle}.`
-                    : `${amount === '1' ? 'Назначить' : 'Снять роль'} модератора для @${selected.handle}.`}
-            </p>
-            <button className="primary" disabled={!reason.trim() || busy}>
-              {busy ? 'Сохраняем…' : 'Подтвердить выдачу'}
-            </button>
+            <div className="admin-grant-summary">
+              <span className="staff-summary-icon">
+                <ActionIcon size={20} />
+              </span>
+              <div>
+                <strong>После подтверждения</strong>
+                <p>
+                  {kind === 'stars'
+                    ? `@${selected.handle} получит ${Number(amount || 0).toLocaleString('ru-RU')} Stars.`
+                    : kind === 'premium'
+                      ? `Premium для @${selected.handle} будет продлён на ${amount} дн.`
+                      : kind === 'verified'
+                        ? `${amount === '1' ? 'Подтвердить' : 'Снять подтверждение'} @${selected.handle}.`
+                        : `${amount === '1' ? 'Назначить модератором' : 'Снять роль модератора у'} @${selected.handle}.`}
+                </p>
+              </div>
+            </div>
+            <div className="staff-form-footer">
+              <span>
+                <History size={14} /> Сохраним в журнале
+              </span>
+              <button className="primary" disabled={!reason.trim() || busy}>
+                <Check size={16} />
+                {busy ? 'Сохраняем…' : submitLabel}
+              </button>
+            </div>
           </fieldset>
         </form>
       )}
       <div className="admin-journal">
-        <h4>Последние действия</h4>
+        <h4>
+          <History size={16} />
+          Последние действия
+        </h4>
         {events.map((e) => (
           <article key={e.id}>
             <div>
               <strong>
-                {labels[e.action]}{' '}
+                {actions.find((a) => a.value === e.action)?.label ||
+                  'Изменение аккаунта'}{' '}
                 {e.action === 'stars'
                   ? `+${e.amount.toLocaleString('ru-RU')}`
                   : e.action === 'premium'
@@ -307,7 +356,13 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
             <small>{e.reason}</small>
           </article>
         ))}
-        {!events.length && <p className="meta">Выдачи появятся здесь.</p>}
+        {!events.length && (
+          <div className="staff-empty">
+            <ArrowUpRight size={22} />
+            <p>Пока без изменений</p>
+            <small>Выдачи и изменения ролей появятся здесь.</small>
+          </div>
+        )}
       </div>
     </section>
   );
