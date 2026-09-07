@@ -1,3 +1,4 @@
+import { telegramGet, telegramPost } from '@/lib/telegram';
 import { premiumGet, premiumPost } from '@/lib/premium';
 import { appearanceColumns } from '@/lib/premium-access';
 import { assertMediaRead, mediaPermission } from '@/lib/media-access';
@@ -61,6 +62,8 @@ export async function GET(req: Request) {
         posts: [],
       });
     await assertReadable(me);
+    const telegram = await telegramGet(action, me);
+    if (telegram) return telegram;
     const premium = await premiumGet(action, me);
     if (premium) return premium;
     const d = db();
@@ -220,6 +223,8 @@ export async function POST(req: Request) {
     const me = await viewer();
     const d = db();
     const action = typeof b.action === 'string' ? b.action : '';
+    const telegram = await telegramPost(action, b, me);
+    if (telegram) return telegram;
     const call = await callsPost(action, b, me);
     if (call) return call;
     const premium = await premiumPost(String(action), b, me);
@@ -531,6 +536,10 @@ export async function POST(req: Request) {
     }
     throw new ApiError(400, 'Неизвестное действие');
   } catch (e) {
+    // Early Origin/size rejection must not strand a small POST body in the
+    // local Worker proxy's keep-alive connection.
+    if (req.body && !req.body.locked && !req.bodyUsed)
+      await readJsonBody(req, 64000).catch(() => {});
     return failure(e);
   }
 }

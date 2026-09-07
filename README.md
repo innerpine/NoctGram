@@ -13,6 +13,7 @@
 - Каналы: создание, поиск, подписка, оформление профиля и публикации от имени канала. Команда с ролями администратора и редактора; владелец управляет юзернеймами и составом команды.
 - Уникальные просмотры: авторизованный читатель видит не менее половины карточки в активной вкладке 1 секунду. Свои публикации, включая собственные каналы, не учитываются.
 - Noct Stars: 10 000 тестовых звёзд один раз на аккаунт, баланс и история операций. Поддержка автора — от 1 до 10 000 суммарно на пост от одного читателя; звёзды канала получает владелец. Повтор запроса не дублирует перевод, одновременные переводы не расходуют один баланс дважды. Оплаты нет.
+- Telegram-бот в `bot/`: привязка кодом, тестовые пополнения, пакеты и история. Запуск и устройство: [bot/README.md](bot/README.md).
 - Отметка 18+ скрывает только фото/видео до нажатия «Показать». Текст и блок кода остаются видимыми. Это пользовательская отметка контента, не проверка возраста.
 - Noct Premium: GIF/видео-аватары, шесть палитр, вращающийся текст вокруг аватара, градиент имени и значок в цвете профиля. Серверный срок доступа; локальная тестовая активация без оплаты. Настройка: [PREMIUM_SETUP.md](PREMIUM_SETUP.md).
 - Noct Premium и Stars используют пользовательские PNG и общую анимацию вылетающих частиц. Логотип Noctgram выровнен на прозрачном фоне и заменяет прежнюю SVG-иконку.
@@ -34,7 +35,7 @@
 
 Node 22.13+; `npm ci`, `npm run dev`. Локальный вход через ссылку «Войти» использует предусмотренную Sites тестовую учётную запись. Данные локального окружения не копируются в размещённый сайт.
 
-Для чистой локальной базы последовательно примените `drizzle/0000_last_freak.sql`, `drizzle/0001_orange_dracula.sql` и `drizzle/0002_complex_landau.sql` и `drizzle/0003_curly_groot.sql` и `drizzle/0004_regular_stardust.sql`, затем `drizzle/0005_massive_mindworm.sql` и `drizzle/0006_dazzling_celestials.sql` и `drizzle/0007_organic_slipstream.sql`, затем `drizzle/0008_spotty_madame_web.sql` и `drizzle/0009_dazzling_eternity.sql` командой `npx wrangler d1 execute DB --local --config wrangler.local.json --file <файл>`. Уже применённые миграции повторно не запускать.
+Для чистой локальной базы последовательно примените `drizzle/0000_last_freak.sql`, `drizzle/0001_orange_dracula.sql` и `drizzle/0002_complex_landau.sql` и `drizzle/0003_curly_groot.sql` и `drizzle/0004_regular_stardust.sql`, затем `drizzle/0005_massive_mindworm.sql` и `drizzle/0006_dazzling_celestials.sql` и `drizzle/0007_organic_slipstream.sql`, затем `drizzle/0008_spotty_madame_web.sql` и `drizzle/0009_dazzling_eternity.sql`, затем `drizzle/0010_past_chat.sql` командой `npx wrangler d1 execute DB --local --config wrangler.local.json --file <файл>`. Уже применённые миграции повторно не запускать.
 
 Проверки: `npx tsc --noEmit`, `npm run lint`, `npm run build`. Вендорные components/ui и use-mobile исключены из линтинга приложения. Общие Dialog/AlertDialog адаптированы под согласованные переходы Base UI.
 

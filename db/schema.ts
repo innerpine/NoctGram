@@ -584,3 +584,53 @@ export const profileAppearance = sqliteTable('profile_appearance', {
   avatarMotionType: text().notNull().default(''),
   updated: integer().notNull(),
 });
+
+// Linking requires proof from both the signed-in website and the private bot chat.
+export const telegramChallenges = sqliteTable('telegram_challenges', {
+  id: text().primaryKey(),
+  userId: text()
+    .notNull()
+    .unique()
+    .references(() => users.id),
+  tokenHash: text().notNull().unique(),
+  telegramId: text(),
+  telegramName: text(),
+  telegramUsername: text(),
+  codeHash: text(),
+  attempts: integer().notNull().default(0),
+  created: integer().notNull(),
+  expiresAt: integer().notNull(),
+});
+export const telegramLinks = sqliteTable('telegram_links', {
+  id: text().primaryKey(),
+  userId: text()
+    .notNull()
+    .unique()
+    .references(() => users.id),
+  telegramId: text().notNull().unique(),
+  telegramName: text().notNull(),
+  telegramUsername: text().notNull(),
+  created: integer().notNull(),
+});
+// Test receipts are separate from any future real Telegram payment ledger.
+export const telegramTopups = sqliteTable(
+  'telegram_topups',
+  {
+    id: text().primaryKey(),
+    requestKey: text().notNull().unique(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    telegramId: text().notNull(),
+    linkId: text().notNull(),
+    amount: integer().notNull(),
+    status: text().notNull().default('pending'),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+    creditedAt: integer(),
+  },
+  (t) => [
+    index('telegram_topups_user').on(t.userId, t.created),
+    index('telegram_topups_sender').on(t.telegramId, t.created),
+  ],
+);

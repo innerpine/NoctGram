@@ -13,7 +13,10 @@
     "format": "oxfmt",
     "db:generate": "drizzle-kit generate",
     "setup:realtime": "node scripts/setup-realtime.mjs",
-    "dev:jobs": "node --env-file=.env scripts/run-jobs.mjs"
+    "dev:jobs": "node --env-file=.env scripts/run-jobs.mjs",
+    "setup:bot": "node --env-file=bot/.env bot/setup.mjs",
+    "dev:bot": "node --env-file=bot/.env bot/run.mjs",
+    "test:bot": "node --test tests/bot.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

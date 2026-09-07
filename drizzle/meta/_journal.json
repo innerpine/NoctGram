@@ -71,6 +71,13 @@
       "when": 1788780819401,
       "tag": "0009_dazzling_eternity",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788784927802,
+      "tag": "0010_past_chat",
+      "breakpoints": true
     }
   ]
 }

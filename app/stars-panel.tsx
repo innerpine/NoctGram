@@ -9,11 +9,13 @@ import {
   RefreshCw,
   ArrowDownLeft,
   ArrowUpRight,
+  Send,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, Empty, Stamp } from './post-card';
 import { StarScene } from './star-scene';
 import { StarsIcon } from './stars-icon';
+import { TelegramLink } from './telegram-link';
 import { request, type Wallet, type Profile, type Post } from '@/lib/client';
 const num = (n: number) => n.toLocaleString('ru-RU');
 export function StarsPanel({
@@ -103,7 +105,8 @@ export function StarsPanel({
         </div>
         <span className="test-stars-label">Тестовые звёзды · без оплаты</span>
         <p className="stars-help">
-          При первом открытии — 10 000 тестовых звёзд. Покупка появится позже.
+          При первом открытии — 10 000 тестовых звёзд. Пополняй тестовый баланс
+          через Telegram-бота.
         </p>
       </div>
       <div className="stars-stats">
@@ -120,6 +123,7 @@ export function StarsPanel({
           </span>
         </div>
       </div>
+      <TelegramLink onWalletChange={() => void load()} />
       <div className="stars-history">
         <div className="row">
           <h3>История операций</h3>
@@ -148,7 +152,14 @@ export function StarsPanel({
         {!wallet && loading && <p className="meta">Загружаем баланс…</p>}
         {rows.map((t) => (
           <div className="star-transaction" key={t.id}>
-            {t.kind === 'grant' ? (
+            {t.kind === 'telegram_test' ? (
+              <span
+                className="transaction-grant telegram-transaction-icon"
+                aria-hidden="true"
+              >
+                <Send size={20} />
+              </span>
+            ) : t.kind === 'grant' ? (
               <span className="transaction-grant">
                 <StarsIcon size={26} />
               </span>
@@ -157,18 +168,22 @@ export function StarsPanel({
             )}
             <div>
               <strong>
-                {t.kind === 'grant' ? (
+                {t.kind === 'telegram_test' ? (
+                  'Пополнение через Telegram'
+                ) : t.kind === 'grant' ? (
                   'Тестовый баланс'
                 ) : (
                   <DisplayName person={t} />
                 )}
               </strong>
               <span>
-                {t.kind === 'grant'
-                  ? 'Стартовые звёзды'
-                  : t.sender === me.id
-                    ? 'Поддержка автора'
-                    : 'Поддержали твою публикацию'}
+                {t.kind === 'telegram_test'
+                  ? 'Тестовые звёзды · без оплаты'
+                  : t.kind === 'grant'
+                    ? 'Стартовые звёзды'
+                    : t.sender === me.id
+                      ? 'Поддержка автора'
+                      : 'Поддержали твою публикацию'}
               </span>
               <Stamp time={t.created} />
             </div>
