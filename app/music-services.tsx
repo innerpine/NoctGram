@@ -73,9 +73,11 @@ function ServiceMark({
 export function MusicServices({
   signedIn,
   readOnly,
+  onBack,
 }: {
   signedIn: boolean;
   readOnly: boolean;
+  onBack: () => void;
 }) {
   const [provider, setProvider] = useState<MusicServiceId>('soundcloud');
   const [statuses, setStatuses] = useState<ServiceStatus[]>([]),
@@ -274,13 +276,14 @@ export function MusicServices({
           <h2>Ваши музыкальные сервисы</h2>
           <p>Подключите аккаунт — любимая музыка будет рядом.</p>
         </div>
-        <Link
-          href="/music"
+        <button
+          type="button"
+          onClick={onBack}
           className="icon-button"
           aria-label="Вернуться к музыке"
         >
           <ArrowLeft size={18} />
-        </Link>
+        </button>
       </div>
       <Tabs
         value={provider}

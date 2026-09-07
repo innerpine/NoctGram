@@ -9,7 +9,6 @@ import {
   type CSSProperties,
 } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import {
   ArrowUpRight,
   Headphones,
@@ -56,10 +55,12 @@ export function MusicPanel({
   signedIn,
   readOnly,
   onProfile,
+  onServices,
 }: {
   signedIn: boolean;
   readOnly: boolean;
   onProfile: (id: string) => void;
+  onServices: () => void;
 }) {
   const [tab, setTab] = useState('discover'),
     [chart, setChart] = useState('listeners');
@@ -260,14 +261,14 @@ export function MusicPanel({
           <RefreshCw size={17} className={loading ? 'spin' : ''} />
         </button>
       </div>
-      <Link href="/music/services" className="music-services-link">
+      <button type="button" onClick={onServices} className="music-services-link">
         <Headphones size={21} />
         <span>
           <strong>Подключить музыкальные сервисы</strong>
           <small>Ваши аккаунты и плейлисты</small>
         </span>
         <ArrowUpRight size={19} />
-      </Link>
+      </button>
       <Tabs
         value={tab}
         onValueChange={(v) => setTab(String(v))}

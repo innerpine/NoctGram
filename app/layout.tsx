@@ -12,10 +12,10 @@ import './realtime.css';
 import './profile-design.css';
 import './telegram-stars.css';
 import './stars-topup.css';
-import './dialog-motion.css';
 import './music.css';
 import './music-services.css';
 import './music-player.css';
+import './dialog-motion.css';
 import { MusicProvider } from './music-provider';
 export const metadata: Metadata = {
   title: 'Noctgram — лента и диалоги',

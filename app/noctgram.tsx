@@ -1710,13 +1710,18 @@ export default function Noctgram({
           </>
         )}
         {page === 'music-services' && (
-          <MusicServices signedIn={!!me} readOnly={!!readOnly} />
+          <MusicServices
+            signedIn={!!me}
+            readOnly={!!readOnly}
+            onBack={() => navigate('music')}
+          />
         )}
         {page === 'music' && (
           <MusicPanel
             signedIn={!!me}
             readOnly={!!readOnly}
             onProfile={(id) => void openProfile(id)}
+            onServices={() => navigate('music-services')}
           />
         )}
         {page === 'stars' && me && (
