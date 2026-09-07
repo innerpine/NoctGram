@@ -1,4 +1,5 @@
 'use client';
+import { DisplayName, AnimationPreference } from './profile-identity';
 /* Async effects load private settings and cancel stale search results. */
 /* eslint-disable react/react-compiler */
 import { useEffect, useId, useRef, useState } from 'react';
@@ -16,6 +17,7 @@ import {
 import { Select } from '@base-ui/react/select';
 import { Switch } from '@base-ui/react/switch';
 import { request, type Person } from '@/lib/client';
+import { PushSettings } from './notifications';
 import { Avatar } from './post-card';
 
 type Settings = {
@@ -136,6 +138,8 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
       )}
       {settings && (
         <>
+          <PushSettings />
+          <AnimationPreference />
           <form
             className="edit-form"
             onSubmit={(e) => {
@@ -297,7 +301,9 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
                 <div className="privacy-person" key={p.id}>
                   <Avatar person={p} size={36} />
                   <span>
-                    <strong>{p.name}</strong>
+                    <strong>
+                      <DisplayName person={p} />
+                    </strong>
                     <small>@{p.handle}</small>
                   </span>
                   <button

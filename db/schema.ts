@@ -45,6 +45,10 @@ export const posts = sqliteTable(
     code: text().notNull().default(''),
     codeLang: text().notNull().default('text'),
     adult: integer().notNull().default(0),
+    publishAt: integer().notNull().default(0),
+    cancelledAt: integer().notNull().default(0),
+    publisherId: text().references(() => users.id),
+    notifyPending: integer().notNull().default(0),
     created: integer().notNull(),
   },
   (t) => [
@@ -540,4 +544,229 @@ export const musicImports = sqliteTable(
     imported: integer().notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.provider, t.playlistId] })],
+);
+
+export const channelMembers = sqliteTable(
+  'channel_members',
+  {
+    channelId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.channelId, t.userId] }),
+    index('channel_members_user').on(t.userId),
+  ],
+);
+export const stories = sqliteTable(
+  'stories',
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    mediaId: text().references(() => uploads.id),
+    text: text().notNull().default(''),
+    background: text().notNull().default('night'),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+    deletedAt: integer().notNull().default(0),
+  },
+  (t) => [
+    index('stories_expiry').on(t.expiresAt),
+    index('stories_author').on(t.userId, t.created),
+  ],
+);
+export const storyViews = sqliteTable(
+  'story_views',
+  {
+    storyId: text()
+      .notNull()
+      .references(() => stories.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    created: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.storyId, t.userId] })],
+);
+export const calls = sqliteTable(
+  'calls',
+  {
+    id: text().primaryKey(),
+    caller: text()
+      .notNull()
+      .references(() => users.id),
+    callee: text()
+      .notNull()
+      .references(() => users.id),
+    callerDevice: text().notNull(),
+    calleeDevice: text(),
+    status: text().notNull().default('ringing'),
+    reason: text().notNull().default(''),
+    offer: text(),
+    answer: text(),
+    created: integer().notNull(),
+    acceptedAt: integer(),
+    endedAt: integer(),
+    callerSeen: integer().notNull(),
+    calleeSeen: integer().notNull(),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [
+    index('calls_caller').on(t.caller, t.created),
+    index('calls_callee').on(t.callee, t.created),
+  ],
+);
+export const callSignals = sqliteTable(
+  'call_signals',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    callId: text()
+      .notNull()
+      .references(() => calls.id, { onDelete: 'cascade' }),
+    sender: text()
+      .notNull()
+      .references(() => users.id),
+    key: text().notNull(),
+    candidate: text().notNull(),
+  },
+  (t) => [
+    uniqueIndex('call_signal_once').on(t.callId, t.sender, t.key),
+    index('call_signals_order').on(t.callId, t.id),
+  ],
+);
+export const notifications = sqliteTable(
+  'notifications',
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    actorId: text()
+      .notNull()
+      .references(() => users.id),
+    kind: text().notNull(),
+    targetId: text().notNull(),
+    created: integer().notNull(),
+    read: integer().notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex('notification_once').on(t.userId, t.kind, t.targetId),
+    index('notifications_user').on(t.userId, t.created),
+  ],
+);
+export const pushSubscriptions = sqliteTable(
+  'push_subscriptions',
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    device: text().notNull(),
+    endpoint: text().notNull(),
+    p256dh: text().notNull(),
+    auth: text().notNull(),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [index('push_subscriptions_user').on(t.userId)],
+);
+export const pushDeliveries = sqliteTable(
+  'push_deliveries',
+  {
+    notificationId: text()
+      .notNull()
+      .references(() => notifications.id, { onDelete: 'cascade' }),
+    subscriptionId: text()
+      .notNull()
+      .references(() => pushSubscriptions.id, { onDelete: 'cascade' }),
+    state: text().notNull().default('pending'),
+    attempts: integer().notNull().default(0),
+    retryAt: integer().notNull().default(0),
+    lease: text(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.notificationId, t.subscriptionId] }),
+    index('push_delivery_retry').on(t.state, t.retryAt),
+  ],
+);
+
+export const premiumEntitlements = sqliteTable('premium_entitlements', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  startsAt: integer().notNull(),
+  expiresAt: integer().notNull(),
+  revokedAt: integer().notNull().default(0),
+  source: text().notNull(),
+  created: integer().notNull(),
+});
+export const profileAppearance = sqliteTable('profile_appearance', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  theme: text().notNull().default('iris'),
+  nameGradient: integer().notNull().default(0),
+  ringText: text().notNull().default(''),
+  chromeFlow: integer().notNull().default(0),
+  chromeTempo: integer().notNull().default(11),
+  avatarMotion: text().notNull().default(''),
+  avatarMotionType: text().notNull().default(''),
+  updated: integer().notNull(),
+});
+
+// Linking requires proof from both the signed-in website and the private bot chat.
+export const telegramChallenges = sqliteTable('telegram_challenges', {
+  id: text().primaryKey(),
+  userId: text()
+    .notNull()
+    .unique()
+    .references(() => users.id),
+  tokenHash: text().notNull().unique(),
+  telegramId: text(),
+  telegramName: text(),
+  telegramUsername: text(),
+  codeHash: text(),
+  attempts: integer().notNull().default(0),
+  created: integer().notNull(),
+  expiresAt: integer().notNull(),
+});
+export const telegramLinks = sqliteTable('telegram_links', {
+  id: text().primaryKey(),
+  userId: text()
+    .notNull()
+    .unique()
+    .references(() => users.id),
+  telegramId: text().notNull().unique(),
+  telegramName: text().notNull(),
+  telegramUsername: text().notNull(),
+  created: integer().notNull(),
+});
+// Test receipts are separate from any future real Telegram payment ledger.
+export const telegramTopups = sqliteTable(
+  'telegram_topups',
+  {
+    id: text().primaryKey(),
+    requestKey: text().notNull().unique(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    telegramId: text().notNull(),
+    linkId: text().notNull(),
+    amount: integer().notNull(),
+    status: text().notNull().default('pending'),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+    creditedAt: integer(),
+  },
+  (t) => [
+    index('telegram_topups_user').on(t.userId, t.created),
+    index('telegram_topups_sender').on(t.telegramId, t.created),
+  ],
 );

@@ -1,3 +1,21 @@
+import { telegramGet, telegramPost } from '@/lib/telegram';
+import { premiumGet, premiumPost } from '@/lib/premium';
+import { appearanceColumns } from '@/lib/premium-access';
+import { assertMediaRead, mediaPermission } from '@/lib/media-access';
+import { callsGet, callsPost } from '@/lib/calls';
+import { notificationsGet, notificationsPost } from '@/lib/notifications';
+import {
+  channelFeatureGet,
+  channelFeaturePost,
+  scheduleTime,
+} from '@/lib/channel-features';
+import { storiesGet, storiesPost } from '@/lib/stories';
+import {
+  published,
+  allowed,
+  channelPermission,
+  writableTarget,
+} from '@/lib/channel-access';
 import {
   privacyGet,
   privacyPost,
@@ -44,15 +62,26 @@ export async function GET(req: Request) {
         posts: [],
       });
     await assertReadable(me);
+    const telegram = await telegramGet(action, me);
+    if (telegram) return telegram;
+    const premium = await premiumGet(action, me);
+    if (premium) return premium;
     const d = db();
+    const realtime =
+      (await callsGet(action, s, me)) || (await notificationsGet(action, me));
+    if (realtime) return realtime;
     const privacy = await privacyGet(action, s, me);
     if (privacy) return privacy;
+    const extended =
+      (await channelFeatureGet(action, s, me)) ||
+      (await storiesGet(action, s, me));
+    if (extended) return extended;
     const feature = await featureGet(action, s, me);
     if (feature) return feature;
     if (action === 'bootstrap') {
       const people = await d
         .prepare(
-          `SELECT u.id,u.name,u.avatar,h.handle,EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=u.id) as followed FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND u.kind='person' AND u.id<>? ORDER BY u.created DESC LIMIT 15`,
+          `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=u.id) as followed FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND u.kind='person' AND u.id<>? ORDER BY u.created DESC LIMIT 15`,
         )
         .bind(me, me, me)
         .all();
@@ -77,7 +106,7 @@ export async function GET(req: Request) {
     if (action === 'topics') {
       const rows = await d
         .prepare(
-          `SELECT p.text FROM posts p JOIN users u ON u.id=p.userId WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND ${contentPreference('p')} AND NOT EXISTS (SELECT 1 FROM hidden_posts WHERE postId=p.id AND userId=?) ORDER BY p.created DESC LIMIT 500`,
+          `SELECT p.text FROM posts p JOIN users u ON u.id=p.userId WHERE ${published('p')} AND ${visibleAccount('u')} AND ${personalVisibility('u')} AND ${contentPreference('p')} AND NOT EXISTS (SELECT 1 FROM hidden_posts WHERE postId=p.id AND userId=?) ORDER BY p.created DESC LIMIT 500`,
         )
         .bind(me, me, me)
         .all<{ text: string }>();
@@ -115,7 +144,7 @@ export async function GET(req: Request) {
         (
           await d
             .prepare(
-              `SELECT u.id,u.name,u.avatar,h.handle FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND u.kind='person' AND u.id<>? AND (u.name LIKE ? OR h.handle LIKE ? OR EXISTS(SELECT 1 FROM handles WHERE userId=u.id AND handle LIKE ?)) LIMIT 30`,
+              `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND u.kind='person' AND u.id<>? AND (u.name LIKE ? OR h.handle LIKE ? OR EXISTS(SELECT 1 FROM handles WHERE userId=u.id AND handle LIKE ?)) LIMIT 30`,
             )
             .bind(me, me, '%' + q + '%', '%' + q + '%', '%' + q + '%')
             .all()
@@ -135,7 +164,7 @@ export async function GET(req: Request) {
         (
           await d
             .prepare(
-              `SELECT * FROM (SELECT c.*,u.name,u.avatar,h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND c.postId=? AND (c.created<? OR (c.created=? AND c.id<?)) ORDER BY c.created DESC,c.id DESC LIMIT 50) ORDER BY created,id`,
+              `SELECT * FROM (SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND c.postId=? AND (c.created<? OR (c.created=? AND c.id<?)) ORDER BY c.created DESC,c.id DESC LIMIT 50) ORDER BY created,id`,
             )
             .bind(
               me,
@@ -153,7 +182,7 @@ export async function GET(req: Request) {
         (
           await d
             .prepare(
-              `SELECT u.id,u.name,u.avatar,h.handle,(SELECT text FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
+              `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,(SELECT text FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
             )
             .bind(me, me, me, me, me, me, me)
             .all()
@@ -194,8 +223,18 @@ export async function POST(req: Request) {
     const me = await viewer();
     const d = db();
     const action = typeof b.action === 'string' ? b.action : '';
+    const telegram = await telegramPost(action, b, me);
+    if (telegram) return telegram;
+    const call = await callsPost(action, b, me);
+    if (call) return call;
+    const premium = await premiumPost(String(action), b, me);
+    if (premium) return premium;
+    const notification = await notificationsPost(action, b, me);
+    if (notification) return notification;
     const privacy = await privacyPost(action, b, me);
     if (privacy) return privacy;
+    const story = await storiesPost(action, b, me);
+    if (story) return story;
     const moderation = await moderationPost(action, b, me);
     if (moderation) return moderation;
     if (action === 'view') await assertReadable(me);
@@ -214,6 +253,8 @@ export async function POST(req: Request) {
       ].includes(action)
     )
       await assertPostVisible(typeof b.id === 'string' ? b.id : '', me);
+    const channel = await channelFeaturePost(action, b, me);
+    if (channel) return channel;
     const feature = await featurePost(action, b, me);
     if (feature) return feature;
     const id = typeof b.id === 'string' ? b.id : '';
@@ -233,14 +274,16 @@ export async function POST(req: Request) {
         .first();
       if (!post) throw new ApiError(404, 'Публикация не найдена');
       if (action === 'pin') {
-        if (!(await canPublish(String(post.userId), me)))
+        if (!(await allowed(String(post.userId), me, 'manage')))
           throw new ApiError(403, 'Можно закрепить только свою публикацию');
-        await d
+        const result = await d
           .prepare(
-            'UPDATE posts SET pinned=CASE WHEN id=? THEN ? ELSE 0 END WHERE userId=?',
+            `UPDATE posts SET pinned=CASE WHEN id=? THEN ? ELSE 0 END WHERE userId=? AND EXISTS(SELECT 1 FROM users u WHERE u.id=posts.userId AND ${channelPermission('u', 'manage')} AND ${writableTarget('u')})`,
           )
-          .bind(id, b.value ? 1 : 0, post.userId)
+          .bind(id, b.value ? 1 : 0, post.userId, me, me, me, me)
           .run();
+        if (!result.meta.changes)
+          throw new ApiError(409, 'Права доступа изменились');
       } else if (action === 'hide') {
         if (b.value)
           await d
@@ -356,25 +399,37 @@ export async function POST(req: Request) {
           .first();
         if (!item) throw new ApiError(400, 'Файл не найден');
         await assertUploadAvailable(entry);
+        await assertMediaRead(entry, me, me);
         verified.push(item);
       }
-      await d
+      const publishAt = scheduleTime(b.publishAt);
+      const inserted = await d
         .prepare(
-          'INSERT INTO posts (id,userId,text,media,poll,code,codeLang,adult,created) VALUES (?,?,?,?,?,?,?,?,?)',
+          `WITH input AS (SELECT ? AS actor,? AS media) INSERT INTO posts (id,userId,text,media,poll,code,codeLang,adult,created,publishAt,publisherId,notifyPending) SELECT ?,u.id,?,?,?,?,?,?,?,?,?,1 FROM users u,input i WHERE u.id=? AND ${channelPermission('u')} AND ${writableTarget('u')} AND NOT EXISTS(SELECT 1 FROM json_each(i.media) j WHERE NOT EXISTS(SELECT 1 FROM uploads up WHERE up.id=j.value AND up.userId=i.actor AND ${mediaPermission('up.id', 'i.actor')}))`,
         )
         .bind(
+          me,
+          JSON.stringify(media),
           postId,
-          author,
           text,
           JSON.stringify(verified),
           JSON.stringify(poll),
           code,
           codeLang,
           b.adult === true && media.length > 0 ? 1 : 0,
-          Date.now(),
+          publishAt || Date.now(),
+          publishAt,
+          me,
+          author,
+          me,
+          me,
+          me,
+          me,
         )
         .run();
-      return Response.json({ ok: true });
+      if (!inserted.meta.changes)
+        throw new ApiError(403, 'Права публикации изменились');
+      return Response.json({ ok: true, id: postId, publishAt });
     }
     if (
       ['like', 'save', 'comment', 'vote', 'delete'].includes(String(action))
@@ -385,9 +440,16 @@ export async function POST(req: Request) {
         .first();
       if (!p) throw new ApiError(404, 'Публикация не найдена');
       if (action === 'delete') {
-        if (!(await canPublish(String(p.userId), me)))
+        if (!(await allowed(String(p.userId), me, 'manage')))
           throw new ApiError(403, 'Можно удалить только свою публикацию');
-        await d.prepare('DELETE FROM posts WHERE id=?').bind(id).run();
+        const result = await d
+          .prepare(
+            `DELETE FROM posts WHERE id=? AND EXISTS(SELECT 1 FROM users u WHERE u.id=posts.userId AND ${channelPermission('u', 'manage')} AND ${writableTarget('u')})`,
+          )
+          .bind(id, me, me, me, me)
+          .run();
+        if (!result.meta.changes)
+          throw new ApiError(409, 'Права доступа изменились');
       } else if (action === 'like' || action === 'save') {
         const table = action === 'like' ? 'likes' : 'bookmarks';
         if (b.value)
@@ -413,7 +475,7 @@ export async function POST(req: Request) {
         return Response.json(
           await d
             .prepare(
-              'SELECT c.*,u.name,u.avatar,h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE c.id=?',
+              `SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE c.id=?`,
             )
             .bind(commentId)
             .first(),
@@ -474,6 +536,10 @@ export async function POST(req: Request) {
     }
     throw new ApiError(400, 'Неизвестное действие');
   } catch (e) {
+    // Early Origin/size rejection must not strand a small POST body in the
+    // local Worker proxy's keep-alive connection.
+    if (req.body && !req.body.locked && !req.bodyUsed)
+      await readJsonBody(req, 64000).catch(() => {});
     return failure(e);
   }
 }
