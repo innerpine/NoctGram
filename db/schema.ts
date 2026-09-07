@@ -469,3 +469,58 @@ export const musicListens = sqliteTable(
     index('music_listens_recent').on(t.created, t.trackId),
   ],
 );
+
+export const musicConnections = sqliteTable(
+  'music_connections',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: text().notNull(),
+    id: text().notNull(),
+    accountId: text().notNull(),
+    displayName: text().notNull(),
+    profileUrl: text().notNull(),
+    sealedTokens: text().notNull(),
+    expiresAt: integer().notNull(),
+    status: text().notNull().default('connected'),
+    refreshLock: text().notNull().default(''),
+    refreshUntil: integer().notNull().default(0),
+    updated: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.provider] })],
+);
+export const musicOauthStates = sqliteTable(
+  'music_oauth_states',
+  {
+    stateHash: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: text().notNull(),
+    browserHash: text().notNull(),
+    sealedVerifier: text().notNull(),
+    consumed: integer().notNull().default(0),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [index('music_oauth_expiry').on(t.expiresAt)],
+);
+// Imported account playlists stay private; they never enter the public discovery/chart tables.
+export const musicImports = sqliteTable(
+  'music_imports',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: text().notNull(),
+    playlistId: text().notNull(),
+    connectionId: text().notNull(),
+    title: text().notNull(),
+    url: text().notNull(),
+    artwork: text().notNull().default(''),
+    trackCount: integer().notNull().default(0),
+    playable: integer().notNull().default(0),
+    imported: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.provider, t.playlistId] })],
+);

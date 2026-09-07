@@ -10,6 +10,7 @@ import './content-moderation.css';
 import './privacy.css';
 import './dialog-motion.css';
 import './music.css';
+import './music-services.css';
 import { MusicProvider } from './music-provider';
 export const metadata: Metadata = {
   title: 'Noctgram — лента и диалоги',

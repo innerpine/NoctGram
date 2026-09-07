@@ -4,6 +4,7 @@
 /* eslint-disable next/no-img-element, next/no-html-link-for-pages, react/react-compiler */
 import { PrivacyPanel } from './privacy-panel';
 import { MusicPanel } from './music-panel';
+import { MusicServices } from './music-services';
 import { MusicLinkCard } from './music-link-card';
 import { MusicAccountGuard } from './music-provider';
 import { Music2 } from 'lucide-react';
@@ -81,7 +82,7 @@ import {
 export default function Noctgram({
   initialPage = 'feed',
 }: {
-  initialPage?: 'feed' | 'music';
+  initialPage?: 'feed' | 'music' | 'music-services';
 }) {
   const [page, setPage] = useState<string>(initialPage),
     [me, setMe] = useState<Profile | null>(null),
@@ -106,6 +107,9 @@ export default function Noctgram({
     [lightbox, setLightbox] = useState<Media | null>(null),
     [lightboxOpen, setLightboxOpen] = useState(false),
     [hasMore, setHasMore] = useState(false);
+  useEffect(() => {
+    setPage(initialPage);
+  }, [initialPage]);
   const [draft, setDraft] = useState(''),
     [attachments, setAttachments] = useState<Media[]>([]),
     [poll, setPoll] = useState<string[] | null>(null),
@@ -312,6 +316,7 @@ export default function Noctgram({
           'messages',
           'moderation',
           'music',
+          'music-services',
         ].includes(page)
       )
         return;
@@ -398,6 +403,7 @@ export default function Noctgram({
         'messages',
         'moderation',
         'music',
+        'music-services',
       ].includes(page)
     )
       return;
@@ -1067,11 +1073,13 @@ export default function Noctgram({
             ['profile', 'Профиль', UserRound],
           ].map(([id, label, Icon]) => {
             const NavIcon = Icon as typeof Home;
+            const selected =
+              page === id || (id === 'music' && page === 'music-services');
             return (
               <button
                 key={String(id)}
-                className={page === id ? 'active' : ''}
-                aria-current={page === id ? 'page' : undefined}
+                className={selected ? 'active' : ''}
+                aria-current={selected ? 'page' : undefined}
                 onClick={() => navigate(String(id))}
               >
                 <NavIcon size={21} />
@@ -1081,7 +1089,7 @@ export default function Noctgram({
                     {unread > 99 ? '99+' : unread}
                   </span>
                 )}
-                {page === id && <i />}
+                {selected && <i />}
               </button>
             );
           })}
@@ -1146,7 +1154,7 @@ export default function Noctgram({
       >
         <header className="page-header">
           <h1>
-            {page === 'music'
+            {['music', 'music-services'].includes(page)
               ? 'Музыка'
               : page === 'moderation'
                 ? 'Модерация'
@@ -1198,7 +1206,7 @@ export default function Noctgram({
             className="icon-button"
             aria-label="Обновить"
             onClick={() => {
-              if (page === 'music') {
+              if (['music', 'music-services'].includes(page)) {
                 window.dispatchEvent(new Event('noctgram:music-refresh'));
               } else if (me && page === 'messages') {
                 void loadThreads().catch((e) => notify(e.message));
@@ -1538,6 +1546,9 @@ export default function Noctgram({
               composer}
           </>
         )}
+        {page === 'music-services' && (
+          <MusicServices signedIn={!!me} readOnly={!!readOnly} />
+        )}
         {page === 'music' && (
           <MusicPanel
             signedIn={!!me}
@@ -1565,6 +1576,7 @@ export default function Noctgram({
           'channels',
           'moderation',
           'music',
+          'music-services',
         ].includes(page) &&
           !(page === 'profile' && profile?.blocked) && (
             <>

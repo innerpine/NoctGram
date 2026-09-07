@@ -2,6 +2,7 @@
 /* Async subscriptions intentionally update loading state; provider artwork keeps its attribution. */
 /* eslint-disable react/react-compiler, next/no-img-element, next/no-html-link-for-pages */
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   ArrowUpRight,
   Headphones,
@@ -212,6 +213,14 @@ export function MusicPanel({
           <RefreshCw size={17} className={loading ? 'spin' : ''} />
         </button>
       </div>
+      <Link href="/music/services" className="music-services-link">
+        <Headphones size={21} />
+        <span>
+          <strong>Подключить музыкальные сервисы</strong>
+          <small>Ваши аккаунты и плейлисты</small>
+        </span>
+        <ArrowUpRight size={19} />
+      </Link>
       <Tabs
         value={tab}
         onValueChange={(v) => setTab(String(v))}
@@ -397,12 +406,6 @@ export function MusicPanel({
           </>
         )
       )}
-      <div className="music-connections">
-        <span className="music-source active">SoundCloud · по ссылке</span>
-        <span className="music-source">Spotify · не подключён</span>
-        <span className="music-source">Яндекс Музыка · не подключена</span>
-        <p>Импорт музыки из аккаунтов пока недоступен.</p>
-      </div>
     </div>
   );
 }
