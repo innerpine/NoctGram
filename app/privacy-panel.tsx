@@ -16,6 +16,7 @@ import {
 import { Select } from '@base-ui/react/select';
 import { Switch } from '@base-ui/react/switch';
 import { request, type Person } from '@/lib/client';
+import { PushSettings } from './notifications';
 import { Avatar } from './post-card';
 
 type Settings = {
@@ -136,6 +137,7 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
       )}
       {settings && (
         <>
+          <PushSettings />
           <form
             className="edit-form"
             onSubmit={(e) => {

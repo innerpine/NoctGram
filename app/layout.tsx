@@ -8,9 +8,16 @@ import './account-states.css';
 import './auth.css';
 import './content-moderation.css';
 import './privacy.css';
+import './realtime.css';
 import './dialog-motion.css';
 export const metadata: Metadata = {
   title: 'Noctgram — лента и диалоги',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'Noctgram',
+    statusBarStyle: 'black-translucent',
+  },
   icons: { icon: '/assets/noctgram-logo.png' },
   description:
     'Публикации, фотографии, опросы и личные диалоги. Твоё пространство в Noctgram.',

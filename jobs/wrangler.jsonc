@@ -1,0 +1,6 @@
+{
+  "name": "noctgram-notifications",
+  "main": "worker.ts",
+  "compatibility_date": "2026-05-15",
+  "triggers": { "crons": ["* * * * *"] }
+}

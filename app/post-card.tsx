@@ -154,6 +154,7 @@ export function PostCard({
   const article = useRef<HTMLElement>(null),
     recorded = useRef(false);
   const mine = p.userId === me || p.ownerId === me;
+  const canManage = mine || !!p.canManagePosts;
   useEffect(() => {
     if (!me || mine || recorded.current || !article.current) return;
     let visible = false;
@@ -256,7 +257,7 @@ export function PostCard({
                 <Link size={15} />
                 Скопировать ссылку
               </DropdownMenuItem>
-              {mine ? (
+              {canManage ? (
                 <>
                   <DropdownMenuItem
                     disabled={busy}

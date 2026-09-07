@@ -1,3 +1,18 @@
+import { assertMediaRead, mediaPermission } from '@/lib/media-access';
+import { callsGet, callsPost } from '@/lib/calls';
+import { notificationsGet, notificationsPost } from '@/lib/notifications';
+import {
+  channelFeatureGet,
+  channelFeaturePost,
+  scheduleTime,
+} from '@/lib/channel-features';
+import { storiesGet, storiesPost } from '@/lib/stories';
+import {
+  published,
+  allowed,
+  channelPermission,
+  writableTarget,
+} from '@/lib/channel-access';
 import {
   privacyGet,
   privacyPost,
@@ -45,8 +60,15 @@ export async function GET(req: Request) {
       });
     await assertReadable(me);
     const d = db();
+    const realtime =
+      (await callsGet(action, s, me)) || (await notificationsGet(action, me));
+    if (realtime) return realtime;
     const privacy = await privacyGet(action, s, me);
     if (privacy) return privacy;
+    const extended =
+      (await channelFeatureGet(action, s, me)) ||
+      (await storiesGet(action, s, me));
+    if (extended) return extended;
     const feature = await featureGet(action, s, me);
     if (feature) return feature;
     if (action === 'bootstrap') {
@@ -77,7 +99,7 @@ export async function GET(req: Request) {
     if (action === 'topics') {
       const rows = await d
         .prepare(
-          `SELECT p.text FROM posts p JOIN users u ON u.id=p.userId WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND ${contentPreference('p')} AND NOT EXISTS (SELECT 1 FROM hidden_posts WHERE postId=p.id AND userId=?) ORDER BY p.created DESC LIMIT 500`,
+          `SELECT p.text FROM posts p JOIN users u ON u.id=p.userId WHERE ${published('p')} AND ${visibleAccount('u')} AND ${personalVisibility('u')} AND ${contentPreference('p')} AND NOT EXISTS (SELECT 1 FROM hidden_posts WHERE postId=p.id AND userId=?) ORDER BY p.created DESC LIMIT 500`,
         )
         .bind(me, me, me)
         .all<{ text: string }>();
@@ -194,8 +216,14 @@ export async function POST(req: Request) {
     const me = await viewer();
     const d = db();
     const action = typeof b.action === 'string' ? b.action : '';
+    const call = await callsPost(action, b, me);
+    if (call) return call;
+    const notification = await notificationsPost(action, b, me);
+    if (notification) return notification;
     const privacy = await privacyPost(action, b, me);
     if (privacy) return privacy;
+    const story = await storiesPost(action, b, me);
+    if (story) return story;
     const moderation = await moderationPost(action, b, me);
     if (moderation) return moderation;
     if (action === 'view') await assertReadable(me);
@@ -214,6 +242,8 @@ export async function POST(req: Request) {
       ].includes(action)
     )
       await assertPostVisible(typeof b.id === 'string' ? b.id : '', me);
+    const channel = await channelFeaturePost(action, b, me);
+    if (channel) return channel;
     const feature = await featurePost(action, b, me);
     if (feature) return feature;
     const id = typeof b.id === 'string' ? b.id : '';
@@ -233,14 +263,16 @@ export async function POST(req: Request) {
         .first();
       if (!post) throw new ApiError(404, 'Публикация не найдена');
       if (action === 'pin') {
-        if (!(await canPublish(String(post.userId), me)))
+        if (!(await allowed(String(post.userId), me, 'manage')))
           throw new ApiError(403, 'Можно закрепить только свою публикацию');
-        await d
+        const result = await d
           .prepare(
-            'UPDATE posts SET pinned=CASE WHEN id=? THEN ? ELSE 0 END WHERE userId=?',
+            `UPDATE posts SET pinned=CASE WHEN id=? THEN ? ELSE 0 END WHERE userId=? AND EXISTS(SELECT 1 FROM users u WHERE u.id=posts.userId AND ${channelPermission('u', 'manage')} AND ${writableTarget('u')})`,
           )
-          .bind(id, b.value ? 1 : 0, post.userId)
+          .bind(id, b.value ? 1 : 0, post.userId, me, me, me, me)
           .run();
+        if (!result.meta.changes)
+          throw new ApiError(409, 'Права доступа изменились');
       } else if (action === 'hide') {
         if (b.value)
           await d
@@ -356,25 +388,37 @@ export async function POST(req: Request) {
           .first();
         if (!item) throw new ApiError(400, 'Файл не найден');
         await assertUploadAvailable(entry);
+        await assertMediaRead(entry, me, me);
         verified.push(item);
       }
-      await d
+      const publishAt = scheduleTime(b.publishAt);
+      const inserted = await d
         .prepare(
-          'INSERT INTO posts (id,userId,text,media,poll,code,codeLang,adult,created) VALUES (?,?,?,?,?,?,?,?,?)',
+          `WITH input AS (SELECT ? AS actor,? AS media) INSERT INTO posts (id,userId,text,media,poll,code,codeLang,adult,created,publishAt,publisherId,notifyPending) SELECT ?,u.id,?,?,?,?,?,?,?,?,?,1 FROM users u,input i WHERE u.id=? AND ${channelPermission('u')} AND ${writableTarget('u')} AND NOT EXISTS(SELECT 1 FROM json_each(i.media) j WHERE NOT EXISTS(SELECT 1 FROM uploads up WHERE up.id=j.value AND up.userId=i.actor AND ${mediaPermission('up.id', 'i.actor')}))`,
         )
         .bind(
+          me,
+          JSON.stringify(media),
           postId,
-          author,
           text,
           JSON.stringify(verified),
           JSON.stringify(poll),
           code,
           codeLang,
           b.adult === true && media.length > 0 ? 1 : 0,
-          Date.now(),
+          publishAt || Date.now(),
+          publishAt,
+          me,
+          author,
+          me,
+          me,
+          me,
+          me,
         )
         .run();
-      return Response.json({ ok: true });
+      if (!inserted.meta.changes)
+        throw new ApiError(403, 'Права публикации изменились');
+      return Response.json({ ok: true, id: postId, publishAt });
     }
     if (
       ['like', 'save', 'comment', 'vote', 'delete'].includes(String(action))
@@ -385,9 +429,16 @@ export async function POST(req: Request) {
         .first();
       if (!p) throw new ApiError(404, 'Публикация не найдена');
       if (action === 'delete') {
-        if (!(await canPublish(String(p.userId), me)))
+        if (!(await allowed(String(p.userId), me, 'manage')))
           throw new ApiError(403, 'Можно удалить только свою публикацию');
-        await d.prepare('DELETE FROM posts WHERE id=?').bind(id).run();
+        const result = await d
+          .prepare(
+            `DELETE FROM posts WHERE id=? AND EXISTS(SELECT 1 FROM users u WHERE u.id=posts.userId AND ${channelPermission('u', 'manage')} AND ${writableTarget('u')})`,
+          )
+          .bind(id, me, me, me, me)
+          .run();
+        if (!result.meta.changes)
+          throw new ApiError(409, 'Права доступа изменились');
       } else if (action === 'like' || action === 'save') {
         const table = action === 'like' ? 'likes' : 'bookmarks';
         if (b.value)

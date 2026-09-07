@@ -243,6 +243,15 @@ export async function moderationPost(
             'INSERT INTO account_restrictions(userId,eventId,mode,reason,expiresAt,created) VALUES(?,?,?,?,?,?) ON CONFLICT(userId) DO UPDATE SET eventId=excluded.eventId,mode=excluded.mode,reason=excluded.reason,expiresAt=excluded.expiresAt,created=excluded.created',
           )
           .bind(id, eventId, mode, reason, until, now),
+    ...(mode === 'active'
+      ? []
+      : [
+          d
+            .prepare(
+              'UPDATE posts SET cancelledAt=? WHERE cancelledAt=0 AND publishAt>? AND (userId=? OR publisherId=? OR userId IN(SELECT id FROM users WHERE ownerId=?))',
+            )
+            .bind(now, now, id, id, id),
+        ]),
   ]);
   return Response.json({ ok: true });
 }

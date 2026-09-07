@@ -1,3 +1,4 @@
+import { published, channelRights } from './channel-access';
 import { personalVisibility, contentPreference } from './privacy';
 import {
   visibleAccount,
@@ -105,7 +106,7 @@ export async function profile(id: string, me: string) {
   const d = db();
   const user = await d
     .prepare(
-      `SELECT *, (SELECT id FROM posts WHERE userId=users.id AND pinned=1 LIMIT 1) as pinnedPostId, (SELECT handle FROM handles WHERE userId=users.id AND main=1 LIMIT 1) as handle, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.follower WHERE f.following=users.id AND ${visibleAccount('fu')}) as followers, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.following WHERE f.follower=users.id AND ${visibleAccount('fu')}) as following, (SELECT COUNT(*) FROM posts WHERE userId=users.id) as postCount, EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=users.id) as followed FROM users WHERE id=?`,
+      `SELECT *, (SELECT id FROM posts WHERE userId=users.id AND cancelledAt=0 AND publishAt<=strftime('%s','now')*1000 AND pinned=1 LIMIT 1) as pinnedPostId, (SELECT handle FROM handles WHERE userId=users.id AND main=1 LIMIT 1) as handle, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.follower WHERE f.following=users.id AND ${visibleAccount('fu')}) as followers, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.following WHERE f.follower=users.id AND ${visibleAccount('fu')}) as following, (SELECT COUNT(*) FROM posts WHERE userId=users.id AND cancelledAt=0 AND publishAt<=strftime('%s','now')*1000) as postCount, EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=users.id) as followed FROM users WHERE id=?`,
     )
     .bind(me, id)
     .first();
@@ -147,10 +148,12 @@ export async function profile(id: string, me: string) {
       };
   }
   const own = id === me;
+  const rights = user.kind === 'channel' ? await channelRights(id, me) : null;
   return {
     ...user,
+    ...rights,
     handles: hs.results.map((h) => h.handle),
-    ...(user.ownerId === me ? { restriction: await restriction(id) } : {}),
+    ...(rights?.canPublish ? { restriction: await restriction(id) } : {}),
     ...(own
       ? {
           restriction: await restriction(me),
@@ -208,6 +211,8 @@ export async function feed(
   }
   where +=
     ' AND ' +
+    published('p') +
+    ' AND ' +
     visibleAccount('u') +
     ' AND ' +
     personalVisibility('u') +
@@ -230,6 +235,10 @@ export async function feed(
         .all();
       return {
         ...p,
+        canManagePosts:
+          p.userId === me ||
+          (p.kind === 'channel' &&
+            (await channelRights(String(p.userId), me)).canManagePosts),
         media: JSON.parse(String(p.media)),
         poll: JSON.parse(String(p.poll)),
         votes: v.results,

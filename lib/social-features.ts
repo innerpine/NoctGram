@@ -1,21 +1,20 @@
+import { assertMediaRead, mediaAssignment } from '@/lib/media-access';
+import {
+  allowed,
+  channelRights,
+  channelPermission,
+  writableTarget,
+} from './channel-access';
 import { personalVisibility } from './privacy';
 import {
   visibleAccount,
   assertAccountVisible,
-  assertChannelWritable,
   assertUploadAvailable,
 } from './account-access';
 import { db, clean, ApiError, profile } from '@/lib/server';
 
 export async function canPublish(id: string, me: string) {
-  const owned = !!(await db()
-    .prepare(
-      "SELECT id FROM users WHERE id=? AND (id=? OR (kind='channel' AND ownerId=?))",
-    )
-    .bind(id, me, me)
-    .first());
-  if (owned && id !== me) await assertChannelWritable(id);
-  return owned;
+  return allowed(id, me, 'publish');
 }
 async function ensureWallet(me: string) {
   await db()
@@ -34,10 +33,11 @@ async function balance(me: string) {
     .first<{ balance: number }>();
   return row?.balance || 0;
 }
-async function validImage(url: unknown, me: string) {
+async function validImage(url: unknown, me: string, existing?: string) {
   const value = clean(url || '', 200);
   if (
     value &&
+    value !== existing &&
     !(await db()
       .prepare(
         "SELECT id FROM uploads WHERE id=? AND userId=? AND type LIKE 'image/%'",
@@ -46,7 +46,11 @@ async function validImage(url: unknown, me: string) {
       .first())
   )
     throw new ApiError(400, 'Изображение не найдено');
-  if (value) await assertUploadAvailable(value.replace('/api/media/', ''));
+  if (value) {
+    const mediaId = value.replace('/api/media/', '');
+    await assertUploadAvailable(mediaId);
+    if (value !== existing) await assertMediaRead(mediaId, me, me);
+  }
   return value;
 }
 function handle(value: unknown) {
@@ -105,8 +109,8 @@ export async function featureGet(
     const rows = await d
       .prepare(`SELECT u.id FROM users u JOIN handles h ON h.userId=u.id AND h.main=1
       WHERE (${visibleAccount('u')} OR u.ownerId=?) AND ${personalVisibility('u')} AND u.kind='channel' AND (u.name LIKE ? OR h.handle LIKE ?)
-      ORDER BY (u.ownerId=?) DESC,u.created DESC LIMIT 50`)
-      .bind(me, me, q, q, me)
+      ORDER BY (u.ownerId=? OR EXISTS(SELECT 1 FROM channel_members WHERE channelId=u.id AND userId=?)) DESC,u.created DESC LIMIT 50`)
+      .bind(me, me, q, q, me, me)
       .all<{ id: string }>();
     return Response.json(
       await Promise.all(rows.results.map((r) => profile(r.id, me))),
@@ -167,12 +171,14 @@ export async function featurePost(
       await d.batch([
         d
           .prepare(
-            "INSERT INTO users(id,name,bio,avatar,kind,ownerId,created) VALUES(?,?,?,?,'channel',?,?)",
+            `WITH input AS(SELECT ? AS actor,? AS avatar) INSERT INTO users(id,name,bio,avatar,kind,ownerId,created) SELECT ?,?,?,i.avatar,'channel',i.actor,? FROM input i WHERE ${mediaAssignment("''", 'i.avatar', 'i.actor')} AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=i.actor AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))`,
           )
-          .bind(channelId, name, bio, avatar, me, Date.now()),
+          .bind(me, avatar, channelId, name, bio, Date.now()),
         d
-          .prepare('INSERT INTO handles(handle,userId,main) VALUES(?,?,1)')
-          .bind(h, channelId),
+          .prepare(
+            'INSERT INTO handles(handle,userId,main) SELECT ?,?,1 WHERE EXISTS(SELECT 1 FROM users WHERE id=?)',
+          )
+          .bind(h, channelId, channelId),
       ]);
     } catch (e) {
       if (
@@ -184,18 +190,33 @@ export async function featurePost(
         throw new ApiError(409, 'Этот юзернейм уже занят');
       throw e;
     }
+    if (
+      !(await d
+        .prepare('SELECT id FROM users WHERE id=?')
+        .bind(channelId)
+        .first())
+    )
+      throw new ApiError(409, 'Права на публикацию или вложение изменились');
     return Response.json(await profile(channelId, me));
   }
   if (action === 'profile') {
     const target = id || me;
-    if (!(await canPublish(target, me)))
+    if (!(await allowed(target, me, 'profile')))
       throw new ApiError(403, 'Нельзя редактировать чужой профиль');
+    const current = await d
+      .prepare('SELECT avatar,cover FROM users WHERE id=?')
+      .bind(target)
+      .first<{ avatar: string; cover: string }>();
+    const rights = await channelRights(target, me);
     const name = clean(b.name, 40, true),
       bio = clean(b.bio, 300),
-      avatar = await validImage(b.avatar, me),
-      cover = await validImage(b.cover, me);
+      avatar = await validImage(b.avatar, me, current?.avatar),
+      cover = await validImage(b.cover, me, current?.cover);
     const statements = [];
-    if (b.mainHandle !== undefined) {
+    // mediaAssignment repeats its expressions; use an input CTE to bind each value once.
+    const eligibility = `WITH input AS(SELECT ? AS actor,? AS avatar,? AS cover),eligible AS(SELECT u.id FROM users u,input i WHERE u.id=? AND ${mediaAssignment('u.avatar', 'i.avatar', 'i.actor')} AND ${mediaAssignment('u.cover', 'i.cover', 'i.actor')})`;
+    const eligibilityArgs = [me, avatar, cover, target];
+    if (b.mainHandle !== undefined && rights.canManageMembers) {
       if (!Array.isArray(b.extraHandles) || b.extraHandles.length > 4)
         throw new ApiError(
           400,
@@ -220,23 +241,44 @@ export async function featurePost(
       if (occupied)
         throw new ApiError(409, 'Юзернейм @' + occupied.handle + ' уже занят');
       statements.push(
-        d.prepare('DELETE FROM handles WHERE userId=?').bind(target),
+        d
+          .prepare(
+            `${eligibility} DELETE FROM handles WHERE userId=? AND userId IN(SELECT id FROM eligible) AND EXISTS(SELECT 1 FROM users u WHERE u.id=handles.userId AND ${channelPermission('u', 'members')} AND ${writableTarget('u')})`,
+          )
+          .bind(...eligibilityArgs, target, me, me, me),
       );
       names.forEach((h, i) =>
         statements.push(
           d
-            .prepare('INSERT INTO handles(handle,userId,main) VALUES(?,?,?)')
-            .bind(h, target, i === 0 ? 1 : 0),
+            .prepare(
+              `${eligibility} INSERT INTO handles(handle,userId,main) SELECT ?,u.id,? FROM users u WHERE u.id=? AND u.id IN(SELECT id FROM eligible) AND ${channelPermission('u', 'members')} AND ${writableTarget('u')}`,
+            )
+            .bind(...eligibilityArgs, h, i === 0 ? 1 : 0, target, me, me, me),
         ),
       );
     }
     statements.push(
       d
-        .prepare('UPDATE users SET name=?,bio=?,avatar=?,cover=? WHERE id=?')
-        .bind(name, bio, avatar, cover, target),
+        .prepare(
+          `${eligibility} UPDATE users AS u SET name=?,bio=?,avatar=?,cover=? WHERE id=? AND id IN(SELECT id FROM eligible) AND ${channelPermission('u', 'profile')} AND ${writableTarget('u')}`,
+        )
+        .bind(
+          ...eligibilityArgs,
+          name,
+          bio,
+          avatar,
+          cover,
+          target,
+          me,
+          me,
+          me,
+          me,
+        ),
     );
     try {
-      await d.batch(statements);
+      const result = await d.batch(statements);
+      if (!result.at(-1)?.meta.changes)
+        throw new ApiError(409, 'Права доступа изменились. Обнови профиль.');
     } catch (e) {
       if (String(e).includes('UNIQUE'))
         throw new ApiError(409, 'Юзернейм занят. Изменения не сохранены.');

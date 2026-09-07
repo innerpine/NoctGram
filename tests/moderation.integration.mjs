@@ -123,7 +123,12 @@ try {
   });
   assert.equal(up.status, 200);
   const media = await up.json();
-  const image = await fetch(base + media.url, { headers: auth(b) });
+  // Unpublished uploads are private; moderation still applies after publication.
+  assert.equal(
+    (await fetch(base + media.url, { headers: auth(b) })).status,
+    404,
+  );
+  const image = await fetch(base + media.url, { headers: auth(a) });
   assert.equal(image.status, 200);
   assert.match(image.headers.get('cache-control'), /no-store/);
   await image.arrayBuffer();
@@ -375,7 +380,7 @@ try {
   );
   assert.equal(
     (await fetch(base + media.url, { headers: auth(b) })).status,
-    403,
+    404,
   );
   await account(b);
   assert.equal(

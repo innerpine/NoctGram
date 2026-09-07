@@ -45,6 +45,10 @@ export const posts = sqliteTable(
     code: text().notNull().default(''),
     codeLang: text().notNull().default('text'),
     adult: integer().notNull().default(0),
+    publishAt: integer().notNull().default(0),
+    cancelledAt: integer().notNull().default(0),
+    publisherId: text().references(() => users.id),
+    notifyPending: integer().notNull().default(0),
     created: integer().notNull(),
   },
   (t) => [
@@ -403,5 +407,156 @@ export const userBlocks = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.blocker, t.blocked] }),
     index('user_blocks_reverse').on(t.blocked, t.blocker),
+  ],
+);
+
+export const channelMembers = sqliteTable(
+  'channel_members',
+  {
+    channelId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.channelId, t.userId] }),
+    index('channel_members_user').on(t.userId),
+  ],
+);
+export const stories = sqliteTable(
+  'stories',
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    mediaId: text().references(() => uploads.id),
+    text: text().notNull().default(''),
+    background: text().notNull().default('night'),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+    deletedAt: integer().notNull().default(0),
+  },
+  (t) => [
+    index('stories_expiry').on(t.expiresAt),
+    index('stories_author').on(t.userId, t.created),
+  ],
+);
+export const storyViews = sqliteTable(
+  'story_views',
+  {
+    storyId: text()
+      .notNull()
+      .references(() => stories.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    created: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.storyId, t.userId] })],
+);
+export const calls = sqliteTable(
+  'calls',
+  {
+    id: text().primaryKey(),
+    caller: text()
+      .notNull()
+      .references(() => users.id),
+    callee: text()
+      .notNull()
+      .references(() => users.id),
+    callerDevice: text().notNull(),
+    calleeDevice: text(),
+    status: text().notNull().default('ringing'),
+    reason: text().notNull().default(''),
+    offer: text(),
+    answer: text(),
+    created: integer().notNull(),
+    acceptedAt: integer(),
+    endedAt: integer(),
+    callerSeen: integer().notNull(),
+    calleeSeen: integer().notNull(),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [
+    index('calls_caller').on(t.caller, t.created),
+    index('calls_callee').on(t.callee, t.created),
+  ],
+);
+export const callSignals = sqliteTable(
+  'call_signals',
+  {
+    id: integer().primaryKey({ autoIncrement: true }),
+    callId: text()
+      .notNull()
+      .references(() => calls.id, { onDelete: 'cascade' }),
+    sender: text()
+      .notNull()
+      .references(() => users.id),
+    key: text().notNull(),
+    candidate: text().notNull(),
+  },
+  (t) => [
+    uniqueIndex('call_signal_once').on(t.callId, t.sender, t.key),
+    index('call_signals_order').on(t.callId, t.id),
+  ],
+);
+export const notifications = sqliteTable(
+  'notifications',
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    actorId: text()
+      .notNull()
+      .references(() => users.id),
+    kind: text().notNull(),
+    targetId: text().notNull(),
+    created: integer().notNull(),
+    read: integer().notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex('notification_once').on(t.userId, t.kind, t.targetId),
+    index('notifications_user').on(t.userId, t.created),
+  ],
+);
+export const pushSubscriptions = sqliteTable(
+  'push_subscriptions',
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    device: text().notNull(),
+    endpoint: text().notNull(),
+    p256dh: text().notNull(),
+    auth: text().notNull(),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [index('push_subscriptions_user').on(t.userId)],
+);
+export const pushDeliveries = sqliteTable(
+  'push_deliveries',
+  {
+    notificationId: text()
+      .notNull()
+      .references(() => notifications.id, { onDelete: 'cascade' }),
+    subscriptionId: text()
+      .notNull()
+      .references(() => pushSubscriptions.id, { onDelete: 'cascade' }),
+    state: text().notNull().default('pending'),
+    attempts: integer().notNull().default(0),
+    retryAt: integer().notNull().default(0),
+    lease: text(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.notificationId, t.subscriptionId] }),
+    index('push_delivery_retry').on(t.state, t.retryAt),
   ],
 );

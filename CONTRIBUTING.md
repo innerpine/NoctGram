@@ -62,3 +62,7 @@ git push -u origin feature/chat-improvements
 - `.env`, `.dev.vars`, `.wrangler`, `node_modules`, `dist`, `work` и `outputs` исключены через `.gitignore`.
 - Актуальный стиль и ограничения маскота описаны в [DESIGN.md](DESIGN.md); будущие функции — в [TODO.md](TODO.md).
 - Загрузка кода на GitHub не публикует приложение. Общий адрес приложения и рабочая база настраиваются отдельно.
+
+## Новые функции общения
+
+После миграции 0007 выполнить `npm run setup:realtime`, затем держать отдельно `npm run dev` и `npm run dev:jobs`. Настройка общего сервера, TURN, push и проверка устройств описаны в [REALTIME_SETUP.md](REALTIME_SETUP.md). Локальные базы двух разработчиков остаются независимыми.

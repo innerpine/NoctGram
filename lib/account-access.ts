@@ -1,3 +1,4 @@
+import { published } from './channel-access';
 import {
   personalVisibility,
   contentPreference,
@@ -79,9 +80,10 @@ export async function assertUploadAvailable(id: string) {
     .prepare(`WITH uses AS (
     SELECT u.id,u.ownerId,u.onboardingComplete FROM posts p JOIN users u ON u.id=p.userId
       WHERE EXISTS(SELECT 1 FROM json_each(p.media) m WHERE json_extract(m.value,'$.id')=?)
+    UNION SELECT u.id,u.ownerId,u.onboardingComplete FROM stories s JOIN users u ON u.id=s.userId WHERE s.mediaId=? AND s.deletedAt=0 AND s.expiresAt>strftime('%s','now')*1000
     UNION SELECT u.id,u.ownerId,u.onboardingComplete FROM users u WHERE u.avatar=? OR u.cover=?
   ) SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN ${visibleAccount('u')} THEN 1 ELSE 0 END),0) AS visible FROM uses u`)
-    .bind(id, '/api/media/' + id, '/api/media/' + id)
+    .bind(id, id, '/api/media/' + id, '/api/media/' + id)
     .first<{ total: number; visible: number }>();
   if (uses?.total && !uses.visible) throw new ApiError(404, 'Файл недоступен');
 }
@@ -105,6 +107,8 @@ export async function assertPostVisible(id: string, me?: string) {
   const post = await db()
     .prepare(
       'SELECT u.id FROM posts p JOIN users u ON u.id=p.userId WHERE p.id=? AND ' +
+        published('p') +
+        ' AND ' +
         visibleAccount('u') +
         (me
           ? ' AND ' + personalVisibility('u') + ' AND ' + contentPreference('p')

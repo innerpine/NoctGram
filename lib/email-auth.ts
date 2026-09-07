@@ -1,3 +1,5 @@
+import { identity as currentIdentity } from './auth-session';
+import { removePushDevice } from './notifications';
 import { db } from './storage';
 import { ApiError } from './api-error';
 import { clean, viewer } from './server';
@@ -407,6 +409,22 @@ export async function finishOnboarding(b: Record<string, unknown>) {
   return Response.json({ redirectTo: '/' });
 }
 export async function signOut(req: Request) {
+  const current = await currentIdentity();
+  await removePushDevice();
+  if (current) {
+    await db().batch([
+      db()
+        .prepare(
+          "UPDATE calls SET status='ended',reason='completed',endedAt=?,offer=NULL,answer=NULL WHERE (caller=? OR callee=?) AND status<>'ended'",
+        )
+        .bind(Date.now(), current.userId, current.userId),
+      db()
+        .prepare(
+          "DELETE FROM call_signals WHERE callId IN(SELECT id FROM calls WHERE status='ended' AND (caller=? OR callee=?))",
+        )
+        .bind(current.userId, current.userId),
+    ]);
+  }
   const token = cookieValue(req.headers.get('cookie'), SESSION_COOKIE),
     pending = cookieValue(req.headers.get('cookie'), CHALLENGE_COOKIE);
   await db().batch([

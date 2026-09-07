@@ -32,6 +32,11 @@ export type AccountAppeal = {
   created: number;
 };
 export type Profile = Person & {
+  channelRole?: 'owner' | 'admin' | 'editor' | null;
+  canPublish?: boolean;
+  canEditProfile?: boolean;
+  canManagePosts?: boolean;
+  canManageMembers?: boolean;
   restriction?: AccountRestriction | null;
   appeal?: AccountAppeal | null;
   canModerate?: boolean;
@@ -48,6 +53,10 @@ export type Profile = Person & {
 };
 export type Media = { id: string; type: string; name: string; url?: string };
 export type Post = {
+  publishAt?: number;
+  publisherId?: string;
+  cancelledAt?: number;
+  canManagePosts?: boolean;
   id: string;
   userId: string;
   name: string;

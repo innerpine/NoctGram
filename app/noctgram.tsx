@@ -2,6 +2,11 @@
 /* Auth routes require top-level links; private R2 images must keep session cookies.
    Async subscription effects intentionally set loading state; no React compiler is enabled. */
 /* eslint-disable next/no-img-element, next/no-html-link-for-pages, react/react-compiler */
+import { StoriesBar } from './stories-bar';
+import { ChannelTools, localDate } from './channel-tools';
+import { NotificationsBell } from './notifications';
+import { useAudioCalls } from './audio-calls';
+import { Clock3, Phone } from 'lucide-react';
 import { PrivacyPanel } from './privacy-panel';
 import { Ban, Flag } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -132,8 +137,11 @@ export default function Noctgram() {
     [messageText, setMessageText] = useState(''),
     [peopleQuery, setPeopleQuery] = useState(''),
     [found, setFound] = useState<Person[]>([]);
+  const [scheduledAt, setScheduledAt] = useState(''),
+    [scheduleVersion, setScheduleVersion] = useState(0);
   const readOnly = me?.restriction?.mode === 'read_only';
   const accountBlocked = me?.restriction?.mode === 'blocked';
+  const audioCalls = useAudioCalls(me?.id, readOnly || accountBlocked);
   const fileRef = useRef<HTMLInputElement>(null),
     searchRef = useRef<HTMLInputElement>(null),
     draftRef = useRef<HTMLTextAreaElement>(null),
@@ -260,13 +268,7 @@ export default function Noctgram() {
     };
   }, [myId, updateAccount]);
   useEffect(() => {
-    if (
-      !myId ||
-      page !== 'profile' ||
-      profile?.kind !== 'channel' ||
-      profile.ownerId !== myId
-    )
-      return;
+    if (!myId || page !== 'profile' || profile?.kind !== 'channel') return;
     const id = profile.id;
     let live = true,
       pending = false;
@@ -422,7 +424,22 @@ export default function Noctgram() {
   }, [myId, privacyVersion, updateAccount]);
   useEffect(() => {
     if (!myId) return;
-    const id = new URLSearchParams(window.location.search).get('post');
+    const params = new URLSearchParams(window.location.search);
+    const chat = params.get('chat');
+    if (chat)
+      void request<Profile>('?action=profile&id=' + encodeURIComponent(chat))
+        .then((person) => {
+          if (person.kind === 'channel') return;
+          messageVersion.current++;
+          activePeer.current = person.id;
+          setMessages([]);
+          setPeer(person);
+          setMessageAccess(null);
+          setMessageText('');
+          setPage('messages');
+        })
+        .catch((e) => notify(e.message));
+    const id = params.get('post');
     if (!id) return;
     let active = true;
     request<Post>('?action=post&id=' + encodeURIComponent(id))
@@ -610,6 +627,7 @@ export default function Noctgram() {
         code: code || '',
         codeLang,
         adult,
+        publishAt: scheduledAt ? new Date(scheduledAt).getTime() : 0,
       });
       setDraft('');
       setAttachments([]);
@@ -623,7 +641,13 @@ export default function Noctgram() {
       );
       if (updated.id === me?.id) setMe(updated);
       setProfile((current) => (current?.id === updated.id ? updated : current));
-      notify('Публикация появилась в ленте');
+      notify(
+        scheduledAt
+          ? 'Публикация добавлена в очередь'
+          : 'Публикация появилась в ленте',
+      );
+      setScheduledAt('');
+      setScheduleVersion((v) => v + 1);
     });
   };
   const recordView = useCallback(
@@ -727,15 +751,17 @@ export default function Noctgram() {
   };
   const profileOwned =
     !!me && (profile?.id === me.id || profile?.ownerId === me.id);
+  const profileEditable = profileOwned || !!profile?.canEditProfile;
+  const profilePublisher = profileOwned || !!profile?.canPublish;
   const channelRestricted =
     profile?.kind === 'channel' && !!profile.restriction;
   const edit = () => {
     if (!me || accountBlocked) return;
-    if (profileOwned && channelRestricted) {
+    if (profileEditable && channelRestricted) {
       notify('Редактирование канала ограничено модератором');
       return;
     }
-    const target = profileOwned && profile ? profile : me;
+    const target = profileEditable && profile ? profile : me;
     setEditTab(readOnly && target.id === me.id ? 'privacy' : 'profile');
     setEditId(target.id);
     setEditName(target.name);
@@ -905,7 +931,41 @@ export default function Noctgram() {
           />
         </div>
       )}
+      {scheduledAt && (
+        <div className="schedule-editor">
+          <Clock3 size={18} />
+          <label>
+            Когда опубликовать
+            <input
+              type="datetime-local"
+              required
+              min={localDate(Date.now() + 60000)}
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+            />
+          </label>
+          <button
+            className="icon-button"
+            aria-label="Опубликовать без задержки"
+            onClick={() => setScheduledAt('')}
+          >
+            <X size={17} />
+          </button>
+          <small className="meta">Время на этом устройстве</small>
+        </div>
+      )}
       <div className="toolbar">
+        <button
+          title="Отложить публикацию"
+          aria-label="Отложить публикацию"
+          aria-pressed={!!scheduledAt}
+          className={scheduledAt ? 'selected' : ''}
+          onClick={() => {
+            if (auth()) setScheduledAt((v) => (v ? '' : localDate()));
+          }}
+        >
+          <Clock3 size={19} />
+        </button>
         <input
           ref={fileRef}
           className="hidden"
@@ -974,7 +1034,13 @@ export default function Noctgram() {
           }
           onClick={publish}
         >
-          {busy ? <LoaderCircle size={14} className="spin" /> : 'Опубликовать'}
+          {busy ? (
+            <LoaderCircle size={14} className="spin" />
+          ) : scheduledAt ? (
+            'Отложить'
+          ) : (
+            'Опубликовать'
+          )}
           <ArrowUpRight size={14} />
         </button>
       </div>
@@ -1026,6 +1092,7 @@ export default function Noctgram() {
     );
   return (
     <div className="app-shell">
+      {audioCalls.panel}
       <aside className="sidebar">
         <button className="brand" onClick={() => navigate('feed')}>
           <span className="brand-icon">
@@ -1158,6 +1225,26 @@ export default function Noctgram() {
           >
             <StarsIcon size={25} />
           </button>
+          {me && (
+            <NotificationsBell
+              me={me.id}
+              onPost={(id) => {
+                void request<Post>('?action=post&id=' + encodeURIComponent(id))
+                  .then((p) => {
+                    setCommentPost(p);
+                    setModal('comments');
+                  })
+                  .catch((e) => notify(e.message));
+              }}
+              onChat={(id) => {
+                void request<Profile>(
+                  '?action=profile&id=' + encodeURIComponent(id),
+                )
+                  .then(openChat)
+                  .catch((e) => notify(e.message));
+              }}
+            />
+          )}
           {loading && page !== 'premium' && page !== 'messages' && (
             <LoaderCircle className="spin" size={15} />
           )}
@@ -1194,7 +1281,7 @@ export default function Noctgram() {
         {page === 'profile' &&
           profile?.kind === 'channel' &&
           profile.restriction &&
-          profile.ownerId === me?.id && (
+          (profile.ownerId === me?.id || profile.canPublish) && (
             <section className="account-readonly channel-restriction-notice">
               <div>
                 <strong>
@@ -1255,7 +1342,11 @@ export default function Noctgram() {
                 </a>
               </div>
             )}
+            {me && <StoriesBar me={me} readOnly={readOnly} />}
             {composer}
+            {me && !readOnly && (
+              <ChannelTools profile={me} revision={scheduleVersion} />
+            )}
           </>
         )}
         {page === 'search' && (
@@ -1315,7 +1406,7 @@ export default function Noctgram() {
                 >
                   <ArrowLeft size={18} />
                 </button>
-                {profileOwned && (
+                {profileEditable && (
                   <button
                     className="cover-edit"
                     disabled={readOnly || channelRestricted}
@@ -1331,7 +1422,7 @@ export default function Noctgram() {
                 <div className="profile-avatar-line">
                   <Avatar person={profile} size={96} />
                   <span className="grow" />
-                  {profileOwned ? (
+                  {profileEditable ? (
                     <>
                       <button
                         className="secondary"
@@ -1503,7 +1594,14 @@ export default function Noctgram() {
                 </TabsList>
               </Tabs>
             </div>
-            {profileOwned &&
+            {profilePublisher && !readOnly && !channelRestricted && (
+              <ChannelTools
+                key={profile.id}
+                profile={profile}
+                revision={scheduleVersion}
+              />
+            )}
+            {profilePublisher &&
               !readOnly &&
               !channelRestricted &&
               profileTab === 'posts' &&
@@ -1637,6 +1735,17 @@ export default function Noctgram() {
                         <strong>{peer.name}</strong>
                         <small>@{peer.handle}</small>
                       </span>
+                    </button>
+                    <button
+                      className="icon-button call-button"
+                      aria-label="Аудиозвонок"
+                      title="Аудиозвонок"
+                      disabled={
+                        readOnly || audioCalls.active || !messageAccess?.allowed
+                      }
+                      onClick={() => void audioCalls.start(peer)}
+                    >
+                      <Phone size={18} />
                     </button>
                     <button
                       className="chat-block icon-button"
@@ -2075,7 +2184,10 @@ export default function Noctgram() {
                     onChange={(e) => setEditName(e.target.value)}
                   />
                 </label>
-                <section className="edit-usernames">
+                <fieldset
+                  className="edit-usernames"
+                  disabled={editId !== me?.id && !profileOwned}
+                >
                   <h3>Юзернеймы</h3>
                   <label>
                     Основной юзернейм
@@ -2130,7 +2242,7 @@ export default function Noctgram() {
                   <span className="meta">
                     До 4 дополнительных имён. 4–24 латинские буквы, цифры или _.
                   </span>
-                </section>
+                </fieldset>
                 <label>
                   О себе
                   <textarea
