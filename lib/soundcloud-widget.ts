@@ -19,6 +19,7 @@ export type Widget = {
   setVolume(value: number): void;
   next(): void;
   prev(): void;
+  skip(index: number): void;
   getCurrentSound(callback: (sound: SoundCloudSound | null) => void): void;
   getSounds(callback: (sounds: SoundCloudSound[]) => void): void;
   getCurrentSoundIndex(callback: (index: number) => void): void;
@@ -29,6 +30,25 @@ type SoundCloud = {
     Events: Record<string, string>;
   };
 };
+export function releaseSoundCloudWidget(
+  widget: Widget,
+  events: Record<string, string>,
+) {
+  // React can remove a keyed iframe before passive-effect cleanup. SoundCloud's
+  // SDK then throws while trying to postMessage to the detached frame.
+  for (const event of Object.values(events)) {
+    try {
+      widget.unbind(event);
+    } catch {
+      /* The removed frame cannot emit events. */
+    }
+  }
+  try {
+    widget.pause();
+  } catch {
+    /* Removing an iframe already stops its audio. */
+  }
+}
 declare global {
   interface Window {
     SC?: SoundCloud;

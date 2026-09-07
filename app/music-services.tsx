@@ -500,16 +500,18 @@ export function MusicServices({
                   </button>
                   <div>
                     <strong>{track.title}</strong>
-                    <small>{track.artist} · SoundCloud</small>
+                    <small>
+                      {track.artist} ·{' '}
+                      <a
+                        className="music-source"
+                        href={track.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        SoundCloud
+                      </a>
+                    </small>
                   </div>
-                  <a
-                    href={track.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Открыть трек в SoundCloud"
-                  >
-                    <ArrowUpRight size={18} />
-                  </a>
                 </div>
               ))}
             </>
@@ -527,7 +529,19 @@ export function MusicServices({
                   <div>
                     <strong>{p.title}</strong>
                     <small>
-                      {p.trackCount} треков · {name}
+                      {p.trackCount} треков ·{' '}
+                      {provider === 'soundcloud' ? (
+                        <a
+                          className="music-source"
+                          href={p.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          SoundCloud
+                        </a>
+                      ) : (
+                        name
+                      )}
                     </small>
                   </div>
                   {p.playable && (
@@ -542,14 +556,16 @@ export function MusicServices({
                       <Play size={17} />
                     </button>
                   )}
-                  <a
-                    href={p.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={'Открыть плейлист в ' + name}
-                  >
-                    <ArrowUpRight size={18} />
-                  </a>
+                  {provider !== 'soundcloud' && (
+                    <a
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={'Открыть плейлист в ' + name}
+                    >
+                      <ArrowUpRight size={18} />
+                    </a>
+                  )}
                   {view === 'playlists' && (
                     <button
                       className="secondary service-import-button"

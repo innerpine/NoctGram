@@ -12,19 +12,6 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  ChevronDown,
-  ChevronUp,
-  ExternalLink,
-  Headphones,
-  LoaderCircle,
-  Pause,
-  Play,
-  SkipBack,
-  SkipForward,
-  X,
-} from 'lucide-react';
-import {
-  formatMusicTime,
   musicLabel,
   musicRequest,
   parseMusicLink,
@@ -32,10 +19,11 @@ import {
 } from '@/lib/music-links';
 import {
   loadSoundCloudWidget,
+  releaseSoundCloudWidget,
   type SoundCloudSound,
   type Widget,
 } from '@/lib/soundcloud-widget';
-import { Slider } from '@/components/ui/slider';
+import { MusicPlayerView, type PlayerTrack } from './music-player-view';
 
 type Context = {
   play: (link: MusicLink, queue?: MusicLink[]) => void;
@@ -67,6 +55,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [retry, setRetry] = useState(0);
   const [playlistIndex, setPlaylistIndex] = useState(0),
     [playlistLength, setPlaylistLength] = useState(0);
+  const [playlistSounds, setPlaylistSounds] = useState<SoundCloudSound[]>([]);
   const [queue, setQueue] = useState<MusicLink[]>([]);
   const frame = useRef<HTMLIFrameElement>(null),
     widget = useRef<Widget | null>(null);
@@ -122,6 +111,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     isPlaying.current = false;
     setPlaying(false);
     setLink(null);
+    setExpanded(false);
     setSound(null);
     setError('');
     setReady(false);
@@ -154,6 +144,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setDuration(0);
     setPlaylistIndex(0);
     setPlaylistLength(0);
+    setPlaylistSounds([]);
     setLink(valid);
   }, []);
   useEffect(() => {
@@ -163,9 +154,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     let bound: Widget | null = null;
     const timeout = setTimeout(() => {
       if (active) {
-        setExpanded(true);
         setError(
-          'Не удалось загрузить запись. Откройте её в SoundCloud или повторите попытку.',
+          'Не удалось загрузить запись. Проверьте соединение и повторите попытку.',
         );
       }
     }, 20000);
@@ -222,12 +212,16 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           setError('');
           w.setVolume(volumeRef.current);
           w.getSounds((sounds) => {
-            if (active) setPlaylistLength(sounds.length);
+            if (active) {
+              setPlaylistLength(sounds.length);
+              setPlaylistSounds(sounds);
+            }
           });
           w.getDuration((ms) => {
             if (active) setDuration(ms);
           });
-          // A blocked autoplay leaves the real iframe controls available.
+          syncSound();
+          // If autoplay is blocked, our Play control lets the user try again.
           w.play();
         });
         w.bind(sc.Widget.Events.PLAY, () => {
@@ -325,9 +319,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         preferenceChanged,
       );
       if (bound) {
-        for (const event of Object.values(window.SC?.Widget.Events || {}))
-          bound.unbind(event);
-        bound.pause();
+        releaseSoundCloudWidget(bound, window.SC?.Widget.Events || {});
       }
       widget.current = null;
     };
@@ -342,173 +334,125 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     else if (queueIndex >= 0 && queueIndex + 1 < queue.length)
       play(queue[queueIndex + 1]);
   };
-  const title = sound?.title || (link ? musicLabel(link) : '');
-  const url = sound?.permalink_url || link?.url || '';
   const currentUrl = sound?.permalink_url || link?.url || '';
   const context = useMemo(
     () => ({ play, currentUrl, playing, stop }),
     [play, currentUrl, playing, stop],
   );
+  const metadata = (item: MusicLink): PlayerTrack => {
+    const known = item as MusicLink & {
+      title?: string;
+      artist?: string;
+      artwork?: string;
+    };
+    return {
+      url: item.url,
+      title: known.title || musicLabel(item),
+      artist: known.artist || '',
+      artwork: known.artwork || '',
+    };
+  };
+  const selected = queue.find((item) => item.url === link?.url);
+  const track: PlayerTrack = {
+    url: currentUrl,
+    title:
+      sound?.title ||
+      (selected ? metadata(selected).title : link ? musicLabel(link) : ''),
+    artist:
+      sound?.user?.username || (selected ? metadata(selected).artist : ''),
+    artwork: sound?.artwork_url || (selected ? metadata(selected).artwork : ''),
+  };
+  const displayQueue =
+    link?.kind === 'playlist'
+      ? playlistSounds.map((item) => ({
+          url: item.permalink_url,
+          title: item.title,
+          artist: item.user?.username || '',
+          artwork: item.artwork_url || '',
+        }))
+      : queue.map((item) => (item.url === currentUrl ? track : metadata(item)));
+  const select = (index: number) => {
+    if (link?.kind === 'playlist') {
+      if (index >= 0 && index < playlistSounds.length) {
+        widget.current?.skip(index);
+        widget.current?.play();
+      }
+    } else if (queue[index]) play(queue[index]);
+  };
   return (
     <MusicContext.Provider value={context}>
       {children}
       {link && (
-        <section
-          ref={playerElement}
-          className={'music-player ' + (expanded ? 'expanded' : '')}
-          aria-label="Музыкальный плеер"
-        >
-          <div className="music-player-row">
-            <div className="music-cover">
-              {sound?.artwork_url ? (
-                <img src={sound.artwork_url} alt="" />
-              ) : (
-                <Headphones size={20} />
-              )}
-            </div>
-            <div className="music-player-title">
-              <strong>{title}</strong>
-              <a href={url} target="_blank" rel="noopener noreferrer">
-                {sound?.user?.username || 'SoundCloud'} · SoundCloud{' '}
-                <ExternalLink size={11} />
-              </a>
-            </div>
-            <div className="music-transport">
-              <button
-                className="icon-button"
-                aria-label="Предыдущий трек"
-                disabled={
-                  !ready ||
-                  (link.kind === 'playlist'
-                    ? playlistIndex <= 0
-                    : queueIndex <= 0)
-                }
-                onClick={previous}
-              >
-                <SkipBack size={18} />
-              </button>
-              <button
-                className="music-play"
-                aria-label={playing ? 'Пауза' : 'Воспроизвести'}
-                disabled={!ready || !!error}
-                onClick={() =>
-                  playing ? widget.current?.pause() : widget.current?.play()
-                }
-              >
-                {!ready && !error ? (
-                  <LoaderCircle className="spin" size={18} />
-                ) : playing ? (
-                  <Pause size={18} />
-                ) : (
-                  <Play size={18} />
-                )}
-              </button>
-              <button
-                className="icon-button"
-                aria-label="Следующий трек"
-                disabled={
-                  !ready ||
-                  (link.kind === 'playlist'
-                    ? playlistIndex + 1 >= playlistLength
-                    : queueIndex < 0 || queueIndex + 1 >= queue.length)
-                }
-                onClick={next}
-              >
-                <SkipForward size={18} />
-              </button>
-            </div>
-            <button
-              className="icon-button"
-              aria-label={expanded ? 'Свернуть плеер' : 'Развернуть плеер'}
-              aria-expanded={expanded}
-              onClick={() => setExpanded((v) => !v)}
-            >
-              {expanded ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-            </button>
-            <button
-              className="icon-button"
-              aria-label="Остановить и закрыть плеер"
-              onClick={stop}
-            >
-              <X size={18} />
-            </button>
-          </div>
-          <div className="music-progress">
-            <span>{formatMusicTime(position)}</span>
-            <Slider
-              aria-label="Позиция воспроизведения"
-              min={0}
-              max={Math.max(duration, 1)}
-              step={1000}
-              value={[Math.min(position, duration)]}
-              disabled={!ready || !duration || !!error}
-              onValueChange={(values) => {
-                const value = Array.isArray(values) ? values[0] : values;
-                stats.current.lastPosition = -1;
-                widget.current?.seekTo(value);
-              }}
-            />
-            <span>{formatMusicTime(duration)}</span>
-          </div>
-          {error && (
-            <div className="music-error" role="alert">
-              {error}{' '}
-              <button
-                onClick={() => {
-                  setError('');
-                  setReady(false);
-                  setRetry((v) => v + 1);
-                }}
-              >
-                Повторить
-              </button>
-            </div>
-          )}
-          {!playing && ready && !expanded && !error && (
-            <button className="music-muted" onClick={() => setExpanded(true)}>
-              Открыть плеер SoundCloud
-            </button>
-          )}
-          <div className="music-widget-area" hidden={!expanded}>
-            <div className="music-volume">
-              <span>Громкость</span>
-              <Slider
-                aria-label="Громкость"
-                min={0}
-                max={100}
-                value={[volume]}
-                onValueChange={(values) => {
-                  const v = Array.isArray(values) ? values[0] : values;
-                  setVolume(v);
-                  widget.current?.setVolume(v);
-                }}
-              />
-            </div>
-            <iframe
-              key={link.url + ':' + retry}
-              ref={frame}
-              title="Официальный плеер SoundCloud"
-              width="100%"
-              height="166"
-              allow="autoplay"
-              src={
-                'https://w.soundcloud.com/player/?' +
-                new URLSearchParams({
-                  url: link.url,
-                  auto_play: 'false',
-                  color: '#eeeeee',
-                  show_artwork: 'true',
-                  show_user: 'true',
-                })
-              }
-            />
-            {!playing && ready && !error && (
-              <p className="music-muted">
-                Если браузер блокирует запуск, нажмите Play в плеере SoundCloud.
-              </p>
-            )}
-          </div>
-        </section>
+        <>
+          <MusicPlayerView
+            track={track}
+            queue={displayQueue}
+            queueIndex={link.kind === 'playlist' ? playlistIndex : queueIndex}
+            expanded={expanded}
+            onExpanded={setExpanded}
+            playing={playing}
+            ready={ready}
+            error={error}
+            position={position}
+            duration={duration}
+            volume={volume}
+            playerRef={playerElement}
+            previousEnabled={
+              link.kind === 'playlist' ? playlistIndex > 0 : queueIndex > 0
+            }
+            nextEnabled={
+              link.kind === 'playlist'
+                ? playlistIndex + 1 < playlistLength
+                : queueIndex >= 0 && queueIndex + 1 < queue.length
+            }
+            onPrevious={previous}
+            onNext={next}
+            onSelect={select}
+            onToggle={() =>
+              playing ? widget.current?.pause() : widget.current?.play()
+            }
+            onSeek={(ms) => {
+              const value = Math.max(0, Math.min(ms, duration));
+              stats.current.lastPosition = -1;
+              setPosition(value);
+              widget.current?.seekTo(value);
+            }}
+            onVolume={(value) => {
+              setVolume(value);
+              widget.current?.setVolume(value);
+            }}
+            onStop={stop}
+            onRetry={() => {
+              setError('');
+              setReady(false);
+              setRetry((value) => value + 1);
+            }}
+          />
+          {/* Keep one engine mounted outside the dialog: collapsing never restarts audio. */}
+          <iframe
+            key={link.url + ':' + retry}
+            ref={frame}
+            className="music-audio-engine"
+            title="Аудиодвижок SoundCloud"
+            tabIndex={-1}
+            aria-hidden="true"
+            allow="autoplay"
+            src={
+              'https://w.soundcloud.com/player/?' +
+              new URLSearchParams({
+                url: link.url,
+                auto_play: 'false',
+                color: '#eeeeee',
+                show_artwork: 'false',
+                show_user: 'false',
+                sharing: 'false',
+                buying: 'false',
+                download: 'false',
+                show_playcount: 'false',
+              })
+            }
+          />
+        </>
       )}
     </MusicContext.Provider>
   );

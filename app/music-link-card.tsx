@@ -1,5 +1,5 @@
 'use client';
-import { ArrowUpRight, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { findMusicLink, musicLabel } from '@/lib/music-links';
 import { useMusic } from './music-provider';
 
@@ -19,18 +19,17 @@ export function MusicLinkCard({ text }: { text: string }) {
         </span>
         <span>
           <strong>{musicLabel(link)}</strong>
-          <small>
-            SoundCloud · {link.kind === 'playlist' ? 'плейлист' : 'трек'}
-          </small>
+          <small>{link.kind === 'playlist' ? 'Плейлист' : 'Трек'}</small>
         </span>
       </button>
       <a
         href={link.url}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Открыть в SoundCloud"
+        className="music-source"
+        aria-label="Источник: SoundCloud"
       >
-        <ArrowUpRight size={18} />
+        SoundCloud
       </a>
     </div>
   );

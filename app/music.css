@@ -139,7 +139,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.music-track-text a {
+.music-track-artist {
   color: #ffffffa6;
   text-decoration: none;
   font-size: 13px;
@@ -417,16 +417,6 @@ body:has(.music-player) .messenger {
   min-width: 0;
   flex: 1;
   padding: 8px 0;
-}
-.music-widget-area {
-  margin-top: 12px;
-}
-.music-widget-area[hidden] {
-  display: none;
-}
-.music-widget-area iframe {
-  border: 0;
-  border-radius: 10px;
 }
 .music-volume {
   display: flex;

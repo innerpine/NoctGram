@@ -153,16 +153,15 @@ export function MusicPanel({
               <button onClick={() => music?.play(track, tracks)}>
                 {track.title}
               </button>
+              <span className="music-track-artist">{track.artist}</span>
               <a
-                href={track.authorUrl || track.url}
+                className="music-source"
+                href={track.url}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                {track.artist}
-              </a>
-              <span className="music-source">
                 SoundCloud{track.kind === 'playlist' ? ' · плейлист' : ''}
-              </span>
+              </a>
             </div>
             {ranked && (
               <span className="music-count">
@@ -170,15 +169,6 @@ export function MusicPanel({
                 <small>прослушиваний</small>
               </span>
             )}
-            <a
-              className="music-outbound"
-              href={track.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={'Открыть ' + track.title + ' в SoundCloud'}
-            >
-              <ArrowUpRight size={18} />
-            </a>
             {tab === 'library' && (
               <button
                 className="icon-button"
@@ -301,13 +291,7 @@ export function MusicPanel({
                 {chart === 'tracks' && trackRows(data.tracks, true)}
                 {chart === 'artists' &&
                   data.artists.map((artist, i) => (
-                    <a
-                      className="music-ranking-row"
-                      key={artist.authorUrl}
-                      href={artist.authorUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
+                    <div className="music-ranking-row" key={artist.authorUrl}>
                       <span className="music-rank">
                         {String(i + 1).padStart(2, '0')}
                       </span>
@@ -319,8 +303,7 @@ export function MusicPanel({
                         <small>SoundCloud · треков: {artist.tracks}</small>
                       </span>
                       <b>{artist.plays}</b>
-                      <ArrowUpRight size={17} />
-                    </a>
+                    </div>
                   ))}
                 {chart === 'listeners' &&
                   data.listeners.map((person, i) => (
