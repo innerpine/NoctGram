@@ -21,6 +21,7 @@ import {
   Plus,
   X,
   Bookmark,
+  ChevronRight,
   Check,
   CheckCheck,
   ArrowLeft,
@@ -1140,15 +1141,16 @@ export default function Noctgram() {
             ['search', 'Поиск', Search],
             ['messages', 'Сообщения', Mail],
             ['channels', 'Каналы', Megaphone],
-            ['saved', 'Сохранённое', Bookmark],
             ['profile', 'Профиль', UserRound],
           ].map(([id, label, Icon]) => {
             const NavIcon = Icon as typeof Home;
+            const active = page === id || (id === 'profile' && page === 'saved');
             return (
               <button
                 key={String(id)}
-                className={page === id ? 'active' : ''}
-                aria-current={page === id ? 'page' : undefined}
+                className={active ? 'active' : ''}
+                aria-label={String(label)}
+                aria-current={active ? 'page' : undefined}
                 onClick={() => navigate(String(id))}
               >
                 <NavIcon size={21} />
@@ -1158,7 +1160,7 @@ export default function Noctgram() {
                     {unread > 99 ? '99+' : unread}
                   </span>
                 )}
-                {page === id && <i />}
+                {active && <i />}
               </button>
             );
           })}
@@ -1305,6 +1307,15 @@ export default function Noctgram() {
             <RefreshCw size={18} />
           </button>
         </header>
+        {page === 'saved' && (
+          <button
+            type="button"
+            className="text-button saved-back"
+            onClick={() => navigate('profile')}
+          >
+            <ArrowLeft size={17} aria-hidden="true" /> В профиль
+          </button>
+        )}
         {loadError && (
           <div className="error-banner" role="alert">
             Не удалось загрузить данные.{' '}
@@ -1620,6 +1631,17 @@ export default function Noctgram() {
                     публикаций
                   </span>
                 </div>
+                {profile.id === me?.id && (
+                  <button
+                    type="button"
+                    className="profile-saved-link"
+                    onClick={() => navigate('saved')}
+                  >
+                    <Bookmark size={19} aria-hidden="true" />
+                    <span>Сохранённое</span>
+                    <ChevronRight size={17} aria-hidden="true" />
+                  </button>
+                )}
               </div>
             </section>
             <div
