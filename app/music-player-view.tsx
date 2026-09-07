@@ -4,6 +4,7 @@
 /* eslint-disable react/react-compiler, next/no-img-element, jsx-a11y/no-noninteractive-tabindex */
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -18,7 +19,6 @@ import {
   Mic2,
   Pause,
   Play,
-  Settings2,
   SkipBack,
   SkipForward,
   Volume2,
@@ -32,12 +32,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTitle } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -54,6 +49,7 @@ import {
 
 export type PlayerTrack = {
   url: string;
+  provider?: 'soundcloud' | 'spotify';
   title: string;
   artist: string;
   artwork: string;
@@ -335,6 +331,32 @@ export function MusicPlayerView(p: Props) {
   const [appearance, setAppearance] = useState(defaultAppearance);
   const [pane, setPane] = useState('lyrics');
   const [offset, setOffset] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [menuPoint, setMenuPoint] = useState({ x: 0, y: 0 });
+  const settingsFocus = useRef<HTMLElement | null>(null);
+  const menuAnchor = useMemo(
+    () => ({
+      getBoundingClientRect: () =>
+        DOMRect.fromRect({
+          x: menuPoint.x,
+          y: menuPoint.y,
+          width: 1,
+          height: 1,
+        }),
+    }),
+    [menuPoint],
+  );
+  const showSettings = (x: number, y: number) => {
+    settingsFocus.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setMenuPoint({ x, y });
+    setSettingsOpen(true);
+  };
+  useEffect(() => {
+    if (!p.expanded) setSettingsOpen(false);
+  }, [p.expanded]);
   const coverButton = useRef<HTMLButtonElement>(null);
   const lastVolume = useRef(70);
   useEffect(() => {
@@ -427,15 +449,16 @@ export function MusicPlayerView(p: Props) {
       {p.error} <button onClick={p.onRetry}>Повторить</button>
     </div>
   );
+  const sourceName = p.track.provider === 'spotify' ? 'Spotify' : 'SoundCloud';
   const source = (
     <a
       className="music-source-credit"
       href={p.track.url}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Источник трека: SoundCloud"
+      aria-label={'Сведения о треке: ' + sourceName}
     >
-      SoundCloud
+      {sourceName}
     </a>
   );
   return (
@@ -495,204 +518,160 @@ export function MusicPlayerView(p: Props) {
       </section>
 
       <Dialog open={p.expanded} onOpenChange={p.onExpanded}>
-        <DialogContent
-          showCloseButton={false}
-          finalFocus={coverButton}
-          className="music-stage"
-          data-motion={appearance.motion ? 'on' : 'off'}
-          data-playing={p.playing}
-          style={
-            {
-              '--music-darkness': appearance.darkness / 100,
-              '--music-blur': `${appearance.blur}px`,
-              '--music-text-size': `${appearance.textSize}px`,
-            } as CSSProperties
-          }
-        >
-          <div className="music-stage-atmosphere" aria-hidden="true">
-            {artwork && <img key={artwork} src={artwork} alt="" />}
-          </div>
-          <header className="music-stage-header">
-            <DialogClose
-              className="music-stage-icon"
-              aria-label="Свернуть плеер"
-            >
-              <ChevronDown size={25} />
-            </DialogClose>
-            <div className="music-stage-label">
-              <span className="music-live-mark">
-                <i />
-                <i />
-                <i />
-              </span>{' '}
-              NOCTGRAM <span>/ МУЗЫКА</span>
-            </div>
-            <Popover>
-              <PopoverTrigger
-                className="music-stage-icon"
-                aria-label="Настройки плеера"
-              >
-                <Settings2 size={21} />
-              </PopoverTrigger>
-              <PopoverContent
-                align="end"
-                sideOffset={12}
-                className="music-player-settings"
-              >
-                <PopoverTitle>Оформление плеера</PopoverTitle>
-                <fieldset
-                  className="music-text-sizes"
-                  aria-label="Размер текста песни"
-                >
-                  {[24, 28, 32, 40].map((size) => (
-                    <button
-                      key={size}
-                      style={{ fontSize: 14 + (size - 24) / 2 }}
-                      aria-label={`Текст ${size} пикселя`}
-                      aria-pressed={appearance.textSize === size}
-                      onClick={() => updateAppearance({ textSize: size })}
-                    >
-                      А
-                    </button>
-                  ))}
-                </fieldset>
-                <Range
-                  label="Затемнение"
-                  value={appearance.darkness}
-                  min={30}
-                  max={85}
-                  suffix="%"
-                  onChange={(darkness) => updateAppearance({ darkness })}
-                />
-                <Range
-                  label="Размытие фона"
-                  value={appearance.blur}
-                  min={24}
-                  max={120}
-                  onChange={(blur) => updateAppearance({ blur })}
-                />
-                <div className="music-setting-switch">
-                  <label htmlFor="music-soft-lyrics">
-                    Размывать соседние строки
-                  </label>
-                  <Switch
-                    id="music-soft-lyrics"
-                    checked={appearance.softLyrics}
-                    onCheckedChange={(softLyrics) =>
-                      updateAppearance({ softLyrics })
-                    }
-                  />
-                </div>
-                <div className="music-setting-switch">
-                  <label htmlFor="music-player-motion">Плавная анимация</label>
-                  <Switch
-                    id="music-player-motion"
-                    checked={appearance.motion}
-                    onCheckedChange={(motion) => updateAppearance({ motion })}
-                  />
-                </div>
-                <Range
-                  label="Сдвиг текста"
-                  value={offset / 1000}
-                  min={-5}
-                  max={5}
-                  step={0.1}
-                  suffix=" с"
-                  onChange={(seconds) => setOffset(Math.round(seconds * 1000))}
-                />
-                <button
-                  className="music-settings-reset"
-                  onClick={() => {
-                    updateAppearance(defaultAppearance);
-                    setOffset(0);
-                  }}
-                >
-                  Сбросить настройки
-                </button>
-              </PopoverContent>
-            </Popover>
-          </header>
-          <DialogDescription className="sr-only">
-            Плеер Noctgram. Воспроизведение, очередь и текст песни. Escape
-            сворачивает окно, музыка продолжает играть.
-          </DialogDescription>
-          <div
-            className={
-              'music-stage-body' + (pane === 'cover' ? ' cover-only' : '')
+        <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <DialogContent
+            showCloseButton={false}
+            finalFocus={coverButton}
+            className="music-stage"
+            onContextMenu={(event) => {
+              event.preventDefault();
+              showSettings(event.clientX, event.clientY);
+            }}
+            onKeyDown={(event) => {
+              if (
+                event.key === 'ContextMenu' ||
+                (event.shiftKey && event.key === 'F10')
+              ) {
+                event.preventDefault();
+                const rect = (
+                  event.target as HTMLElement
+                ).getBoundingClientRect();
+                showSettings(
+                  rect.left + rect.width / 2,
+                  rect.top + rect.height / 2,
+                );
+              }
+            }}
+            data-motion={appearance.motion ? 'on' : 'off'}
+            data-playing={p.playing}
+            style={
+              {
+                '--music-darkness': appearance.darkness / 100,
+                '--music-blur': `${appearance.blur}px`,
+                '--music-text-size': `${appearance.textSize}px`,
+              } as CSSProperties
             }
           >
-            <div className="music-stage-main">
-              <div className="music-stage-artwork">
-                {artwork ? (
-                  <img
-                    key={artwork}
-                    src={artwork}
-                    alt={`Обложка ${p.track.title}`}
-                    onError={(event) => {
-                      if (event.currentTarget.src !== p.track.artwork)
-                        event.currentTarget.src = p.track.artwork;
-                    }}
-                  />
-                ) : (
-                  <Headphones size={88} strokeWidth={0.8} />
-                )}
-              </div>
-              <div className="music-stage-track">
-                <DialogTitle>{p.track.title}</DialogTitle>
-                <p>
-                  {p.track.artist || 'Музыка'}
-                  <span> · </span>
-                  {source}
-                </p>
-              </div>
-              {progress(true)}
-              <div className="music-stage-controls">
-                <button
-                  className="music-stage-icon"
-                  aria-label={p.volume ? 'Выключить звук' : 'Включить звук'}
-                  onClick={toggleVolume}
-                >
-                  {p.volume ? <Volume2 size={21} /> : <VolumeX size={21} />}
-                </button>
-                {transport()}
-                <button
-                  className="music-stage-icon"
-                  aria-label="Показать очередь"
-                  aria-pressed={pane === 'queue'}
-                  onClick={() => setPane(pane === 'queue' ? 'lyrics' : 'queue')}
-                >
-                  <ListMusic size={22} />
-                </button>
-              </div>
-              <div className="music-stage-volume">
-                <Volume2 size={15} />
-                <Slider
-                  aria-label="Громкость"
-                  min={0}
-                  max={100}
-                  value={[p.volume]}
-                  onValueChange={(values) =>
-                    p.onVolume(Array.isArray(values) ? values[0] : values)
-                  }
-                />
-                <span>{p.volume}%</span>
-              </div>
-              {error}
+            <div className="music-stage-atmosphere" aria-hidden="true">
+              {artwork && <img key={artwork} src={artwork} alt="" />}
             </div>
-            {pane !== 'cover' && (
-              <aside className="music-stage-aside">
-                {pane === 'lyrics' ? (
+            <header className="music-stage-header">
+              <DialogClose
+                className="music-stage-icon"
+                aria-label="Свернуть плеер"
+              >
+                <ChevronDown size={25} />
+              </DialogClose>
+              <div className="music-stage-label">
+                <span className="music-live-mark">
+                  <i />
+                  <i />
+                  <i />
+                </span>{' '}
+                NOCTGRAM <span>/ МУЗЫКА</span>
+              </div>
+              <span className="music-stage-header-spacer" aria-hidden="true" />
+            </header>
+            <DialogDescription className="sr-only">
+              Плеер Noctgram. Настройки открываются правой кнопкой мыши или
+              Shift+F10. Воспроизведение, очередь и текст песни. Escape
+              сворачивает окно, музыка продолжает играть.
+            </DialogDescription>
+            <div
+              className={
+                'music-stage-body' + (pane === 'cover' ? ' cover-only' : '')
+              }
+            >
+              <div className="music-stage-main">
+                <div className="music-stage-artwork">
+                  {artwork ? (
+                    <img
+                      key={artwork}
+                      src={artwork}
+                      alt={`Обложка ${p.track.title}`}
+                      onError={(event) => {
+                        if (event.currentTarget.src !== p.track.artwork)
+                          event.currentTarget.src = p.track.artwork;
+                      }}
+                    />
+                  ) : (
+                    <Headphones size={88} strokeWidth={0.8} />
+                  )}
+                </div>
+                <div className="music-stage-track">
+                  <DialogTitle>{p.track.title}</DialogTitle>
+                  <p>
+                    {p.track.artist || 'Музыка'}
+                    <span> · </span>
+                    {source}
+                  </p>
+                </div>
+                {progress(true)}
+                <div className="music-stage-controls">
+                  <button
+                    className="music-stage-icon"
+                    aria-label={p.volume ? 'Выключить звук' : 'Включить звук'}
+                    onClick={toggleVolume}
+                  >
+                    {p.volume ? <Volume2 size={21} /> : <VolumeX size={21} />}
+                  </button>
+                  {transport()}
+                  <button
+                    className="music-stage-icon"
+                    aria-label="Показать очередь"
+                    aria-pressed={pane === 'queue'}
+                    onClick={() =>
+                      setPane(pane === 'queue' ? 'lyrics' : 'queue')
+                    }
+                  >
+                    <ListMusic size={22} />
+                  </button>
+                </div>
+                <div className="music-stage-volume">
+                  <Volume2 size={15} />
+                  <Slider
+                    aria-label="Громкость"
+                    min={0}
+                    max={100}
+                    value={[p.volume]}
+                    onValueChange={(values) =>
+                      p.onVolume(Array.isArray(values) ? values[0] : values)
+                    }
+                  />
+                  <span>{p.volume}%</span>
+                </div>
+                {error}
+              </div>
+              <aside
+                className="music-stage-aside"
+                aria-hidden={pane === 'cover'}
+                inert={pane === 'cover'}
+              >
+                <div
+                  className="music-mode-panel"
+                  data-active={pane === 'lyrics'}
+                  aria-hidden={pane !== 'lyrics'}
+                  inert={pane !== 'lyrics'}
+                >
                   <Lyrics
                     track={p.track}
                     duration={p.duration}
                     position={p.position}
-                    enabled={p.expanded && p.ready && !p.error}
+                    enabled={
+                      p.expanded && pane === 'lyrics' && p.ready && !p.error
+                    }
                     appearance={appearance}
                     offset={offset}
                     onQueue={() => setPane('queue')}
                     onSeek={p.onSeek}
                   />
-                ) : (
+                </div>
+                <div
+                  className="music-mode-panel"
+                  data-active={pane === 'queue'}
+                  aria-hidden={pane !== 'queue'}
+                  inert={pane !== 'queue'}
+                >
                   <div className="music-stage-queue">
                     <div className="music-queue-heading">
                       <h3>Очередь</h3>
@@ -743,29 +722,108 @@ export function MusicPlayerView(p: Props) {
                       ))}
                     </div>
                   </div>
-                )}
+                </div>
               </aside>
-            )}
-          </div>
-          <footer className="music-stage-footer">
-            <Tabs
-              value={pane}
-              onValueChange={(value) => setPane(String(value))}
+            </div>
+            <footer className="music-stage-footer">
+              <Tabs
+                value={pane}
+                onValueChange={(value) => setPane(String(value))}
+              >
+                <TabsList aria-label="Вид плеера">
+                  <TabsTrigger value="cover">
+                    <Headphones size={16} /> Обложка
+                  </TabsTrigger>
+                  <TabsTrigger value="lyrics">
+                    <Mic2 size={16} /> Текст
+                  </TabsTrigger>
+                  <TabsTrigger value="queue">
+                    <ListMusic size={16} /> Очередь
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </footer>
+          </DialogContent>
+          <PopoverContent
+            align="start"
+            anchor={menuAnchor}
+            initialFocus={true}
+            finalFocus={settingsFocus}
+            sideOffset={6}
+            className="music-player-settings"
+          >
+            <PopoverTitle>Оформление плеера</PopoverTitle>
+            <fieldset
+              className="music-text-sizes"
+              aria-label="Размер текста песни"
             >
-              <TabsList aria-label="Вид плеера">
-                <TabsTrigger value="cover">
-                  <Headphones size={16} /> Обложка
-                </TabsTrigger>
-                <TabsTrigger value="lyrics">
-                  <Mic2 size={16} /> Текст
-                </TabsTrigger>
-                <TabsTrigger value="queue">
-                  <ListMusic size={16} /> Очередь
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </footer>
-        </DialogContent>
+              {[24, 28, 32, 40].map((size) => (
+                <button
+                  key={size}
+                  style={{ fontSize: 14 + (size - 24) / 2 }}
+                  aria-label={`Текст ${size} пикселя`}
+                  aria-pressed={appearance.textSize === size}
+                  onClick={() => updateAppearance({ textSize: size })}
+                >
+                  А
+                </button>
+              ))}
+            </fieldset>
+            <Range
+              label="Затемнение"
+              value={appearance.darkness}
+              min={30}
+              max={85}
+              suffix="%"
+              onChange={(darkness) => updateAppearance({ darkness })}
+            />
+            <Range
+              label="Размытие фона"
+              value={appearance.blur}
+              min={24}
+              max={120}
+              onChange={(blur) => updateAppearance({ blur })}
+            />
+            <div className="music-setting-switch">
+              <label htmlFor="music-soft-lyrics">
+                Размывать соседние строки
+              </label>
+              <Switch
+                id="music-soft-lyrics"
+                checked={appearance.softLyrics}
+                onCheckedChange={(softLyrics) =>
+                  updateAppearance({ softLyrics })
+                }
+              />
+            </div>
+            <div className="music-setting-switch">
+              <label htmlFor="music-player-motion">Плавная анимация</label>
+              <Switch
+                id="music-player-motion"
+                checked={appearance.motion}
+                onCheckedChange={(motion) => updateAppearance({ motion })}
+              />
+            </div>
+            <Range
+              label="Сдвиг текста"
+              value={offset / 1000}
+              min={-5}
+              max={5}
+              step={0.1}
+              suffix=" с"
+              onChange={(seconds) => setOffset(Math.round(seconds * 1000))}
+            />
+            <button
+              className="music-settings-reset"
+              onClick={() => {
+                updateAppearance(defaultAppearance);
+                setOffset(0);
+              }}
+            >
+              Сбросить настройки
+            </button>
+          </PopoverContent>
+        </Popover>
       </Dialog>
     </>
   );

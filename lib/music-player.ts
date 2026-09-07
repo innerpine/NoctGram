@@ -38,14 +38,16 @@ export function playerArtwork(value?: string, large = false): string {
     const url = new URL(value);
     if (
       url.protocol !== 'https:' ||
-      !/^i\d+\.sndcdn\.com$/.test(url.hostname) ||
+      !/^(?:i\d+\.sndcdn\.com|i\.scdn\.co|image-cdn-[a-z0-9-]+\.spotifycdn\.com)$/.test(
+        url.hostname,
+      ) ||
       url.username ||
       url.password ||
       url.port
     )
       return '';
     // SoundCloud's artwork URLs expose a named size. Keep other URLs intact.
-    if (large)
+    if (large && /^i\d+\.sndcdn\.com$/.test(url.hostname))
       url.pathname = url.pathname.replace(
         /-(large|t\d+x\d+)(\.[a-z]+)$/i,
         '-t500x500$2',

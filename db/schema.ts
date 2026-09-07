@@ -411,6 +411,7 @@ export const musicTracks = sqliteTable('music_tracks', {
   url: text().notNull().unique(),
   kind: text().notNull(),
   provider: text().notNull().default('soundcloud'),
+  durationMs: integer().notNull().default(0),
   title: text().notNull(),
   artist: text().notNull(),
   artwork: text().notNull().default(''),
@@ -439,6 +440,22 @@ export const musicPreferences = sqliteTable('music_preferences', {
     .references(() => users.id, { onDelete: 'cascade' }),
   participate: integer().notNull().default(0),
 });
+export const musicAudio = sqliteTable(
+  'music_audio',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    trackId: text()
+      .notNull()
+      .references(() => musicTracks.id, { onDelete: 'cascade' }),
+    objectKey: text().notNull().unique(),
+    mime: text().notNull(),
+    size: integer().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.trackId] })],
+);
 // One active session per listener prevents parallel tabs from multiplying scores.
 export const musicSessions = sqliteTable('music_sessions', {
   userId: text()

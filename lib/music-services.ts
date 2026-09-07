@@ -734,7 +734,7 @@ export async function searchServiceTracks(
   return collection.flatMap((row) => {
     const link = parseMusicLink(row.permalink_url),
       author = row.user as Data | undefined;
-    return link?.kind === 'track'
+    return link?.provider === 'soundcloud' && link.kind === 'track'
       ? [
           {
             ...link,

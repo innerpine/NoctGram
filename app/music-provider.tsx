@@ -16,6 +16,7 @@ import {
   musicRequest,
   parseMusicLink,
   type MusicLink,
+  type MusicTrack,
 } from '@/lib/music-links';
 import {
   loadSoundCloudWidget,
@@ -45,6 +46,8 @@ export function MusicAccountGuard({ blocked }: { blocked: boolean }) {
 export function MusicProvider({ children }: { children: ReactNode }) {
   const [link, setLink] = useState<MusicLink | null>(null);
   const [sound, setSound] = useState<SoundCloudSound | null>(null);
+  const [localTrack, setLocalTrack] = useState<MusicTrack | null>(null);
+  const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false),
     [ready, setReady] = useState(false);
   const [error, setError] = useState(''),
@@ -105,6 +108,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const stop = useCallback(() => {
     generation.current++;
     widget.current?.pause();
+    audio.current?.pause();
     desired.current = null;
     soundUrl.current = '';
     clearStats();
@@ -113,6 +117,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setLink(null);
     setExpanded(false);
     setSound(null);
+    setLocalTrack(null);
     setError('');
     setReady(false);
   }, []);
@@ -130,8 +135,21 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       widget.current.play();
       return;
     }
+    if (
+      desired.current?.url === valid.url &&
+      valid.provider === 'spotify' &&
+      audio.current?.currentSrc
+    ) {
+      void audio.current
+        .play()
+        .catch(() =>
+          setError('Не удалось запустить аудио. Нажмите «Повторить».'),
+        );
+      return;
+    }
     generation.current++;
     widget.current?.pause();
+    audio.current?.pause();
     clearStats();
     soundUrl.current = '';
     desired.current = valid;
@@ -140,6 +158,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setReady(false);
     setError('');
     setSound(null);
+    setLocalTrack(null);
     setPosition(0);
     setDuration(0);
     setPlaylistIndex(0);
@@ -148,7 +167,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setLink(valid);
   }, []);
   useEffect(() => {
-    if (!link || !frame.current) return;
+    if (link?.provider !== 'soundcloud' || !frame.current) return;
     let active = true;
     const token = ++generation.current;
     let bound: Widget | null = null;
@@ -194,7 +213,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             const current = parseMusicLink(value.permalink_url);
             setSound(value);
             setDuration(value.duration || 0);
-            if (current && soundUrl.current !== current.url) {
+            if (
+              current?.provider === 'soundcloud' &&
+              soundUrl.current !== current.url
+            ) {
               soundUrl.current = current.url;
               clearStats();
               // Opt-in is checked server-side before metadata or listening history is stored.
@@ -324,6 +346,108 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       widget.current = null;
     };
   }, [link, retry, play]);
+  useEffect(() => {
+    if (link?.provider !== 'spotify' || !audio.current) return;
+    const element = audio.current;
+    const token = ++generation.current;
+    const controller = new AbortController();
+    let active = true;
+    const current = () => active && generation.current === token;
+    const attemptPlay = () => {
+      void element.play().catch((error: DOMException) => {
+        if (
+          current() &&
+          error.name !== 'NotAllowedError' &&
+          error.name !== 'AbortError'
+        )
+          setError(
+            'Не удалось воспроизвести файл. Попробуйте другой аудиофайл.',
+          );
+      });
+    };
+    const loaded = () => {
+      if (!current()) return;
+      if (!Number.isFinite(element.duration) || element.duration <= 0) {
+        setError('Не удалось прочитать длительность аудио.');
+        return;
+      }
+      setDuration(Math.round(element.duration * 1000));
+      setReady(true);
+      setError('');
+      attemptPlay();
+    };
+    const progress = () => {
+      if (current()) setPosition(element.currentTime * 1000);
+    };
+    const started = () => {
+      if (current()) {
+        setPlaying(true);
+        setError('');
+      }
+    };
+    const paused = () => {
+      if (current()) setPlaying(false);
+    };
+    const failed = () => {
+      if (current()) {
+        setPlaying(false);
+        setError(
+          'Аудиофайл недоступен или браузер не поддерживает его формат.',
+        );
+      }
+    };
+    const ended = () => {
+      if (!current()) return;
+      setPlaying(false);
+      const index = queueRef.current.findIndex((item) => item.url === link.url);
+      if (index >= 0 && index + 1 < queueRef.current.length)
+        play(queueRef.current[index + 1]);
+    };
+    element.addEventListener('loadedmetadata', loaded);
+    element.addEventListener('timeupdate', progress);
+    element.addEventListener('play', started);
+    element.addEventListener('pause', paused);
+    element.addEventListener('error', failed);
+    element.addEventListener('ended', ended);
+    element.volume = volumeRef.current / 100;
+    void fetch('/api/music?action=track&url=' + encodeURIComponent(link.url), {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then(async (response) => {
+        const data = (await response.json()) as MusicTrack & { error?: string };
+        if (!response.ok)
+          throw new Error(data.error || 'Не удалось загрузить трек.');
+        if (!current()) return;
+        setLocalTrack(data);
+        setDuration(data.durationMs || 0);
+        if (
+          !data.audioUrl ||
+          !/^\/api\/music\/audio\/[a-f0-9-]{36}$/.test(data.audioUrl)
+        )
+          throw new Error(
+            'Добавьте аудиофайл к этому треку в «Моей музыке». Ссылка Spotify содержит сведения о песне, но не само аудио.',
+          );
+        element.src = data.audioUrl;
+        element.load();
+      })
+      .catch((error: Error) => {
+        if (current() && error.name !== 'AbortError') setError(error.message);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+      element.removeEventListener('loadedmetadata', loaded);
+      element.removeEventListener('timeupdate', progress);
+      element.removeEventListener('play', started);
+      element.removeEventListener('pause', paused);
+      element.removeEventListener('error', failed);
+      element.removeEventListener('ended', ended);
+      element.pause();
+      element.removeAttribute('src');
+      element.load();
+    };
+  }, [link, retry, play]);
   const queueIndex = queue.findIndex((x) => x.url === link?.url);
   const previous = () => {
     if (link?.kind === 'playlist') widget.current?.prev();
@@ -347,6 +471,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     };
     return {
       url: item.url,
+      provider: item.provider,
       title: known.title || musicLabel(item),
       artist: known.artist || '',
       artwork: known.artwork || '',
@@ -355,12 +480,19 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const selected = queue.find((item) => item.url === link?.url);
   const track: PlayerTrack = {
     url: currentUrl,
+    provider: link?.provider || 'soundcloud',
     title:
+      localTrack?.title ||
       sound?.title ||
       (selected ? metadata(selected).title : link ? musicLabel(link) : ''),
     artist:
-      sound?.user?.username || (selected ? metadata(selected).artist : ''),
-    artwork: sound?.artwork_url || (selected ? metadata(selected).artwork : ''),
+      localTrack?.artist ||
+      sound?.user?.username ||
+      (selected ? metadata(selected).artist : ''),
+    artwork:
+      localTrack?.artwork ||
+      sound?.artwork_url ||
+      (selected ? metadata(selected).artwork : ''),
   };
   const displayQueue =
     link?.kind === 'playlist'
@@ -408,18 +540,33 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             onPrevious={previous}
             onNext={next}
             onSelect={select}
-            onToggle={() =>
-              playing ? widget.current?.pause() : widget.current?.play()
-            }
+            onToggle={() => {
+              if (link.provider === 'spotify' && audio.current) {
+                if (playing) audio.current.pause();
+                else
+                  void audio.current
+                    .play()
+                    .catch(() =>
+                      setError(
+                        'Не удалось запустить файл. Попробуйте ещё раз.',
+                      ),
+                    );
+              } else if (playing) widget.current?.pause();
+              else widget.current?.play();
+            }}
             onSeek={(ms) => {
               const value = Math.max(0, Math.min(ms, duration));
               stats.current.lastPosition = -1;
               setPosition(value);
-              widget.current?.seekTo(value);
+              if (link.provider === 'spotify' && audio.current)
+                audio.current.currentTime = value / 1000;
+              else widget.current?.seekTo(value);
             }}
             onVolume={(value) => {
               setVolume(value);
-              widget.current?.setVolume(value);
+              if (link.provider === 'spotify' && audio.current)
+                audio.current.volume = value / 100;
+              else widget.current?.setVolume(value);
             }}
             onStop={stop}
             onRetry={() => {
@@ -429,29 +576,35 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             }}
           />
           {/* Keep one engine mounted outside the dialog: collapsing never restarts audio. */}
-          <iframe
-            key={link.url + ':' + retry}
-            ref={frame}
-            className="music-audio-engine"
-            title="Аудиодвижок SoundCloud"
-            tabIndex={-1}
-            aria-hidden="true"
-            allow="autoplay"
-            src={
-              'https://w.soundcloud.com/player/?' +
-              new URLSearchParams({
-                url: link.url,
-                auto_play: 'false',
-                color: '#eeeeee',
-                show_artwork: 'false',
-                show_user: 'false',
-                sharing: 'false',
-                buying: 'false',
-                download: 'false',
-                show_playcount: 'false',
-              })
-            }
-          />
+          {link.provider === 'spotify' ? (
+            // Lyrics, when available, are rendered in the accessible Text pane.
+            // eslint-disable-next-line jsx-a11y/media-has-caption
+            <audio ref={audio} preload="metadata" />
+          ) : (
+            <iframe
+              key={link.url + ':' + retry}
+              ref={frame}
+              className="music-audio-engine"
+              title="Аудиодвижок SoundCloud"
+              tabIndex={-1}
+              aria-hidden="true"
+              allow="autoplay"
+              src={
+                'https://w.soundcloud.com/player/?' +
+                new URLSearchParams({
+                  url: link.url,
+                  auto_play: 'false',
+                  color: '#eeeeee',
+                  show_artwork: 'false',
+                  show_user: 'false',
+                  sharing: 'false',
+                  buying: 'false',
+                  download: 'false',
+                  show_playcount: 'false',
+                })
+              }
+            />
+          )}
         </>
       )}
     </MusicContext.Provider>

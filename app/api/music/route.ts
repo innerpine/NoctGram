@@ -1,4 +1,5 @@
-import { db, viewer, ApiError, failure } from '@/lib/server';
+import { bucket, db, viewer, ApiError, failure } from '@/lib/server';
+import { resolveSpotifyMetadata } from '@/lib/spotify-metadata';
 import {
   assertReadable,
   assertWritable,
@@ -25,6 +26,30 @@ async function resolveTrack(link: MusicLink): Promise<MusicTrack> {
     .bind(link.url)
     .first<MusicTrack>();
   if (existing) return existing;
+  if (link.provider === 'spotify') {
+    const track = await resolveSpotifyMetadata(link.url);
+    await db()
+      .prepare(
+        'INSERT OR IGNORE INTO music_tracks(id,url,kind,provider,title,artist,artwork,authorUrl,durationMs,created) VALUES(?,?,?,?,?,?,?,?,?,?)',
+      )
+      .bind(
+        track.id,
+        track.url,
+        track.kind,
+        track.provider,
+        track.title,
+        track.artist,
+        track.artwork,
+        track.authorUrl,
+        track.durationMs || 0,
+        Date.now(),
+      )
+      .run();
+    return (await db()
+      .prepare('SELECT * FROM music_tracks WHERE url=?')
+      .bind(link.url)
+      .first<MusicTrack>())!;
+  }
   // Fixed endpoint, canonical public URL, no redirects, no client-provided HTML.
   let response: Response;
   try {
@@ -98,7 +123,24 @@ export async function GET(req: Request) {
   try {
     const me = await viewer();
     await assertReadable(me);
-    if (new URL(req.url).searchParams.get('action') !== 'home')
+    const params = new URL(req.url).searchParams;
+    if (params.get('action') === 'track') {
+      const link = parseMusicLink(params.get('url'));
+      if (link?.provider !== 'spotify')
+        throw new ApiError(400, 'Нужна ссылка Spotify.');
+      const track = await db()
+        .prepare(
+          "SELECT t.*, CASE WHEN a.objectKey IS NOT NULL THEN '/api/music/audio/' || t.id ELSE NULL END AS audioUrl FROM music_library l JOIN music_tracks t ON t.id=l.trackId LEFT JOIN music_audio a ON a.userId=l.userId AND a.trackId=t.id WHERE l.userId=? AND t.url=?",
+        )
+        .bind(me, link.url)
+        .first<MusicTrack>();
+      if (!track)
+        throw new ApiError(404, 'Сначала добавьте этот трек в «Мою музыку».');
+      return Response.json(track, {
+        headers: { 'Cache-Control': 'private, no-store' },
+      });
+    }
+    if (params.get('action') !== 'home')
       throw new ApiError(400, 'Неизвестное действие');
     const d = db(),
       since = Date.now() - 7 * DAY;
@@ -111,13 +153,13 @@ export async function GET(req: Request) {
           .first<{ participate: number }>(),
         d
           .prepare(
-            'SELECT t.* FROM music_library l JOIN music_tracks t ON t.id=l.trackId WHERE l.userId=? ORDER BY l.created DESC,t.id LIMIT 100',
+            "SELECT t.*, CASE WHEN a.objectKey IS NOT NULL THEN '/api/music/audio/' || t.id ELSE NULL END AS audioUrl FROM music_library l JOIN music_tracks t ON t.id=l.trackId LEFT JOIN music_audio a ON a.userId=l.userId AND a.trackId=t.id WHERE l.userId=? ORDER BY l.created DESC,t.id LIMIT 100",
           )
           .bind(me)
           .all(),
         d
           .prepare(
-            `SELECT t.*,COUNT(*) as shared FROM music_library l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId WHERE ${visibility} GROUP BY t.id ORDER BY MAX(l.created) DESC,t.id LIMIT 50`,
+            `SELECT t.*,COUNT(*) as shared FROM music_library l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId WHERE t.provider='soundcloud' AND ${visibility} GROUP BY t.id ORDER BY MAX(l.created) DESC,t.id LIMIT 50`,
           )
           .bind(me)
           .all(),
@@ -158,6 +200,12 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    if (
+      (req.headers.get('origin') &&
+        req.headers.get('origin') !== new URL(req.url).origin) ||
+      req.headers.get('sec-fetch-site') === 'cross-site'
+    )
+      throw new ApiError(403, 'Недопустимый источник');
     const me = await viewer();
     await assertReadable(me);
     const body = await readJsonBody(req, 4096),
@@ -189,9 +237,11 @@ export async function POST(req: Request) {
       if (!link)
         throw new ApiError(
           400,
-          'Нужна публичная ссылка SoundCloud на трек или плейлист',
+          'Нужна ссылка на трек Spotify или публичный трек/плейлист SoundCloud',
         );
       if (body.action === 'start') {
+        if (link.provider !== 'soundcloud')
+          return Response.json({ session: null });
         if (link.kind !== 'track')
           throw new ApiError(400, 'Засчитываются отдельные треки');
         const pref = await d
@@ -250,6 +300,13 @@ export async function POST(req: Request) {
         .prepare('DELETE FROM music_library WHERE userId=? AND trackId=?')
         .bind(me, body.id)
         .run();
+      const audio = await d
+        .prepare(
+          'DELETE FROM music_audio WHERE userId=? AND trackId=? RETURNING objectKey',
+        )
+        .bind(me, body.id)
+        .first<{ objectKey: string }>();
+      if (audio) await bucket().delete(audio.objectKey);
       return Response.json({ ok: true });
     }
     if (body.action === 'progress') {

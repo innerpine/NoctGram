@@ -1,7 +1,7 @@
 export type MusicLink = {
   url: string;
   kind: 'track' | 'playlist';
-  provider: 'soundcloud';
+  provider: 'soundcloud' | 'spotify';
 };
 export type MusicTrack = MusicLink & {
   id: string;
@@ -9,6 +9,8 @@ export type MusicTrack = MusicLink & {
   artist: string;
   artwork: string;
   authorUrl: string;
+  durationMs?: number;
+  audioUrl?: string | null;
   shared?: number;
   listeners?: number;
 };
@@ -18,6 +20,24 @@ export function parseMusicLink(value: unknown): MusicLink | null {
   if (typeof value !== 'string' || value.length > 1000) return null;
   try {
     const u = new URL(value.trim());
+    if (
+      u.protocol === 'https:' &&
+      u.hostname === 'open.spotify.com' &&
+      !u.username &&
+      !u.password &&
+      !u.port
+    ) {
+      const match = u.pathname.match(
+        /^\/(?:intl-[a-z]{2}\/)?track\/([a-zA-Z0-9]{22})\/?$/,
+      );
+      return match
+        ? {
+            url: 'https://open.spotify.com/track/' + match[1],
+            kind: 'track',
+            provider: 'spotify',
+          }
+        : null;
+    }
     if (
       u.protocol !== 'https:' ||
       u.username ||
@@ -77,6 +97,7 @@ export function findMusicLink(text: string) {
   return null;
 }
 export function musicLabel(link: MusicLink) {
+  if (link.provider === 'spotify') return 'Трек Spotify';
   return decodeURIComponent(link.url.split('/').at(-1) || '').replaceAll(
     '-',
     ' ',

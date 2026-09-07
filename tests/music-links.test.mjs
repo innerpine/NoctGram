@@ -50,4 +50,23 @@ assert.equal(
 );
 assert.equal(formatMusicTime(NaN), '0:00');
 assert.equal(formatMusicTime(61000), '1:01');
+assert.deepEqual(
+  parseMusicLink(
+    'https://open.spotify.com/intl-de/track/4cOdK2wGLETKBW3PvgPWqT?si=example',
+  ),
+  {
+    url: 'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
+    provider: 'spotify',
+    kind: 'track',
+  },
+);
+for (const url of [
+  'https://open.spotify.com.evil.test/track/4cOdK2wGLETKBW3PvgPWqT',
+  'https://user@open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
+  'http://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
+  'https://open.spotify.com/playlist/4cOdK2wGLETKBW3PvgPWqT',
+  'https://open.spotify.com/track/invalid',
+  'https://spotify.link/short',
+])
+  assert.equal(parseMusicLink(url), null);
 console.log('Music URL boundary tests passed.');

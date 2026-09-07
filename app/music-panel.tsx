@@ -22,6 +22,7 @@ import {
   type MusicTrack,
 } from '@/lib/music-links';
 import { useMusic } from './music-provider';
+import { MusicAudioUpload } from './music-audio-upload';
 import { Avatar } from './post-card';
 import type { Person } from '@/lib/client';
 
@@ -82,7 +83,9 @@ export function MusicPanel({
   async function save() {
     const link = parseMusicLink(url);
     if (!link) {
-      setError('Вставьте публичную ссылку на трек или плейлист SoundCloud.');
+      setError(
+        'Вставьте ссылку на трек Spotify или публичный трек/плейлист SoundCloud.',
+      );
       return;
     }
     setBusy(true);
@@ -138,6 +141,7 @@ export function MusicPanel({
             <button
               className="music-track-play"
               aria-label={'Слушать ' + track.title}
+              disabled={track.provider === 'spotify' && !track.audioUrl}
               onClick={() => music?.play(track, tracks)}
             >
               {track.artwork ? (
@@ -150,7 +154,10 @@ export function MusicPanel({
               </span>
             </button>
             <div className="music-track-text">
-              <button onClick={() => music?.play(track, tracks)}>
+              <button
+                disabled={track.provider === 'spotify' && !track.audioUrl}
+                onClick={() => music?.play(track, tracks)}
+              >
                 {track.title}
               </button>
               <span className="music-track-artist">{track.artist}</span>
@@ -160,8 +167,16 @@ export function MusicPanel({
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                SoundCloud{track.kind === 'playlist' ? ' · плейлист' : ''}
+                {track.provider === 'spotify' ? 'Spotify' : 'SoundCloud'}
+                {track.kind === 'playlist' ? ' · плейлист' : ''}
               </a>
+              {track.provider === 'spotify' && (
+                <small className="music-audio-caption">
+                  {track.audioUrl
+                    ? 'Ваш аудиофайл'
+                    : 'Добавьте файл для прослушивания'}
+                </small>
+              )}
             </div>
             {ranked && (
               <span className="music-count">
@@ -170,14 +185,24 @@ export function MusicPanel({
               </span>
             )}
             {tab === 'library' && (
-              <button
-                className="icon-button"
-                disabled={busy || readOnly}
-                onClick={() => void remove(track.id)}
-                aria-label={'Убрать ' + track.title + ' из моей музыки'}
-              >
-                <X size={16} />
-              </button>
+              <>
+                {track.provider === 'spotify' && (
+                  <MusicAudioUpload
+                    track={track}
+                    disabled={busy || readOnly}
+                    onSaved={() => void refresh()}
+                    onError={setError}
+                  />
+                )}
+                <button
+                  className="icon-button"
+                  disabled={busy || readOnly}
+                  onClick={() => void remove(track.id)}
+                  aria-label={'Убрать ' + track.title + ' из моей музыки'}
+                >
+                  <X size={16} />
+                </button>
+              </>
             )}
           </div>
         ))}
@@ -237,7 +262,7 @@ export function MusicPanel({
             type="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://soundcloud.com/…"
+            placeholder="Ссылка SoundCloud или Spotify"
             disabled={busy || readOnly || !signedIn}
           />
           <button
@@ -248,8 +273,10 @@ export function MusicPanel({
           </button>
         </form>
         <p>
-          Публичный трек или плейлист SoundCloud. Сохранится в вашей музыке и
-          появится в открытиях.
+          SoundCloud — прослушивание по ссылке и публикация в открытиях. Spotify
+          — название, исполнитель и обложка в вашей коллекции. Добавьте свой
+          аудиофайл, чтобы слушать без Premium: MP3, WAV, OGG или FLAC до 25 МБ.
+          Файл доступен только вам.
         </p>
       </section>
       {error && (
