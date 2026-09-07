@@ -1,4 +1,5 @@
 'use client';
+import { DisplayName } from './profile-identity';
 import { useState, type CSSProperties } from 'react';
 import { ChevronDown, Headphones, Trophy } from 'lucide-react';
 import {
@@ -42,7 +43,9 @@ export function MusicLeaderboard({
       <span className="music-rank">{String(index + 1).padStart(2, '0')}</span>
       <Avatar person={person} size={36} />
       <span>
-        <strong>{person.name}</strong>
+        <strong>
+          <DisplayName person={person} />
+        </strong>
         <small>@{person.handle}</small>
       </span>
       <span className="music-listener-score">
@@ -88,7 +91,7 @@ export function MusicLeaderboard({
           <Avatar person={profile} size={36} />
           <span>
             <strong>
-              {profile.name}
+              <DisplayName person={profile} />
               <em>Вы</em>
             </strong>
             <small>

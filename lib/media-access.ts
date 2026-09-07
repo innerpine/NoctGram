@@ -39,7 +39,7 @@ export async function assertMediaRead(
 // Only internal SQL expressions are accepted here. Keep the same access rule in
 // content writes so revoking a channel editor cannot race an attachment check.
 export function mediaPermission(idExpr: string, actorExpr: string) {
-  return `NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=${idExpr}) AND (
+  return `EXISTS(SELECT 1 FROM uploads live WHERE live.id=${idExpr} AND live.state='ready') AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=${idExpr}) AND (
  EXISTS(SELECT 1 FROM users pu WHERE (pu.avatar='/api/media/'||${idExpr} OR pu.cover='/api/media/'||${idExpr}) AND ${visibleAccount('pu')})
  OR EXISTS(SELECT 1 FROM profile_appearance ma JOIN users pu ON pu.id=ma.userId WHERE ma.avatarMotion='/api/media/'||${idExpr} AND ${premiumActive('pu.id')} AND ${visibleAccount('pu')})
  OR EXISTS(SELECT 1 FROM posts mp JOIN users pu ON pu.id=mp.userId WHERE ${published('mp')} AND ${visibleAccount('pu')} AND EXISTS(SELECT 1 FROM json_each(mp.media) mm WHERE json_extract(mm.value,'$.id')=${idExpr}))

@@ -18,6 +18,9 @@ export const users = sqliteTable('users', {
   lastSeen: integer().notNull().default(0),
   onboardingComplete: integer().notNull().default(1),
   kind: text().notNull().default('person'),
+  verified: integer().notNull().default(0),
+  deletedAt: integer().notNull().default(0),
+  sessionsRevokedAt: integer().notNull().default(0),
   ownerId: text().references((): AnySQLiteColumn => users.id),
 });
 export const handles = sqliteTable(
@@ -146,6 +149,8 @@ export const uploads = sqliteTable('uploads', {
     .references(() => users.id),
   type: text().notNull(),
   name: text().notNull(),
+  bytes: integer().notNull().default(0),
+  state: text().notNull().default('ready'),
   created: integer().notNull(),
 });
 
@@ -274,6 +279,73 @@ export const moderationAppeals = sqliteTable(
   ],
 );
 
+export const administrators = sqliteTable('administrators', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id),
+  created: integer().notNull(),
+});
+export const accountDeletions = sqliteTable('account_deletions', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id),
+  requestId: text().notNull().unique(),
+  created: integer().notNull(),
+});
+export const storageDeletions = sqliteTable('storage_deletions', {
+  objectKey: text().primaryKey(),
+  created: integer().notNull(),
+});
+export const adminEvents = sqliteTable(
+  'admin_events',
+  {
+    id: text().primaryKey(),
+    actorId: text()
+      .notNull()
+      .references(() => users.id),
+    targetId: text()
+      .notNull()
+      .references(() => users.id),
+    action: text().notNull(),
+    amount: integer().notNull().default(0),
+    reason: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [index('admin_events_created').on(t.created)],
+);
+export const recoveryCodes = sqliteTable(
+  'recovery_codes',
+  {
+    hash: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [index('recovery_codes_user').on(t.userId)],
+);
+export const accountChallenges = sqliteTable(
+  'account_challenges',
+  {
+    id: text().primaryKey(),
+    sessionHash: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    purpose: text().notNull(),
+    subject: text().notNull(),
+    email: text().notNull(),
+    attempts: integer().notNull().default(0),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [
+    index('account_challenges_session').on(t.sessionHash),
+    index('account_challenges_expiry').on(t.expiresAt),
+  ],
+);
+
 // Email proof is owned by Supabase. No OTPs or provider tokens are stored here.
 export const authIdentities = sqliteTable(
   'auth_identities',
@@ -296,6 +368,7 @@ export const authSessions = sqliteTable(
       .references(() => users.id),
     created: integer().notNull(),
     expiresAt: integer().notNull(),
+    verifiedAt: integer().notNull().default(0),
   },
   (t) => [
     index('auth_sessions_user').on(t.userId),

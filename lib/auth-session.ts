@@ -61,7 +61,7 @@ export async function identity(): Promise<Identity | null> {
     if (!/^[a-f0-9]{64}$/.test(token)) return null;
     const row = await db()
       .prepare(
-        'SELECT userId FROM auth_sessions WHERE tokenHash=? AND expiresAt>?',
+        'SELECT s.userId FROM auth_sessions s JOIN users u ON u.id=s.userId WHERE s.tokenHash=? AND s.expiresAt>? AND u.deletedAt=0',
       )
       .bind(await tokenHash(token), Date.now())
       .first<{ userId: string }>();
@@ -69,6 +69,16 @@ export async function identity(): Promise<Identity | null> {
   }
   if (!sitesAuthEnabled()) return null;
   const user = await getChatGPTUser();
+  if (
+    user &&
+    (await db()
+      .prepare(
+        'SELECT 1 FROM users u WHERE u.id=? AND (u.deletedAt>0 OR EXISTS(SELECT 1 FROM auth_identities a WHERE a.userId=u.id))',
+      )
+      .bind(user.userId)
+      .first())
+  )
+    return null;
   return user
     ? { userId: user.userId, fullName: user.fullName, source: 'sites' }
     : null;

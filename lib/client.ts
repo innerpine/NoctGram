@@ -42,6 +42,7 @@ export type Profile = Person & {
   restriction?: AccountRestriction | null;
   appeal?: AccountAppeal | null;
   canModerate?: boolean;
+  canAdmin?: boolean;
   blocked?: boolean;
   blockedAt?: number;
   pinnedPostId?: string | null;

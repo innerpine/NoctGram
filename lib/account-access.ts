@@ -17,7 +17,7 @@ export type Restriction = {
 // Alias arguments are internal SQL identifiers; values always use bindings.
 export function visibleAccount(alias: string) {
   if (!/^[a-z]+$/.test(alias)) throw new Error('Invalid SQL alias');
-  return `${alias}.onboardingComplete=1 AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId IN (${alias}.id,${alias}.ownerId) AND ar.mode='blocked' AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))`;
+  return `${alias}.deletedAt=0 AND ${alias}.onboardingComplete=1 AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId IN (${alias}.id,${alias}.ownerId) AND ar.mode='blocked' AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))`;
 }
 export async function restriction(id: string) {
   return db()
@@ -37,8 +37,10 @@ export async function blockingRestriction(id: string) {
 }
 export async function isModerator(id: string) {
   return !!(await db()
-    .prepare('SELECT userId FROM moderators WHERE userId=?')
-    .bind(id)
+    .prepare(
+      'SELECT userId FROM moderators WHERE userId=? UNION SELECT userId FROM administrators WHERE userId=?',
+    )
+    .bind(id, id)
     .first());
 }
 export async function assertReadable(id: string) {
@@ -79,11 +81,11 @@ export async function assertUploadAvailable(id: string) {
   // file must not bypass a channel block through the uploader's personal account.
   const uses = await db()
     .prepare(`WITH uses AS (
-    SELECT u.id,u.ownerId,u.onboardingComplete FROM posts p JOIN users u ON u.id=p.userId
+    SELECT u.id,u.ownerId,u.onboardingComplete,u.deletedAt FROM posts p JOIN users u ON u.id=p.userId
       WHERE EXISTS(SELECT 1 FROM json_each(p.media) m WHERE json_extract(m.value,'$.id')=?)
-    UNION SELECT u.id,u.ownerId,u.onboardingComplete FROM stories s JOIN users u ON u.id=s.userId WHERE s.mediaId=? AND s.deletedAt=0 AND s.expiresAt>strftime('%s','now')*1000
-    UNION SELECT u.id,u.ownerId,u.onboardingComplete FROM profile_appearance pa JOIN users u ON u.id=pa.userId WHERE pa.avatarMotion=? AND ${premiumActive('u.id')}
-    UNION SELECT u.id,u.ownerId,u.onboardingComplete FROM users u WHERE u.avatar=? OR u.cover=?
+    UNION SELECT u.id,u.ownerId,u.onboardingComplete,u.deletedAt FROM stories s JOIN users u ON u.id=s.userId WHERE s.mediaId=? AND s.deletedAt=0 AND s.expiresAt>strftime('%s','now')*1000
+    UNION SELECT u.id,u.ownerId,u.onboardingComplete,u.deletedAt FROM profile_appearance pa JOIN users u ON u.id=pa.userId WHERE pa.avatarMotion=? AND ${premiumActive('u.id')}
+    UNION SELECT u.id,u.ownerId,u.onboardingComplete,u.deletedAt FROM users u WHERE u.avatar=? OR u.cover=?
   ) SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN ${visibleAccount('u')} THEN 1 ELSE 0 END),0) AS visible FROM uses u`)
     .bind(id, id, '/api/media/' + id, '/api/media/' + id, '/api/media/' + id)
     .first<{ total: number; visible: number }>();

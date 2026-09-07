@@ -8,10 +8,11 @@ export function appearanceColumns(alias: string) {
   const active = premiumActive(alias + '.id');
   const field = (column: string, fallback: string) =>
     `COALESCE((SELECT pa.${column} FROM profile_appearance pa WHERE pa.userId=${alias}.id AND ${active}),${fallback})`;
-  return `${active} AS premium,${field('theme', "'iris'")} AS profileTheme,${field('nameGradient', '0')} AS nameGradient,${field('ringText', "''")} AS ringText,${field('chromeFlow', '0')} AS chromeFlow,${field('chromeTempo', '11')} AS chromeTempo,${field('avatarMotion', "''")} AS avatarMotion,${field('avatarMotionType', "''")} AS avatarMotionType`;
+  return `${alias}.verified AS verified,${active} AS premium,${field('theme', "'iris'")} AS profileTheme,${field('nameGradient', '0')} AS nameGradient,${field('ringText', "''")} AS ringText,${field('chromeFlow', '0')} AS chromeFlow,${field('chromeTempo', '11')} AS chromeTempo,${field('avatarMotion', "''")} AS avatarMotion,${field('avatarMotionType', "''")} AS avatarMotionType`;
 }
 export function appearanceFrom(row: Record<string, unknown>) {
   return {
+    verified: row.verified,
     premium: row.premium,
     profileTheme: row.profileTheme,
     nameGradient: row.nameGradient,

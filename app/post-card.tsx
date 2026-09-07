@@ -212,11 +212,6 @@ export function PostCard({
           <button className="author-button" onClick={() => onProfile(p.userId)}>
             <DisplayName person={p} />
           </button>
-          {p.userId === 'noctgram' && (
-            <span className="verified" title="Официальный аккаунт">
-              <Check size={10} />
-            </span>
-          )}
           <span className="meta handle">@{p.handle}</span>
           <span className="meta-dot" />
           <Stamp time={p.created} compact />

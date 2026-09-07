@@ -102,8 +102,30 @@ export function DisplayName({ person }: { person: Identity }) {
         {person.name}
       </span>
       <PremiumBadge person={person} />
+      <VerifiedBadge person={person} />
     </span>
   );
+}
+export function VerifiedBadge({ person }: { person: Appearance }) {
+  return person.verified ? (
+    <span
+      className="noct-verified-badge"
+      style={appearanceStyle(person)}
+      role="img"
+      aria-label="Подтверждённый аккаунт NoctGram"
+      title="Подтверждённый аккаунт NoctGram"
+    />
+  ) : null;
+}
+export function VerifiedProfile({ person }: { person: Appearance }) {
+  return person.verified ? (
+    <div className="profile-verification" style={appearanceStyle(person)}>
+      <VerifiedBadge person={person} />
+      <span>
+        Этот аккаунт подтверждён как официальный представителями NoctGram.
+      </span>
+    </div>
+  ) : null;
 }
 export function Avatar({
   person,

@@ -1,4 +1,5 @@
 'use client';
+import { AdministrationPanel } from './administration-panel';
 import { DisplayName } from './profile-identity';
 /* eslint-disable react/react-compiler */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -93,7 +94,13 @@ function Choice({
     </div>
   );
 }
-export function ModerationPanel({ onChanged }: { onChanged: () => void }) {
+export function ModerationPanel({
+  onChanged,
+  canAdmin = false,
+}: {
+  onChanged: () => void;
+  canAdmin?: boolean;
+}) {
   const [tab, setTab] = useState('users'),
     [query, setQuery] = useState(''),
     [targetId, setTargetId] = useState<string | null>(null),
@@ -247,6 +254,7 @@ export function ModerationPanel({ onChanged }: { onChanged: () => void }) {
           <TabsTrigger value="appeals">Обращения</TabsTrigger>
           <TabsTrigger value="reports">Жалобы</TabsTrigger>
           <TabsTrigger value="removals">Удаления</TabsTrigger>
+          {canAdmin && <TabsTrigger value="admin">Управление</TabsTrigger>}
         </TabsList>
       </Tabs>
       {error && (
@@ -255,6 +263,9 @@ export function ModerationPanel({ onChanged }: { onChanged: () => void }) {
         </p>
       )}
       {notice && <output className="moderation-notice">{notice}</output>}
+      {tab === 'admin' && canAdmin && (
+        <AdministrationPanel onChanged={onChanged} />
+      )}
       {tab === 'users' && (
         <>
           <div className="searchbox">

@@ -15,6 +15,7 @@ import './stars-topup.css';
 import './music.css';
 import './music-services.css';
 import './music-player.css';
+import './account-management.css';
 import './dialog-motion.css';
 import { MusicProvider } from './music-provider';
 export const metadata: Metadata = {

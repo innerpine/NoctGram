@@ -1,4 +1,6 @@
 'use client';
+import { AccountPanel } from './account-panel';
+import { VerifiedProfile } from './profile-identity';
 /* Auth routes require top-level links; private R2 images must keep session cookies.
    Async subscription effects intentionally set loading state; no React compiler is enabled. */
 /* eslint-disable next/no-img-element, next/no-html-link-for-pages, react/react-compiler */
@@ -137,9 +139,9 @@ export default function Noctgram({
     [topics, setTopics] = useState<{ tag: string; count: number }[]>([]),
     [toastLeaving, setToastLeaving] = useState(false),
     [privacyVersion, setPrivacyVersion] = useState(0);
-  const [editTab, setEditTab] = useState<'profile' | 'privacy' | 'design'>(
-      'profile',
-    ),
+  const [editTab, setEditTab] = useState<
+      'profile' | 'privacy' | 'design' | 'account'
+    >('profile'),
     [reportedMessage, setReportedMessage] = useState<Message | null>(null),
     [messageAccess, setMessageAccess] = useState<{
       allowed: boolean;
@@ -807,10 +809,28 @@ export default function Noctgram({
     setEditAliases(target.handles.filter((h) => h !== target.handle));
     setModal('edit');
   };
+  useEffect(() => {
+    if (
+      !me ||
+      new URLSearchParams(window.location.search).get('recovered') !== '1'
+    )
+      return;
+    window.history.replaceState(null, '', window.location.pathname);
+    setEditId(me.id);
+    setEditName(me.name);
+    setEditBio(me.bio);
+    setEditAvatar(me.avatar);
+    setEditCover(me.cover);
+    setEditHandle(me.handle);
+    setEditAliases(me.handles.filter((h) => h !== me.handle));
+    setEditTab('account');
+    setModal('edit');
+  }, [me]);
   const applyAppearance = (updated: Profile) => {
     setMe(updated);
     setProfile((current) => (current?.id === updated.id ? updated : current));
     const appearance = {
+      verified: updated.verified,
       premium: updated.premium,
       profileTheme: updated.profileTheme,
       nameGradient: updated.nameGradient,
@@ -1388,6 +1408,7 @@ export default function Noctgram({
           )}
         {page === 'moderation' && me?.canModerate && (
           <ModerationPanel
+            canAdmin={!!me.canAdmin}
             onChanged={() => {
               void refreshAccount();
             }}
@@ -1556,11 +1577,6 @@ export default function Noctgram({
                 </div>
                 <h2>
                   <DisplayName person={profile} />
-                  {profile.id === 'noctgram' && (
-                    <span className="verified">
-                      <Check size={12} />
-                    </span>
-                  )}
                 </h2>
                 <button
                   className="handle-main meta"
@@ -1679,6 +1695,7 @@ export default function Noctgram({
                     <ChevronRight size={17} aria-hidden="true" />
                   </button>
                 )}
+                <VerifiedProfile person={profile} />
               </div>
             </section>
             <div
@@ -2221,7 +2238,17 @@ export default function Noctgram({
               >
                 Приватность
               </button>
+              <button
+                aria-pressed={editTab === 'account'}
+                disabled={uploading || busy}
+                onClick={() => setEditTab('account')}
+              >
+                Аккаунт
+              </button>
             </div>
+          )}
+          {modal === 'edit' && editTab === 'account' && editId === me?.id && (
+            <AccountPanel />
           )}
           {modal === 'edit' && me && editId === me.id && (
             <div hidden={editTab !== 'design'}>

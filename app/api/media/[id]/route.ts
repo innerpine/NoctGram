@@ -11,10 +11,14 @@ export async function GET(
     const { id } = await params;
     const upload = await db()
       .prepare(
-        'SELECT up.userId,u.onboardingComplete FROM uploads up JOIN users u ON u.id=up.userId WHERE up.id=?',
+        "SELECT up.userId,u.onboardingComplete,u.deletedAt FROM uploads up JOIN users u ON u.id=up.userId WHERE up.id=? AND up.state='ready'",
       )
       .bind(id)
-      .first<{ userId: string; onboardingComplete: number }>();
+      .first<{
+        userId: string;
+        onboardingComplete: number;
+        deletedAt: number;
+      }>();
     if (!upload) throw new ApiError(404, 'Файл не найден');
     const account = await db()
       .prepare('SELECT onboardingComplete FROM users WHERE id=?')
@@ -22,7 +26,8 @@ export async function GET(
       .first<{ onboardingComplete: number }>();
     if (
       upload.userId !== me &&
-      (!account?.onboardingComplete || !upload.onboardingComplete)
+      (!account?.onboardingComplete ||
+        (!upload.onboardingComplete && !upload.deletedAt))
     )
       throw new ApiError(403, 'Завершите настройку профиля.');
     await assertUploadAvailable(id);

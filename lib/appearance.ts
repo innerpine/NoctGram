@@ -8,6 +8,7 @@ export const profileThemes = {
 } as const;
 export type ProfileTheme = keyof typeof profileThemes;
 export type Appearance = {
+  verified?: number | boolean;
   premium?: number | boolean;
   profileTheme?: string;
   nameGradient?: number | boolean;
