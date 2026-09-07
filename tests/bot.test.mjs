@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NoctBot } from '../bot/handler.mjs';
 import { screen } from '../bot/screens.mjs';
+import { icons } from '../bot/emoji.mjs';
 import { RemoteError, safeBase, telegramTransport } from '../bot/transport.mjs';
 import { BotStore } from '../bot/store.mjs';
 const state = {
@@ -20,9 +21,12 @@ const options = {
 function fixture(site) {
   const calls = [],
     store = new BotStore(':memory:', 123);
+  let nextMessageId = 90;
   const telegram = async (method, body) => {
     calls.push({ method, body });
-    return { message_id: 90 };
+    return {
+      message_id: method === 'sendMessage' ? ++nextMessageId : body.message_id,
+    };
   };
   return {
     calls,
@@ -44,6 +48,17 @@ function event(id, data) {
       from: { id: 123 },
       data,
       message: { message_id: 90, chat: { id: 123, type: 'private' } },
+    },
+  };
+}
+function command(id, text = '/start') {
+  return {
+    update_id: id,
+    message: {
+      message_id: id,
+      from: { id: 123 },
+      chat: { id: 123, type: 'private' },
+      text,
     },
   };
 }
@@ -96,12 +111,13 @@ test('Bridge credentials only travel over HTTPS or actual loopback', () => {
 test('Callback navigation edits one panel and always answers the callback', async () => {
   const f = fixture(async () => state);
   try {
+    await f.bot.handle(command(0));
     await f.bot.handle(event(1, 'home'));
     await f.bot.handle(event(2, 'history'));
     assert.equal(f.calls.filter((x) => x.method === 'sendMessage').length, 1);
     assert.equal(
       f.calls.filter((x) => x.method === 'editMessageText').length,
-      1,
+      2,
     );
     assert.equal(
       f.calls.filter((x) => x.method === 'answerCallbackQuery').length,
@@ -165,7 +181,7 @@ test('Lost reply after credit retries the same order without making another quot
   try {
     const real = f.bot.telegram;
     f.bot.telegram = async (method, body) => {
-      if (method === 'sendMessage')
+      if (method === 'sendMessage' || method === 'editMessageText')
         throw new RemoteError('telegram', 503, 'network');
       return real(method, body);
     };
@@ -208,6 +224,182 @@ test('Preference toggles survive replay without inverting twice', async () => {
     assert.equal(f.store.get('chat:123').rich, false);
     await f.bot.handle(event(8, 'toggle:rich'));
     assert.equal(f.store.get('chat:123').rich, true);
+  } finally {
+    f.store.close();
+  }
+});
+
+test('Repeated /start and /balance send visible fresh panels after linking', async () => {
+  const f = fixture(async () => state);
+  try {
+    f.store.set('chat:123', { messageId: 2 });
+    await f.bot.handle(command(100));
+    await f.bot.handle(command(101));
+    await f.bot.handle(command(102, '/balance'));
+    const sent = f.calls.filter((x) => x.method === 'sendMessage');
+    assert.equal(sent.length, 3);
+    assert.ok(
+      sent.every(
+        (x) => x.body.text.includes('noct stars') && x.body.text.includes('11'),
+      ),
+    );
+    assert.equal(
+      f.calls.filter((x) => x.method === 'editMessageText').length,
+      0,
+    );
+    // Replaying a successfully sent command after a restart edits its saved reply.
+    await f.bot.handle(command(102, '/balance'));
+    assert.equal(f.calls.filter((x) => x.method === 'sendMessage').length, 3);
+    assert.equal(f.calls.at(-1).body.message_id, 93);
+  } finally {
+    f.store.close();
+  }
+});
+
+test('An older menu edits the clicked panel without hijacking the latest command reply', async () => {
+  const f = fixture(async () => state);
+  try {
+    await f.bot.handle(command(200));
+    const older = event(201, 'history');
+    older.callback_query.message.message_id = 2;
+    await f.bot.handle(older);
+    assert.equal(f.calls.at(-1).body.message_id, 2);
+    assert.match(f.calls.at(-1).body.text, /история пополнений/);
+    await f.bot.handle(command(200));
+    assert.equal(f.calls.at(-1).body.message_id, 91);
+  } finally {
+    f.store.close();
+  }
+});
+
+test('An unchanged callback and an unavailable old panel are handled separately', async () => {
+  const f = fixture(async () => state);
+  try {
+    const real = f.bot.telegram;
+    f.bot.telegram = async (method, body) => {
+      if (method === 'editMessageText')
+        throw new RemoteError(
+          'telegram',
+          400,
+          'Bad Request: message is not modified',
+        );
+      return real(method, body);
+    };
+    await f.bot.handle(event(300, 'home'));
+    assert.equal(
+      f.calls.some((x) => x.method === 'sendMessage'),
+      false,
+    );
+    f.bot.telegram = async (method, body) => {
+      if (method === 'editMessageText')
+        throw new RemoteError(
+          'telegram',
+          400,
+          'Bad Request: message to edit not found',
+        );
+      return real(method, body);
+    };
+    await f.bot.handle(event(301, 'home'));
+    assert.equal(f.calls.filter((x) => x.method === 'sendMessage').length, 1);
+  } finally {
+    f.store.close();
+  }
+});
+
+test('Premium emoji are on by default, respect opting out and use the requested packs', async () => {
+  const f = fixture(async () => state);
+  try {
+    f.bot.emojiAvailable = true;
+    await f.bot.handle(command(400));
+    const first = f.calls.at(-1).body;
+    assert.match(first.text, /<tg-emoji emoji-id="[0-9]+">/);
+    assert.equal(
+      first.reply_markup.inline_keyboard[0][0].icon_custom_emoji_id,
+      icons.stars.id,
+    );
+    assert.deepEqual(
+      new Set(Object.values(icons).map((x) => x.pack)),
+      new Set(['RestrictedEmoji', 'CreepyEmoji', 'NewsEmoji']),
+    );
+    await f.bot.handle(event(401, 'toggle:customEmoji'));
+    assert.equal(f.store.get('chat:123').customEmoji, false);
+    assert.ok(!f.calls.at(-1).body.text.includes('<tg-emoji'));
+    await f.bot.handle(command(402));
+    assert.ok(!f.calls.at(-1).body.text.includes('<tg-emoji'));
+    assert.equal(
+      f.calls.at(-1).body.reply_markup.inline_keyboard[0][0]
+        .icon_custom_emoji_id,
+      undefined,
+    );
+  } finally {
+    f.store.close();
+  }
+});
+
+test('Denied custom emoji fall back to readable replies instead of swallowing /start', async () => {
+  const f = fixture(async () => state);
+  try {
+    f.bot.emojiAvailable = true;
+    const real = f.bot.telegram;
+    let denied = 0;
+    f.bot.telegram = async (method, body) => {
+      if (body.text?.includes('<tg-emoji')) {
+        denied++;
+        throw new RemoteError('telegram', 400, 'Custom emoji are not allowed');
+      }
+      return real(method, body);
+    };
+    await f.bot.handle(command(500));
+    assert.equal(denied, 1);
+    assert.equal(f.calls.filter((x) => x.method === 'sendMessage').length, 1);
+    assert.ok(!f.calls.at(-1).body.text.includes('<tg-emoji'));
+  } finally {
+    f.store.close();
+  }
+});
+
+test('Error screens also fall back when Telegram denies Premium emoji', async () => {
+  let requests = 0;
+  const f = fixture(async () => {
+    requests++;
+    throw new RemoteError('site', 409, 'Ссылка истекла');
+  });
+  try {
+    f.bot.emojiAvailable = true;
+    const real = f.bot.telegram;
+    f.bot.telegram = async (method, body) => {
+      if (body.text?.includes('<tg-emoji'))
+        throw new RemoteError('telegram', 400, 'Custom emoji are not allowed');
+      return real(method, body);
+    };
+    await f.bot.handle(command(600));
+    assert.equal(
+      requests,
+      1,
+      'Emoji fallback must not replay backend operations',
+    );
+    assert.equal(f.calls.filter((x) => x.method === 'sendMessage').length, 1);
+    assert.match(f.calls.at(-1).body.text, /ссылка истекла/);
+  } finally {
+    f.store.close();
+  }
+});
+
+test('Enabling emoji still refreshes settings when Telegram rejects the icons', async () => {
+  const f = fixture(async () => state);
+  try {
+    f.bot.emojiAvailable = true;
+    f.store.set('chat:123', { customEmoji: false, messageId: 2 });
+    const real = f.bot.telegram;
+    f.bot.telegram = async (method, body) => {
+      if (body.text?.includes('<tg-emoji'))
+        throw new RemoteError('telegram', 400, 'Custom emoji are not allowed');
+      return real(method, body);
+    };
+    await f.bot.handle(event(700, 'toggle:customEmoji'));
+    assert.equal(f.calls.at(-1).method, 'editMessageText');
+    assert.match(f.calls.at(-1).body.text, /оформление/);
+    assert.ok(!f.calls.at(-1).body.text.includes('<tg-emoji'));
   } finally {
     f.store.close();
   }

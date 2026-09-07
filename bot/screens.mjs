@@ -1,11 +1,4 @@
-export const icons = {
-  stars: { fallback: '⭐', id: '5388824848438932415' },
-  balance: { fallback: '✦', id: '5375296873982604963' },
-  back: { fallback: '↩️', id: '5388584622328131561' },
-  settings: { fallback: '⚙️', id: '5388725162247992600' },
-  history: { fallback: '◷', id: '5389091046216972082' },
-  link: { fallback: '🔗', id: '5388738824538959063' },
-};
+import { icons } from './emoji.mjs';
 export const num = (value) => Number(value).toLocaleString('ru-RU');
 export const escape = (value) =>
   String(value ?? '')
@@ -14,7 +7,7 @@ export const escape = (value) =>
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
 export function ui(preferences = {}, emojiAvailable = false) {
-  const custom = emojiAvailable && preferences.customEmoji;
+  const custom = emojiAvailable && preferences.customEmoji !== false;
   const emoji = (name) =>
     custom
       ? `<tg-emoji emoji-id="${icons[name].id}">${icons[name].fallback}</tg-emoji>`
@@ -65,7 +58,7 @@ export function screen(name, state, options = {}) {
     };
   if (name === 'error')
     return {
-      text: head('stars', 'не получилось') + escape(message),
+      text: head('error', 'не получилось') + escape(message),
       rows: footer,
     };
   if (name === 'settings')
@@ -83,10 +76,10 @@ export function screen(name, state, options = {}) {
           ? [
               [
                 b(
-                  `премиум-эмодзи ${preferences.customEmoji ? '✓' : '✕'}`,
+                  `премиум-эмодзи ${preferences.customEmoji !== false ? '✓' : '✕'}`,
                   'toggle:customEmoji',
                   'stars',
-                  preferences.customEmoji ? 'success' : 'danger',
+                  preferences.customEmoji !== false ? 'success' : 'danger',
                 ),
               ],
             ]
@@ -113,7 +106,7 @@ export function screen(name, state, options = {}) {
   if (name === 'help')
     return {
       text:
-        head('stars', 'о noct stars') +
+        head('help', 'о noct stars') +
         'звёзды для поддержки авторов в noctgram\n\n' +
         block(
           '• все пополнения сейчас тестовые\n• telegram stars и деньги не списываются\n• звёзды появляются в балансе на сайте\n• лимит — 50 000 звёзд за 24 часа\n• отвязать telegram можно на сайте',
@@ -124,7 +117,7 @@ export function screen(name, state, options = {}) {
   if (!state?.linked)
     return {
       text:
-        head('stars', 'noct stars') +
+        head('moon', 'noct stars') +
         'маленькие звёзды — большая поддержка\n\n' +
         block(
           'привяжи свой аккаунт noctgram, чтобы пополнять баланс и поддерживать авторов',
@@ -179,7 +172,7 @@ export function screen(name, state, options = {}) {
   if (name === 'success')
     return {
       text:
-        head('stars', 'звёзды уже у тебя') +
+        head('success', 'звёзды уже у тебя') +
         `<b>+${num(order.amount)} noct stars</b> → ${who}\n\n` +
         block(
           `баланс · ${num(state.balance)} звёзд\nоперация · ${escape(order.id.slice(0, 8))}\nтестовое пополнение · без оплаты`,
@@ -209,7 +202,7 @@ export function screen(name, state, options = {}) {
     };
   return {
     text:
-      head('stars', 'noct stars') +
+      head('moon', 'noct stars') +
       `твоё пространство поддержки\n\n` +
       block(
         `${emoji('balance')} <b>${num(state.balance)} звёзд</b>\nаккаунт · ${who}\nтестовый режим · без оплаты`,
@@ -224,7 +217,7 @@ export function screen(name, state, options = {}) {
       ...siteRow,
       [
         b('обновить баланс ›', 'home', 'balance'),
-        b('помощь ›', 'help', 'link'),
+        b('помощь ›', 'help', 'help'),
       ],
     ],
   };

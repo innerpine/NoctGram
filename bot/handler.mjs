@@ -19,14 +19,47 @@ export class NoctBot {
       emojiAvailable,
     });
   }
+  recordDelivery(message) {
+    if (!message || typeof message.text !== 'string') return;
+    // Capability diagnostics only; never persist message text or link proofs.
+    this.store.set('lastDelivery', {
+      at: Date.now(),
+      customEmoji: (message.entities || []).filter(
+        (e) => e.type === 'custom_emoji',
+      ).length,
+      customButtons: (message.reply_markup?.inline_keyboard || [])
+        .flat()
+        .filter((b) => b.icon_custom_emoji_id).length,
+    });
+  }
   async render(chatId, name, state, extra = {}) {
+    try {
+      return await this.renderOnce(chatId, name, state, extra);
+    } catch (e) {
+      // All screens, including error/proof screens, must remain deliverable when
+      // Telegram denies custom emoji. Retrying rendering never repeats a credit.
+      if (
+        e instanceof RemoteError &&
+        e.service === 'telegram' &&
+        e.status === 400 &&
+        /emoji|entity|entities/i.test(e.message) &&
+        this.emojiAvailable
+      ) {
+        this.emojiAvailable = false;
+        return this.renderOnce(chatId, name, state, extra);
+      }
+      throw e;
+    }
+  }
+  async renderOnce(chatId, name, state, extra = {}) {
     const key = 'chat:' + chatId;
     const preferences = this.store.get(key) || {};
+    const { delivery = {}, ...screenOptions } = extra;
     const view = screen(name, state, {
       preferences,
       emojiAvailable: this.emojiAvailable,
       siteUrl: this.siteUrl,
-      ...extra,
+      ...screenOptions,
     });
     const body = {
       chat_id: chatId,
@@ -35,12 +68,23 @@ export class NoctBot {
       link_preview_options: { is_disabled: true },
       reply_markup: { inline_keyboard: view.rows },
     };
-    if (preferences.messageId) {
+    // Commands need a visible reply below the user's message. Button navigation
+    // edits the panel actually clicked, including an older panel above the chat.
+    const commandUpdateId = delivery.commandUpdateId;
+    const messageId =
+      delivery.callbackMessageId ||
+      (commandUpdateId !== undefined
+        ? preferences.lastCommandUpdate === commandUpdateId
+          ? preferences.lastCommandMessageId
+          : undefined
+        : preferences.messageId);
+    if (messageId) {
       try {
-        await this.telegram('editMessageText', {
+        const edited = await this.telegram('editMessageText', {
           ...body,
-          message_id: preferences.messageId,
+          message_id: messageId,
         });
+        this.recordDelivery(edited);
         return;
       } catch (e) {
         if (
@@ -60,7 +104,17 @@ export class NoctBot {
       }
     }
     const sent = await this.telegram('sendMessage', body);
-    this.store.set(key, { ...preferences, messageId: sent.message_id });
+    this.store.set(key, {
+      ...preferences,
+      messageId: sent.message_id,
+      ...(commandUpdateId !== undefined
+        ? {
+            lastCommandUpdate: commandUpdateId,
+            lastCommandMessageId: sent.message_id,
+          }
+        : {}),
+    });
+    this.recordDelivery(sent);
   }
   async statusLine(chatId, state) {
     const key = 'chat:' + chatId,
@@ -141,6 +195,11 @@ export class NoctBot {
       telegramId = String(user.id);
     const data = callback?.data || '';
     const text = message.text || '';
+    const delivery = callback
+      ? { callbackMessageId: message.message_id }
+      : { commandUpdateId: update.update_id };
+    const render = (name, state, extra = {}) =>
+      this.render(chatId, name, state, { ...extra, delivery });
     // A bot cannot prove an inbound transaction. This runtime never handles money.
     if (message.successful_payment || message.refunded_payment) return;
     try {
@@ -164,7 +223,7 @@ export class NoctBot {
           name: [user.first_name, user.last_name].filter(Boolean).join(' '),
           username: user.username || '',
         });
-        await this.render(chatId, 'proof', null, { code });
+        await render('proof', null, { code });
         return;
       }
       const state = await this.site({ action: 'status', telegramId });
@@ -180,8 +239,8 @@ export class NoctBot {
         // Replayed updates must not invert a toggle a second time.
         if (preferences.lastToggle !== update.update_id) {
           const value =
-            option === 'rich'
-              ? preferences.rich !== false
+            option === 'rich' || option === 'customEmoji'
+              ? preferences[option] !== false
               : !!preferences[option];
           this.store.set(key, {
             ...preferences,
@@ -197,7 +256,7 @@ export class NoctBot {
           });
           this.store.set(key, { ...current, statusPinned: false });
         }
-        await this.render(chatId, 'settings', state);
+        await render('settings', state);
       } else if (data.startsWith('pack:') && state.linked) {
         const { order } = await this.site({
           action: 'order',
@@ -205,8 +264,7 @@ export class NoctBot {
           amount: Number(data.slice(5)),
           key: 'callback_' + callback.id,
         });
-        await this.render(
-          chatId,
+        await render(
           order.status === 'credited' ? 'success' : 'confirm',
           state,
           { order },
@@ -217,11 +275,11 @@ export class NoctBot {
           telegramId,
           id: data.slice(7),
         });
-        await this.render(chatId, 'success', result, { order: result.order });
+        await render('success', result, { order: result.order });
         await this.statusLine(chatId, result);
         return;
       } else {
-        const command = text.split(/[ @]/)[0];
+        const command = text.trim().split(/[\s@]/)[0].toLowerCase();
         const page = ['packages', 'history', 'settings', 'help'].includes(data)
           ? data
           : {
@@ -230,7 +288,7 @@ export class NoctBot {
               '/help': 'help',
               '/settings': 'settings',
             }[command] || 'home';
-        await this.render(chatId, page, state);
+        await render(page, state);
       }
       await this.statusLine(chatId, state);
     } catch (e) {
@@ -239,21 +297,10 @@ export class NoctBot {
         e.service === 'site' &&
         [400, 403, 404, 409, 410, 429].includes(e.status)
       ) {
-        await this.render(chatId, 'error', null, {
+        await render('error', null, {
           message: e.message.toLocaleLowerCase('ru-RU'),
         });
         return;
-      }
-      // Telegram custom-emoji permissions can change. Retry with readable fallbacks.
-      if (
-        e instanceof RemoteError &&
-        e.service === 'telegram' &&
-        e.status === 400 &&
-        /emoji|entity|entities/i.test(e.message) &&
-        this.emojiAvailable
-      ) {
-        this.emojiAvailable = false;
-        return this.handle(update);
       }
       throw e;
     }

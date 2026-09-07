@@ -58,7 +58,7 @@ try {
     store,
     secret,
     siteUrl,
-    emojiAvailable: process.env.NOCT_BOT_CUSTOM_EMOJI === '1',
+    emojiAvailable: process.env.NOCT_BOT_CUSTOM_EMOJI !== '0',
   });
   console.log(`@${me.username} запущен · тестовые звёзды · ${siteUrl}`);
   let failures = 0;
@@ -90,6 +90,7 @@ try {
         }
         // Durable receipt commits before this cursor, so crashes cannot double-credit.
         store.set('offset', update.update_id + 1);
+        store.set('lastHandledAt', Date.now());
       }
       failures = 0;
     } catch (e) {
@@ -100,9 +101,13 @@ try {
         e.service === 'telegram'
       )
         throw new Error('Токен недействителен или запущен второй процесс бота');
+      if (e instanceof RemoteError && e.service === 'site' && e.status === 401)
+        throw new Error(
+          'Секрет API бота не совпадает с сайтом — выполни npm run setup:bot и перезапусти сайт',
+        );
       failures++;
       console.warn(
-        `Связь с ${e instanceof RemoteError ? e.service : 'сервисом'} прервана; повтор ${failures}. Обновление сохранено для повторной обработки`,
+        `Связь с ${e instanceof RemoteError ? e.service + ', HTTP ' + e.status : 'сервисом'} прервана; повтор ${failures}. Обновление сохранено для повторной обработки`,
       );
       await delay(
         Math.max(
