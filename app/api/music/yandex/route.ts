@@ -1,6 +1,7 @@
 import { viewer, failure, ApiError } from '@/lib/server';
 import { assertReadable, assertWritable } from '@/lib/account-access';
 import { readJsonBody } from '@/lib/request-body';
+import { checkYandexConnection } from '@/lib/yandex-transport';
 import {
   connectYandex,
   disconnectYandex,
@@ -19,7 +20,10 @@ export async function GET(req: Request) {
   try {
     const user = await viewer();
     await assertReadable(user);
-    const id = new URL(req.url).searchParams.get('playlist');
+    const query = new URL(req.url).searchParams;
+    if (query.get('action') === 'check')
+      return privateResponse(Response.json(await checkYandexConnection()));
+    const id = query.get('playlist');
     return privateResponse(
       Response.json(
         id

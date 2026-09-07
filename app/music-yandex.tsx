@@ -70,7 +70,6 @@ export function MusicYandex({
     setSelected(null);
     setTracks([]);
     const credential = token;
-    setToken('');
     try {
       await request(
         {
@@ -80,6 +79,7 @@ export function MusicYandex({
         '',
         abort.signal,
       );
+      setToken('');
       if (value === 'connect')
         await request({ action: 'sync' }, '', abort.signal);
       const result = await request<Data>(undefined, '', abort.signal);
@@ -124,6 +124,25 @@ export function MusicYandex({
         setTracks(result.items);
         setPartial(result.partial);
       }
+    } catch (error) {
+      if (!abort.signal.aborted) setError((error as Error).message);
+    } finally {
+      if (!abort.signal.aborted) setBusy(false);
+    }
+  }
+  async function checkConnection() {
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await request<{ ok: true }>(undefined, '?action=check', abort.signal);
+      if (!abort.signal.aborted)
+        setNotice(
+          'Сервер Noctgram может соединиться с Яндексом. Теперь можно подключить аккаунт. Эта проверка не использует токен.',
+        );
     } catch (error) {
       if (!abort.signal.aborted) setError((error as Error).message);
     } finally {
@@ -223,6 +242,22 @@ export function MusicYandex({
             Токен хранится зашифрованным на сервере. Пароль Яндекса здесь не
             нужен.
           </p>
+          {signedIn && (
+            <>
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={() => void checkConnection()}
+              >
+                Проверить соединение с Яндексом
+              </button>
+              <p>
+                Запросы отправляет сервер Noctgram. Если доступ к Яндексу
+                ограничен, VPN должен работать на компьютере с сервером.
+                Расширения в браузере недостаточно.
+              </p>
+            </>
+          )}
         </div>
       </section>
       {error && (

@@ -3,6 +3,7 @@ import { setting, randomToken } from './auth-session';
 import { ApiError } from './api-error';
 import { openMusicToken, sealMusicToken } from './music-token-crypto';
 import type { ServiceStatus } from './music-service-types';
+import { fetchYandex } from './yandex-transport';
 
 // Experimental metadata connector. Protocol reference: MarshalX/yandex-music-api.
 // It never requests downloads, streams, passwords or another application's credentials.
@@ -68,16 +69,7 @@ export function yandexArtwork(value: unknown) {
   }
 }
 async function api(token: string, path: string): Promise<unknown> {
-  let response: Response;
-  try {
-    response = await fetch('https://api.music.yandex.net' + path, {
-      headers: { Authorization: 'OAuth ' + token, Accept: 'application/json' },
-      redirect: 'manual',
-      signal: AbortSignal.timeout(10000),
-    });
-  } catch {
-    throw new ApiError(502, 'Яндекс Музыка не отвечает. Попробуйте позже.');
-  }
+  const response = await fetchYandex(path, token);
   if (response.status === 401 || response.status === 403)
     throw new ApiError(
       401,
