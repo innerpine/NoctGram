@@ -1,0 +1,7 @@
+* text=auto
+*.png binary
+
+# Preserve the supplied mascot sources and the original CSS block byte-for-byte.
+app/mascot-drag.ts -text
+app/noct-mascot.tsx -text
+app/features.css -text

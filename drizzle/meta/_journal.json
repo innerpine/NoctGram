@@ -8,6 +8,48 @@
       "when": 1788619213188,
       "tag": "0000_last_freak",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788639737291,
+      "tag": "0001_orange_dracula",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788687440071,
+      "tag": "0002_complex_landau",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788708239851,
+      "tag": "0003_curly_groot",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788726704752,
+      "tag": "0004_regular_stardust",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788730679374,
+      "tag": "0005_massive_mindworm",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788732362151,
+      "tag": "0006_dazzling_celestials",
+      "breakpoints": true
     }
   ]
 }

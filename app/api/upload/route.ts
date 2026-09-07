@@ -1,17 +1,34 @@
+import { assertWritable } from '@/lib/account-access';
 import { bucket, db, viewer, ApiError, failure } from '@/lib/server';
 export async function POST(req: Request) {
   try {
     const origin = req.headers.get('origin');
     if (origin && origin !== new URL(req.url).origin)
       throw new ApiError(403, 'Недопустимый источник');
-    const me = await viewer();
-    const max = 25 * 1024 * 1024;
+    const me = await viewer(true);
+    await assertWritable(me);
+    const account = await db()
+      .prepare('SELECT onboardingComplete FROM users WHERE id=?')
+      .bind(me)
+      .first<{ onboardingComplete: number }>();
+    const pending = !account?.onboardingComplete;
+    const max = (pending ? 5 : 25) * 1024 * 1024;
     if (Number(req.headers.get('content-length')) > max + 16384)
-      throw new ApiError(413, 'Файл должен быть меньше 25 МБ');
+      throw new ApiError(
+        413,
+        pending ? 'Аватарка — до 5 МБ.' : 'Файл должен быть меньше 25 МБ',
+      );
     const form = await req.formData();
     const file = form.get('file');
     if (!(file instanceof File) || !file.size || file.size > max)
-      throw new ApiError(400, 'Выберите файл размером до 25 МБ');
+      throw new ApiError(
+        400,
+        pending
+          ? 'Выберите аватарку размером до 5 МБ.'
+          : 'Выберите файл размером до 25 МБ',
+      );
+    if (pending && !file.type.startsWith('image/'))
+      throw new ApiError(400, 'Для аватарки выберите изображение.');
     if (
       ![
         'image/jpeg',

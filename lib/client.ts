@@ -7,8 +7,37 @@ export type Person = {
   lastText?: string;
   lastTime?: number;
   unread?: number;
+  lastSeen?: number;
+  kind?: string;
+  ownerId?: string | null;
+};
+export type ConnectionsPage = {
+  people: Person[];
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+export type AccountRestriction = {
+  eventId: string;
+  mode: 'read_only' | 'blocked';
+  reason: string;
+  expiresAt: number | null;
+  created: number;
+};
+export type AccountAppeal = {
+  id: string;
+  eventId: string;
+  status: string;
+  text: string;
+  reviewNote: string;
+  created: number;
 };
 export type Profile = Person & {
+  restriction?: AccountRestriction | null;
+  appeal?: AccountAppeal | null;
+  canModerate?: boolean;
+  blocked?: boolean;
+  blockedAt?: number;
+  pinnedPostId?: string | null;
   bio: string;
   cover: string;
   handles: string[];
@@ -32,6 +61,15 @@ export type Post = {
   comments: number;
   liked: number;
   saved: number;
+  pinned?: number;
+  kind?: string;
+  ownerId?: string | null;
+  views?: number;
+  stars?: number;
+  mySupport?: number;
+  adult?: number;
+  code?: string;
+  codeLang?: string;
   voted: number | null;
   votes: { option: number; count: number }[];
 };
@@ -104,7 +142,15 @@ export async function request<T>(query: string, body?: unknown): Promise<T> {
         }
       : { cache: 'no-store' },
   );
-  const data = (await response.json()) as T & { error?: string };
+  const data = (await response.json()) as T & { error?: string; code?: string };
+  if (data.code === 'ONBOARDING_REQUIRED' && typeof window !== 'undefined')
+    window.location.replace('/welcome');
+  if (
+    !response.ok &&
+    typeof window !== 'undefined' &&
+    ['ACCOUNT_BLOCKED', 'READ_ONLY'].includes(data.code || '')
+  )
+    window.dispatchEvent(new Event('noctgram:restriction'));
   if (!response.ok)
     throw new Error(
       response.status === 401
@@ -119,7 +165,29 @@ export async function upload(file: File): Promise<Media> {
   const data = new FormData();
   data.set('file', file);
   const r = await fetch('/api/upload', { method: 'POST', body: data });
-  const body = (await r.json()) as Media & { error?: string };
+  const body = (await r.json()) as Media & { error?: string; code?: string };
+  if (!r.ok && ['ACCOUNT_BLOCKED', 'READ_ONLY'].includes(body.code || ''))
+    window.dispatchEvent(new Event('noctgram:restriction'));
   if (!r.ok) throw new Error(body.error || 'Не удалось загрузить файл');
   return body;
 }
+
+export type StarTransaction = {
+  id: string;
+  sender: string | null;
+  recipient: string;
+  postId: string | null;
+  postText: string;
+  amount: number;
+  kind: string;
+  created: number;
+  name: string;
+  avatar: string;
+};
+export type Wallet = {
+  balance: number;
+  testMode: boolean;
+  received: number;
+  sent: number;
+  transactions: StarTransaction[];
+};

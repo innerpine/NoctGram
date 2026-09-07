@@ -28,6 +28,9 @@ yarn-error.log*
 
 # local environment
 .env*
+!.env.example
+.dev.vars
+.dev.vars.*
 
 # deployment and generated files
 .vercel
@@ -38,4 +41,12 @@ next-env.d.ts
 /work/
 
 *.tsbuildinfo
+*.log
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.key
+*.p12
+*.pfx
 

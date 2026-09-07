@@ -1,0 +1,924 @@
+/* Stars, channels and publishing controls extend the supplied Noctgram palette. */
+.noct-logo {
+  display: block;
+  object-fit: contain;
+  max-width: none;
+  flex-shrink: 0;
+  user-select: none;
+  pointer-events: none;
+}
+.brand .brand-icon {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: none;
+  border-radius: 0;
+  overflow: visible;
+}
+.brand .brand-icon .noct-logo {
+  width: 44px;
+  height: 44px;
+  transform: translateY(-1px);
+}
+.avatar .noct-logo {
+  width: 110%;
+  height: 110%;
+  object-fit: contain;
+}
+.stars-nav-shell .premium-nav-beam {
+  background: linear-gradient(to left, #ffda55, #ffa844, transparent);
+}
+.stars-hero .premium-star-main {
+  filter: drop-shadow(0 8px 24px #ffd15218);
+}
+.stars-balance {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 10px;
+}
+.stars-balance strong {
+  font-size: 36px;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -1px;
+}
+.test-stars-label {
+  color: #dfce8c;
+  background: #ffd1520a;
+  border: 1px solid #ffd15220;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+.stars-hero .stars-help {
+  font-size: 12px;
+  max-width: 300px;
+  line-height: 1.6;
+  margin: 14px 0 0;
+  color: #ffffff7a;
+}
+.stars-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-block: 1px solid var(--border);
+  padding: 20px 24px;
+  gap: 20px;
+}
+.stars-stats > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: #ffffff7a;
+}
+.stars-stats > div + div {
+  border-left: 1px solid var(--border);
+  padding-left: 20px;
+}
+.stars-stats span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.stars-stats strong {
+  color: #fff;
+  font-size: 17px;
+  font-weight: 500;
+}
+.stars-history {
+  padding: 20px 24px 24px;
+}
+.stars-history h3 {
+  font-size: 15px;
+  font-weight: 500;
+}
+.stars-history .icon-button {
+  width: 36px;
+  height: 36px;
+}
+.stars-tabs {
+  display: flex !important;
+  width: 100%;
+  height: 40px !important;
+  background: #ffffff06;
+  border-radius: 999px;
+  padding: 3px;
+  margin: 14px 0;
+}
+.stars-tabs [data-slot='tabs-trigger'] {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #ffffff7a;
+  border: 0;
+  background: none;
+}
+.stars-tabs [data-active] {
+  background: #242424 !important;
+  color: #fff !important;
+  box-shadow: none;
+}
+.star-transaction {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid #ffffff08;
+  animation: line-rise 0.25s var(--motion);
+}
+.star-transaction > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.star-transaction strong {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+.star-transaction > div > span {
+  font-size: 12px;
+  color: #ffffff99;
+  margin-top: 3px;
+}
+.star-transaction time {
+  font-size: 11px;
+  color: #ffffff7a;
+  margin-top: 3px;
+}
+.star-transaction > b {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: #ffffff99;
+}
+.star-transaction > b.incoming {
+  color: #efd176;
+}
+.transaction-grant {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #ffd1520a;
+  border: 1px solid #ffd15214;
+}
+.support-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 6px;
+}
+.support-panel > h3 {
+  font-size: 19px;
+  margin-top: 12px;
+}
+.support-panel > p {
+  text-align: center;
+  max-width: 310px;
+}
+.support-panel > fieldset {
+  border: 0;
+  padding: 0;
+  margin: 12px 0 0;
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+.support-amount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.support-amount input {
+  max-width: 180px;
+  text-align: center;
+  font-size: 32px;
+  letter-spacing: -1px;
+  border: 0;
+  background: none;
+  padding: 6px;
+  appearance: textfield;
+}
+.support-amount input::-webkit-inner-spin-button,
+.support-amount input::-webkit-outer-spin-button {
+  appearance: none;
+}
+.stars-range {
+  accent-color: #ffd35c;
+  min-height: 28px;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+  border: 0;
+  background: none;
+}
+.star-presets {
+  display: flex;
+  gap: 8px;
+}
+.star-presets > button {
+  flex: 1;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12px;
+  color: #ffffff99;
+}
+.star-presets > button.selected {
+  border-color: #ffffff55;
+  background: #ffffff14;
+  color: #fff;
+}
+.support-panel fieldset > .meta {
+  text-align: center;
+  font-size: 12px;
+}
+.support-panel .form-error {
+  text-align: left;
+  width: 100%;
+}
+.post-extras {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #ffffff06;
+  margin-top: 16px;
+  padding-top: 9px;
+  min-height: 30px;
+}
+.post-views {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffffff7a;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.support-post {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  min-height: 32px;
+  padding: 0 7px;
+  color: #ffffff99;
+}
+.support-post > b {
+  font-weight: 500;
+  color: #edd07b;
+}
+.support-post:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+.post-code {
+  margin-top: 14px;
+  border: 1px solid #ffffff14;
+  border-radius: 12px;
+  background: #080808;
+  overflow: hidden;
+}
+.post-code > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid #ffffff0d;
+  font-size: 11px;
+  color: #ffffff7a;
+}
+.post-code > div > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow-wrap: anywhere;
+}
+.post-code button {
+  min-height: 26px;
+  font-size: 11px;
+  padding: 0 6px;
+  color: #ffffff99;
+}
+.post-code pre {
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  max-height: 380px;
+  font:
+    12px/1.7 'Cascadia Code',
+    'Consolas',
+    monospace;
+  color: #dedee5;
+  tab-size: 2;
+  white-space: pre;
+}
+.code-editor {
+  margin: 12px 0;
+  border: 1px solid #ffffff14;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #080808;
+}
+.code-editor .row {
+  padding: 10px 12px;
+  color: #ffffff99;
+  gap: 8px;
+}
+.code-editor strong {
+  font-size: 12px;
+  font-weight: 500;
+  flex: 1;
+}
+.code-editor .row input {
+  width: 100px;
+  padding: 4px 8px;
+  font-size: 11px;
+  min-height: 28px;
+}
+.code-editor textarea {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  font:
+    12px/1.7 'Cascadia Code',
+    'Consolas',
+    monospace;
+  white-space: pre;
+  min-height: 140px;
+  resize: vertical;
+}
+.toolbar .adult-toggle {
+  font-size: 11px;
+  font-weight: 500;
+}
+.toolbar .adult-toggle.selected {
+  color: #fff;
+  background: #ffffff14;
+}
+.post-media-wrap {
+  position: relative;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+.post-media-wrap > .media-grid {
+  margin: 0;
+}
+.post-media-wrap.is-sensitive > .media-grid {
+  filter: blur(22px);
+  pointer-events: none;
+  user-select: none;
+  min-height: 200px;
+  transform: scale(1.08);
+}
+.sensitive-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  border: 1px solid #ffffff14;
+  border-radius: 12px;
+  background: #0007 !important;
+  color: #fff;
+  backdrop-filter: blur(2px);
+}
+.sensitive-cover:active {
+  transform: none;
+}
+.sensitive-cover strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.sensitive-cover > span:last-child {
+  font-size: 12px;
+  color: #ffffffbf;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.adult-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #ffffff60;
+  border-radius: 50%;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+.sensitive-video {
+  display: grid;
+  place-items: center;
+  height: 240px;
+  background: #242424;
+}
+.hide-sensitive {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #000b !important;
+  font-size: 11px;
+  z-index: 2;
+}
+.edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.edit-usernames {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-block: 1px solid var(--border);
+  padding-block: 18px;
+}
+.edit-usernames h3 {
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 3px;
+}
+.edit-usernames .meta {
+  margin: 0;
+  font-size: 11px;
+}
+.edit-usernames .row input {
+  flex: 1;
+  width: 100%;
+  font-size: 13px;
+}
+.edit-usernames .row > button {
+  min-width: 30px;
+  min-height: 36px;
+}
+.edit-usernames .text-button {
+  justify-content: flex-start;
+  font-size: 12px;
+  min-height: 32px;
+}
+.field-label {
+  font-size: 12px;
+  color: #aaa;
+}
+.channels-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.channels-toolbar .searchbox {
+  flex: 1;
+  min-width: 0;
+}
+.channels-toolbar .primary {
+  flex-shrink: 0;
+}
+.channels-toolbar input {
+  width: 100%;
+  min-width: 0;
+}
+.channel-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  width: 100%;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: #0c0c0c;
+  margin-bottom: 12px;
+  animation: post-in 0.3s var(--motion);
+}
+.channel-card > span:not(.avatar) {
+  flex: 1;
+  min-width: 0;
+}
+.channel-card strong {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+}
+.channel-card strong .badge {
+  font-size: 10px;
+  white-space: nowrap;
+  font-weight: 400;
+}
+.channel-card small {
+  color: #ffffff7a;
+  font-size: 12px;
+  margin-top: 3px;
+}
+.channel-card > svg {
+  color: #ffffff7a;
+}
+.channel-card p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #ffffff99;
+  margin: 8px 0 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.channel-editor {
+  padding: 20px;
+  border: 1px solid #ffffff14;
+  background: #0c0c0c;
+  border-radius: 16px;
+  margin-bottom: 16px;
+  animation: post-in 0.3s var(--motion);
+}
+.channel-editor > .row {
+  margin-bottom: 20px;
+}
+.channel-editor h2 {
+  font-size: 19px;
+}
+.channel-editor fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.channel-editor label:not(.channel-avatar-upload) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  color: #ffffff99;
+}
+.channel-editor input,
+.channel-editor textarea {
+  font-size: 14px;
+}
+.channel-editor .meta {
+  font-size: 11px;
+}
+.channel-avatar-upload {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.channel-editor .icon-button {
+  width: 32px;
+  height: 32px;
+}
+.channel-profile-label,
+.publish-as {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #ffffff7a;
+  font-size: 12px;
+  margin-top: 10px;
+}
+.publish-as {
+  margin: 4px 0 12px 52px;
+}
+.channel-profile .cosmetic {
+  display: none;
+}
+@media (max-width: 720px) {
+  .brand .brand-icon .noct-logo {
+    width: 40px;
+    height: 40px;
+  }
+  .stars-history {
+    padding-inline: 18px;
+  }
+}
+@media (max-width: 500px) {
+  .stars-history {
+    padding: 16px;
+  }
+  .stars-stats {
+    padding: 18px 16px;
+    gap: 12px;
+  }
+  .stars-stats > div + div {
+    padding-left: 12px;
+  }
+  .stars-tabs [data-slot='tabs-trigger'] {
+    font-size: 11px;
+  }
+  .star-transaction {
+    gap: 9px;
+  }
+  .star-transaction > div > span {
+    font-size: 11px;
+  }
+  .star-transaction > b {
+    font-size: 12px;
+  }
+  .post-code pre {
+    font-size: 11px;
+    padding: 12px;
+  }
+  .channel-card {
+    padding: 16px;
+    gap: 10px;
+  }
+  .channels-toolbar .primary {
+    padding: 0 12px;
+    font-size: 12px;
+  }
+  .channels-toolbar .searchbox {
+    padding-inline: 10px;
+  }
+  .channels-toolbar input {
+    font-size: 12px;
+  }
+  .publish-as {
+    margin-left: 48px;
+    font-size: 11px;
+  }
+  .post-extras {
+    margin-top: 14px;
+  }
+  .support-post {
+    font-size: 11px;
+  }
+  .sidebar nav button {
+    min-width: 0;
+    width: auto;
+    flex: 1;
+  }
+  .sidebar nav button span {
+    font-size: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stars-nav-shell {
+    background: linear-gradient(
+      120deg,
+      #ffffff30,
+      #ffe47780,
+      #ffac4870,
+      #ffffff30
+    );
+  }
+}
+
+/* Profile relationship lists share the existing modal surface and motion. */
+.profile-stat-button {
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  transition: color 180ms, background-color 180ms;
+}
+.profile-stat-button:hover {
+  color: #fff;
+}
+.profile-stat-button:hover strong {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.noct-dialog.connections-dialog {
+  max-width: 440px !important;
+}
+.connections-panel {
+  min-width: 0;
+}
+.connections-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.connection-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 10px;
+  border-radius: 12px;
+  text-align: left;
+  min-width: 0;
+  transition: background-color 180ms var(--motion);
+}
+.connection-person:hover {
+  background: #ffffff08;
+}
+.connection-person-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.connection-person strong,
+.connection-person small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.connection-person strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.connection-person small,
+.connection-person > svg {
+  color: #ffffff7a;
+  font-size: 12px;
+}
+.connection-person > svg {
+  flex-shrink: 0;
+}
+.connections-status,
+.connections-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 12px;
+  color: #ffffff99;
+  font-size: 13px;
+}
+.connections-empty {
+  flex-direction: column;
+  padding-block: 40px;
+  text-align: center;
+}
+.connections-empty strong {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+}
+.connections-empty p {
+  max-width: 280px;
+  line-height: 1.6;
+}
+.connections-error {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding-block: 20px;
+}
+@keyframes connections-enter {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes connections-leave {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(.98); }
+}
+@media (max-width: 500px) {
+  .profile-stat-button { font-size: 12px; }
+  .connection-person { padding-inline: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .noct-dialog.connections-dialog[data-open],
+  .noct-dialog.connections-dialog[data-closed] {
+    animation: none;
+  }
+}
+
+/* Ноктик — pixel-art mascot, 48x48 sprite. Drops into place, breathes, can be
+   pulled like a slime toy, and drops in again when tapped (see mascot-drag.ts). */
+.noct-mascot {
+  display: block;
+  flex-shrink: 0;
+  max-width: none;
+  /* Pixel art: never let the browser smooth it. Sizes stay whole multiples of 48. */
+  image-rendering: pixelated;
+  transform-origin: bottom center;
+  filter: drop-shadow(0 0 18px #ffffff14);
+  -webkit-user-drag: none;
+  user-select: none;
+  /* The mascot is a pull toy: the drag owns the gesture, so the page must not steal
+     it into a scroll. */
+  touch-action: none;
+  cursor: grab;
+  animation:
+    noct-mascot-drop 0.78s both,
+    noct-mascot-drift 5.5s ease-in-out 0.78s infinite;
+}
+.noct-mascot:active {
+  cursor: grabbing;
+}
+
+/* Falls in from above the slot, lands, squashes, rebounds. The timing function is
+   set per keyframe: gravity accelerates on the way down, everything after it eases
+   out. */
+@keyframes noct-mascot-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-150%) scale(1, 1);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.5);
+  }
+  45% {
+    opacity: 1;
+    transform: translateY(0) scale(1, 1);
+    animation-timing-function: ease-out;
+  }
+  58% {
+    transform: translateY(0) scale(1.16, 0.84);
+    animation-timing-function: ease-out;
+  }
+  74% {
+    transform: translateY(-14%) scale(0.94, 1.06);
+    animation-timing-function: ease-in;
+  }
+  88% {
+    transform: translateY(0) scale(1.05, 0.95);
+    animation-timing-function: ease-out;
+  }
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+
+/* Breathing, deliberately at the edge of perception. */
+@keyframes noct-mascot-drift {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: translateY(-4px) rotate(1.2deg);
+  }
+}
+
+/* Once the entrance has played, the element keeps only the looping drift. Added by
+   landMascot; removed by a tap, which replays the drop. Must stay above --pulling:
+   both are single-class selectors, so source order decides. */
+.noct-mascot--landed {
+  animation: noct-mascot-drift 5.5s ease-in-out infinite;
+}
+
+/* While the pull runs (pointer travel plus the spring back) the drift would outrank
+   the inline transform, so it steps aside for the whole gesture. */
+.noct-mascot--pulling {
+  animation: none;
+  will-change: transform;
+}
+
+/* The mascot lives in one place: the empty messenger. It takes the slot the Moon
+   glyph held, so it keeps that glyph's gap to the heading. */
+.chat-empty > .noct-mascot {
+  margin-bottom: 22px;
+}
+
+@media (max-width: 500px) {
+  .chat-empty > .noct-mascot {
+    width: 96px;
+    height: 96px;
+    margin-bottom: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noct-mascot {
+    animation: none;
+    will-change: auto;
+  }
+}

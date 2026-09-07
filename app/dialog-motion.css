@@ -1,0 +1,57 @@
+/* Base UI retains the portal until the popup finishes. Keep the backdrop at
+   opacity: 0 throughout that interval instead of letting an exit keyframe reset. */
+[data-slot='dialog-overlay'],
+[data-slot='alert-dialog-overlay'] {
+  opacity: 1;
+  transition: opacity 180ms ease;
+}
+[data-slot='dialog-content'],
+[data-slot='alert-dialog-content'] {
+  opacity: 1;
+  scale: 1;
+  transition:
+    opacity 180ms ease,
+    scale 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+[data-slot='dialog-overlay']:is(
+  [data-starting-style],
+  [data-ending-style],
+  [data-closed]
+),
+[data-slot='alert-dialog-overlay']:is(
+  [data-starting-style],
+  [data-ending-style],
+  [data-closed]
+),
+[data-slot='dialog-content']:is(
+  [data-starting-style],
+  [data-ending-style],
+  [data-closed]
+),
+[data-slot='alert-dialog-content']:is(
+  [data-starting-style],
+  [data-ending-style],
+  [data-closed]
+) {
+  opacity: 0;
+}
+[data-slot='dialog-content']:is(
+  [data-starting-style],
+  [data-ending-style],
+  [data-closed]
+),
+[data-slot='alert-dialog-content']:is(
+  [data-starting-style],
+  [data-ending-style],
+  [data-closed]
+) {
+  scale: 0.97;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='dialog-overlay'],
+  [data-slot='alert-dialog-overlay'],
+  [data-slot='dialog-content'],
+  [data-slot='alert-dialog-content'] {
+    transition: none !important;
+  }
+}

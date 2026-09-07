@@ -4,7 +4,10 @@ import {
   integer,
   primaryKey,
   index,
+  uniqueIndex,
+  type AnySQLiteColumn,
 } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
 export const users = sqliteTable('users', {
   id: text().primaryKey(),
   name: text().notNull(),
@@ -12,6 +15,10 @@ export const users = sqliteTable('users', {
   avatar: text().notNull().default(''),
   cover: text().notNull().default(''),
   created: integer().notNull(),
+  lastSeen: integer().notNull().default(0),
+  onboardingComplete: integer().notNull().default(1),
+  kind: text().notNull().default('person'),
+  ownerId: text().references((): AnySQLiteColumn => users.id),
 });
 export const handles = sqliteTable(
   'handles',
@@ -34,6 +41,10 @@ export const posts = sqliteTable(
     text: text().notNull(),
     media: text().notNull().default('[]'),
     poll: text().notNull().default('[]'),
+    pinned: integer().notNull().default(0),
+    code: text().notNull().default(''),
+    codeLang: text().notNull().default('text'),
+    adult: integer().notNull().default(0),
     created: integer().notNull(),
   },
   (t) => [
@@ -133,3 +144,264 @@ export const uploads = sqliteTable('uploads', {
   name: text().notNull(),
   created: integer().notNull(),
 });
+
+export const hiddenPosts = sqliteTable(
+  'hidden_posts',
+  {
+    postId: text()
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] })],
+);
+export const reports = sqliteTable(
+  'reports',
+  {
+    postId: text()
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    reason: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] })],
+);
+
+export const postViews = sqliteTable(
+  'post_views',
+  {
+    postId: text()
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    created: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] })],
+);
+
+// Balances are derived from this ledger. Transfers use a single conditional INSERT.
+export const starTransfers = sqliteTable(
+  'star_transfers',
+  {
+    id: text().primaryKey(),
+    sender: text().references(() => users.id),
+    recipient: text()
+      .notNull()
+      .references(() => users.id),
+    postId: text().references(() => posts.id, { onDelete: 'set null' }),
+    postText: text().notNull().default(''),
+    amount: integer().notNull(),
+    kind: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    index('stars_sender').on(t.sender, t.created),
+    index('stars_recipient').on(t.recipient, t.created),
+    index('stars_post').on(t.postId, t.sender),
+    uniqueIndex('stars_one_grant')
+      .on(t.recipient)
+      .where(sql`${t.kind} = 'grant'`),
+  ],
+);
+
+// Moderators are granted by an owner-controlled database operation, never signup.
+export const moderators = sqliteTable('moderators', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id),
+  created: integer().notNull(),
+});
+export const moderationEvents = sqliteTable(
+  'moderation_events',
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    moderatorId: text()
+      .notNull()
+      .references(() => users.id),
+    mode: text().notNull(),
+    reason: text().notNull(),
+    expiresAt: integer(),
+    created: integer().notNull(),
+  },
+  (t) => [index('moderation_events_user').on(t.userId, t.created)],
+);
+export const accountRestrictions = sqliteTable('account_restrictions', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id),
+  eventId: text()
+    .notNull()
+    .references(() => moderationEvents.id),
+  mode: text().notNull(),
+  reason: text().notNull(),
+  expiresAt: integer(),
+  created: integer().notNull(),
+});
+export const moderationAppeals = sqliteTable(
+  'moderation_appeals',
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    eventId: text()
+      .notNull()
+      .references(() => moderationEvents.id),
+    text: text().notNull(),
+    status: text().notNull().default('pending'),
+    created: integer().notNull(),
+    reviewedBy: text().references(() => users.id),
+    reviewedAt: integer(),
+    reviewNote: text().notNull().default(''),
+  },
+  (t) => [
+    uniqueIndex('appeal_event').on(t.eventId),
+    index('appeals_status').on(t.status, t.created),
+  ],
+);
+
+// Email proof is owned by Supabase. No OTPs or provider tokens are stored here.
+export const authIdentities = sqliteTable(
+  'auth_identities',
+  {
+    subject: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    email: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [uniqueIndex('auth_identity_user').on(t.userId)],
+);
+export const authSessions = sqliteTable(
+  'auth_sessions',
+  {
+    tokenHash: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [
+    index('auth_sessions_user').on(t.userId),
+    index('auth_sessions_expiry').on(t.expiresAt),
+  ],
+);
+export const authChallenges = sqliteTable(
+  'auth_challenges',
+  {
+    tokenHash: text().primaryKey(),
+    email: text().notNull(),
+    linkUserId: text().references(() => users.id),
+    attempts: integer().notNull().default(0),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [index('auth_challenges_expiry').on(t.expiresAt)],
+);
+export const authLimits = sqliteTable(
+  'auth_limits',
+  {
+    key: text().primaryKey(),
+    count: integer().notNull(),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [index('auth_limits_expiry').on(t.expiresAt)],
+);
+
+// Reports and decisions keep their evidence when the original content is deleted.
+export const contentReports = sqliteTable(
+  'content_reports',
+  {
+    id: text().primaryKey(),
+    targetType: text().notNull(),
+    targetId: text().notNull(),
+    postId: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    authorId: text()
+      .notNull()
+      .references(() => users.id),
+    text: text().notNull(),
+    snapshot: text().notNull(),
+    reason: text().notNull(),
+    status: text().notNull().default('new'),
+    created: integer().notNull(),
+    updated: integer().notNull(),
+    reviewedBy: text().references(() => users.id),
+    reviewNote: text().notNull().default(''),
+  },
+  (t) => [
+    uniqueIndex('content_report_once').on(t.targetType, t.targetId, t.userId),
+    index('content_reports_queue').on(t.status, t.created, t.id),
+    index('content_reports_post').on(t.postId),
+  ],
+);
+export const contentRemovals = sqliteTable(
+  'content_removals',
+  {
+    id: text().primaryKey(),
+    targetType: text().notNull(),
+    targetId: text().notNull(),
+    postId: text().notNull(),
+    authorId: text()
+      .notNull()
+      .references(() => users.id),
+    moderatorId: text()
+      .notNull()
+      .references(() => users.id),
+    text: text().notNull(),
+    snapshot: text().notNull(),
+    reason: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    uniqueIndex('content_removal_once').on(t.targetType, t.targetId),
+    index('content_removals_created').on(t.created, t.id),
+  ],
+);
+export const moderatedUploads = sqliteTable('moderated_uploads', {
+  uploadId: text()
+    .primaryKey()
+    .references(() => uploads.id),
+  removalId: text()
+    .notNull()
+    .references(() => contentRemovals.id),
+});
+
+// Personal settings never appear in another user's public profile.
+export const userPrivacy = sqliteTable('user_privacy', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  hideAdult: integer().notNull().default(0),
+  messagePolicy: text().notNull().default('everyone'),
+});
+export const userBlocks = sqliteTable(
+  'user_blocks',
+  {
+    blocker: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    blocked: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.blocker, t.blocked] }),
+    index('user_blocks_reverse').on(t.blocked, t.blocker),
+  ],
+);

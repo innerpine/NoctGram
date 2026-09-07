@@ -2,6 +2,8 @@
 /* Auth routes require top-level links; private R2 images must keep session cookies.
    Async subscription effects intentionally set loading state; no React compiler is enabled. */
 /* eslint-disable next/no-img-element, next/no-html-link-for-pages, react/react-compiler */
+import { PrivacyPanel } from './privacy-panel';
+import { Ban, Flag } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Moon,
@@ -10,7 +12,6 @@ import {
   Image as ImageIcon,
   ChartNoAxesColumn,
   ArrowUpRight,
-  Star,
   Send,
   Plus,
   X,
@@ -21,15 +22,16 @@ import {
   Pencil,
   Camera,
   CalendarDays,
-  AtSign,
   RefreshCw,
   Video,
-  Sparkles,
   LogOut,
   LoaderCircle,
   UserRound,
   Mail,
   Copy,
+  Code2,
+  Megaphone,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   Dialog,
@@ -45,7 +47,23 @@ import {
   AlertDialogDescription,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
-import { Avatar, Empty, PostCard, Stamp } from './post-card';
+import { Avatar, Empty, PostCard, PostSkeleton } from './post-card';
+import { CommentsPanel } from './comments-panel';
+import { ContentDecisionForm } from './content-decision-form';
+import { PremiumPanel } from './premium-panel';
+import { PremiumIcon } from './premium-icon';
+import { StarsIcon, NoctLogo } from './stars-icon';
+import { StarsPanel, SupportPanel } from './stars-panel';
+import { ChannelsPanel } from './channels-panel';
+import { NoctMascot } from './noct-mascot';
+import { ConnectionsPanel } from './connections-panel';
+import {
+  BlockedAccount,
+  ReadOnlyNotice,
+  SuspendedProfile,
+} from './account-states';
+import { ModerationPanel } from './moderation-panel';
+import { SignOutButton } from './sign-out-button';
 import {
   request,
   upload,
@@ -54,7 +72,6 @@ import {
   type Profile,
   type Media,
   type Post,
-  type Comment,
   type Message,
 } from '@/lib/client';
 export default function Noctgram() {
@@ -69,41 +86,87 @@ export default function Noctgram() {
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [notice, setNotice] = useState(''),
+    [noticeVersion, setNoticeVersion] = useState(0),
     [loadError, setLoadError] = useState(false),
     [guest, setGuest] = useState(false),
-    [modal, setModal] = useState(''),
+    [modal, setModalContent] = useState(''),
+    [modalOpen, setModalOpen] = useState(false),
+    [connectionsProfile, setConnectionsProfile] = useState<Profile | null>(
+      null,
+    ),
     [deleteId, setDeleteId] = useState(''),
     [lightbox, setLightbox] = useState<Media | null>(null),
+    [lightboxOpen, setLightboxOpen] = useState(false),
     [hasMore, setHasMore] = useState(false);
   const [draft, setDraft] = useState(''),
     [attachments, setAttachments] = useState<Media[]>([]),
     [poll, setPoll] = useState<string[] | null>(null),
-    [uploading, setUploading] = useState(false);
+    [uploading, setUploading] = useState(false),
+    [code, setCode] = useState<string | null>(null),
+    [codeLang, setCodeLang] = useState('text'),
+    [adult, setAdult] = useState(false);
   const [commentPost, setCommentPost] = useState<Post | null>(null),
-    [comments, setComments] = useState<Comment[]>([]),
-    [commentText, setCommentText] = useState('');
-  const [editName, setEditName] = useState(''),
+    [supportPost, setSupportPost] = useState<Post | null>(null),
+    [reportPost, setReportPost] = useState<Post | null>(null),
+    [reportReason, setReportReason] = useState(''),
+    [undoHidden, setUndoHidden] = useState<Post | null>(null),
+    [topics, setTopics] = useState<{ tag: string; count: number }[]>([]),
+    [toastLeaving, setToastLeaving] = useState(false),
+    [privacyVersion, setPrivacyVersion] = useState(0);
+  const [editTab, setEditTab] = useState<'profile' | 'privacy'>('profile'),
+    [reportedMessage, setReportedMessage] = useState<Message | null>(null),
+    [messageAccess, setMessageAccess] = useState<{
+      allowed: boolean;
+      blockedByMe: boolean;
+    } | null>(null),
+    [editName, setEditName] = useState(''),
     [editBio, setEditBio] = useState(''),
     [editAvatar, setEditAvatar] = useState(''),
     [editCover, setEditCover] = useState(''),
-    [newHandle, setNewHandle] = useState('');
+    [editId, setEditId] = useState(''),
+    [editHandle, setEditHandle] = useState(''),
+    [editAliases, setEditAliases] = useState<string[]>([]);
   const [threads, setThreads] = useState<Person[]>([]),
     [peer, setPeer] = useState<Person | null>(null),
     [messages, setMessages] = useState<Message[]>([]),
     [messageText, setMessageText] = useState(''),
     [peopleQuery, setPeopleQuery] = useState(''),
     [found, setFound] = useState<Person[]>([]);
+  const readOnly = me?.restriction?.mode === 'read_only';
+  const accountBlocked = me?.restriction?.mode === 'blocked';
   const fileRef = useRef<HTMLInputElement>(null),
     searchRef = useRef<HTMLInputElement>(null),
     draftRef = useRef<HTMLTextAreaElement>(null),
     messageEnd = useRef<HTMLDivElement>(null),
     requestVersion = useRef(0),
     messageVersion = useRef(0),
+    activePeer = useRef(''),
+    premiumReturn = useRef('feed'),
+    starsReturn = useRef('feed'),
     actionLock = useRef(false);
-  const notify = (s: string) => setNotice(s);
+  const setModal = (next: string) => {
+    if (next) setModalContent(next);
+    setModalOpen(!!next);
+  };
+  const notify = (s: string, undo: Post | null = null) => {
+    setToastLeaving(false);
+    setUndoHidden(undo);
+    setNotice(s);
+    setNoticeVersion((v) => v + 1);
+  };
   const auth = () => {
     if (!me) {
       setModal('signin');
+      return false;
+    }
+    return true;
+  };
+  const writable = () => {
+    if (!auth()) return false;
+    if (readOnly || accountBlocked) {
+      notify(
+        'Для аккаунта действуют ограничения. Подробности — в плашке над контентом.',
+      );
       return false;
     }
     return true;
@@ -148,17 +211,100 @@ export default function Noctgram() {
   }, [bootstrap]);
   useEffect(() => {
     if (!notice) return;
-    const t = setTimeout(() => setNotice(''), 6500);
-    return () => clearTimeout(t);
-  }, [notice]);
+    const fade = setTimeout(() => setToastLeaving(true), 4200);
+    const t = setTimeout(() => {
+      setNotice('');
+      setUndoHidden(null);
+      setToastLeaving(false);
+    }, 4480);
+    return () => {
+      clearTimeout(fade);
+      clearTimeout(t);
+    };
+  }, [notice, noticeVersion]);
+  const updateAccount = useCallback((next: Profile) => {
+    setMe(next);
+    setProfile((current) => (current?.id === next.id ? next : current));
+    if (next.restriction?.mode === 'blocked') {
+      setPosts([]);
+      setThreads([]);
+      setMessages([]);
+      setModalOpen(false);
+    }
+  }, []);
+  const refreshAccount = useCallback(async () => {
+    updateAccount(await request<Profile>('?action=account'));
+  }, [updateAccount]);
   const myId = me?.id,
-    viewedId = profile?.id;
+    viewedId = profile?.id,
+    pinnedId = profile?.pinnedPostId;
+  useEffect(() => {
+    if (!myId) return;
+    let live = true;
+    const check = () => {
+      if (document.visibilityState === 'visible')
+        void request<Profile>('?action=account')
+          .then((p) => {
+            if (live) updateAccount(p);
+          })
+          .catch(() => {});
+    };
+    const timer = setInterval(check, 15000);
+    window.addEventListener('focus', check);
+    window.addEventListener('noctgram:restriction', check);
+    return () => {
+      live = false;
+      clearInterval(timer);
+      window.removeEventListener('focus', check);
+      window.removeEventListener('noctgram:restriction', check);
+    };
+  }, [myId, updateAccount]);
+  useEffect(() => {
+    if (
+      !myId ||
+      page !== 'profile' ||
+      profile?.kind !== 'channel' ||
+      profile.ownerId !== myId
+    )
+      return;
+    const id = profile.id;
+    let live = true,
+      pending = false;
+    const check = () => {
+      if (pending || document.visibilityState !== 'visible') return;
+      pending = true;
+      void request<Profile>('?action=profile&id=' + encodeURIComponent(id))
+        .then((next) => {
+          if (live)
+            setProfile((current) => (current?.id === id ? next : current));
+        })
+        .catch(() => {})
+        .finally(() => {
+          pending = false;
+        });
+    };
+    const timer = setInterval(check, 15000);
+    window.addEventListener('focus', check);
+    return () => {
+      live = false;
+      clearInterval(timer);
+      window.removeEventListener('focus', check);
+    };
+  }, [myId, page, profile?.id, profile?.kind, profile?.ownerId]);
   const refresh = useCallback(
-    async (append = false, before = Date.now() + 1) => {
-      if (!myId) return;
+    async (append = false, before = Date.now() + 1, afterId = '') => {
+      if (
+        !myId ||
+        accountBlocked ||
+        (page === 'profile' && profile?.blocked) ||
+        ['premium', 'stars', 'channels', 'messages', 'moderation'].includes(
+          page,
+        )
+      )
+        return;
       const version = ++requestVersion.current;
       const filter =
-        page === 'saved' ? 'saved' : page === 'profile' ? 'all' : mode;
+        page === 'saved' ? 'saved' : page === 'feed' ? mode : 'all';
       const user = page === 'profile' ? viewedId || myId : '';
       setLoading(true);
       try {
@@ -168,15 +314,38 @@ export default function Noctgram() {
           q: query,
           user,
         });
-        if (append) q.set('before', String(before));
+        if (page === 'profile' && profileTab === 'media') q.set('media', '1');
+        if (append) {
+          q.set('before', String(before));
+          q.set('afterId', afterId);
+        }
         const r = await request<Post[]>('?' + q);
+        const count = r.length;
+        if (
+          !append &&
+          page === 'profile' &&
+          profileTab === 'posts' &&
+          pinnedId &&
+          !query &&
+          !r.some((p) => p.id === pinnedId)
+        ) {
+          try {
+            r.unshift(
+              await request<Post>(
+                '?action=post&id=' + encodeURIComponent(pinnedId),
+              ),
+            );
+          } catch {
+            /* A deleted pin does not block the profile feed. */
+          }
+        }
         if (version === requestVersion.current) {
           setPosts((p) =>
             append
               ? [...p, ...r.filter((n) => !p.some((x) => x.id === n.id))]
               : r,
           );
-          setHasMore(r.length === 30);
+          setHasMore(count === 30);
           setLoadError(false);
         }
       } catch (e) {
@@ -188,15 +357,107 @@ export default function Noctgram() {
         if (version === requestVersion.current) setLoading(false);
       }
     },
-    [myId, page, viewedId, mode, query],
+    [
+      myId,
+      page,
+      viewedId,
+      mode,
+      query,
+      profileTab,
+      pinnedId,
+      accountBlocked,
+      profile?.blocked,
+    ],
   );
+  const latestRefresh = useRef(refresh);
   useEffect(() => {
-    if (!myId || page === 'messages') return;
+    latestRefresh.current = refresh;
+  }, [refresh]);
+  useEffect(() => {
+    if (
+      !myId ||
+      accountBlocked ||
+      (page === 'profile' && profile?.blocked) ||
+      ['premium', 'stars', 'channels', 'messages', 'moderation'].includes(page)
+    )
+      return;
+    setPosts([]);
+    setHasMore(false);
+    setLoading(true);
     const t = setTimeout(() => void refresh(), query ? 250 : 0);
-    return () => clearTimeout(t);
-  }, [myId, page, query, refresh]);
+    const version = requestVersion;
+    return () => {
+      clearTimeout(t);
+      version.current++;
+    };
+  }, [myId, page, query, refresh, accountBlocked, profile?.blocked]);
+  useEffect(() => {
+    if (!myId) return;
+    let active = true;
+    request<{ tag: string; count: number }[]>('?action=topics')
+      .then((v) => {
+        if (active) setTopics(v);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [myId, posts.length, privacyVersion]);
+  useEffect(() => {
+    if (!myId || !privacyVersion) return;
+    let active = true;
+    request<{ me: Profile; people: Person[] }>('?action=bootstrap')
+      .then((r) => {
+        if (active) {
+          setPeople(r.people);
+          updateAccount(r.me);
+        }
+      })
+      .catch((e) => {
+        if (active) notify(e.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [myId, privacyVersion, updateAccount]);
+  useEffect(() => {
+    if (!myId) return;
+    const id = new URLSearchParams(window.location.search).get('post');
+    if (!id) return;
+    let active = true;
+    request<Post>('?action=post&id=' + encodeURIComponent(id))
+      .then((p) => {
+        if (active) {
+          setCommentPost(p);
+          setModal('comments');
+        }
+      })
+      .catch((e) => {
+        if (active) notify(e.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [myId]);
+  const refreshPost = async (id: string) => {
+    try {
+      const updated = await request<Post>(
+        '?action=post&id=' + encodeURIComponent(id),
+      );
+      setPosts((rows) => rows.map((p) => (p.id === id ? updated : p)));
+    } catch (e) {
+      notify((e as Error).message);
+    }
+  };
   const navigate = (v: string) => {
-    if (['profile', 'saved', 'messages'].includes(v) && !auth()) return;
+    if (
+      ['profile', 'saved', 'messages', 'channels', 'stars'].includes(v) &&
+      !auth()
+    )
+      return;
+    if (v === 'moderation' && !me?.canModerate) return;
+    if (v === 'premium' && page !== 'premium') premiumReturn.current = page;
+    if (v === 'stars' && page !== 'stars') starsReturn.current = page;
     setQuery('');
     setPage(v);
     if (v === 'profile') {
@@ -217,18 +478,37 @@ export default function Noctgram() {
     return () => window.removeEventListener('keydown', key);
   }, []);
   const loadThreads = useCallback(async () => {
-    if (me) setThreads(await request<Person[]>('?action=threads'));
+    if (me && me.restriction?.mode !== 'blocked')
+      setThreads(await request<Person[]>('?action=threads'));
   }, [me]);
   const loadMessages = useCallback(async () => {
-    if (!peer) return;
+    if (!peer || activePeer.current !== peer.id) return;
     const version = ++messageVersion.current;
-    const r = await request<Message[]>(
-      '?action=messages&peer=' + encodeURIComponent(peer.id),
-    );
-    if (version === messageVersion.current) setMessages(r);
+    let r: Message[];
+    let access: { allowed: boolean; blockedByMe: boolean };
+    try {
+      [r, access] = await Promise.all([
+        request<Message[]>(
+          '?action=messages&peer=' + encodeURIComponent(peer.id),
+        ),
+        request<{ allowed: boolean; blockedByMe: boolean }>(
+          '?action=messageAccess&peer=' + encodeURIComponent(peer.id),
+        ),
+      ]);
+    } catch (e) {
+      if (version === messageVersion.current) {
+        setMessages([]);
+        setMessageAccess(null);
+      }
+      throw e;
+    }
+    if (version === messageVersion.current && activePeer.current === peer.id) {
+      setMessages(r);
+      setMessageAccess(access);
+    }
   }, [peer]);
   useEffect(() => {
-    if (page !== 'messages' || !me) return;
+    if (!me) return;
     void loadThreads().catch((e) => notify(e.message));
     const t = setInterval(() => {
       if (document.visibilityState === 'visible')
@@ -237,15 +517,21 @@ export default function Noctgram() {
     return () => clearInterval(t);
   }, [page, me, loadThreads]);
   useEffect(() => {
-    if (page !== 'messages' || !peer) return;
+    if (page !== 'messages' || !peer || accountBlocked) return;
+    activePeer.current = peer.id;
+    const generationRef = messageVersion;
     setMessages([]);
     void loadMessages().catch((e) => notify(e.message));
     const t = setInterval(() => {
       if (document.visibilityState === 'visible')
         void loadMessages().catch(() => {});
     }, 3000);
-    return () => clearInterval(t);
-  }, [peer, page, loadMessages]);
+    return () => {
+      clearInterval(t);
+      activePeer.current = '';
+      generationRef.current++;
+    };
+  }, [peer, page, loadMessages, accountBlocked]);
   useEffect(() => {
     messageEnd.current?.scrollIntoView({ block: 'end' });
   }, [messages.length]);
@@ -283,13 +569,17 @@ export default function Noctgram() {
       notify('Это официальный канал. Общайтесь с командой в комментариях.');
       return;
     }
+    messageVersion.current++;
+    activePeer.current = person.id;
+    setMessages([]);
     setPeer(person);
+    setMessageAccess(null);
     setMessageText('');
     setPage('messages');
     setModal('');
   };
   const addFiles = async (files: FileList | null) => {
-    if (!files || !auth()) return;
+    if (!files || !writable()) return;
     setUploading(true);
     try {
       if (attachments.length + files.length > 4)
@@ -307,81 +597,175 @@ export default function Noctgram() {
     }
   };
   const publish = () => {
-    if (!auth()) return;
+    if (!writable()) return;
+    const publisher =
+      page === 'profile' && profile?.kind === 'channel' ? profile.id : me!.id;
     void run(async () => {
       await request('', {
         action: 'post',
+        as: publisher,
         text: draft,
         media: attachments.map((x) => x.id),
         poll: poll || [],
+        code: code || '',
+        codeLang,
+        adult,
       });
       setDraft('');
       setAttachments([]);
       setPoll(null);
-      await refresh();
-      const updated = await request<Profile>('?action=profile');
-      setMe(updated);
-      if (profile?.id === updated.id) setProfile(updated);
+      setCode(null);
+      setCodeLang('text');
+      setAdult(false);
+      await latestRefresh.current();
+      const updated = await request<Profile>(
+        '?action=profile&id=' + encodeURIComponent(publisher),
+      );
+      if (updated.id === me?.id) setMe(updated);
+      setProfile((current) => (current?.id === updated.id ? updated : current));
       notify('Публикация появилась в ленте');
     });
   };
-  const action = async (p: Post, kind: string, value: unknown) => {
-    if (!auth()) return;
-    await run(async () => {
+  const recordView = useCallback(
+    async (id: string) => {
+      if (!myId) return false;
+      try {
+        const result = await request<{ views: number }>('', {
+          action: 'view',
+          id,
+        });
+        setPosts((rows) =>
+          rows.map((p) => (p.id === id ? { ...p, views: result.views } : p)),
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [myId],
+  );
+  const action = async (
+    p: Post,
+    kind: string,
+    value: unknown,
+  ): Promise<boolean> => {
+    if (!auth()) return false;
+    try {
       await request('', {
         action: kind,
         id: p.id,
         ...(kind === 'vote' ? { option: value } : { value }),
       });
-      await refresh();
-    });
+      const updated = await request<Post>(
+        '?action=post&id=' + encodeURIComponent(p.id),
+      );
+      setPosts((rows) => rows.map((x) => (x.id === p.id ? updated : x)));
+      return true;
+    } catch (e) {
+      notify((e as Error).message);
+      return false;
+    }
   };
   const openComments = (p: Post) => {
     if (!auth()) return;
     setCommentPost(p);
-    setComments([]);
-    setCommentText('');
     setModal('comments');
-    void run(async () =>
-      setComments(await request<Comment[]>('?action=comments&post=' + p.id)),
-    );
   };
+  const postMenu = (p: Post, kind: string) => {
+    if (kind === 'copy') {
+      const url = new URL(window.location.href);
+      url.search = '';
+      url.hash = '';
+      url.searchParams.set('post', p.id);
+      void navigator.clipboard
+        .writeText(url.href)
+        .then(() => notify('Ссылка скопирована'))
+        .catch(() => notify('Не удалось скопировать ссылку'));
+      return;
+    }
+    if (!auth()) return;
+    if (kind === 'moderateContent' && me?.canModerate) {
+      setReportPost(p);
+      setModal('moderateContent');
+      return;
+    }
+    if (kind === 'report') {
+      setReportPost(p);
+      setReportReason('');
+      setModal('report');
+      return;
+    }
+    void run(async () => {
+      await request('', {
+        action: kind,
+        id: p.id,
+        value: kind === 'pin' ? !p.pinned : true,
+      });
+      if (kind === 'hide') {
+        setPosts((rows) => rows.filter((x) => x.id !== p.id));
+        notify('Публикация скрыта', p);
+      } else {
+        setPosts((rows) =>
+          rows.map((x) =>
+            x.userId === p.userId
+              ? { ...x, pinned: x.id === p.id && !p.pinned ? 1 : 0 }
+              : x,
+          ),
+        );
+        const next = await request<Profile>(
+          '?action=profile&id=' + encodeURIComponent(p.userId),
+        );
+        if (next.id === me?.id) setMe(next);
+        setProfile((current) => (current?.id === next.id ? next : current));
+        notify(
+          p.pinned
+            ? 'Публикация откреплена'
+            : 'Публикация закреплена в профиле',
+        );
+      }
+    });
+  };
+  const profileOwned =
+    !!me && (profile?.id === me.id || profile?.ownerId === me.id);
+  const channelRestricted =
+    profile?.kind === 'channel' && !!profile.restriction;
   const edit = () => {
-    if (!me) return;
-    setEditName(me.name);
-    setEditBio(me.bio);
-    setEditAvatar(me.avatar);
-    setEditCover(me.cover);
+    if (!me || accountBlocked) return;
+    if (profileOwned && channelRestricted) {
+      notify('Редактирование канала ограничено модератором');
+      return;
+    }
+    const target = profileOwned && profile ? profile : me;
+    setEditTab(readOnly && target.id === me.id ? 'privacy' : 'profile');
+    setEditId(target.id);
+    setEditName(target.name);
+    setEditBio(target.bio);
+    setEditAvatar(target.avatar);
+    setEditCover(target.cover);
+    setEditHandle(target.handle);
+    setEditAliases(target.handles.filter((h) => h !== target.handle));
     setModal('edit');
   };
   const saveProfile = () =>
     void run(async () => {
       const r = await request<Profile>('', {
         action: 'profile',
+        id: editId,
         name: editName,
         bio: editBio,
         avatar: editAvatar,
         cover: editCover,
+        mainHandle: editHandle,
+        extraHandles: editAliases,
       });
-      setMe(r);
-      setProfile(r);
+      if (r.id === me?.id) setMe(r);
+      setProfile((current) => (current?.id === r.id ? r : current));
       setModal('');
-      notify('Профиль обновлён');
-      await refresh();
-    });
-  const updateHandle = (handle: string, remove = false) =>
-    void run(async () => {
-      const r = await request<Profile>('', {
-        action: remove ? 'removeHandle' : 'handle',
-        handle,
-      });
-      setMe(r);
-      setProfile(r);
-      setNewHandle('');
-      notify(remove ? 'Юзернейм удалён' : 'Основной юзернейм обновлён');
+      notify('Изменения сохранены');
+      await latestRefresh.current();
     });
   const follow = (person: Person) => {
-    if (!auth()) return;
+    if (!writable()) return;
     void run(async () => {
       await request('', {
         action: 'follow',
@@ -393,24 +777,37 @@ export default function Noctgram() {
           x.id === person.id ? { ...x, followed: x.followed ? 0 : 1 } : x,
         ),
       );
-      if (profile?.id === person.id)
-        setProfile(await request<Profile>('?action=profile&id=' + person.id));
+      const updated = await request<Profile>('?action=profile&id=' + person.id);
+      setProfile((current) => (current?.id === person.id ? updated : current));
       setMe(await request<Profile>('?action=profile'));
     });
   };
   const composer = (
-    <div className="composer">
+    <fieldset className="composer" disabled={busy || readOnly}>
       <div className="composer-top">
-        <Avatar person={me || { name: 'Вы', avatar: '' }} size={40} />
+        <Avatar
+          person={
+            page === 'profile' && profile?.kind === 'channel'
+              ? profile
+              : me || { name: 'Вы', avatar: '' }
+          }
+          size={40}
+        />
         <textarea
           ref={draftRef}
           aria-label="Новая публикация"
-          placeholder="Что нового?"
+          placeholder={poll ? 'Задай вопрос…' : 'Что нового?'}
           maxLength={5000}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
         />
       </div>
+      {page === 'profile' && profile?.kind === 'channel' && (
+        <div className="publish-as">
+          <Megaphone size={13} />
+          Публикация от имени {profile.name}
+        </div>
+      )}
       {attachments.length > 0 && (
         <div className="attachment-list">
           {attachments.map((m) => (
@@ -436,12 +833,17 @@ export default function Noctgram() {
       {poll && (
         <div className="poll-editor">
           <div className="row">
-            <strong>Варианты ответа</strong>
+            <strong>
+              <ChartNoAxesColumn size={15} /> Опрос
+            </strong>
             <span className="grow" />
             <button onClick={() => setPoll(null)} aria-label="Убрать опрос">
               <X size={16} />
             </button>
           </div>
+          <p className="poll-editor-hint">
+            Вопрос — в тексте публикации. Добавь от 2 до 6 вариантов.
+          </p>
           {poll.map((v, i) => (
             <div className="row" key={i}>
               <input
@@ -476,6 +878,33 @@ export default function Noctgram() {
           )}
         </div>
       )}
+      {code !== null && (
+        <div className="code-editor">
+          <div className="row">
+            <Code2 size={15} />
+            <strong>Блок кода</strong>
+            <input
+              aria-label="Язык программирования"
+              value={codeLang}
+              maxLength={24}
+              placeholder="text"
+              onChange={(e) => setCodeLang(e.target.value)}
+            />
+            <button aria-label="Убрать блок кода" onClick={() => setCode(null)}>
+              <X size={15} />
+            </button>
+          </div>
+          <textarea
+            aria-label="Код публикации"
+            spellCheck={false}
+            value={code}
+            maxLength={20000}
+            rows={7}
+            placeholder="Вставь код…"
+            onChange={(e) => setCode(e.target.value)}
+          />
+        </div>
+      )}
       <div className="toolbar">
         <input
           ref={fileRef}
@@ -506,6 +935,27 @@ export default function Noctgram() {
         >
           <ChartNoAxesColumn size={19} />
         </button>
+        <button
+          title="Блок кода"
+          aria-label="Прикрепить блок кода"
+          className={code !== null ? 'selected' : ''}
+          onClick={() => {
+            if (auth()) setCode((c) => (c === null ? '' : null));
+          }}
+        >
+          <Code2 size={19} />
+        </button>
+        {attachments.length > 0 && (
+          <button
+            title="Размыть только фото и видео"
+            aria-label="Материалы 18+"
+            aria-pressed={adult}
+            className={'adult-toggle ' + (adult ? 'selected' : '')}
+            onClick={() => setAdult((v) => !v)}
+          >
+            18+
+          </button>
+        )}
         <span className="meta composer-hint">
           {uploading
             ? 'Загружаем…'
@@ -519,7 +969,7 @@ export default function Noctgram() {
           disabled={
             busy ||
             uploading ||
-            (!draft.trim() && !attachments.length) ||
+            (!draft.trim() && !attachments.length && !code?.trim()) ||
             !!poll?.some((x) => !x.trim())
           }
           onClick={publish}
@@ -528,32 +978,58 @@ export default function Noctgram() {
           <ArrowUpRight size={14} />
         </button>
       </div>
-    </div>
+    </fieldset>
   );
   const cards = (items: Post[]) =>
     items.map((p) => (
       <PostCard
+        canModerate={!!me?.canModerate && !readOnly}
         key={p.id}
         p={p}
         me={me?.id}
-        busy={busy}
+        busy={busy || readOnly}
         onProfile={(id) => void openProfile(id)}
-        onAction={(p, k, v) => void action(p, k, v)}
+        onAction={action}
         onComments={openComments}
         onDelete={setDeleteId}
-        onMedia={setLightbox}
+        onMedia={(media) => {
+          setLightbox(media);
+          setLightboxOpen(true);
+        }}
+        onMenu={postMenu}
+        onView={recordView}
+        onSupport={(p) => {
+          if (writable()) {
+            setSupportPost(p);
+            setModal('support');
+          }
+        }}
       />
     ));
   const shownPosts =
     page === 'profile' && profileTab === 'media'
       ? posts.filter((p) => p.media.length)
-      : posts;
+      : page === 'profile'
+        ? [...posts].sort((a, b) => (b.pinned || 0) - (a.pinned || 0))
+        : page === 'saved'
+          ? posts.filter((p) => p.saved)
+          : posts;
+  const unread = threads.reduce((sum, t) => sum + (t.unread || 0), 0);
+  const online = !!profile?.lastSeen && Date.now() - profile.lastSeen < 120000;
+  if (accountBlocked && me)
+    return (
+      <BlockedAccount
+        me={me}
+        onUpdate={updateAccount}
+        onRefresh={refreshAccount}
+      />
+    );
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <button className="brand" onClick={() => navigate('feed')}>
           <span className="brand-icon">
-            <Moon size={22} strokeWidth={2.5} />
+            <NoctLogo size={40} />
           </span>
           noctgram<span className="alpha">α</span>
         </button>
@@ -562,6 +1038,7 @@ export default function Noctgram() {
             ['feed', 'Лента', Home],
             ['search', 'Поиск', Search],
             ['messages', 'Сообщения', Mail],
+            ['channels', 'Каналы', Megaphone],
             ['saved', 'Сохранённое', Bookmark],
             ['profile', 'Профиль', UserRound],
           ].map(([id, label, Icon]) => {
@@ -575,27 +1052,42 @@ export default function Noctgram() {
               >
                 <NavIcon size={21} />
                 <span>{String(label)}</span>
+                {id === 'messages' && unread > 0 && (
+                  <span className="nav-unread">
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                )}
                 {page === id && <i />}
               </button>
             );
           })}
         </nav>
-        <button
-          className="primary new-post"
-          onClick={() => {
-            navigate('feed');
-            setTimeout(() => draftRef.current?.focus(), 0);
-          }}
-        >
-          <Plus size={17} />
-          <span>Новая публикация</span>
-        </button>
         <div className="sidebar-bottom">
-          <button className="premium-nav" onClick={() => setModal('premium')}>
-            <Sparkles size={19} />
-            <span>Noct Premium</span>
-            <span className="badge">скоро</span>
-          </button>
+          <div className="premium-nav-shell">
+            <span className="premium-nav-beam" aria-hidden="true" />
+            <button
+              className="premium-nav"
+              onClick={() => navigate('premium')}
+              aria-label="Открыть Noct Premium"
+              aria-current={page === 'premium' ? 'page' : undefined}
+            >
+              <PremiumIcon size={23} />
+              <span>Noct Premium</span>
+              <span className="badge">скоро</span>
+            </button>
+          </div>
+          <div className="premium-nav-shell stars-nav-shell">
+            <span className="premium-nav-beam" aria-hidden="true" />
+            <button
+              className="premium-nav"
+              aria-label="Открыть Noct Stars"
+              onClick={() => navigate('stars')}
+            >
+              <StarsIcon size={23} />
+              <span>Noct Stars</span>
+              <span className="badge">тест</span>
+            </button>
+          </div>
           {me ? (
             <>
               <button className="account" onClick={() => navigate('profile')}>
@@ -605,50 +1097,70 @@ export default function Noctgram() {
                   <small>@{me.handle}</small>
                 </span>
               </button>
-              <a
-                className="logout"
-                href="/signout-with-chatgpt?return_to=%2F"
-                target="_top"
-              >
+              <SignOutButton className="logout">
                 <LogOut size={17} />
                 <span>Выйти</span>
-              </a>
+              </SignOutButton>
             </>
           ) : (
-            <a
-              className="logout"
-              href="/signin-with-chatgpt?return_to=%2F"
-              target="_top"
-            >
+            <a className="logout" href="/login" target="_top">
               <LogOut size={17} />
               <span>Войти</span>
             </a>
           )}
-          <p className="sidebar-footnote">
-            Твоё пространство.
-            <br />В твоём ритме.
-          </p>
         </div>
       </aside>
       <main
         className={
-          'main-column ' + (page === 'messages' ? 'messages-main' : '')
+          'main-column ' +
+          (page === 'messages'
+            ? 'messages-main'
+            : ['premium', 'stars'].includes(page)
+              ? 'premium-main'
+              : '')
         }
       >
         <header className="page-header">
           <h1>
-            {page === 'profile'
-              ? profile?.name || 'Профиль'
-              : page === 'messages'
-                ? 'Сообщения'
-                : page === 'search'
-                  ? 'Поиск'
-                  : page === 'saved'
-                    ? 'Сохранённое'
-                    : 'Noctgram'}
+            {page === 'moderation'
+              ? 'Модерация'
+              : page === 'profile'
+                ? profile?.name || 'Профиль'
+                : page === 'channels'
+                  ? 'Каналы'
+                  : page === 'stars'
+                    ? 'Noct Stars'
+                    : page === 'messages'
+                      ? 'Сообщения'
+                      : page === 'search'
+                        ? 'Поиск'
+                        : page === 'premium'
+                          ? 'Noct Premium'
+                          : page === 'saved'
+                            ? 'Сохранённое'
+                            : 'Noctgram'}
           </h1>
           <span className="grow" />
-          {loading && <LoaderCircle className="spin" size={15} />}
+          {me?.canModerate && (
+            <button
+              className="icon-button"
+              title="Модерация"
+              aria-label="Открыть модерацию"
+              onClick={() => navigate('moderation')}
+            >
+              <ShieldCheck size={20} />
+            </button>
+          )}
+          <button
+            className="icon-button header-stars"
+            onClick={() => navigate('stars')}
+            aria-label="Открыть Noct Stars"
+          >
+            <StarsIcon size={25} />
+          </button>
+          {loading && page !== 'premium' && page !== 'messages' && (
+            <LoaderCircle className="spin" size={15} />
+          )}
           <button
             className="icon-button"
             aria-label="Найти в Noctgram"
@@ -660,7 +1172,10 @@ export default function Noctgram() {
             className="icon-button"
             aria-label="Обновить"
             onClick={() => {
-              if (me) void refresh();
+              if (me && page === 'messages') {
+                void loadThreads().catch((e) => notify(e.message));
+                void loadMessages().catch((e) => notify(e.message));
+              } else if (me) void refresh();
               else void bootstrap();
             }}
           >
@@ -670,12 +1185,52 @@ export default function Noctgram() {
         {loadError && (
           <div className="error-banner" role="alert">
             Не удалось загрузить данные.{' '}
-            <button onClick={() => void bootstrap()}>Повторить</button>
+            <button onClick={() => void (me ? refresh() : bootstrap())}>
+              Повторить
+            </button>
           </div>
+        )}
+        {readOnly && me && <ReadOnlyNotice me={me} onUpdate={updateAccount} />}
+        {page === 'profile' &&
+          profile?.kind === 'channel' &&
+          profile.restriction &&
+          profile.ownerId === me?.id && (
+            <section className="account-readonly channel-restriction-notice">
+              <div>
+                <strong>
+                  {profile.restriction.mode === 'blocked'
+                    ? 'Канал заблокирован'
+                    : 'Канал в режиме только чтения'}
+                </strong>
+                <p>{profile.restriction.reason}</p>
+                <small>
+                  {profile.restriction.expiresAt
+                    ? 'До ' +
+                      new Date(profile.restriction.expiresAt).toLocaleString(
+                        'ru-RU',
+                      )
+                    : 'До снятия ограничения'}
+                  . Ограничение действует на этот канал.
+                </small>
+              </div>
+            </section>
+          )}
+        {page === 'moderation' && me?.canModerate && (
+          <ModerationPanel
+            onChanged={() => {
+              void refreshAccount();
+            }}
+          />
+        )}
+        {page === 'profile' && profile?.blocked && (
+          <SuspendedProfile profile={profile} onBack={() => navigate('feed')} />
         )}
         {page === 'feed' && (
           <>
-            <div className="feed-tabs">
+            <div
+              className="feed-tabs"
+              data-selected={mode === 'following' ? 1 : 0}
+            >
               <Tabs
                 value={mode}
                 onValueChange={(v) => {
@@ -695,23 +1250,11 @@ export default function Noctgram() {
                   <strong>Свои люди. Твои мысли.</strong>
                   <span>Войди, чтобы стать частью Noctgram.</span>
                 </div>
-                <a
-                  href="/signin-with-chatgpt?return_to=%2F"
-                  target="_top"
-                  className="primary"
-                >
+                <a href="/login" target="_top" className="primary">
                   Войти <ArrowUpRight size={14} />
                 </a>
               </div>
             )}
-            <div className="feed-intro">
-              <span className="tiny-line" />
-              <span>
-                {mode === 'following'
-                  ? 'Публикации тех, кто тебе интересен'
-                  : 'Место для того, чем хочется поделиться'}
-              </span>
-            </div>
             {composer}
           </>
         )}
@@ -749,9 +1292,14 @@ export default function Noctgram() {
             </button>
           </div>
         )}
-        {page === 'profile' && profile && (
+        {page === 'profile' && profile && !profile.blocked && (
           <>
-            <section className="profile-card">
+            <section
+              className={
+                'profile-card ' +
+                (profile.kind === 'channel' ? 'channel-profile' : '')
+              }
+            >
               <div
                 className="profile-cover"
                 style={
@@ -767,51 +1315,61 @@ export default function Noctgram() {
                 >
                   <ArrowLeft size={18} />
                 </button>
-                {profile.id === me?.id && (
+                {profileOwned && (
                   <button
                     className="cover-edit"
+                    disabled={readOnly || channelRestricted}
                     aria-label="Изменить обложку"
                     onClick={edit}
                   >
                     <Camera size={17} />
                   </button>
                 )}
-                <span className="cover-monogram">n.</span>
+                {!profile.cover && <span className="cover-monogram">n.</span>}
               </div>
               <div className="profile-info">
                 <div className="profile-avatar-line">
-                  <Avatar person={profile} size={98} />
+                  <Avatar person={profile} size={96} />
                   <span className="grow" />
-                  {profile.id === me?.id ? (
+                  {profileOwned ? (
                     <>
-                      <button className="secondary" onClick={edit}>
+                      <button
+                        className="secondary"
+                        disabled={
+                          channelRestricted ||
+                          (readOnly && profile?.id !== me?.id)
+                        }
+                        onClick={edit}
+                      >
                         Редактировать
                       </button>
                       <button
                         className="icon-button cosmetic"
                         aria-label="Оформление профиля"
-                        onClick={() => setModal('premium')}
+                        onClick={() => navigate('premium')}
                       >
-                        <Sparkles size={18} />
+                        <PremiumIcon size={21} />
                       </button>
                     </>
                   ) : (
                     <>
                       <button
                         className="primary"
+                        disabled={readOnly || busy}
                         onClick={() => follow(profile)}
                       >
                         {profile.followed ? 'Вы подписаны' : 'Подписаться'}
                       </button>
-                      {profile.id !== 'noctgram' && (
-                        <button
-                          className="icon-button"
-                          aria-label="Написать сообщение"
-                          onClick={() => openChat(profile)}
-                        >
-                          <Send size={18} />
-                        </button>
-                      )}
+                      {profile.id !== 'noctgram' &&
+                        profile.kind !== 'channel' && (
+                          <button
+                            className="icon-button"
+                            aria-label="Написать сообщение"
+                            onClick={() => openChat(profile)}
+                          >
+                            <Send size={18} />
+                          </button>
+                        )}
                     </>
                   )}
                 </div>
@@ -836,24 +1394,59 @@ export default function Noctgram() {
                   @{profile.handle}
                   <Copy size={12} />
                 </button>
+                {profile.kind === 'channel' && (
+                  <span className="channel-profile-label">
+                    <Megaphone size={13} />
+                    Канал
+                  </span>
+                )}
+                {!!profile.lastSeen && (
+                  <div
+                    className={'profile-presence ' + (online ? 'online' : '')}
+                  >
+                    <i />
+                    {online
+                      ? 'В сети'
+                      : 'Был(а) ' +
+                        new Date(profile.lastSeen).toLocaleString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                  </div>
+                )}
+                <div className="profile-aliases">
+                  {profile.handles.some((h) => h !== profile.handle) && (
+                    <>
+                      <span className="aliases-prefix">а также</span>
+                      {profile.handles
+                        .filter((h) => h !== profile.handle)
+                        .map((h, i) => (
+                          <span className="profile-alias" key={h}>
+                            {i > 0 && <span className="alias-comma">, </span>}
+                            <button
+                              title={'Скопировать @' + h}
+                              onClick={() =>
+                                void navigator.clipboard
+                                  .writeText('@' + h)
+                                  .then(() => notify('Юзернейм скопирован'))
+                                  .catch(() => notify('@' + h))
+                              }
+                            >
+                              @{h}
+                            </button>
+                          </span>
+                        ))}
+                    </>
+                  )}
+                </div>
                 <p className="bio">
                   {profile.bio ||
                     (profile.id === me?.id
                       ? 'Расскажи о себе — пусть свои тебя узнают.'
                       : 'Пока без описания.')}
                 </p>
-                <div className="handle-list">
-                  {profile.handles
-                    .filter((h) => h !== profile.handle)
-                    .map((h) => (
-                      <span key={h}>@{h}</span>
-                    ))}
-                  {profile.id === me?.id && (
-                    <button onClick={() => setModal('handles')}>
-                      <Plus size={13} /> Юзернеймы
-                    </button>
-                  )}
-                </div>
                 <div className="profile-details">
                   <CalendarDays size={14} /> В Noctgram с{' '}
                   {new Date(profile.created).toLocaleDateString('ru-RU', {
@@ -863,31 +1456,43 @@ export default function Noctgram() {
                   })}
                 </div>
                 <div className="profile-stats">
+                  <button
+                    type="button"
+                    className="profile-stat-button"
+                    aria-haspopup="dialog"
+                    aria-label={'Показать подписчиков: ' + profile.followers}
+                    onClick={() => {
+                      setConnectionsProfile(profile);
+                      setModal('followers');
+                    }}
+                  >
+                    <strong>{profile.followers.toLocaleString('ru-RU')}</strong>{' '}
+                    подписчиков
+                  </button>
+                  <button
+                    type="button"
+                    className="profile-stat-button"
+                    aria-haspopup="dialog"
+                    aria-label={'Показать подписки: ' + profile.following}
+                    onClick={() => {
+                      setConnectionsProfile(profile);
+                      setModal('following');
+                    }}
+                  >
+                    <strong>{profile.following.toLocaleString('ru-RU')}</strong>{' '}
+                    подписок
+                  </button>
                   <span>
-                    <strong>{profile.followers}</strong> подписчиков
-                  </span>
-                  <span>
-                    <strong>{profile.following}</strong> подписок
-                  </span>
-                  <span>
-                    <strong>{profile.postCount}</strong> публикаций
+                    <strong>{profile.postCount.toLocaleString('ru-RU')}</strong>{' '}
+                    публикаций
                   </span>
                 </div>
-                {profile.id === me?.id && (
-                  <button
-                    className="premium-strip"
-                    onClick={() => setModal('premium')}
-                  >
-                    <Star size={16} />
-                    <span>Noct Premium</span>
-                    <span className="grow" />
-                    <span className="badge">скоро</span>
-                    <ArrowUpRight size={14} />
-                  </button>
-                )}
               </div>
             </section>
-            <div className="feed-tabs profile-tabs">
+            <div
+              className="feed-tabs profile-tabs"
+              data-selected={profileTab === 'media' ? 1 : 0}
+            >
               <Tabs
                 value={profileTab}
                 onValueChange={(v) => setProfileTab(String(v))}
@@ -898,42 +1503,75 @@ export default function Noctgram() {
                 </TabsList>
               </Tabs>
             </div>
-            {profile.id === me?.id && profileTab === 'posts' && composer}
+            {profileOwned &&
+              !readOnly &&
+              !channelRestricted &&
+              profileTab === 'posts' &&
+              composer}
           </>
         )}
-        {page !== 'messages' && (
-          <>
-            {cards(shownPosts)}
-            {shownPosts.length === 0 && !loading && (
-              <Empty>
-                {query
-                  ? 'Ничего не найдено. Попробуйте другой запрос.'
-                  : page === 'saved'
-                    ? 'Сохраняй публикации, чтобы вернуться к ним позже.'
-                    : page === 'profile'
-                      ? 'Здесь пока тихо. Каждая история с чего-то начинается.'
-                      : mode === 'following'
-                        ? 'Подпишись на интересных людей — их публикации появятся здесь.'
-                        : 'Поделись первой мыслью.'}
-              </Empty>
-            )}
-            {hasMore && (
-              <button
-                className="secondary load-more"
-                disabled={loading}
-                onClick={() =>
-                  void refresh(true, posts[posts.length - 1]?.created)
-                }
-              >
-                Загрузить ещё
-              </button>
-            )}
-            <div className="feed-end">
-              <Moon size={13} />
-              {loading ? 'Загружаем публикации…' : 'Ты на одной волне с ночью'}
-            </div>
-          </>
+        {page === 'stars' && me && (
+          <StarsPanel me={me} onBack={() => setPage(starsReturn.current)} />
         )}
+        {page === 'channels' && me && (
+          <ChannelsPanel
+            me={me}
+            readOnly={readOnly}
+            onOpen={(id) => void openProfile(id)}
+          />
+        )}
+        {page === 'premium' && (
+          <PremiumPanel me={me} onBack={() => setPage(premiumReturn.current)} />
+        )}
+        {!['messages', 'premium', 'stars', 'channels', 'moderation'].includes(
+          page,
+        ) &&
+          !(page === 'profile' && profile?.blocked) && (
+            <>
+              {loading && !posts.length ? (
+                <>
+                  <PostSkeleton />
+                  <PostSkeleton />
+                </>
+              ) : (
+                cards(shownPosts)
+              )}
+              {shownPosts.length === 0 && !loading && (
+                <Empty>
+                  {query
+                    ? 'Ничего не найдено. Попробуйте другой запрос.'
+                    : page === 'saved'
+                      ? 'Сохраняй публикации, чтобы вернуться к ним позже.'
+                      : page === 'profile'
+                        ? 'Здесь пока тихо. Каждая история с чего-то начинается.'
+                        : mode === 'following'
+                          ? 'Подпишись на интересных людей — их публикации появятся здесь.'
+                          : 'Поделись первой мыслью.'}
+                </Empty>
+              )}
+              {hasMore && (
+                <button
+                  className="secondary load-more"
+                  disabled={loading}
+                  onClick={() =>
+                    void refresh(
+                      true,
+                      posts[posts.length - 1]?.created,
+                      posts[posts.length - 1]?.id,
+                    )
+                  }
+                >
+                  Загрузить ещё
+                </button>
+              )}
+              <div className="feed-end">
+                <Moon size={13} />
+                {loading
+                  ? 'Загружаем публикации…'
+                  : 'Ты на одной волне с ночью'}
+              </div>
+            </>
+          )}
         {page === 'messages' && (
           <div className={'messenger ' + (peer ? 'peer-open' : '')}>
             <section className="threads-panel">
@@ -1000,6 +1638,38 @@ export default function Noctgram() {
                         <small>@{peer.handle}</small>
                       </span>
                     </button>
+                    <button
+                      className="chat-block icon-button"
+                      disabled={busy || !messageAccess}
+                      aria-label={
+                        messageAccess?.blockedByMe
+                          ? 'Разблокировать собеседника'
+                          : 'Заблокировать собеседника'
+                      }
+                      title={
+                        messageAccess?.blockedByMe
+                          ? 'Разблокировать собеседника'
+                          : 'Заблокировать собеседника'
+                      }
+                      onClick={() =>
+                        void run(async () => {
+                          await request('', {
+                            action: 'blockUser',
+                            id: peer.id,
+                            value: !messageAccess?.blockedByMe,
+                          });
+                          await loadMessages();
+                          setPrivacyVersion((v) => v + 1);
+                          notify(
+                            messageAccess?.blockedByMe
+                              ? 'Собеседник разблокирован'
+                              : 'Собеседник добавлен в чёрный список',
+                          );
+                        })
+                      }
+                    >
+                      <Ban size={17} />
+                    </button>
                   </div>
                   <div className="message-list">
                     {messages.length === 0 && (
@@ -1014,6 +1684,19 @@ export default function Noctgram() {
                       >
                         <p>{m.text}</p>
                         <span className="message-time">
+                          {m.sender !== me?.id && (
+                            <button
+                              className="message-report"
+                              aria-label="Пожаловаться на сообщение"
+                              title="Пожаловаться на сообщение"
+                              onClick={() => {
+                                setReportedMessage(m);
+                                setModal('reportMessage');
+                              }}
+                            >
+                              <Flag size={13} />
+                            </button>
+                          )}
                           {new Date(m.created).toLocaleTimeString('ru-RU', {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -1029,24 +1712,40 @@ export default function Noctgram() {
                     ))}
                     <div ref={messageEnd} />
                   </div>
+                  {!messageAccess?.allowed && (
+                    <p className="message-privacy-note">
+                      {!messageAccess
+                        ? 'Проверяем доступ к сообщениям…'
+                        : messageAccess.blockedByMe
+                          ? 'Собеседник в чёрном списке. История переписки сохранена.'
+                          : 'Отправка сообщений недоступна из-за настроек приватности.'}
+                    </p>
+                  )}
                   <form
                     className="message-composer"
                     onSubmit={(e) => {
                       e.preventDefault();
-                      if (!messageText.trim() || busy) return;
+                      if (
+                        !messageText.trim() ||
+                        busy ||
+                        !messageAccess?.allowed ||
+                        !writable()
+                      )
+                        return;
                       void run(async () => {
                         await request('', {
                           action: 'message',
                           id: peer.id,
                           text: messageText,
                         });
-                        setMessageText('');
+                        if (activePeer.current === peer.id) setMessageText('');
                         await loadMessages();
                         await loadThreads();
                       });
                     }}
                   >
                     <textarea
+                      disabled={busy || readOnly || !messageAccess?.allowed}
                       aria-label="Сообщение"
                       placeholder="Написать сообщение…"
                       maxLength={4000}
@@ -1062,7 +1761,12 @@ export default function Noctgram() {
                     <button
                       className="send-button"
                       aria-label="Отправить сообщение"
-                      disabled={busy || !messageText.trim()}
+                      disabled={
+                        busy ||
+                        readOnly ||
+                        !messageAccess?.allowed ||
+                        !messageText.trim()
+                      }
                     >
                       <Send size={18} />
                     </button>
@@ -1070,7 +1774,7 @@ export default function Noctgram() {
                 </>
               ) : (
                 <div className="chat-empty">
-                  <Moon size={42} strokeWidth={1} />
+                  <NoctMascot size={144} />
                   <h2>Ближе, чем кажется.</h2>
                   <p>
                     Выбери диалог или начни новый.
@@ -1088,14 +1792,13 @@ export default function Noctgram() {
           <section className="side-card">
             <div className="side-card-heading">
               <h2>Что происходит</h2>
-              <span className="small-dot" />
             </div>
-            <p className="side-lead">Новые мысли начинаются здесь.</p>
-            {[
-              ['#noctgram', 'Жизнь сообщества'],
-              ['#ночныемысли', 'Разговоры после полуночи'],
-              ['#вдохновение', 'То, что хочется сохранить'],
-            ].map(([tag, desc]) => (
+            {!topics.length && (
+              <p className="topics-empty">
+                Темы появятся, когда в публикациях будут хэштеги.
+              </p>
+            )}
+            {topics.map(({ tag, count }) => (
               <button
                 className="topic"
                 key={tag}
@@ -1104,9 +1807,17 @@ export default function Noctgram() {
                   setQuery(tag);
                 }}
               >
-                <small>ТЕМА ДЛЯ РАЗГОВОРА</small>
                 <strong>{tag}</strong>
-                <span>{desc}</span>
+                <span>
+                  {count}{' '}
+                  {count % 10 === 1 && count % 100 !== 11
+                    ? 'публикация'
+                    : count % 10 >= 2 &&
+                        count % 10 <= 4 &&
+                        (count % 100 < 12 || count % 100 > 14)
+                      ? 'публикации'
+                      : 'публикаций'}
+                </span>
                 <ArrowUpRight size={14} />
               </button>
             ))}
@@ -1140,7 +1851,7 @@ export default function Noctgram() {
                 </button>
                 <button
                   className="follow-small"
-                  disabled={busy}
+                  disabled={busy || readOnly}
                   aria-label={
                     person.followed
                       ? 'Отписаться от ' + person.name
@@ -1164,21 +1875,6 @@ export default function Noctgram() {
               Найти своих <ArrowUpRight size={15} />
             </button>
           </section>
-          <button className="premium-card" onClick={() => setModal('premium')}>
-            <span className="premium-top">
-              <Sparkles size={24} />
-              <span className="badge">скоро</span>
-            </span>
-            <h2>Ещё больше тебя.</h2>
-            <p>
-              Твой профиль. Твой характер.
-              <br />
-              Новые возможности Noct Premium.
-            </p>
-            <span className="premium-link">
-              Узнать больше <ArrowUpRight size={14} />
-            </span>
-          </button>
           <div className="aside-footer">
             <span>noctgram</span>
             <span>alpha / 2026</span>
@@ -1187,14 +1883,22 @@ export default function Noctgram() {
         </aside>
       )}
       <Dialog
-        open={!!modal}
+        open={modalOpen}
+        onOpenChangeComplete={(open) => {
+          if (!open && !modalOpen) setModalContent('');
+        }}
         onOpenChange={(open) => {
           if (!open && !uploading) setModal('');
         }}
       >
         <DialogContent
           className={
-            'noct-dialog ' + (modal === 'comments' ? 'comments-dialog' : '')
+            'noct-dialog ' +
+            (modal === 'comments'
+              ? 'comments-dialog'
+              : modal === 'followers' || modal === 'following'
+                ? 'connections-dialog'
+                : '')
           }
         >
           <DialogTitle>
@@ -1203,9 +1907,14 @@ export default function Noctgram() {
                 signin: 'Войти в Noctgram',
                 premium: 'Noct Premium',
                 edit: 'Редактировать профиль',
-                handles: 'Твои юзернеймы',
+                support: 'Поддержать автора',
                 comments: 'Комментарии',
                 people: 'Найти своих',
+                report: 'Пожаловаться',
+                reportMessage: 'Жалоба на сообщение',
+                moderateContent: 'Удалить публикацию',
+                followers: 'Подписчики',
+                following: 'Подписки',
               } as Record<string, string>
             )[modal] || 'Noctgram'}
           </DialogTitle>
@@ -1215,59 +1924,74 @@ export default function Noctgram() {
                 {
                   signin: 'Публикуй, общайся и сохраняй важное.',
                   premium: 'Больше способов быть собой. В разработке.',
-                  edit: 'Пусть профиль рассказывает о тебе.',
-                  handles: 'До пяти имён. Одно — основное.',
+                  edit: 'Профиль и твоё личное пространство.',
+                  reportMessage:
+                    'Модератор получит только это сообщение и причину жалобы.',
+                  support: 'Благодарность за публикацию в Noct Stars.',
                   comments: 'Каждая мысль может стать началом разговора.',
                   people: 'Поиск по имени или @юзернейму.',
+                  moderateContent:
+                    'Укажи причину удаления. Решение будет записано в историю модерации.',
+                  followers: connectionsProfile
+                    ? '@' + connectionsProfile.handle
+                    : '',
+                  following: connectionsProfile
+                    ? '@' + connectionsProfile.handle
+                    : '',
+                  report:
+                    'Укажи причину — она будет сохранена вместе с публикацией.',
                 } as Record<string, string>
               )[modal]
             }
           </DialogDescription>
           {modal === 'signin' && (
-            <a
-              className="primary sign-in-link"
-              href="/signin-with-chatgpt?return_to=%2F"
-              target="_top"
-            >
-              Войти через ChatGPT <ArrowUpRight size={15} />
+            <a className="primary sign-in-link" href="/login" target="_top">
+              Войти по почте <ArrowUpRight size={15} />
             </a>
           )}
-          {modal === 'premium' && (
-            <div className="premium-modal">
-              <div className="premium-star">
-                <Star size={40} />
-              </div>
-              <span className="badge">TODO · скоро</span>
-              <h2>
-                Твоя ночь.
-                <br />
-                Твой стиль.
-              </h2>
-              <p>Косметические возможности Noct Premium:</p>
-              <ul>
-                <li>
-                  <Sparkles size={19} />
-                  <span>Анимированные аватары и рамки</span>
-                </li>
-                <li>
-                  <Moon size={19} />
-                  <span>Темы и оформление профиля</span>
-                </li>
-                <li>
-                  <Star size={19} />
-                  <span>Эксклюзивные значки и эмодзи-статусы</span>
-                </li>
-                <li>
-                  <AtSign size={19} />
-                  <span>Коллекционные юзернеймы</span>
-                </li>
-              </ul>
-              <p className="meta">
-                Покупки пока недоступны. О запуске расскажем в @noctgram.
-              </p>
+          {modal === 'edit' && editId === me?.id && (
+            <div className="edit-tabs" aria-label="Раздел редактирования">
+              <button
+                aria-pressed={editTab === 'profile'}
+                disabled={uploading || busy}
+                onClick={() => setEditTab('profile')}
+              >
+                Профиль
+              </button>
+              <button
+                aria-pressed={editTab === 'privacy'}
+                disabled={uploading || busy}
+                onClick={() => setEditTab('privacy')}
+              >
+                Приватность
+              </button>
             </div>
           )}
-          {modal === 'edit' && (
+          {modal === 'edit' && editTab === 'privacy' && editId === me?.id && (
+            <PrivacyPanel
+              onChanged={() => {
+                setPrivacyVersion((v) => v + 1);
+                void latestRefresh.current();
+                void loadThreads().catch(() => {});
+                if (peer) void loadMessages().catch(() => {});
+              }}
+            />
+          )}
+          {modal === 'reportMessage' && reportedMessage && (
+            <ContentDecisionForm
+              key={reportedMessage.id}
+              id={reportedMessage.id}
+              type="message"
+              action="report"
+              text={reportedMessage.text}
+              onCancel={() => setModal('')}
+              onDone={() => {
+                setModal('');
+                notify('Жалоба отправлена модератору');
+              }}
+            />
+          )}
+          {modal === 'edit' && editTab === 'profile' && (
             <form
               className="edit-form"
               onSubmit={(e) => {
@@ -1275,211 +1999,250 @@ export default function Noctgram() {
                 saveProfile();
               }}
             >
-              <div className="edit-photo">
-                <Avatar
-                  person={{ name: editName, avatar: editAvatar }}
-                  size={66}
-                />
-                <label className="secondary">
-                  <Camera size={14} /> Аватар
-                  <input
-                    className="hidden"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    disabled={uploading}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      setUploading(true);
-                      void upload(f)
-                        .then((m) => setEditAvatar(m.url!))
-                        .catch((e) => notify(e.message))
-                        .finally(() => setUploading(false));
-                    }}
-                  />
-                </label>
-                <label className="secondary">
-                  Обложка
-                  <input
-                    className="hidden"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    disabled={uploading}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      setUploading(true);
-                      void upload(f)
-                        .then((m) => setEditCover(m.url!))
-                        .catch((e) => notify(e.message))
-                        .finally(() => setUploading(false));
-                    }}
-                  />
-                </label>
-              </div>
-              {editCover && (
-                <div className="edit-cover">
-                  <img src={editCover} alt="Новая обложка" />
+              <fieldset
+                className="edit-fields"
+                disabled={busy || uploading || readOnly}
+              >
+                {editId === me?.id && (
                   <button
                     type="button"
-                    aria-label="Убрать обложку"
-                    onClick={() => setEditCover('')}
+                    className="secondary"
+                    onClick={() => window.location.assign('/login?link=1')}
                   >
-                    <X size={14} />
+                    <Mail size={15} /> Почта для входа
                   </button>
+                )}
+                <div className="edit-photo">
+                  <Avatar
+                    person={{ name: editName, avatar: editAvatar }}
+                    size={66}
+                  />
+                  <label className="secondary">
+                    <Camera size={14} /> Аватар
+                    <input
+                      className="hidden"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      disabled={uploading}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        setUploading(true);
+                        void upload(f)
+                          .then((m) => setEditAvatar(m.url!))
+                          .catch((e) => notify(e.message))
+                          .finally(() => setUploading(false));
+                      }}
+                    />
+                  </label>
+                  <label className="secondary">
+                    Обложка
+                    <input
+                      className="hidden"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      disabled={uploading}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        setUploading(true);
+                        void upload(f)
+                          .then((m) => setEditCover(m.url!))
+                          .catch((e) => notify(e.message))
+                          .finally(() => setUploading(false));
+                      }}
+                    />
+                  </label>
                 </div>
-              )}
+                {editCover && (
+                  <div className="edit-cover">
+                    <img src={editCover} alt="Новая обложка" />
+                    <button
+                      type="button"
+                      aria-label="Убрать обложку"
+                      onClick={() => setEditCover('')}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+                <label>
+                  Имя
+                  <input
+                    required
+                    maxLength={40}
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                  />
+                </label>
+                <section className="edit-usernames">
+                  <h3>Юзернеймы</h3>
+                  <label>
+                    Основной юзернейм
+                    <input
+                      required
+                      value={editHandle}
+                      maxLength={25}
+                      onChange={(e) => setEditHandle(e.target.value)}
+                      placeholder="@username"
+                    />
+                  </label>
+                  <p className="meta">
+                    По этому имени тебя находят в Noctgram.
+                  </p>
+                  <span className="field-label">Под-юзернеймы</span>
+                  {editAliases.map((h, i) => (
+                    <div className="row" key={i}>
+                      <input
+                        aria-label={'Под-юзернейм ' + (i + 1)}
+                        value={h}
+                        maxLength={25}
+                        placeholder="@another_name"
+                        onChange={(e) =>
+                          setEditAliases((rows) =>
+                            rows.map((v, n) => (n === i ? e.target.value : v)),
+                          )
+                        }
+                      />
+                      <button
+                        type="button"
+                        aria-label={'Удалить под-юзернейм ' + (i + 1)}
+                        onClick={() =>
+                          setEditAliases((rows) =>
+                            rows.filter((_, n) => n !== i),
+                          )
+                        }
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  ))}
+                  {editAliases.length < 4 && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => setEditAliases((rows) => [...rows, ''])}
+                    >
+                      <Plus size={14} />
+                      Добавить под-юзернейм
+                    </button>
+                  )}
+                  <span className="meta">
+                    До 4 дополнительных имён. 4–24 латинские буквы, цифры или _.
+                  </span>
+                </section>
+                <label>
+                  О себе
+                  <textarea
+                    rows={3}
+                    maxLength={300}
+                    value={editBio}
+                    onChange={(e) => setEditBio(e.target.value)}
+                    placeholder="Немного о тебе"
+                  />
+                  <span className="meta">{editBio.length} / 300</span>
+                </label>
+                <button
+                  className="primary"
+                  disabled={busy || uploading || !editName.trim()}
+                >
+                  {uploading ? 'Загрузка…' : 'Сохранить изменения'}
+                </button>
+              </fieldset>
+            </form>
+          )}
+          {modal === 'support' && supportPost && (
+            <SupportPanel
+              key={supportPost.id}
+              post={supportPost}
+              onDone={(amount) => {
+                setModal('');
+                void refreshPost(supportPost.id);
+                notify(
+                  'Автор получил ' + amount.toLocaleString('ru-RU') + ' звёзд',
+                );
+              }}
+            />
+          )}
+          {modal === 'comments' && commentPost && me && (
+            <CommentsPanel
+              key={commentPost.id}
+              post={commentPost}
+              me={me}
+              readOnly={readOnly}
+              onChanged={() => void refreshPost(commentPost.id)}
+            />
+          )}
+          {modal === 'report' && reportPost && (
+            <form
+              className="edit-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void run(async () => {
+                  await request('', {
+                    action: 'report',
+                    id: reportPost.id,
+                    reason: reportReason,
+                  });
+                  setModal('');
+                  notify('Жалоба сохранена');
+                });
+              }}
+            >
               <label>
-                Имя
-                <input
-                  required
-                  maxLength={40}
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                />
-              </label>
-              <label>
-                О себе
+                Что не так с публикацией?
                 <textarea
-                  rows={3}
-                  maxLength={300}
-                  value={editBio}
-                  onChange={(e) => setEditBio(e.target.value)}
-                  placeholder="Немного о тебе"
+                  required
+                  maxLength={500}
+                  disabled={busy}
+                  rows={4}
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  placeholder="Опиши причину жалобы"
                 />
-                <span className="meta">{editBio.length} / 300</span>
               </label>
               <button
                 className="primary"
-                disabled={busy || uploading || !editName.trim()}
+                disabled={busy || !reportReason.trim()}
               >
-                {uploading ? 'Загрузка…' : 'Сохранить изменения'}
+                Отправить жалобу
               </button>
             </form>
           )}
-          {modal === 'handles' && me && (
-            <div className="handles-manager">
-              {me.handles.map((h) => (
-                <div className="handle-row" key={h}>
-                  <AtSign size={15} />
-                  <strong>{h}</strong>
-                  <span className="grow" />
-                  {me.handle === h ? (
-                    <span className="badge">основной</span>
-                  ) : (
-                    <>
-                      <button
-                        className="text-button"
-                        disabled={busy}
-                        onClick={() => updateHandle(h)}
-                      >
-                        Основной
-                      </button>
-                      <button
-                        disabled={busy}
-                        aria-label={'Удалить @' + h}
-                        onClick={() => updateHandle(h, true)}
-                      >
-                        <X size={14} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              ))}
-              <form
-                className="handle-form"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  updateHandle(newHandle);
-                }}
-              >
-                <label>
-                  Добавить юзернейм
-                  <input
-                    aria-label="Новый юзернейм"
-                    value={newHandle}
-                    maxLength={25}
-                    onChange={(e) => setNewHandle(e.target.value)}
-                    placeholder="@yourname"
-                  />
-                </label>
-                <p className="meta">
-                  4–24 символа: латинские буквы, цифры и _. Новое имя станет
-                  основным.
-                </p>
-                <button
-                  className="primary"
-                  disabled={busy || !newHandle.trim()}
-                >
-                  Добавить
-                </button>
-              </form>
-              <div className="handle-todo">
-                <Star size={15} />
-                <span>Покупка и коллекционные юзернеймы — в планах.</span>
-              </div>
-            </div>
+          {modal === 'moderateContent' && reportPost && me?.canModerate && (
+            <ContentDecisionForm
+              key={reportPost.id}
+              id={reportPost.id}
+              type="post"
+              action="remove"
+              text={reportPost.text}
+              onCancel={() => setModal('')}
+              onDone={() => {
+                setPosts((old) => old.filter((p) => p.id !== reportPost.id));
+                setModal('');
+                notify('Публикация удалена. Решение сохранено.');
+                if (profile?.id === reportPost.userId)
+                  void request<Profile>(
+                    '?action=profile&id=' + encodeURIComponent(profile.id),
+                  )
+                    .then(setProfile)
+                    .catch(() => {});
+              }}
+            />
           )}
-          {modal === 'comments' && commentPost && (
-            <>
-              <div className="comment-context">
-                <strong>{commentPost.name}</strong>
-                <p>{commentPost.text}</p>
-              </div>
-              <div className="comment-list">
-                {comments.map((c) => (
-                  <article key={c.id} className="comment">
-                    <Avatar person={c} />
-                    <div>
-                      <strong>{c.name}</strong>
-                      <Stamp time={c.created} />
-                      <p>{c.text}</p>
-                    </div>
-                  </article>
-                ))}
-                {!comments.length && (
-                  <Empty>
-                    {busy ? 'Загружаем…' : 'Начни разговор первым.'}
-                  </Empty>
-                )}
-              </div>
-              <form
-                className="comment-form"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void run(async () => {
-                    await request('', {
-                      action: 'comment',
-                      id: commentPost.id,
-                      text: commentText,
-                    });
-                    setCommentText('');
-                    setComments(
-                      await request<Comment[]>(
-                        '?action=comments&post=' + commentPost.id,
-                      ),
-                    );
-                    await refresh();
-                  });
+          {(modal === 'followers' || modal === 'following') &&
+            connectionsProfile && (
+              <ConnectionsPanel
+                key={connectionsProfile.id + ':' + modal}
+                profileId={connectionsProfile.id}
+                kind={modal}
+                busy={busy}
+                onProfile={(id) => {
+                  setModal('');
+                  void openProfile(id);
                 }}
-              >
-                <textarea
-                  aria-label="Комментарий"
-                  placeholder="Добавить мысль…"
-                  maxLength={2000}
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                />
-                <button
-                  className="primary"
-                  disabled={busy || !commentText.trim()}
-                  aria-label="Отправить комментарий"
-                >
-                  <Send size={17} />
-                </button>
-              </form>
-            </>
-          )}
+              />
+            )}
           {modal === 'people' && (
             <>
               <div className="searchbox">
@@ -1529,9 +2292,10 @@ export default function Noctgram() {
         </DialogContent>
       </Dialog>
       <Dialog
-        open={!!lightbox}
-        onOpenChange={(o) => {
-          if (!o) setLightbox(null);
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+        onOpenChangeComplete={(open) => {
+          if (!open && !lightboxOpen) setLightbox(null);
         }}
       >
         <DialogContent className="lightbox">
@@ -1565,10 +2329,10 @@ export default function Noctgram() {
                 void run(async () => {
                   await request('', { action: 'delete', id: deleteId });
                   setDeleteId('');
-                  await refresh();
+                  await latestRefresh.current();
                   const p = await request<Profile>('?action=profile');
                   setMe(p);
-                  if (profile?.id === p.id) setProfile(p);
+                  setProfile((current) => (current?.id === p.id ? p : current));
                   notify('Публикация удалена');
                 })
               }
@@ -1579,8 +2343,30 @@ export default function Noctgram() {
         </AlertDialogContent>
       </AlertDialog>
       {notice && (
-        <output className="toast" aria-live="polite">
+        <output
+          className={'toast ' + (toastLeaving ? 'leaving' : '')}
+          aria-live="polite"
+        >
           <span>{notice}</span>
+          {undoHidden && (
+            <button
+              className="toast-undo"
+              onClick={() =>
+                void run(async () => {
+                  await request('', {
+                    action: 'hide',
+                    id: undoHidden.id,
+                    value: false,
+                  });
+                  setUndoHidden(null);
+                  setNotice('');
+                  await latestRefresh.current();
+                })
+              }
+            >
+              Отменить
+            </button>
+          )}
           <button
             aria-label="Закрыть уведомление"
             onClick={() => setNotice('')}

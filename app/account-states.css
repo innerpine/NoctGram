@@ -1,0 +1,418 @@
+/* Account states follow the supplied Noctgram reference; selectors are scoped. */
+.account-readonly,
+.account-blocked-card,
+.account-suspended,
+.moderation-editor,
+.moderation-queue article {
+  background: #0c0c0c;
+  border: 1px solid #ffffff14;
+  border-radius: 16px;
+}
+.account-readonly {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+  border-color: #ffffff24;
+  margin-bottom: 16px;
+  animation: account-rise 340ms var(--motion) both;
+}
+.account-readonly > div {
+  flex: 1;
+  min-width: 0;
+}
+.account-readonly-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: #ffffff0f;
+  border: 1px solid #ffffff14;
+}
+.account-readonly strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.account-readonly p {
+  margin: 6px 0 14px;
+  color: #ffffffbf;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.account-readonly .secondary {
+  min-height: 36px;
+  font-size: 12px;
+}
+.account-restriction-details {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #ffffff14;
+}
+.account-blocked-shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+.account-blocked-card {
+  padding: 32px 28px;
+  animation: account-rise 340ms var(--motion) both;
+}
+.account-blocked-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  border: 1px solid #ef444459;
+  color: #ef4444;
+}
+.account-blocked-card h1 {
+  margin-top: 24px;
+  font-size: 36px;
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -1.8px;
+}
+.account-lead {
+  margin-top: 12px;
+  color: #ffffffbf;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.account-decision {
+  margin: 24px 0;
+}
+.account-decision > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 20px;
+  border-bottom: 1px solid #ffffff14;
+  padding: 14px 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.account-decision dt {
+  color: #ffffff7a;
+}
+.account-decision dd {
+  margin: 0;
+  color: #ffffffbf;
+  text-align: right;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+.account-actions > button,
+.account-appeal > button {
+  min-height: 40px;
+  padding-inline: 16px;
+  font-size: 13px;
+}
+.account-signout {
+  display: inline-flex;
+  align-items: center;
+  color: #ffffff99;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.account-note {
+  margin-top: 14px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #ffffff7a;
+}
+.account-appeal form,
+.account-appeal label,
+.moderation-editor,
+.moderation-editor label,
+.moderation-queue label {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.account-appeal label,
+.moderation-editor label,
+.moderation-queue label {
+  font-size: 13px;
+  color: #ffffff99;
+}
+.account-appeal textarea,
+.moderation-editor textarea,
+.moderation-queue textarea {
+  width: 100%;
+  resize: vertical;
+}
+.account-appeal-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #ffffff0f;
+  border: 1px solid #ffffff14;
+  border-radius: 12px;
+  padding: 20px;
+}
+.account-appeal-status > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.account-appeal-status strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.account-appeal-status p {
+  margin-top: 6px;
+  color: #ffffffbf;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.account-suspended {
+  overflow: hidden;
+  animation: account-rise 340ms var(--motion) both;
+}
+.account-suspended-cover {
+  height: 120px;
+  position: relative;
+  z-index: 0;
+  background: #111;
+  border-bottom: 1px solid #ffffff14;
+}
+.account-suspended-body {
+  position: relative;
+  z-index: 1;
+  padding: 0 20px 28px;
+}
+.account-suspended-avatar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  margin-top: -40px;
+  border-radius: 50%;
+  border: 4px solid #0c0c0c;
+  background: #161616;
+  color: #ffffff40;
+}
+.account-suspended h2 {
+  margin-top: 16px;
+  font-size: 29px;
+  font-weight: 500;
+  letter-spacing: -1.2px;
+  line-height: 1.1;
+}
+.account-suspended p {
+  margin-top: 10px;
+  font-size: 15px;
+  color: #ffffffbf;
+  line-height: 1.6;
+}
+.account-suspended .secondary {
+  margin-top: 8px;
+}
+.moderation-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding-bottom: 24px;
+}
+.moderation-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ffffff99;
+  font-size: 13px;
+}
+.moderation-heading p {
+  flex: 1;
+}
+.moderation-panel [data-slot='tabs-list'] {
+  width: 100%;
+}
+.moderation-panel [data-slot='tabs-trigger'] {
+  flex: 1;
+  font-size: 13px;
+}
+.moderation-editor {
+  padding: 20px;
+  gap: 16px;
+}
+.moderation-editor-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+.moderation-editor-title strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.moderation-choice {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  color: #ffffff99;
+}
+.moderation-choice [data-slot='select-trigger'] {
+  width: 100%;
+  min-height: 42px;
+  background: #ffffff06;
+  color: #fff;
+  box-shadow: none;
+}
+.moderation-choice [data-slot='select-trigger']:focus-visible {
+  outline: none;
+  border-color: #ffffff60;
+}
+.moderation-submit {
+  min-height: 40px;
+  border-radius: 10px;
+  padding: 10px 16px;
+  background: #ef444418;
+  border: 1px solid #ef444450;
+  color: #ef7777;
+}
+.moderation-users {
+  display: grid;
+  gap: 4px;
+}
+.moderation-user {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 12px;
+  text-align: left;
+  border-radius: 12px;
+}
+.moderation-user:hover {
+  background: #ffffff08;
+}
+.moderation-user > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.moderation-user strong {
+  font-weight: 500;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.moderation-user small {
+  color: #ffffff7a;
+  font-size: 12px;
+}
+.moderation-user em {
+  font-style: normal;
+  font-size: 11px;
+  color: #ffffff99;
+}
+.moderation-history {
+  padding-top: 14px;
+  border-top: 1px solid #ffffff14;
+  font-size: 13px;
+}
+.moderation-history summary {
+  cursor: pointer;
+  color: #ffffffbf;
+}
+.moderation-history > div {
+  padding-top: 14px;
+}
+.moderation-history p {
+  white-space: pre-wrap;
+  margin: 6px 0;
+}
+.moderation-history small {
+  color: #ffffff7a;
+  font-size: 11px;
+}
+.moderation-queue {
+  display: grid;
+  gap: 14px;
+}
+.moderation-queue article {
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+.moderation-queue p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.moderation-queue small {
+  color: #ffffff7a;
+}
+.moderation-notice {
+  padding: 12px 16px;
+  border: 1px solid #ffffff24;
+  border-radius: 12px;
+  font-size: 13px;
+}
+.moderation-empty {
+  padding: 32px 12px;
+  text-align: center;
+  color: #ffffff7a;
+  font-size: 13px;
+}
+@keyframes account-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 500px) {
+  .account-blocked-shell {
+    padding: 16px 12px;
+  }
+  .account-blocked-card {
+    padding: 24px 20px;
+  }
+  .account-blocked-card h1 {
+    font-size: 30px;
+  }
+  .account-suspended h2 {
+    font-size: 25px;
+  }
+  .account-readonly {
+    padding: 16px;
+    gap: 10px;
+  }
+  .moderation-user {
+    padding-inline: 4px;
+    gap: 8px;
+  }
+  .moderation-user em {
+    max-width: 78px;
+    text-align: right;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .account-blocked-card,
+  .account-suspended,
+  .account-readonly {
+    animation: none;
+  }
+}

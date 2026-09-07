@@ -2,9 +2,16 @@
 /* eslint-disable next/no-page-custom-font */
 import type { Metadata } from 'next';
 import './globals.css';
+import './redesign.css';
+import './features.css';
+import './account-states.css';
+import './auth.css';
+import './content-moderation.css';
+import './privacy.css';
+import './dialog-motion.css';
 export const metadata: Metadata = {
   title: 'Noctgram — лента и диалоги',
-  icons: { icon: '/favicon.svg' },
+  icons: { icon: '/assets/noctgram-logo.png' },
   description:
     'Публикации, фотографии, опросы и личные диалоги. Твоё пространство в Noctgram.',
 };
@@ -25,4 +32,3 @@ export default function RootLayout({
     </html>
   );
 }
-

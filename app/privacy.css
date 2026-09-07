@@ -1,0 +1,414 @@
+.edit-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #303034;
+  border-radius: 12px;
+  background: #0e0e0f;
+}
+.edit-tabs button {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 9px;
+  color: #999;
+  transition:
+    background 160ms,
+    color 160ms;
+}
+.edit-tabs button[aria-pressed='true'] {
+  background: #242426;
+  color: #f4f4f5;
+}
+.privacy-panel {
+  display: grid;
+  gap: 20px;
+}
+.privacy-section {
+  display: grid;
+  gap: 12px;
+}
+.privacy-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+.privacy-section .meta {
+  margin: 0;
+  line-height: 1.6;
+}
+.privacy-select-field {
+  display: grid;
+  gap: 8px;
+}
+.privacy-select-trigger {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #303034;
+  background: linear-gradient(180deg, #202022, #1a1a1c);
+  box-shadow: inset 0 1px #ffffff05;
+  color: #e9e9ef;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+.privacy-select-trigger:hover:not([data-disabled]) {
+  border-color: #505057;
+}
+.privacy-select-trigger[data-popup-open] {
+  border-color: #9380ca;
+  box-shadow:
+    0 0 0 3px #b9a4ff0c,
+    inset 0 1px #ffffff07;
+}
+.privacy-policy-icon {
+  flex: 0 0 auto;
+  color: #b8accd;
+}
+.privacy-select-value {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.45;
+}
+.privacy-select-chevron {
+  display: flex;
+  color: #888890;
+  transition:
+    transform 200ms ease,
+    color 180ms ease;
+}
+.privacy-select-trigger[data-popup-open] .privacy-select-chevron {
+  transform: rotate(180deg);
+  color: #c8b8f2;
+}
+.privacy-select-positioner {
+  z-index: 70;
+  isolation: isolate;
+}
+.privacy-select-menu {
+  width: var(--anchor-width);
+  max-width: calc(100vw - 24px);
+  max-height: var(--available-height);
+  padding: 5px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #414046;
+  border-radius: 16px;
+  background: #1b1b1e;
+  color: #ededf3;
+  box-shadow:
+    0 14px 36px #0006,
+    0 3px 8px #0003,
+    inset 0 1px #ffffff06;
+  outline: none;
+  transform-origin: var(--transform-origin);
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transition:
+    opacity 160ms ease,
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.privacy-select-menu:is(
+  [data-starting-style],
+  [data-ending-style],
+  [data-closed]
+) {
+  opacity: 0;
+  transform: scale(0.97) translateY(-5px);
+}
+.privacy-select-menu[data-side='top']:is(
+    [data-starting-style],
+    [data-ending-style],
+    [data-closed]
+  ) {
+  transform: scale(0.97) translateY(5px);
+}
+.privacy-select-list {
+  display: grid;
+  gap: 3px;
+}
+.privacy-select-option {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 62px;
+  padding: 10px 11px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+.privacy-select-option[data-selected] {
+  background: #b9a4ff0d;
+  border-color: #b9a4ff16;
+}
+.privacy-select-option[data-highlighted] {
+  background: #ffffff0c;
+  border-color: #ffffff0d;
+}
+.privacy-select-option[data-selected][data-highlighted] {
+  background: #b9a4ff18;
+  border-color: #b9a4ff24;
+}
+.privacy-option-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #ffffff05;
+  color: #96949f;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
+}
+.privacy-select-option[data-selected] .privacy-option-icon {
+  background: #b9a4ff16;
+  color: #cabaed;
+}
+.privacy-option-copy {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.privacy-option-copy small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #a09da9;
+}
+.privacy-option-check {
+  display: grid;
+  place-items: center;
+  flex: 0 0 20px;
+  color: #c8b6fa;
+  opacity: 0;
+  transform: scale(0.6) rotate(-15deg);
+  transition:
+    opacity 140ms ease,
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.privacy-select-option[data-selected] .privacy-option-check {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+.privacy-select-trigger:focus-visible,
+.privacy-toggle .privacy-switch:focus-visible {
+  outline: 2px solid #baa6ee;
+  outline-offset: 3px;
+}
+.privacy-select-trigger[data-disabled],
+.privacy-switch[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.privacy-toggle {
+  position: relative;
+  padding: 14px;
+  border: 1px solid #303034;
+  border-radius: 14px;
+  background: #1a1a1c;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease;
+}
+.privacy-toggle:has(.privacy-switch[data-checked]) {
+  background: #1d1b23;
+  border-color: #b9a4ff30;
+}
+.privacy-toggle:has(.privacy-switch[data-disabled]) {
+  cursor: not-allowed;
+}
+.privacy-toggle > span:first-child {
+  min-width: 0;
+  color: #dedde5;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.privacy-toggle .privacy-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 48px;
+  height: 28px;
+  flex: 0 0 48px;
+  padding: 3px;
+  border: 0;
+  border-radius: 999px;
+  background: #3a393f;
+  box-shadow: inset 0 0 0 1px #ffffff09;
+  outline: none;
+  cursor: pointer;
+  transition:
+    background 200ms ease,
+    box-shadow 200ms ease;
+}
+.privacy-switch::after {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
+}
+.privacy-toggle .privacy-switch[data-checked] {
+  background: #b8a0e7;
+  box-shadow:
+    inset 0 0 0 1px #e5d7ff30,
+    0 0 14px #b9a4ff10;
+}
+.privacy-switch-thumb {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #c9c7cf;
+  color: #756093;
+  box-shadow: 0 1px 4px #0004;
+  transform: translateX(0);
+  transition:
+    transform 280ms cubic-bezier(0.34, 1.35, 0.5, 1),
+    background 180ms ease;
+}
+.privacy-switch[data-checked] .privacy-switch-thumb {
+  transform: translateX(20px);
+  background: #fcfaff;
+}
+.privacy-switch-thumb svg {
+  opacity: 0;
+  transform: scale(0.5) rotate(-25deg);
+  transition:
+    opacity 150ms ease,
+    transform 220ms ease;
+}
+.privacy-switch[data-checked] .privacy-switch-thumb svg {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .privacy-select-trigger,
+  .privacy-select-chevron,
+  .privacy-select-menu,
+  .privacy-select-option,
+  .privacy-option-icon,
+  .privacy-option-check,
+  .privacy-toggle,
+  .privacy-switch,
+  .privacy-switch-thumb,
+  .privacy-switch-thumb svg {
+    transition: none !important;
+  }
+}
+.privacy-toggle {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+}
+.privacy-toggle small {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+.privacy-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #18181a;
+  padding: 0 12px;
+  border: 1px solid #303034;
+  border-radius: 12px;
+}
+.privacy-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  color: inherit;
+  outline: none;
+}
+.privacy-search:focus-within {
+  border-color: #8573b9;
+}
+.privacy-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+}
+.privacy-person > span {
+  flex: 1;
+  min-width: 0;
+}
+.privacy-person strong,
+.privacy-person small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.privacy-person strong {
+  font-size: 13px;
+}
+.privacy-person small {
+  color: #999;
+  font-size: 12px;
+  margin-top: 3px;
+}
+.privacy-person .secondary {
+  padding: 7px 10px;
+  font-size: 11px;
+}
+.privacy-empty {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+}
+.message-privacy-note {
+  padding: 10px 16px;
+  font-size: 12px;
+  color: #999;
+  background: #141416;
+  border-top: 1px solid #252528;
+}
+.chat-header .chat-block {
+  margin-left: auto;
+  padding: 8px;
+  color: #999;
+  flex-shrink: 0;
+}
+.message-report {
+  padding: 4px;
+  margin-left: 6px;
+  border-radius: 5px;
+  color: inherit;
+  opacity: 0.65;
+}
+.message-report:hover,
+.message-report:focus-visible {
+  opacity: 1;
+  background: #ffffff14;
+}
