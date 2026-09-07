@@ -9,7 +9,7 @@ import { activeActor } from './channel-access';
 import { premiumActive, appearanceColumns } from './premium-access';
 import { assertMediaRead, mediaPermission } from './media-access';
 import { assertStaticAvatar } from './avatar-media';
-import { profileThemes, ringCharacters } from './appearance';
+import { profileThemes, ringCharacters, chromeTempo } from './appearance';
 export async function premiumGet(
   action: string,
   me: string,
@@ -74,10 +74,30 @@ export async function premiumPost(
     throw new ApiError(400, 'Проверь оформление: текст обводки до 48 символов');
   const current = await d
     .prepare(
-      'SELECT avatarMotion,avatarMotionType FROM profile_appearance WHERE userId=?',
+      'SELECT avatarMotion,avatarMotionType,chromeFlow,chromeTempo FROM profile_appearance WHERE userId=?',
     )
     .bind(me)
-    .first<{ avatarMotion: string; avatarMotionType: string }>();
+    .first<{
+      avatarMotion: string;
+      avatarMotionType: string;
+      chromeFlow: number;
+      chromeTempo: number;
+    }>();
+  // Older clients omit Chrome fields. Keep existing preferences on those saves.
+  const chrome =
+    b.chromeFlow === undefined ? !!current?.chromeFlow : b.chromeFlow;
+  const tempo =
+    b.chromeTempo === undefined
+      ? (current?.chromeTempo ?? chromeTempo.default)
+      : b.chromeTempo;
+  if (
+    typeof chrome !== 'boolean' ||
+    typeof tempo !== 'number' ||
+    !Number.isInteger(tempo) ||
+    tempo < chromeTempo.min ||
+    tempo > chromeTempo.max
+  )
+    throw new ApiError(400, 'Проверь Chrome Flow: темп от 3 до 26 секунд');
   const motion = clean(b.avatarMotion || '', 200),
     poster = clean(b.poster || '', 200);
   let type = '';
@@ -119,7 +139,7 @@ export async function premiumPost(
   const result = await d.batch([
     d
       .prepare(
-        `${input} INSERT INTO profile_appearance(userId,theme,nameGradient,ringText,avatarMotion,avatarMotionType,updated) SELECT id,?,?,?,?,?,? FROM eligible WHERE 1 ON CONFLICT(userId) DO UPDATE SET theme=excluded.theme,nameGradient=excluded.nameGradient,ringText=excluded.ringText,avatarMotion=excluded.avatarMotion,avatarMotionType=excluded.avatarMotionType,updated=excluded.updated`,
+        `${input} INSERT INTO profile_appearance(userId,theme,nameGradient,ringText,chromeFlow,chromeTempo,avatarMotion,avatarMotionType,updated) SELECT id,?,?,?,?,?,?,?,? FROM eligible WHERE 1 ON CONFLICT(userId) DO UPDATE SET theme=excluded.theme,nameGradient=excluded.nameGradient,ringText=excluded.ringText,chromeFlow=excluded.chromeFlow,chromeTempo=excluded.chromeTempo,avatarMotion=excluded.avatarMotion,avatarMotionType=excluded.avatarMotionType,updated=excluded.updated`,
       )
       .bind(
         me,
@@ -128,6 +148,8 @@ export async function premiumPost(
         theme,
         b.nameGradient ? 1 : 0,
         ringText,
+        chrome ? 1 : 0,
+        tempo,
         motion,
         type,
         now,

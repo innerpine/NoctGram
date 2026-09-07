@@ -44,6 +44,175 @@
   object-fit: cover;
   border-radius: inherit;
 }
+.avatar.chrome-avatar {
+  position: relative;
+  overflow: visible;
+  isolation: isolate;
+}
+.avatar-face {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: inherit;
+  background: inherit;
+}
+.avatar-face > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.chrome-flow-frame {
+  --chrome-width: max(2px, 3.8%);
+  --chrome-gap: max(2.5px, 3.8%);
+  --chrome-light: color-mix(in oklab, var(--profile-second) 62%, white);
+  position: absolute;
+  inset: calc(-1 * (var(--chrome-width) + var(--chrome-gap)));
+  border-radius: 50%;
+  padding: var(--chrome-width);
+  box-sizing: border-box;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    #fff 0,
+    var(--chrome-light) 12%,
+    #17171d 25%,
+    var(--profile-first) 38%,
+    #fff 50%,
+    var(--chrome-light) 62%,
+    #17171d 75%,
+    var(--profile-first) 88%,
+    #fff 100%
+  );
+  background-size: 300% 100%;
+  background-repeat: repeat;
+  filter: contrast(1.12) saturate(1.1);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: noct-chrome-flow calc(var(--chrome-tempo) * 0.75) linear infinite;
+}
+@keyframes noct-chrome-flow {
+  to {
+    background-position: 300% 50%;
+  }
+}
+.profile-identity-avatar.has-chrome-flow.has-text-ring > .avatar {
+  box-shadow: none;
+}
+.profile-identity-avatar.has-chrome-flow .profile-text-ring {
+  inset: -34%;
+  width: 168%;
+  height: 168%;
+}
+.profile-card[data-premium='true'] .profile-aliases button {
+  color: var(--profile-first);
+}
+.design-chrome {
+  border: 1px solid #ffffff12;
+  border-radius: 14px;
+  background: #ffffff03;
+  overflow: hidden;
+}
+.design-chrome .appearance-switch {
+  border: 0;
+  padding: 16px;
+}
+.chrome-tempo-setting {
+  padding: 0 16px 16px;
+  animation: chrome-setting-in 0.18s ease-out;
+}
+.chrome-tempo-heading,
+.chrome-tempo-scale {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+.chrome-tempo-heading output {
+  color: var(--profile-first);
+  font-variant-numeric: tabular-nums;
+}
+.chrome-tempo-scale {
+  color: #929099;
+  font-size: 11px;
+}
+.chrome-tempo-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  touch-action: none;
+  user-select: none;
+}
+.chrome-tempo-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #333239;
+}
+.chrome-tempo-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--profile-second),
+    var(--profile-first)
+  );
+}
+.chrome-tempo-thumb {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f5f2fa;
+  box-shadow: 0 0 0 3px #24212a;
+}
+.chrome-tempo-thumb::after {
+  content: '';
+  position: absolute;
+  inset: -9px;
+}
+.chrome-tempo-thumb:has(input:focus-visible) {
+  outline: 2px solid var(--profile-first);
+  outline-offset: 5px;
+}
+.chrome-tempo-slider[data-disabled] {
+  opacity: 0.45;
+}
+@keyframes chrome-setting-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chrome-flow-frame,
+  .chrome-tempo-setting {
+    animation: none;
+  }
+}
+@media (forced-colors: active) {
+  .chrome-flow-frame {
+    background: CanvasText;
+    filter: none;
+    animation: none;
+  }
+  .chrome-tempo-thumb {
+    border: 1px solid CanvasText;
+  }
+}
 .avatar.profile-identity-avatar {
   position: relative;
   overflow: visible;

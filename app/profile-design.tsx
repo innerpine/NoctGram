@@ -1,11 +1,13 @@
 'use client';
 import { useId, useRef, useState } from 'react';
 import { Switch } from '@base-ui/react/switch';
+import { Slider } from '@base-ui/react/slider';
 import { Check, Film, LoaderCircle, Palette, RotateCw } from 'lucide-react';
 import { request, upload, type Profile } from '@/lib/client';
 import {
   profileThemes,
   ringCharacters,
+  chromeTempo,
   type ProfileTheme,
 } from '@/lib/appearance';
 import { avatarPoster } from '@/lib/avatar-poster';
@@ -33,6 +35,8 @@ export function ProfileDesign({
     ),
     [gradient, setGradient] = useState(!!me.nameGradient),
     [ring, setRing] = useState(me.ringText || ''),
+    [chrome, setChrome] = useState(!!me.chromeFlow),
+    [tempo, setTempo] = useState<number>(me.chromeTempo || chromeTempo.default),
     [motion, setMotion] = useState(me.avatarMotion || ''),
     [motionType, setMotionType] = useState(me.avatarMotionType || ''),
     [poster, setPoster] = useState(''),
@@ -40,6 +44,8 @@ export function ProfileDesign({
     [error, setError] = useState('');
   const lock = useRef(false),
     gradientId = useId(),
+    chromeId = useId(),
+    tempoId = useId(),
     fileInput = useRef<HTMLInputElement>(null);
   const preview = {
     ...me,
@@ -47,6 +53,8 @@ export function ProfileDesign({
     profileTheme: theme,
     nameGradient: gradient,
     ringText: ring,
+    chromeFlow: chrome,
+    chromeTempo: tempo,
     avatar: poster || me.avatar,
     avatarMotion: motion,
     avatarMotionType: motionType,
@@ -87,6 +95,8 @@ export function ProfileDesign({
               theme,
               nameGradient: gradient,
               ringText: ring,
+              chromeFlow: chrome,
+              chromeTempo: tempo,
               avatarMotion: motion,
               poster,
             });
@@ -134,6 +144,63 @@ export function ProfileDesign({
               <Switch.Thumb className="privacy-switch-thumb" />
             </Switch.Root>
           </label>
+          <div className="design-chrome" style={appearanceStyle(preview)}>
+            <label className="appearance-switch" htmlFor={chromeId}>
+              <span>
+                <strong>Chrome Flow</strong>
+                <small>Металлический блик в цветах профиля.</small>
+              </span>
+              <Switch.Root
+                id={chromeId}
+                className="privacy-switch"
+                checked={chrome}
+                onCheckedChange={setChrome}
+                disabled={busy || disabled}
+              >
+                <Switch.Thumb className="privacy-switch-thumb" />
+              </Switch.Root>
+            </label>
+            {chrome && (
+              <div className="chrome-tempo-setting">
+                <div className="chrome-tempo-heading">
+                  <span id={tempoId}>Темп переливания</span>
+                  <output>
+                    {(chromeTempo.default / tempo).toLocaleString('ru-RU', {
+                      maximumFractionDigits: 2,
+                    })}
+                    ×
+                  </output>
+                </div>
+                <Slider.Root
+                  className="chrome-tempo-slider"
+                  min={chromeTempo.min}
+                  max={chromeTempo.max}
+                  step={1}
+                  value={chromeTempo.max + chromeTempo.min - tempo}
+                  onValueChange={(value) =>
+                    setTempo(chromeTempo.max + chromeTempo.min - value)
+                  }
+                  disabled={busy || disabled}
+                  thumbAlignment="edge"
+                >
+                  <Slider.Control className="chrome-tempo-control">
+                    <Slider.Track className="chrome-tempo-track">
+                      <Slider.Indicator className="chrome-tempo-fill" />
+                    </Slider.Track>
+                    <Slider.Thumb
+                      className="chrome-tempo-thumb"
+                      aria-labelledby={tempoId}
+                      aria-valuetext={`${(chromeTempo.default / tempo).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} от обычного темпа`}
+                    />
+                  </Slider.Control>
+                </Slider.Root>
+                <div className="chrome-tempo-scale">
+                  <span>Спокойнее</span>
+                  <span>Быстрее</span>
+                </div>
+              </div>
+            )}
+          </div>
           <label className="design-ring-label">
             <span>
               <RotateCw size={16} /> Текст вокруг аватара{' '}

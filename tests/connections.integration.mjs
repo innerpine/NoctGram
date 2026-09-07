@@ -115,6 +115,8 @@ assert.deepEqual(
     'profileTheme',
     'nameGradient',
     'ringText',
+    'chromeFlow',
+    'chromeTempo',
     'avatarMotion',
     'avatarMotionType',
   ].sort((a, b) => a.localeCompare(b)),

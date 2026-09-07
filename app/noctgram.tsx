@@ -788,6 +788,8 @@ export default function Noctgram() {
       profileTheme: updated.profileTheme,
       nameGradient: updated.nameGradient,
       ringText: updated.ringText,
+      chromeFlow: updated.chromeFlow,
+      chromeTempo: updated.chromeTempo,
       avatar: updated.avatar,
       avatarMotion: updated.avatarMotion,
       avatarMotionType: updated.avatarMotionType,
@@ -1421,6 +1423,7 @@ export default function Noctgram() {
           <>
             <section
               style={profile.premium ? appearanceStyle(profile) : undefined}
+              data-premium={!!profile.premium}
               className={
                 'profile-card ' +
                 (profile.kind === 'channel' ? 'channel-profile' : '')

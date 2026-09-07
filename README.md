@@ -34,7 +34,7 @@
 
 Node 22.13+; `npm ci`, `npm run dev`. Локальный вход через ссылку «Войти» использует предусмотренную Sites тестовую учётную запись. Данные локального окружения не копируются в размещённый сайт.
 
-Для чистой локальной базы последовательно примените `drizzle/0000_last_freak.sql`, `drizzle/0001_orange_dracula.sql` и `drizzle/0002_complex_landau.sql` и `drizzle/0003_curly_groot.sql` и `drizzle/0004_regular_stardust.sql`, затем `drizzle/0005_massive_mindworm.sql` и `drizzle/0006_dazzling_celestials.sql` и `drizzle/0007_organic_slipstream.sql`, затем `drizzle/0008_spotty_madame_web.sql` командой `npx wrangler d1 execute DB --local --config wrangler.local.json --file <файл>`. Уже применённые миграции повторно не запускать.
+Для чистой локальной базы последовательно примените `drizzle/0000_last_freak.sql`, `drizzle/0001_orange_dracula.sql` и `drizzle/0002_complex_landau.sql` и `drizzle/0003_curly_groot.sql` и `drizzle/0004_regular_stardust.sql`, затем `drizzle/0005_massive_mindworm.sql` и `drizzle/0006_dazzling_celestials.sql` и `drizzle/0007_organic_slipstream.sql`, затем `drizzle/0008_spotty_madame_web.sql` и `drizzle/0009_dazzling_eternity.sql` командой `npx wrangler d1 execute DB --local --config wrangler.local.json --file <файл>`. Уже применённые миграции повторно не запускать.
 
 Проверки: `npx tsc --noEmit`, `npm run lint`, `npm run build`. Вендорные components/ui и use-mobile исключены из линтинга приложения. Общие Dialog/AlertDialog адаптированы под согласованные переходы Base UI.
 

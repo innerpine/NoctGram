@@ -578,6 +578,8 @@ export const profileAppearance = sqliteTable('profile_appearance', {
   theme: text().notNull().default('iris'),
   nameGradient: integer().notNull().default(0),
   ringText: text().notNull().default(''),
+  chromeFlow: integer().notNull().default(0),
+  chromeTempo: integer().notNull().default(11),
   avatarMotion: text().notNull().default(''),
   avatarMotionType: text().notNull().default(''),
   updated: integer().notNull(),

@@ -12,9 +12,12 @@ export type Appearance = {
   profileTheme?: string;
   nameGradient?: number | boolean;
   ringText?: string;
+  chromeFlow?: number | boolean;
+  chromeTempo?: number;
   avatarMotion?: string;
   avatarMotionType?: string;
 };
+export const chromeTempo = { min: 3, max: 26, default: 11 } as const;
 export function themeFor(person: Appearance) {
   return (
     profileThemes[person.profileTheme as ProfileTheme] || profileThemes.iris

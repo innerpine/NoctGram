@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { Switch } from '@base-ui/react/switch';
 import type { Appearance } from '@/lib/appearance';
-import { themeFor } from '@/lib/appearance';
+import { themeFor, chromeTempo } from '@/lib/appearance';
 import { NoctLogo } from './stars-icon';
 
 type Identity = Appearance & { name: string; avatar?: string };
@@ -117,8 +117,10 @@ export function Avatar({
   const [visible, setVisible] = useState(false),
     [failed, setFailed] = useState('');
   const motion = !!person.premium && enabled && !!person.avatarMotion;
+  const chrome = !!person.premium && !!person.chromeFlow;
+  const observe = enabled && (motion || chrome);
   useEffect(() => {
-    if (!motion || !root.current) {
+    if (!observe || !root.current) {
       setVisible(false);
       return;
     }
@@ -134,44 +136,70 @@ export function Avatar({
       observer.disconnect();
       document.removeEventListener('visibilitychange', update);
     };
-  }, [motion]);
+  }, [observe]);
   const words = person.name.trim().split(/\s+/);
   const initials =
     words.length > 1
       ? words[0].slice(0, 1) + words[words.length - 1].slice(0, 1)
       : person.name.slice(0, 2);
   const playing = motion && visible && failed !== person.avatarMotion;
+  const content =
+    playing && person.avatarMotionType?.startsWith('video/') ? (
+      <video
+        key={person.avatarMotion}
+        src={person.avatarMotion}
+        poster={person.avatar}
+        muted
+        loop
+        autoPlay
+        playsInline
+        preload="metadata"
+        onError={() => setFailed(person.avatarMotion!)}
+      />
+    ) : playing ? (
+      <img
+        src={person.avatarMotion}
+        alt=""
+        onError={() => setFailed(person.avatarMotion!)}
+      />
+    ) : person.avatar ? (
+      <img src={person.avatar} alt="" />
+    ) : person.name === 'Noctgram' ? (
+      <NoctLogo size={size * 1.08} />
+    ) : (
+      initials.toUpperCase()
+    );
+  const tempo = Math.min(
+    chromeTempo.max,
+    Math.max(chromeTempo.min, person.chromeTempo || chromeTempo.default),
+  );
   return (
     <span
       ref={root}
-      className="avatar"
-      style={{ width: size, height: size, fontSize: size / 2.8 }}
+      className={'avatar' + (chrome ? ' chrome-avatar' : '')}
+      style={
+        {
+          ...appearanceStyle(person),
+          width: size,
+          height: size,
+          fontSize: size / 2.8,
+          '--chrome-tempo': `${tempo}s`,
+        } as CSSProperties
+      }
       aria-hidden="true"
     >
-      {playing && person.avatarMotionType?.startsWith('video/') ? (
-        <video
-          key={person.avatarMotion}
-          src={person.avatarMotion}
-          poster={person.avatar}
-          muted
-          loop
-          autoPlay
-          playsInline
-          preload="metadata"
-          onError={() => setFailed(person.avatarMotion!)}
-        />
-      ) : playing ? (
-        <img
-          src={person.avatarMotion}
-          alt=""
-          onError={() => setFailed(person.avatarMotion!)}
-        />
-      ) : person.avatar ? (
-        <img src={person.avatar} alt="" />
-      ) : person.name === 'Noctgram' ? (
-        <NoctLogo size={size * 1.08} />
+      {chrome ? (
+        <>
+          <span className="avatar-face">{content}</span>
+          <span
+            className="chrome-flow-frame"
+            style={{
+              animationPlayState: enabled && visible ? 'running' : 'paused',
+            }}
+          />
+        </>
       ) : (
-        initials.toUpperCase()
+        content
       )}
     </span>
   );
@@ -189,7 +217,9 @@ export function ProfileAvatar({
   return (
     <span
       className={
-        'avatar profile-identity-avatar' + (text ? ' has-text-ring' : '')
+        'avatar profile-identity-avatar' +
+        (text ? ' has-text-ring' : '') +
+        (person.premium && person.chromeFlow ? ' has-chrome-flow' : '')
       }
       style={{ ...appearanceStyle(person), width: size, height: size }}
     >

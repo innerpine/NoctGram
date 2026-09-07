@@ -74,10 +74,14 @@ const design = {
   theme: 'rose',
   nameGradient: true,
   ringText: 'Своя орбита ☾',
+  chromeFlow: true,
+  chromeTempo: 7,
   avatarMotion: '',
   poster: '',
 };
 assert.equal(pa.premium, 0);
+assert.equal(pa.chromeFlow, 0);
+assert.equal(pa.chromeTempo, 11);
 await deny(a, design);
 await ok(a, '', {
   action: 'profile',
@@ -115,6 +119,23 @@ let styled = await ok(a, '', design);
 assert.equal(styled.nameGradient, 1);
 assert.equal(styled.ringText, design.ringText);
 assert.equal(styled.profileTheme, 'rose');
+assert.equal(styled.chromeFlow, 1);
+assert.equal(styled.chromeTempo, 7);
+for (const invalid of [2, 27, 6.5, '7', null])
+  await deny(a, { ...design, chromeTempo: invalid });
+await deny(a, { ...design, chromeFlow: 1 });
+for (const tempo of [3, 26])
+  assert.equal(
+    (await ok(a, '', { ...design, chromeTempo: tempo })).chromeTempo,
+    tempo,
+  );
+const legacyDesign = { ...design };
+delete legacyDesign.chromeFlow;
+delete legacyDesign.chromeTempo;
+const legacySave = await ok(a, '', legacyDesign);
+assert.equal(legacySave.chromeFlow, 1, 'Older clients preserve the frame');
+assert.equal(legacySave.chromeTempo, 26, 'Older clients preserve the tempo');
+assert.equal((await ok(a, '', { ...design, chromeFlow: false })).chromeFlow, 0);
 await deny(a, { ...design, theme: 'url(javascript:bad)' });
 await deny(a, { ...design, nameGradient: 'true' });
 await deny(a, { ...design, ringText: 'x'.repeat(49) });
@@ -189,6 +210,8 @@ const rows = await ok(b, '?action=feed&user=' + a),
 assert.ok(post);
 assert.equal(post.premium, 1);
 assert.equal(post.avatarMotion, motion.url);
+assert.equal(post.chromeFlow, 1);
+assert.equal(post.chromeTempo, 7);
 const comment = await ok(a, '', {
   action: 'comment',
   id: post.id,
@@ -238,6 +261,8 @@ assert.equal(expired.premium, 0);
 assert.equal(expired.nameGradient, 0);
 assert.equal(expired.ringText, '');
 assert.equal(expired.avatarMotion, '');
+assert.equal(expired.chromeFlow, 0);
+assert.equal(expired.chromeTempo, 11);
 assert.equal(expired.avatar, poster.url);
 assert.equal(
   await mediaStatus(b, motion.url),
@@ -248,6 +273,11 @@ await deny(a, animated);
 await deny(a, { action: 'activatePremiumTest' });
 fixtureSQL(
   `UPDATE premium_entitlements SET expiresAt=${Date.now() + 86400000} WHERE userId='${a}';`,
+);
+assert.equal(
+  (await ok(a, '?action=profile')).chromeFlow,
+  1,
+  'Chrome returns with renewed Premium',
 );
 assert.equal(
   (await ok(a, '?action=profile')).ringText,
