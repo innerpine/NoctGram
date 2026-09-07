@@ -1,7 +1,8 @@
 'use client';
 /* Async subscriptions intentionally update loading state; provider artwork keeps its attribution. */
 /* eslint-disable react/react-compiler, next/no-img-element, next/no-html-link-for-pages */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -37,8 +38,17 @@ type MusicData = {
     authorUrl: string;
     plays: number;
     tracks: number;
+    provider: string;
   }[];
   listeners: (Person & { plays: number; tracks: number })[];
+  mine: {
+    rank: number | null;
+    plays: number;
+    tracks: number;
+    participants: number;
+  } | null;
+  period: string;
+  updatedAt: number;
 };
 
 export function MusicPanel({
@@ -52,27 +62,51 @@ export function MusicPanel({
 }) {
   const [tab, setTab] = useState('discover'),
     [chart, setChart] = useState('tracks');
+  const [period, setPeriod] = useState('7');
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  useEffect(() => {
+    if (requestedTab === 'charts') setTab('charts');
+  }, [requestedTab]);
   const [url, setUrl] = useState(''),
     [error, setError] = useState('');
   const [data, setData] = useState<MusicData | null>(null),
     [loading, setLoading] = useState(false),
     [busy, setBusy] = useState(false);
   const music = useMusic();
+  const requestVersion = useRef(0);
   const refresh = useCallback(async () => {
     if (!signedIn) return;
+    const version = ++requestVersion.current;
     setLoading(true);
     setError('');
     try {
-      setData(await musicRequest<MusicData>('home'));
+      const result = await musicRequest<MusicData>('home', undefined, {
+        charts: tab === 'charts' ? '1' : '0',
+        period,
+      });
+      if (version === requestVersion.current) setData(result);
     } catch (e) {
-      setError((e as Error).message);
+      if (version === requestVersion.current) setError((e as Error).message);
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
-  }, [signedIn]);
+  }, [signedIn, tab, period]);
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  useEffect(() => {
+    if (tab !== 'charts' || !signedIn) return;
+    const update = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    const timer = window.setInterval(update, 60000);
+    document.addEventListener('visibilitychange', update);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', update);
+    };
+  }, [tab, signedIn, refresh]);
   useEffect(() => {
     const update = () => {
       void refresh();
@@ -243,7 +277,7 @@ export function MusicPanel({
       >
         <TabsList>
           <TabsTrigger value="discover">Открытия</TabsTrigger>
-          <TabsTrigger value="charts">Чарт недели</TabsTrigger>
+          <TabsTrigger value="charts">Чарты</TabsTrigger>
           <TabsTrigger value="library">Моя музыка</TabsTrigger>
         </TabsList>
       </Tabs>
@@ -301,13 +335,65 @@ export function MusicPanel({
       ) : (
         data && (
           <>
+            <section className="music-participation card">
+              <div>
+                <h3>
+                  {data.participate
+                    ? 'Вы участвуете в чарте'
+                    : 'Участвовать в чарте'}
+                </h3>
+                <p>
+                  Ваше имя и число прослушиваний появятся в рейтинге, а песни и
+                  исполнители — в общем топе. Аудиофайлы остаются личными.
+                  Выключение удаляет историю участия.
+                </p>
+              </div>
+              <Switch
+                aria-label="Участвовать в музыкальном чарте"
+                checked={data.participate}
+                disabled={busy || (readOnly && !data.participate)}
+                onCheckedChange={(v) => void participate(v)}
+              />
+            </section>
             {tab === 'charts' ? (
               <section className="music-chart card">
                 <div className="music-section-heading">
                   <Trophy size={18} />
                   <h3>На повторе у Noctgram</h3>
-                  <span>7 дней</span>
+                  <span>Топ 30</span>
                 </div>
+                <Tabs
+                  value={period}
+                  onValueChange={(v) => setPeriod(String(v))}
+                >
+                  <TabsList aria-label="Период чарта">
+                    <TabsTrigger value="today">Сегодня</TabsTrigger>
+                    <TabsTrigger value="7">7 дней</TabsTrigger>
+                    <TabsTrigger value="30">30 дней</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <div className="music-my-ranking" aria-busy={loading}>
+                  <div>
+                    <strong>
+                      {data.mine?.rank ? `#${data.mine.rank}` : '—'}
+                    </strong>
+                    <small>ваше место</small>
+                  </div>
+                  <div>
+                    <strong>{data.mine?.plays || 0}</strong>
+                    <small>прослушиваний</small>
+                  </div>
+                  <div>
+                    <strong>{data.mine?.participants || 0}</strong>
+                    <small>участников</small>
+                  </div>
+                </div>
+                {!data.participate && (
+                  <p className="music-footnote">
+                    Включите участие выше, затем слушайте музыку в плеере. Учёт
+                    начнётся с этого момента.
+                  </p>
+                )}
                 <Tabs value={chart} onValueChange={(v) => setChart(String(v))}>
                   <TabsList>
                     <TabsTrigger value="tracks">Треки</TabsTrigger>
@@ -318,7 +404,10 @@ export function MusicPanel({
                 {chart === 'tracks' && trackRows(data.tracks, true)}
                 {chart === 'artists' &&
                   data.artists.map((artist, i) => (
-                    <div className="music-ranking-row" key={artist.authorUrl}>
+                    <div
+                      className="music-ranking-row"
+                      key={artist.provider + artist.authorUrl + artist.artist}
+                    >
                       <span className="music-rank">
                         {String(i + 1).padStart(2, '0')}
                       </span>
@@ -327,7 +416,12 @@ export function MusicPanel({
                       </span>
                       <span>
                         <strong>{artist.artist}</strong>
-                        <small>SoundCloud · треков: {artist.tracks}</small>
+                        <small>
+                          {artist.provider === 'spotify'
+                            ? 'Spotify · личное аудио'
+                            : 'SoundCloud'}{' '}
+                          · треков: {artist.tracks}
+                        </small>
                       </span>
                       <b>{artist.plays}</b>
                     </div>
@@ -367,7 +461,15 @@ export function MusicPanel({
                 <p className="music-footnote">
                   Засчитываем 30 секунд воспроизведения в Noctgram: один трек от
                   одного участника — раз в сутки по UTC. Переход по ссылке не
-                  считается.
+                  считается. Повтор песни продолжает музыку, но не увеличивает
+                  счёт повторно. Рейтинг учитывает настройки видимости профилей;
+                  при равном счёте порядок постоянный. Сегодня — с 00:00 UTC,
+                  остальные периоды — последние 7 или 30 дней.
+                </p>
+                <p className="music-footnote">
+                  {loading
+                    ? 'Обновляем…'
+                    : `Обновлено ${new Date(data.updatedAt).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })} · автообновление раз в минуту`}
                 </p>
               </section>
             ) : (
@@ -398,21 +500,6 @@ export function MusicPanel({
                 )}
               </section>
             )}
-            <section className="music-participation card">
-              <div>
-                <h3>Участвовать в чарте</h3>
-                <p>
-                  Ваше имя и число прослушиваний появятся в рейтинге. При
-                  выключении история участия удаляется.
-                </p>
-              </div>
-              <Switch
-                aria-label="Участвовать в музыкальном чарте"
-                checked={data.participate}
-                disabled={busy || (readOnly && !data.participate)}
-                onCheckedChange={(v) => void participate(v)}
-              />
-            </section>
           </>
         )
       )}

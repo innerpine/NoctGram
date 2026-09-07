@@ -43,6 +43,8 @@ assert.equal(
 assert.deepEqual((await api(alice, { action: 'start', url })).data, {
   session: null,
 });
+await api(alice, { action: 'preferences', participate: true });
+assert.equal((await api(alice, { action: 'start', url })).status, 400);
 const wav = new Uint8Array(8044);
 const view = new DataView(wav.buffer),
   text = (at, s) => [...s].forEach((c, i) => (wav[at + i] = c.charCodeAt(0)));
@@ -62,24 +64,77 @@ wav.fill(128, 44); // Synthetic silence, no copyrighted audio.
 async function upload(user, bytes, extra = {}) {
   const body = new FormData();
   body.set('file', new File([bytes], 'test.wav', { type: 'audio/wav' }));
-  return fetch(base + path, {
+  const response = await fetch(base + path, {
     method: 'POST',
     headers: { ...headers(user), ...extra },
     body,
   });
+  await response.text();
+  return response;
 }
-assert.equal((await upload(null, wav)).status, 401);
-assert.equal((await upload(bob, wav)).status, 404);
-assert.equal(
-  (await upload(alice, wav, { Origin: 'https://evil.test' })).status,
-  403,
-);
+// These checks run before multipart parsing. An empty request avoids the Windows
+// workerd transport resetting an in-flight upload after an early rejection.
+async function rejectedUpload(user, extra = {}) {
+  const response = await fetch(base + path, {
+    method: 'POST',
+    headers: { ...headers(user), ...extra },
+  });
+  await response.text();
+  return response.status;
+}
+assert.equal(await rejectedUpload(null), 401);
+assert.equal(await rejectedUpload(bob), 404);
+assert.equal(await rejectedUpload(alice, { Origin: 'https://evil.test' }), 403);
 assert.equal(
   (await upload(alice, new TextEncoder().encode('<html>fake-audio</html>')))
     .status,
   400,
 );
 assert.equal((await upload(alice, wav)).status, 200);
+const listen = await api(alice, { action: 'start', url });
+assert.ok(listen.data.session, JSON.stringify(listen));
+await api(bob, { action: 'preferences', participate: true });
+assert.equal((await api(bob, { action: 'start', url })).status, 400);
+assert.equal(
+  (
+    await api(alice, {
+      action: 'progress',
+      session: listen.data.session,
+      totalMs: 30000,
+    })
+  ).status,
+  409,
+);
+console.log(
+  'Private audio ownership and early chart events passed. Waiting for server-time threshold…',
+);
+await new Promise((resolve) => setTimeout(resolve, 31000));
+assert.equal(
+  (
+    await api(alice, {
+      action: 'progress',
+      session: listen.data.session,
+      totalMs: 30000,
+    })
+  ).data.counted,
+  true,
+);
+const chart = (await api(alice)).data;
+assert.equal(chart.mine.plays, 1);
+assert.equal(chart.tracks.find((t) => t.id === id).audioUrl, path);
+assert.equal(
+  (await api(bob)).data.tracks.find((t) => t.id === id).audioUrl,
+  null,
+);
+assert.equal((await fetch(base + path, { headers: headers(bob) })).status, 404);
+assert.equal(
+  chart.artists.find(
+    (a) => a.provider === 'spotify' && a.artist === 'Rick Astley',
+  ).plays >= 1,
+  true,
+);
+await api(alice, { action: 'preferences', participate: false });
+assert.equal((await api(alice)).data.mine.plays, 0);
 assert.equal(
   (await api(alice)).data.library.find((t) => t.id === id).audioUrl,
   path,

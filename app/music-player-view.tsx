@@ -37,6 +37,8 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatMusicTime } from '@/lib/music-links';
+import type { ListenState } from '@/lib/music-listening';
+import Link from 'next/link';
 import {
   currentLyric,
   defaultAppearance,
@@ -66,6 +68,7 @@ type Props = {
   position: number;
   duration: number;
   volume: number;
+  listening: ListenState;
   previousEnabled: boolean;
   nextEnabled: boolean;
   playerRef: RefObject<HTMLElement | null>;
@@ -347,6 +350,10 @@ export function MusicPlayerView(p: Props) {
     [menuPoint],
   );
   const showSettings = (x: number, y: number) => {
+    if (settingsOpen) {
+      setSettingsOpen(false);
+      return;
+    }
     settingsFocus.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -357,6 +364,16 @@ export function MusicPlayerView(p: Props) {
   useEffect(() => {
     if (!p.expanded) setSettingsOpen(false);
   }, [p.expanded]);
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const close = (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setSettingsOpen(false);
+    };
+    document.addEventListener('contextmenu', close, true);
+    return () => document.removeEventListener('contextmenu', close, true);
+  }, [settingsOpen]);
   const coverButton = useRef<HTMLButtonElement>(null);
   const lastVolume = useRef(70);
   useEffect(() => {
@@ -514,11 +531,63 @@ export function MusicPlayerView(p: Props) {
           </button>
         </div>
         {progress()}
+        <div className="music-mini-footer">
+          <Link
+            className="music-listen-status"
+            href="/music?tab=charts"
+            title="Открыть чарт прослушиваний"
+          >
+            {p.listening.status === 'counted'
+              ? 'Учтено в чарте сегодня'
+              : p.listening.status === 'tracking'
+                ? `В чарт · ${p.listening.seconds} / 30 с`
+                : p.listening.status === 'error'
+                  ? 'Учёт недоступен'
+                  : p.listening.status === 'checking'
+                    ? 'Проверяем учёт…'
+                    : 'Участвовать в чарте'}
+          </Link>
+          <div className="music-mini-volume">
+            <button
+              className="icon-button"
+              aria-label={p.volume ? 'Выключить звук' : 'Включить звук'}
+              onClick={toggleVolume}
+            >
+              {p.volume ? <Volume2 size={17} /> : <VolumeX size={17} />}
+            </button>
+            <Slider
+              aria-label="Громкость в компактном плеере"
+              min={0}
+              max={100}
+              step={1}
+              value={[p.volume]}
+              onValueChange={(value) =>
+                p.onVolume(Array.isArray(value) ? value[0] : value)
+              }
+            />
+            <span>{p.volume}%</span>
+          </div>
+        </div>
         {!p.expanded && error}
       </section>
 
       <Dialog open={p.expanded} onOpenChange={p.onExpanded}>
-        <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <Popover
+          open={settingsOpen}
+          onOpenChange={(open, details) => {
+            // Keep the menu until contextmenu so the same right click cannot reopen it.
+            if (
+              !open &&
+              details.reason === 'outside-press' &&
+              'button' in details.event &&
+              details.event.button === 2
+            ) {
+              details.cancel();
+              return;
+            }
+            setSettingsOpen(open);
+          }}
+        >
           <DialogContent
             showCloseButton={false}
             finalFocus={coverButton}

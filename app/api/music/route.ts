@@ -142,10 +142,17 @@ export async function GET(req: Request) {
     }
     if (params.get('action') !== 'home')
       throw new ApiError(400, 'Неизвестное действие');
+    const period = params.get('period') || '7';
+    if (!['today', '7', '30'].includes(period))
+      throw new ApiError(400, 'Неизвестный период чарта');
+    const chart = params.get('charts') !== '0';
     const d = db(),
-      since = Date.now() - 7 * DAY;
+      since =
+        period === 'today'
+          ? Math.floor(Date.now() / DAY) * DAY
+          : Date.now() - Number(period) * DAY;
     const visibility = `${visibleAccount('u')} AND ${personalVisibility('u')}`;
-    const [pref, library, discoveries, tracks, artists, listeners] =
+    const [pref, library, discoveries, tracks, artists, listeners, mine] =
       await Promise.all([
         d
           .prepare('SELECT participate FROM music_preferences WHERE userId=?')
@@ -163,33 +170,60 @@ export async function GET(req: Request) {
           )
           .bind(me)
           .all(),
-        d
-          .prepare(
-            `SELECT t.*,COUNT(*) as plays,COUNT(DISTINCT l.userId) as listeners FROM music_listens l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId JOIN music_preferences mp ON mp.userId=u.id WHERE l.created>=? AND mp.participate=1 AND ${visibility} GROUP BY t.id ORDER BY plays DESC,t.id LIMIT 30`,
-          )
-          .bind(since, me)
-          .all(),
-        d
-          .prepare(
-            `SELECT t.artist,t.authorUrl,COUNT(*) as plays,COUNT(DISTINCT t.id) as tracks FROM music_listens l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId JOIN music_preferences mp ON mp.userId=u.id WHERE l.created>=? AND mp.participate=1 AND ${visibility} GROUP BY t.authorUrl ORDER BY plays DESC,t.authorUrl LIMIT 30`,
-          )
-          .bind(since, me)
-          .all(),
-        d
-          .prepare(
-            `SELECT u.id,u.name,u.avatar,h.handle,COUNT(*) as plays,COUNT(DISTINCT l.trackId) as tracks FROM music_listens l JOIN users u ON u.id=l.userId JOIN handles h ON h.userId=u.id AND h.main=1 JOIN music_preferences mp ON mp.userId=u.id WHERE l.created>=? AND mp.participate=1 AND ${visibility} GROUP BY u.id ORDER BY plays DESC,u.id LIMIT 30`,
-          )
-          .bind(since, me)
-          .all(),
+        chart
+          ? d
+              .prepare(
+                `SELECT t.*,COUNT(*) as plays,COUNT(DISTINCT l.userId) as listeners FROM music_listens l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId JOIN music_preferences mp ON mp.userId=u.id WHERE l.created>=? AND mp.participate=1 AND ${visibility} GROUP BY t.id ORDER BY plays DESC,t.id LIMIT 30`,
+              )
+              .bind(since, me)
+              .all()
+          : { results: [] },
+        chart
+          ? d
+              .prepare(
+                `SELECT t.artist,t.authorUrl,t.provider,COUNT(*) as plays,COUNT(DISTINCT t.id) as tracks FROM music_listens l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId JOIN music_preferences mp ON mp.userId=u.id WHERE l.created>=? AND mp.participate=1 AND ${visibility} GROUP BY t.provider,t.authorUrl,t.artist ORDER BY plays DESC,t.provider,t.authorUrl,t.artist LIMIT 30`,
+              )
+              .bind(since, me)
+              .all()
+          : { results: [] },
+        chart
+          ? d
+              .prepare(
+                `SELECT u.id,u.name,u.avatar,h.handle,COUNT(*) as plays,COUNT(DISTINCT l.trackId) as tracks FROM music_listens l JOIN users u ON u.id=l.userId JOIN handles h ON h.userId=u.id AND h.main=1 JOIN music_preferences mp ON mp.userId=u.id WHERE l.created>=? AND mp.participate=1 AND ${visibility} GROUP BY u.id ORDER BY plays DESC,u.id LIMIT 30`,
+              )
+              .bind(since, me)
+              .all()
+          : { results: [] },
+        chart
+          ? d
+              .prepare(`WITH ranked AS (
+          SELECT u.id,COUNT(*) AS plays,COUNT(DISTINCT l.trackId) AS tracks,
+          ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC,u.id) AS rank
+          FROM music_listens l JOIN users u ON u.id=l.userId JOIN handles h ON h.userId=u.id AND h.main=1
+          JOIN music_preferences mp ON mp.userId=u.id
+          WHERE l.created>=? AND mp.participate=1 AND ${visibility} GROUP BY u.id
+        ) SELECT COALESCE(r.plays,0) AS plays,COALESCE(r.tracks,0) AS tracks,r.rank,
+          (SELECT COUNT(*) FROM ranked) AS participants FROM (SELECT 1) LEFT JOIN ranked r ON r.id=?`)
+              .bind(since, me, me)
+              .first()
+          : null,
       ]);
     return Response.json(
       {
         participate: !!pref?.participate,
         library: library.results,
         discoveries: discoveries.results,
-        tracks: tracks.results,
+        tracks: tracks.results.map((track) => ({
+          ...track,
+          audioUrl:
+            library.results.find((item) => item.id === track.id)?.audioUrl ||
+            null,
+        })),
         artists: artists.results,
         listeners: listeners.results,
+        mine,
+        period,
+        updatedAt: Date.now(),
       },
       { headers: { 'Cache-Control': 'private, no-store' } },
     );
@@ -240,8 +274,6 @@ export async function POST(req: Request) {
           'Нужна ссылка на трек Spotify или публичный трек/плейлист SoundCloud',
         );
       if (body.action === 'start') {
-        if (link.provider !== 'soundcloud')
-          return Response.json({ session: null });
         if (link.kind !== 'track')
           throw new ApiError(400, 'Засчитываются отдельные треки');
         const pref = await d
@@ -249,6 +281,19 @@ export async function POST(req: Request) {
           .bind(me)
           .first<{ participate: number }>();
         if (!pref?.participate) return Response.json({ session: null });
+        if (
+          link.provider === 'spotify' &&
+          !(await d
+            .prepare(
+              'SELECT 1 FROM music_audio a JOIN music_library l ON l.userId=a.userId AND l.trackId=a.trackId JOIN music_tracks t ON t.id=a.trackId WHERE a.userId=? AND t.url=?',
+            )
+            .bind(me, link.url)
+            .first())
+        )
+          throw new ApiError(
+            400,
+            'Добавьте свой аудиофайл, чтобы учитывать его прослушивания.',
+          );
       }
       // Bound external metadata requests using the existing short-lived limit table.
       const key = 'music:' + me + ':' + Math.floor(now / 60000);
@@ -283,6 +328,20 @@ export async function POST(req: Request) {
             'Не удалось добавить запись. В коллекции может быть не больше 100 ссылок.',
           );
         return Response.json(track);
+      }
+      if (
+        await d
+          .prepare(
+            'SELECT 1 FROM music_listens WHERE userId=? AND trackId=? AND day=?',
+          )
+          .bind(me, track.id, Math.floor(now / DAY))
+          .first()
+      ) {
+        await d
+          .prepare('DELETE FROM music_sessions WHERE userId=?')
+          .bind(me)
+          .run();
+        return Response.json({ session: null, counted: true });
       }
       const id = crypto.randomUUID(),
         started = Date.now();

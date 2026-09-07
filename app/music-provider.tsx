@@ -25,6 +25,11 @@ import {
   type Widget,
 } from '@/lib/soundcloud-widget';
 import { MusicPlayerView, type PlayerTrack } from './music-player-view';
+import {
+  MusicListenTracker,
+  adjacentPlayable,
+  type ListenState,
+} from '@/lib/music-listening';
 
 type Context = {
   play: (link: MusicLink, queue?: MusicLink[]) => void;
@@ -86,24 +91,26 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const generation = useRef(0),
     isPlaying = useRef(false),
     volumeRef = useRef(volume);
-  const stats = useRef({
-    session: '',
-    total: 0,
-    sent: 0,
-    lastPosition: -1,
-    lastTime: 0,
-    busy: false,
+  const tracker = useRef<MusicListenTracker | null>(null);
+  const [listening, setListening] = useState<ListenState>({
+    status: 'idle',
+    seconds: 0,
   });
   volumeRef.current = volume;
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('noctgram:music-volume');
+      const value = Number(saved);
+      if (saved !== null && Number.isFinite(value))
+        setVolume(Math.max(0, Math.min(100, Math.round(value))));
+    } catch {
+      /* Device storage is optional. */
+    }
+  }, []);
   const clearStats = () => {
-    stats.current = {
-      session: '',
-      total: 0,
-      sent: 0,
-      lastPosition: -1,
-      lastTime: 0,
-      busy: false,
-    };
+    tracker.current?.dispose();
+    tracker.current = null;
+    setListening({ status: 'idle', seconds: 0 });
   };
   const stop = useCallback(() => {
     generation.current++;
@@ -168,6 +175,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     if (link?.provider !== 'soundcloud' || !frame.current) return;
+    soundUrl.current = '';
+    clearStats();
     let active = true;
     const token = ++generation.current;
     let bound: Widget | null = null;
@@ -178,24 +187,18 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         );
       }
     }, 20000);
+    let nativeIndex = 0,
+      nativeLength = 0;
     const beginSession = (currentUrl: string) => {
       clearStats();
-      void musicRequest<{ session: string | null }>('start', {
-        url: currentUrl,
-      })
-        .then((r) => {
-          if (
-            active &&
-            generation.current === token &&
-            soundUrl.current === currentUrl
-          ) {
-            clearStats();
-            stats.current.session = r.session || '';
-          }
-        })
-        .catch(() => {
-          /* Playback also works without chart participation. */
-        });
+      tracker.current = new MusicListenTracker(
+        musicRequest,
+        (state) => {
+          if (active && generation.current === token) setListening(state);
+        },
+        () => window.dispatchEvent(new Event('noctgram:music-refresh')),
+      );
+      void tracker.current.start(currentUrl);
     };
     const preferenceChanged = () => {
       if (soundUrl.current) beginSession(soundUrl.current);
@@ -224,7 +227,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             }
           });
           w.getCurrentSoundIndex((i) => {
-            if (active) setPlaylistIndex(i);
+            if (active) {
+              nativeIndex = i;
+              setPlaylistIndex(i);
+            }
           });
         };
         w.bind(sc.Widget.Events.READY, () => {
@@ -235,6 +241,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           w.setVolume(volumeRef.current);
           w.getSounds((sounds) => {
             if (active) {
+              nativeLength = sounds.length;
               setPlaylistLength(sounds.length);
               setPlaylistSounds(sounds);
             }
@@ -251,7 +258,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             isPlaying.current = true;
             setPlaying(true);
             setError('');
-            stats.current.lastPosition = -1;
+            tracker.current?.resetPosition();
             syncSound();
           }
         });
@@ -259,62 +266,37 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           if (active) {
             isPlaying.current = false;
             setPlaying(false);
-            stats.current.lastPosition = -1;
+            tracker.current?.resetPosition();
           }
         });
         w.bind(sc.Widget.Events.SEEK, () => {
-          stats.current.lastPosition = -1;
+          tracker.current?.resetPosition();
         });
         w.bind(sc.Widget.Events.PLAY_PROGRESS, (event) => {
           if (!active || typeof event?.currentPosition !== 'number') return;
-          const p = event.currentPosition,
-            now = performance.now(),
-            s = stats.current;
-          setPosition(p);
-          const delta = p - s.lastPosition,
-            elapsed = now - s.lastTime;
-          if (
-            isPlaying.current &&
-            s.lastPosition >= 0 &&
-            delta > 0 &&
-            delta <= 2000 &&
-            elapsed < 3000
-          )
-            s.total += Math.min(delta, elapsed);
-          s.lastPosition = p;
-          s.lastTime = now;
-          if (s.session && !s.busy && s.total - s.sent >= 5000) {
-            s.busy = true;
-            const total = Math.floor(s.total);
-            void musicRequest<{ counted: boolean }>('progress', {
-              session: s.session,
-              totalMs: total,
-            })
-              .then((r) => {
-                s.sent = total;
-                if (r.counted) {
-                  s.session = '';
-                  window.dispatchEvent(new Event('noctgram:music-refresh'));
-                }
-              })
-              .catch(() => {
-                s.session = '';
-              })
-              .finally(() => {
-                s.busy = false;
-              });
-          }
+          setPosition(event.currentPosition);
+          tracker.current?.sample(event.currentPosition, isPlaying.current);
         });
         w.bind(sc.Widget.Events.FINISH, () => {
           if (!active) return;
           isPlaying.current = false;
           setPlaying(false);
-          clearStats();
-          soundUrl.current = '';
-          if (desired.current?.kind === 'playlist') return; // Native widget owns playlist advancement.
-          const list = queueRef.current,
-            index = list.findIndex((x) => x.url === desired.current?.url);
-          if (index >= 0 && index + 1 < list.length) play(list[index + 1]);
+          tracker.current?.resetPosition();
+          if (
+            desired.current?.kind === 'playlist' &&
+            nativeIndex + 1 < nativeLength
+          )
+            return;
+          const next = adjacentPlayable(
+            queueRef.current,
+            desired.current?.url || '',
+          );
+          if (next) play(next);
+          else {
+            // At the end of either queue, keep the current song playing.
+            w.seekTo(0);
+            w.play();
+          }
         });
         w.bind(sc.Widget.Events.ERROR, () => {
           if (!active) return;
@@ -335,6 +317,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       });
     return () => {
       active = false;
+      tracker.current?.dispose();
       clearTimeout(timeout);
       window.removeEventListener(
         'noctgram:music-preferences',
@@ -353,6 +336,21 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     let active = true;
     const current = () => active && generation.current === token;
+    const beginSession = () => {
+      clearStats();
+      tracker.current = new MusicListenTracker(
+        musicRequest,
+        (state) => {
+          if (current()) setListening(state);
+        },
+        () => window.dispatchEvent(new Event('noctgram:music-refresh')),
+      );
+      void tracker.current.start(link.url);
+    };
+    const preferenceChanged = () => {
+      if (element.currentSrc) beginSession();
+    };
+    window.addEventListener('noctgram:music-preferences', preferenceChanged);
     const attemptPlay = () => {
       void element.play().catch((error: DOMException) => {
         if (
@@ -377,20 +375,31 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       attemptPlay();
     };
     const progress = () => {
-      if (current()) setPosition(element.currentTime * 1000);
+      if (current()) {
+        setPosition(element.currentTime * 1000);
+        tracker.current?.sample(
+          element.currentTime * 1000,
+          !element.paused && !element.seeking,
+        );
+      }
     };
     const started = () => {
       if (current()) {
+        tracker.current?.resetPosition();
         setPlaying(true);
         setError('');
       }
     };
     const paused = () => {
-      if (current()) setPlaying(false);
+      if (current()) {
+        tracker.current?.resetPosition();
+        setPlaying(false);
+      }
     };
     const failed = () => {
       if (current()) {
         setPlaying(false);
+        clearStats();
         setError(
           'Аудиофайл недоступен или браузер не поддерживает его формат.',
         );
@@ -399,10 +408,16 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     const ended = () => {
       if (!current()) return;
       setPlaying(false);
-      const index = queueRef.current.findIndex((item) => item.url === link.url);
-      if (index >= 0 && index + 1 < queueRef.current.length)
-        play(queueRef.current[index + 1]);
+      tracker.current?.resetPosition();
+      const next = adjacentPlayable(queueRef.current, link.url);
+      if (next) play(next);
+      else {
+        element.currentTime = 0;
+        attemptPlay();
+      }
     };
+    const seeking = () => tracker.current?.resetPosition();
+    element.addEventListener('seeking', seeking);
     element.addEventListener('loadedmetadata', loaded);
     element.addEventListener('timeupdate', progress);
     element.addEventListener('play', started);
@@ -428,6 +443,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           throw new Error(
             'Добавьте аудиофайл к этому треку в «Моей музыке». Ссылка Spotify содержит сведения о песне, но не само аудио.',
           );
+        beginSession();
         element.src = data.audioUrl;
         element.load();
       })
@@ -436,6 +452,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       });
     return () => {
       active = false;
+      tracker.current?.dispose();
+      window.removeEventListener(
+        'noctgram:music-preferences',
+        preferenceChanged,
+      );
+      element.removeEventListener('seeking', seeking);
       controller.abort();
       element.removeEventListener('loadedmetadata', loaded);
       element.removeEventListener('timeupdate', progress);
@@ -451,12 +473,17 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const queueIndex = queue.findIndex((x) => x.url === link?.url);
   const previous = () => {
     if (link?.kind === 'playlist') widget.current?.prev();
-    else if (queueIndex > 0) play(queue[queueIndex - 1]);
+    else {
+      const item = adjacentPlayable(queue, link?.url || '', -1);
+      if (item) play(item);
+    }
   };
   const next = () => {
     if (link?.kind === 'playlist') widget.current?.next();
-    else if (queueIndex >= 0 && queueIndex + 1 < queue.length)
-      play(queue[queueIndex + 1]);
+    else {
+      const item = adjacentPlayable(queue, link?.url || '');
+      if (item) play(item);
+    }
   };
   const currentUrl = sound?.permalink_url || link?.url || '';
   const context = useMemo(
@@ -528,14 +555,17 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             position={position}
             duration={duration}
             volume={volume}
+            listening={listening}
             playerRef={playerElement}
             previousEnabled={
-              link.kind === 'playlist' ? playlistIndex > 0 : queueIndex > 0
+              link.kind === 'playlist'
+                ? playlistIndex > 0
+                : !!adjacentPlayable(queue, link.url, -1)
             }
             nextEnabled={
               link.kind === 'playlist'
                 ? playlistIndex + 1 < playlistLength
-                : queueIndex >= 0 && queueIndex + 1 < queue.length
+                : !!adjacentPlayable(queue, link.url)
             }
             onPrevious={previous}
             onNext={next}
@@ -556,7 +586,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             }}
             onSeek={(ms) => {
               const value = Math.max(0, Math.min(ms, duration));
-              stats.current.lastPosition = -1;
+              tracker.current?.resetPosition();
               setPosition(value);
               if (link.provider === 'spotify' && audio.current)
                 audio.current.currentTime = value / 1000;
@@ -564,6 +594,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             }}
             onVolume={(value) => {
               setVolume(value);
+              try {
+                localStorage.setItem('noctgram:music-volume', String(value));
+              } catch {
+                /* Optional. */
+              }
               if (link.provider === 'spotify' && audio.current)
                 audio.current.volume = value / 100;
               else widget.current?.setVolume(value);

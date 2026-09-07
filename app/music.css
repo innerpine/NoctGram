@@ -543,3 +543,25 @@ body:has(.music-player) .messenger {
     transition: none !important;
   }
 }
+.music-my-ranking {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+  padding: 18px 0;
+  border-block: 1px solid #ffffff0d;
+}
+.music-my-ranking > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.music-my-ranking strong {
+  font-size: 27px;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+.music-my-ranking small {
+  color: #999;
+  font-size: 11px;
+}

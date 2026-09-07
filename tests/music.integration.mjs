@@ -104,7 +104,11 @@ const counts = await Promise.all(
 assert.ok(counts.every((r) => r.status === 200 && r.data.counted));
 let data = (await api(alice)).data;
 const before = data.tracks.find((t) => t.id === 'music_qa_track').plays;
-assert.equal(data.listeners.find((p) => p.id === alice).plays, 1);
+const ownIndex = data.listeners.findIndex((p) => p.id === alice);
+assert.equal(data.mine.plays, 1);
+if (ownIndex >= 0) assert.equal(data.mine.rank, ownIndex + 1);
+else assert.ok(data.mine.rank > 30);
+assert.ok(data.mine.participants >= 1);
 assert.equal(
   data.artists.find((a) => a.authorUrl === 'https://soundcloud.com/noctgram-qa')
     .plays >= 1,
@@ -114,10 +118,23 @@ assert.equal(
   (await api(alice, { action: 'progress', session, totalMs: 29999 })).status,
   409,
 );
-await api(alice, { action: 'progress', session, totalMs: 30000 });
+assert.equal(
+  (await api(alice, { action: 'progress', session, totalMs: 30000 })).data
+    .counted,
+  true,
+);
 assert.equal(
   (await api(alice)).data.tracks.find((t) => t.id === 'music_qa_track').plays,
   before,
+);
+assert.deepEqual((await api(alice, { action: 'start', url })).data, {
+  session: null,
+  counted: true,
+});
+// Starting an already counted track invalidates the previous session.
+assert.equal(
+  (await api(alice, { action: 'progress', session, totalMs: 30000 })).status,
+  409,
 );
 await api(alice, { action: 'preferences', participate: false });
 assert.equal(

@@ -110,9 +110,11 @@ export function formatMusicTime(ms: number) {
 export async function musicRequest<T>(
   action: string,
   body?: Record<string, unknown>,
+  query?: Record<string, string>,
 ): Promise<T> {
   const response = await fetch(
-    '/api/music' + (body ? '' : '?action=' + encodeURIComponent(action)),
+    '/api/music' +
+      (body ? '' : '?' + new URLSearchParams({ ...query, action })),
     body
       ? {
           method: 'POST',
