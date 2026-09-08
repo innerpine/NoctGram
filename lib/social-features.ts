@@ -113,7 +113,7 @@ export async function featureGet(
       .all();
     const totals = await d
       .prepare(
-        "SELECT COALESCE(SUM(CASE WHEN recipient=? AND kind='support' THEN amount ELSE 0 END),0) AS received,COALESCE(SUM(CASE WHEN sender=? THEN amount ELSE 0 END),0) AS sent,COALESCE(SUM(CASE WHEN recipient=? AND kind='telegram_test' THEN 1 ELSE 0 END),0) AS topupCount,COALESCE(SUM(CASE WHEN recipient=? AND kind='telegram_test' THEN amount ELSE 0 END),0) AS topupTotal FROM star_transfers WHERE sender=? OR recipient=?",
+        "SELECT COALESCE(SUM(CASE WHEN recipient=? AND kind='support' THEN amount ELSE 0 END),0) AS received,COALESCE(SUM(CASE WHEN sender=? THEN amount ELSE 0 END),0) AS sent,COALESCE(SUM(CASE WHEN recipient=? AND kind IN ('telegram_test','admin_grant') THEN 1 ELSE 0 END),0) AS topupCount,COALESCE(SUM(CASE WHEN recipient=? AND kind IN ('telegram_test','admin_grant') THEN amount ELSE 0 END),0) AS topupTotal FROM star_transfers WHERE sender=? OR recipient=?",
       )
       .bind(me, me, me, me, me, me)
       .first();
@@ -266,7 +266,7 @@ export async function featurePost(
     statements.unshift(
       d
         .prepare(
-          `${eligibility} UPDATE profile_appearance SET avatarMotion='',avatarMotionType='' WHERE userId=? AND EXISTS(SELECT 1 FROM users u WHERE u.id=profile_appearance.userId AND u.avatar<>? AND u.id IN(SELECT id FROM eligible) AND ${channelPermission('u', 'profile')} AND ${writableTarget('u')})`,
+          `${eligibility} UPDATE profile_appearance SET avatarMotion='',avatarMotionType='' WHERE userId=? AND userId IN(SELECT id FROM eligible) AND EXISTS(SELECT 1 FROM users u WHERE u.id=profile_appearance.userId AND u.avatar<>? AND ${channelPermission('u', 'profile')} AND ${writableTarget('u')})`,
         )
         .bind(...eligibilityArgs, target, avatar, me, me, me, me),
     );

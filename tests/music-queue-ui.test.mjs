@@ -159,16 +159,16 @@ function environment(t) {
     },
   };
 }
-test('heart: one playlist saves directly; duplicate clicks lock; several choices close only after acknowledgement and keep the selected song', async (t) => {
+void test('heart: one playlist saves directly; duplicate clicks lock; several choices close only after acknowledgement and keep the selected song', async (t) => {
   environment(t);
   let lists = [{ id: 'one', name: 'Ночь', trackCount: 0, savedTrackId: null }];
   const calls = [];
-  let release;
+  const release = {};
   globalThis.fetch = async (url, options = {}) => {
     const body = options.body ? JSON.parse(options.body) : null;
     if (!body) return Response.json({ playlists: lists });
     calls.push(body);
-    if (release) await release.promise;
+    if (release.promise) await release.promise;
     if (body.action === 'add')
       lists = lists.map((p) =>
         p.id === body.id ? { ...p, savedTrackId: 'song-id' } : p,
@@ -211,7 +211,6 @@ test('heart: one playlist saves directly; duplicate clicks lock; several choices
   };
   c.dirty = true;
   await c.flush();
-  release = {};
   release.promise = new Promise((resolve) => (release.resolve = resolve));
   const choice = byType(c.tree, 'button').find(
     (n) => n.props['aria-label'] === 'Добавить в «Утро»',
@@ -238,7 +237,7 @@ test('heart: one playlist saves directly; duplicate clicks lock; several choices
     'Exit animation retains the dialog content',
   );
 });
-test('heart: no playlists creates favorites, while a failed save leaves the choice available', async (t) => {
+void test('heart: no playlists creates favorites, while a failed save leaves the choice available', async (t) => {
   environment(t);
   let lists = [],
     fail = false;
@@ -281,13 +280,12 @@ test('heart: no playlists creates favorites, while a failed save leaves the choi
     'Нет соединения',
   );
 });
-test('drag: fifth to third, keyboard reorder, autoscroll and Escape cancellation never start playback', async (t) => {
+void test('drag: fifth to third, keyboard reorder, autoscroll and Escape cancellation never start playback', async (t) => {
   const env = environment(t);
   const calls = [];
   let animations = 0,
-    c,
     treeSnapshot;
-  let rowIds = ['1', '2', '3', '4', '5'];
+  const rowIds = ['1', '2', '3', '4', '5'];
   const makeRows = () =>
     rowIds.map((id) => ({
       id,
@@ -311,7 +309,7 @@ test('drag: fifth to third, keyboard reorder, autoscroll and Escape cancellation
         }),
       ),
   };
-  c = harness(
+  const c = harness(
     MusicReorderList,
     {
       className: 'queue',

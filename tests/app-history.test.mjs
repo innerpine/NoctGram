@@ -36,7 +36,6 @@ function fixture(href = '/', prepare) {
   ];
   let index = 1,
     ui,
-    controller,
     nativePops = 0;
   const listeners = [],
     commits = [],
@@ -81,7 +80,7 @@ function fixture(href = '/', prepare) {
     ui = route;
     controller.observe(route);
   };
-  controller = createAppHistory(host, {
+  const controller = createAppHistory(host, {
     owner: 'me',
     initial: { page: 'feed' },
     error: (error) => errors.push(error),
@@ -134,12 +133,13 @@ function fixture(href = '/', prepare) {
   };
 }
 
-test('URLs restore app sections, profile tabs, selected chats and legacy deep links', () => {
+void test('URLs restore app sections, profile tabs, selected chats and legacy deep links', () => {
   const routes = [
     { page: 'feed', mode: 'following' },
     { page: 'messages' },
     { page: 'messages', peerId: 'friend & one' },
     { page: 'profile', profileId: 'friend', profileTab: 'gifts' },
+    { page: 'profile', profileId: 'channel', boost: true },
     { page: 'profile', handle: 'Flyather', profileTab: 'media' },
     { page: 'search', query: 'музыка & люди' },
     { page: 'music' },
@@ -172,7 +172,7 @@ test('URLs restore app sections, profile tabs, selected chats and legacy deep li
   );
 });
 
-test('messages → profiles → gift tab restores in both directions without resetting browser history', async () => {
+void test('messages → profiles → gift tab restores in both directions without resetting browser history', async () => {
   const f = fixture();
   await f.controller.ready;
   assert.equal(
@@ -218,7 +218,7 @@ test('messages → profiles → gift tab restores in both directions without res
   assert.deepEqual(f.host.history.state.tree, ['existing-router-tree']);
 });
 
-test('search typing replaces its entry, while sections, profile tabs and peers add entries', async () => {
+void test('search typing replaces its entry, while sections, profile tabs and peers add entries', async () => {
   const f = fixture();
   await f.controller.ready;
   f.observe({ page: 'search', query: '' });
@@ -249,7 +249,7 @@ test('search typing replaces its entry, while sections, profile tabs and peers a
   assert.equal(f.ui.page, 'feed');
 });
 
-test('same-view clicks preserve the current chat and do not prepare or remount it', async () => {
+void test('same-view clicks preserve the current chat and do not prepare or remount it', async () => {
   const f = fixture('/?chat=friend');
   await f.controller.ready;
   const count = f.commits.length;
@@ -259,7 +259,7 @@ test('same-view clicks preserve the current chat and do not prepare or remount i
   assert.equal(f.entries.length, 2);
 });
 
-test('music chart links and library/service transitions remain in app history', async () => {
+void test('music chart links and library/service transitions remain in app history', async () => {
   const f = fixture('/music?tab=charts');
   await f.controller.ready;
   assert.equal(f.ui.musicTab, 'charts');
@@ -278,7 +278,7 @@ test('music chart links and library/service transitions remain in app history', 
   assert.equal(f.nativePops, 0);
 });
 
-test('reload honors the URL and resolves profile handles once; callback parameters survive initialization', async () => {
+void test('reload honors the URL and resolves profile handles once; callback parameters survive initialization', async () => {
   const f = fixture(
     '/?handle=Flyather&tab=gifts&post=post-1',
     async (route) => ({ ...route, handle: '', profileId: 'resolved-id' }),
@@ -300,7 +300,7 @@ test('reload honors the URL and resolves profile handles once; callback paramete
   );
 });
 
-test('stale asynchronous profiles cannot override newer navigation or a sidebar click', async () => {
+void test('stale asynchronous profiles cannot override newer navigation or a sidebar click', async () => {
   const slow = deferred();
   const f = fixture('/', (route) =>
     route.profileId === 'slow' ? slow.promise : undefined,
@@ -328,7 +328,7 @@ test('stale asynchronous profiles cannot override newer navigation or a sidebar 
   assert.equal(second.host.location.pathname, '/music');
 });
 
-test('rapid Back/Forward commits only the most recent traversal', async () => {
+void test('rapid Back/Forward commits only the most recent traversal', async () => {
   let delayed = false;
   const pending = deferred();
   const f = fixture('/', (route) =>
@@ -349,7 +349,7 @@ test('rapid Back/Forward commits only the most recent traversal', async () => {
   assert.equal(f.entries.length, 4);
 });
 
-test('Back beyond the first app entry stays native and invalidates pending work', async () => {
+void test('Back beyond the first app entry stays native and invalidates pending work', async () => {
   const slow = deferred();
   const f = fixture('/', (route) =>
     route.profileId ? slow.promise : undefined,
@@ -366,7 +366,7 @@ test('Back beyond the first app entry stays native and invalidates pending work'
   assert.equal(f.host.location.pathname, '/__dev/accounts');
 });
 
-test('unowned entries and other accounts are left to the native router', async () => {
+void test('unowned entries and other accounts are left to the native router', async () => {
   for (const state of [
     null,
     { arbitrary: true },
@@ -389,7 +389,7 @@ test('unowned entries and other accounts are left to the native router', async (
   }
 });
 
-test('failed restoration keeps the displayed view and URL consistent; disposal prevents commits', async () => {
+void test('failed restoration keeps the displayed view and URL consistent; disposal prevents commits', async () => {
   let fail = false;
   const f = fixture('/', (route) => {
     if (fail && route.profileId === 'gone')

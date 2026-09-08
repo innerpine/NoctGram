@@ -109,7 +109,7 @@ function fixture(t, reduced = false) {
   };
 }
 
-test('message jumps move only the chat, ease in bounded time and clear the arrival highlight', (t) => {
+void test('message jumps move only the chat, ease in bounded time and clear the arrival highlight', (t) => {
   const f = fixture(t),
     message = f.target(1600);
   assert.equal(f.navigation.jump(message), true);
@@ -127,7 +127,7 @@ test('message jumps move only the chat, ease in bounded time and clear the arriv
   assert.equal(message.attributes.size, 0);
 });
 
-test('gift arrivals illuminate the rounded card rather than the event wrapper', (t) => {
+void test('gift arrivals illuminate the rounded card rather than the event wrapper', (t) => {
   const f = fixture(t),
     gift = f.target(1600),
     card = f.target(1600);
@@ -142,7 +142,7 @@ test('gift arrivals illuminate the rounded card rather than the event wrapper', 
   assert.equal(card.attributes.size, 0);
 });
 
-test('a second jump replaces the first and never focuses or highlights a stale destination later', (t) => {
+void test('a second jump replaces the first and never focuses or highlights a stale destination later', (t) => {
   const f = fixture(t),
     old = f.target(1900),
     recent = f.target(2800);
@@ -160,7 +160,7 @@ test('a second jump replaces the first and never focuses or highlights a stale d
   assert.equal(recent.animations[0].canceled, true);
 });
 
-test('manual wheel, touch, pointer and keyboard interaction interrupt automated scrolling', (t) => {
+void test('manual wheel, touch, pointer and keyboard interaction interrupt automated scrolling', (t) => {
   const f = fixture(t);
   for (const event of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
     const message = f.target(1800);
@@ -176,7 +176,7 @@ test('manual wheel, touch, pointer and keyboard interaction interrupt automated 
   }
 });
 
-test('reduced motion navigates immediately with a static, temporary marker', (t) => {
+void test('reduced motion navigates immediately with a static, temporary marker', (t) => {
   const f = fixture(t, true),
     message = f.target(1600);
   f.navigation.jump(message);
@@ -188,7 +188,7 @@ test('reduced motion navigates immediately with a static, temporary marker', (t)
   assert.equal(message.attributes.size, 0);
 });
 
-test('foreign targets are ignored; tall messages and short histories stay inside list bounds', (t) => {
+void test('foreign targets are ignored; tall messages and short histories stay inside list bounds', (t) => {
   const f = fixture(t, true),
     foreign = f.target(1900);
   foreign.parent = null;
@@ -204,7 +204,7 @@ test('foreign targets are ignored; tall messages and short histories stay inside
   assert.equal(f.list.scrollTop, 0);
 });
 
-test('following the tail adapts to a changing composer height and still finishes within 420 ms', (t) => {
+void test('following the tail adapts to a changing composer height and still finishes within 420 ms', (t) => {
   const f = fixture(t);
   f.list.scrollHeight = 50000;
   f.navigation.bottom(true);

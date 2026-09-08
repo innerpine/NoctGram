@@ -1,3 +1,6 @@
+import { rateLimit } from '@/lib/rate-limit';
+import { queueStorageDeletion } from '@/lib/upload-storage';
+import { appearanceColumns } from '@/lib/premium-access';
 import { bucket, db, viewer, ApiError, failure } from '@/lib/server';
 import { resolveTrack } from '@/lib/music-track-resolver';
 import {
@@ -55,7 +58,7 @@ export async function GET(req: Request) {
       await Promise.all([
         d
           .prepare(
-            'SELECT u.id,u.name,u.avatar,h.handle FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE u.id=?',
+            `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE u.id=?`,
           )
           .bind(me)
           .first(),
@@ -90,7 +93,7 @@ export async function GET(req: Request) {
         leaders
           ? d
               .prepare(
-                `SELECT u.id,u.name,u.avatar,h.handle,COUNT(*) as plays,COUNT(DISTINCT l.trackId) as tracks FROM music_listens l JOIN users u ON u.id=l.userId JOIN handles h ON h.userId=u.id AND h.main=1 WHERE l.created>=? AND ${visibility} GROUP BY u.id ORDER BY plays DESC,u.id LIMIT 25`,
+                `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,COUNT(*) as plays,COUNT(DISTINCT l.trackId) as tracks FROM music_listens l JOIN users u ON u.id=l.userId JOIN handles h ON h.userId=u.id AND h.main=1 WHERE l.created>=? AND ${visibility} GROUP BY u.id ORDER BY plays DESC,u.id LIMIT 25`,
               )
               .bind(since, me)
               .all()
@@ -145,6 +148,12 @@ export async function POST(req: Request) {
     const body = await readJsonBody(req, 4096),
       d = db(),
       now = Date.now();
+    await rateLimit(
+      body.action === 'progress' ? 'music-progress' : 'music-actions',
+      me,
+      body.action === 'progress' ? 120 : 30,
+      60,
+    );
     if (body.action === 'preferences')
       throw new ApiError(
         400,
@@ -247,6 +256,13 @@ export async function POST(req: Request) {
     if (body.action === 'remove') {
       if (typeof body.id !== 'string')
         throw new ApiError(400, 'Некорректная запись');
+      const pendingAudio = await d
+        .prepare(
+          'SELECT objectKey FROM music_audio WHERE userId=? AND trackId=?',
+        )
+        .bind(me, body.id)
+        .first<{ objectKey: string }>();
+      if (pendingAudio) await queueStorageDeletion(pendingAudio.objectKey);
       await d
         .prepare('DELETE FROM music_library WHERE userId=? AND trackId=?')
         .bind(me, body.id)
@@ -257,7 +273,10 @@ export async function POST(req: Request) {
         )
         .bind(me, body.id)
         .first<{ objectKey: string }>();
-      if (audio) await bucket().delete(audio.objectKey);
+      if (audio)
+        await bucket()
+          .delete(audio.objectKey)
+          .catch(() => {});
       return Response.json({ ok: true });
     }
     if (body.action === 'progress') {

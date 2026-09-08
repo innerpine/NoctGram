@@ -14,7 +14,7 @@ const { musicGain, readMusicVolume, youtubeVolume, volumeFromYouTube } =
       Buffer.from(compiled.outputFiles[0].text).toString('base64')
   );
 
-test('quiet volume choices have fine gain control, mute is silent and full scale remains available', () => {
+void test('quiet volume choices have fine gain control, mute is silent and full scale remains available', () => {
   assert.equal(musicGain(0), 0);
   assert.equal(musicGain(1), 0.0001);
   assert.equal(musicGain(10), 0.010000000000000002);
@@ -26,7 +26,7 @@ test('quiet volume choices have fine gain control, mute is silent and full scale
   );
   for (let i = 1; i <= 100; i++) assert.ok(musicGain(i) > musicGain(i - 1));
 });
-test('saved quiet levels and mute are retained, malformed storage uses a quieter default', () => {
+void test('saved quiet levels and mute are retained, malformed storage uses a quieter default', () => {
   for (const [saved, expected] of [
     [null, 25],
     ['', 25],
@@ -40,7 +40,7 @@ test('saved quiet levels and mute are retained, malformed storage uses a quieter
   ])
     assert.equal(readMusicVolume(saved), expected);
 });
-test('YouTube native integer limits do not create silent nonzero steps or make the slider jump during polling', () => {
+void test('YouTube native integer limits do not create silent nonzero steps or make the slider jump during polling', () => {
   assert.equal(youtubeVolume(0), 0);
   assert.equal(youtubeVolume(1), 1);
   assert.equal(youtubeVolume(50), 25);

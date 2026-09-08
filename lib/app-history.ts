@@ -23,6 +23,7 @@ export type AppRoute = {
   musicTab?: string;
   mode?: string;
   query?: string;
+  boost?: boolean;
 };
 export type PreparedRoute = { route: AppRoute; commit: () => void };
 
@@ -34,6 +35,7 @@ export function normalizeAppRoute(input: AppRoute): AppRoute {
     return {
       page,
       profileId: text(input.profileId),
+      ...(input.boost ? { boost: true } : {}),
       handle: input.profileId ? '' : text(input.handle, 24).toLowerCase(),
       profileTab: ['posts', 'media', 'gifts'].includes(input.profileTab || '')
         ? input.profileTab
@@ -59,6 +61,7 @@ export function appRouteFromURL(href: string, owner: string): AppRoute {
   const url = new URL(href, 'http://noctgram.local'),
     params = url.searchParams;
   if (
+    params.has('boost') ||
     params.has('profile') ||
     params.has('handle') ||
     params.get('gifts') === '1'
@@ -66,7 +69,10 @@ export function appRouteFromURL(href: string, owner: string): AppRoute {
     return normalizeAppRoute({
       page: 'profile',
       profileId:
-        params.get('profile') || (params.get('gifts') === '1' ? owner : ''),
+        params.get('boost') ||
+        params.get('profile') ||
+        (params.get('gifts') === '1' ? owner : ''),
+      ...(params.get('boost') ? { boost: true } : {}),
       handle: params.get('handle') || '',
       profileTab:
         params.get('gifts') === '1' ? 'gifts' : params.get('tab') || 'posts',
@@ -96,7 +102,8 @@ export function appRouteHref(input: AppRoute) {
     params = new URLSearchParams();
   let path = '/';
   if (route.page === 'profile') {
-    if (route.profileId) params.set('profile', route.profileId);
+    if (route.profileId)
+      params.set(route.boost ? 'boost' : 'profile', route.profileId);
     else if (route.handle) params.set('handle', route.handle);
     else params.set('page', 'profile');
     if (route.profileTab !== 'posts') params.set('tab', route.profileTab!);

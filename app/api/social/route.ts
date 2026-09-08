@@ -1,4 +1,7 @@
 import { telegramGet, telegramPost } from '@/lib/telegram';
+import { boostsGet, boostsPost } from '@/lib/boosts';
+import { administrationGet, administrationPost } from '@/lib/administration';
+import { socialRateLimit } from '@/lib/rate-limit';
 import { premiumGet, premiumPost } from '@/lib/premium';
 import { appearanceColumns } from '@/lib/premium-access';
 import { assertMediaRead, mediaPermission } from '@/lib/media-access';
@@ -61,6 +64,8 @@ export async function GET(req: Request) {
     await seed();
     const s = new URL(req.url).searchParams;
     const action = s.get('action') || 'feed';
+    const administration = await administrationGet(action, s, me);
+    if (administration) return administration;
     const moderation = await moderationGet(action, s, me);
     if (moderation) return moderation;
     if (action === 'bootstrap' && (await restriction(me))?.mode === 'blocked')
@@ -74,6 +79,8 @@ export async function GET(req: Request) {
     if (telegram) return telegram;
     const premium = await premiumGet(action, me);
     if (premium) return premium;
+    const boosts = await boostsGet(action, s, me);
+    if (boosts) return boosts;
     const d = db();
     const realtime =
       (await callsGet(action, s, me)) || (await notificationsGet(action, me));
@@ -241,6 +248,9 @@ export async function POST(req: Request) {
     const me = await viewer();
     const d = db();
     const action = typeof b.action === 'string' ? b.action : '';
+    await socialRateLimit(me, action);
+    const administration = await administrationPost(action, b, me);
+    if (administration) return administration;
     if (action === 'chatTheme')
       return Response.json(await saveChatTheme(me, b));
     const telegram = await telegramPost(action, b, me);
@@ -249,6 +259,8 @@ export async function POST(req: Request) {
     if (call) return call;
     const premium = await premiumPost(String(action), b, me);
     if (premium) return premium;
+    const boosts = await boostsPost(String(action), b, me);
+    if (boosts) return boosts;
     const notification = await notificationsPost(action, b, me);
     if (notification) return notification;
     const privacy = await privacyPost(action, b, me);

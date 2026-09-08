@@ -4,6 +4,8 @@ import { assertReadable, visibleAccount } from './account-access';
 import { messageAllowed } from './privacy';
 import { setting } from './auth-session';
 import { sqlNow } from './channel-access';
+import { turnConfiguration } from './turn';
+import { rateLimit } from './rate-limit';
 
 export function callAllowed() {
   return `${messageAllowed} AND s.kind='person' AND r.kind='person' AND s.id<>r.id AND ${visibleAccount('s')} AND ${visibleAccount('r')}
@@ -11,10 +13,14 @@ export function callAllowed() {
 }
 export async function expireCalls() {
   await db()
+    .prepare('DELETE FROM call_cancellations WHERE created<?')
+    .bind(Date.now() - 300000)
+    .run();
+  await db()
     .prepare(`UPDATE calls SET status='ended',reason=CASE WHEN status='ringing' THEN 'missed' ELSE 'disconnected' END,endedAt=?,offer=NULL,answer=NULL
     WHERE status<>'ended' AND (expiresAt<? OR (status='accepted' AND (callerSeen<? OR calleeSeen<?))
     OR NOT EXISTS(SELECT 1 FROM users s,users r WHERE s.id=calls.caller AND r.id=calls.callee AND ${callAllowed()}))`)
-    .bind(Date.now(), Date.now(), Date.now() - 60000, Date.now() - 60000)
+    .bind(Date.now(), Date.now(), Date.now() - 90000, Date.now() - 90000)
     .run();
   await db()
     .prepare(
@@ -37,41 +43,22 @@ export async function callsGet(
   if (!['callState', 'callConfig'].includes(action)) return null;
   await assertReadable(me);
   if (action === 'callConfig') {
-    const urls = (setting('NOCT_STUN_URLS') || 'stun:stun.l.google.com:19302')
-      .split(',')
-      .map((x) => x.trim())
-      .filter((x) => /^stuns?:[^\s]+$/.test(x));
-    const iceServers: RTCIceServer[] = urls.length ? [{ urls }] : [];
-    const turn = (setting('NOCT_TURN_URLS') || '')
-        .split(',')
-        .map((x) => x.trim())
-        .filter((x) => /^turns?:[^\s]+$/.test(x)),
-      secret = setting('NOCT_TURN_SECRET');
-    if (turn.length && secret) {
-      const username = Math.floor(Date.now() / 1000 + 10800) + ':' + me;
-      const key = await crypto.subtle.importKey(
-        'raw',
-        new TextEncoder().encode(secret),
-        { name: 'HMAC', hash: 'SHA-1' },
-        false,
-        ['sign'],
-      );
-      const signature = new Uint8Array(
-        await crypto.subtle.sign(
-          'HMAC',
-          key,
-          new TextEncoder().encode(username),
-        ),
-      );
-      iceServers.push({
-        urls: turn,
-        username,
-        credential: btoa(String.fromCharCode(...signature)),
-      });
-    }
-    return Response.json({
-      iceServers,
-      relayConfigured: !!(turn.length && secret),
+    await expireCalls();
+    const client = device(s.get('device')),
+      id = clean(s.get('id'), 100, true);
+    const eligible = () =>
+      db()
+        .prepare(
+          `SELECT id FROM calls WHERE id=? AND status='accepted' AND expiresAt>? AND ${ownsDevice} AND EXISTS(SELECT 1 FROM users s,users r WHERE s.id=calls.caller AND r.id=calls.callee AND ${callAllowed()})`,
+        )
+        .bind(id, Date.now(), me, client, me, client)
+        .first();
+    if (!(await eligible())) throw new ApiError(403, 'Звонок недоступен');
+    await rateLimit('turn-config', me, 8, 60);
+    const config = await turnConfiguration(setting);
+    if (!(await eligible())) throw new ApiError(403, 'Звонок уже завершён');
+    return Response.json(config, {
+      headers: { 'Cache-Control': 'private, no-store' },
     });
   }
   await expireCalls();
@@ -100,7 +87,7 @@ export async function callsGet(
       ? (
           await db()
             .prepare(
-              `SELECT id,candidate FROM call_signals WHERE callId=? AND sender<>? AND id>? AND EXISTS(SELECT 1 FROM calls c,users s,users r WHERE c.id=call_signals.callId AND c.status='accepted' AND s.id=c.caller AND r.id=c.callee AND ${callAllowed()}) ORDER BY id LIMIT 100`,
+              `SELECT id,candidate,negotiation FROM call_signals WHERE callId=? AND sender<>? AND id>? AND EXISTS(SELECT 1 FROM calls c,users s,users r WHERE c.id=call_signals.callId AND c.status='accepted' AND s.id=c.caller AND r.id=c.callee AND ${callAllowed()}) ORDER BY id LIMIT 100`,
             )
             .bind(row.id, me, Math.max(0, Number(s.get('after')) || 0))
             .all()
@@ -116,6 +103,8 @@ export async function callsGet(
       reason: row.reason,
       created: row.created,
       acceptedAt: row.acceptedAt,
+      negotiation: row.negotiation,
+      restartRequested: row.restartRequested,
       name: row.name,
       avatar: row.avatar,
       handle: row.handle,
@@ -139,9 +128,13 @@ export async function callsPost(
     d = db(),
     now = Date.now();
   if (action === 'callEnd') {
-    const reason = ['declined', 'cancelled', 'completed', 'failed'].includes(
-      String(b.reason),
-    )
+    const reason = [
+      'declined',
+      'cancelled',
+      'completed',
+      'failed',
+      'disconnected',
+    ].includes(String(b.reason))
       ? String(b.reason)
       : 'completed';
     const r = await d.batch([
@@ -155,6 +148,16 @@ export async function callsPost(
           "DELETE FROM call_signals WHERE callId=? AND EXISTS(SELECT 1 FROM calls WHERE id=? AND status='ended' AND (caller=? OR callee=?))",
         )
         .bind(id, id, me, me),
+      d
+        .prepare('DELETE FROM call_cancellations WHERE caller=? AND created<?')
+        .bind(me, now - 300000),
+      // Cancel can reach the server before its in-flight callStart. Keep a short,
+      // device-bound record so that a delayed request cannot ring the peer later.
+      d
+        .prepare(`INSERT OR IGNORE INTO call_cancellations(callId,caller,device,created)
+        SELECT ?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM calls WHERE id=?)
+        AND (SELECT COUNT(*) FROM call_cancellations WHERE caller=?)<100`)
+        .bind(id, me, client, now, id, me),
     ]);
     if (
       !r[0].meta.changes &&
@@ -163,6 +166,12 @@ export async function callsPost(
           "SELECT id FROM calls WHERE id=? AND status='ended' AND (caller=? OR callee=?)",
         )
         .bind(id, me, me)
+        .first()) &&
+      !(await d
+        .prepare(
+          'SELECT callId FROM call_cancellations WHERE callId=? AND caller=? AND device=? AND NOT EXISTS(SELECT 1 FROM calls WHERE id=?)',
+        )
+        .bind(id, me, client, id)
         .first())
     )
       throw new ApiError(403, 'Звонок недоступен');
@@ -183,11 +192,24 @@ export async function callsPost(
       d
         .prepare(`INSERT OR IGNORE INTO calls(id,caller,callee,callerDevice,created,callerSeen,calleeSeen,expiresAt) SELECT ?,s.id,r.id,?,?,?,?,? FROM users s,users r WHERE s.id=? AND r.id=? AND ${callAllowed()}
         AND NOT EXISTS(SELECT 1 FROM calls WHERE status<>'ended' AND (caller IN(s.id,r.id) OR callee IN(s.id,r.id)))
+        AND NOT EXISTS(SELECT 1 FROM call_cancellations WHERE callId=? AND caller=s.id AND device=?)
         AND (SELECT COUNT(*) FROM calls WHERE caller=s.id AND created>?)<5`)
-        .bind(id, client, now, now, now, now + 60000, me, peer, now - 60000),
+        .bind(
+          id,
+          client,
+          now,
+          now,
+          now,
+          now + 60000,
+          me,
+          peer,
+          id,
+          client,
+          now - 60000,
+        ),
       d
         .prepare(
-          "INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created) SELECT ?,callee,caller,'call',id,created FROM calls WHERE id=? AND caller=? AND callerDevice=?",
+          "INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created) SELECT ?,callee,caller,'call',id,created FROM calls WHERE id=? AND caller=? AND callerDevice=? AND status='ringing'",
         )
         .bind('call:' + id, id, me, client),
     ]);
@@ -213,7 +235,24 @@ export async function callsPost(
     return Response.json({ ok: true });
   }
   const type = clean(b.type, 10, true);
-  if (type === 'offer' || type === 'answer') {
+  // Older clients may complete their first negotiation, but cannot overwrite a restart.
+  const negotiation = b.negotiation === undefined ? 1 : b.negotiation;
+  if (
+    typeof negotiation !== 'number' ||
+    !Number.isInteger(negotiation) ||
+    negotiation < 1 ||
+    negotiation > 1000
+  )
+    throw new ApiError(400, 'Неверная версия соединения');
+  if (type === 'restart') {
+    const r = await d
+      .prepare(
+        `UPDATE calls SET restartRequested=? WHERE id=? AND callee=? AND calleeDevice=? AND status='accepted' AND negotiation=? AND EXISTS(SELECT 1 FROM users s,users r WHERE s.id=calls.caller AND r.id=calls.callee AND ${callAllowed()})`,
+      )
+      .bind(negotiation, id, me, client, negotiation)
+      .run();
+    if (!r.meta.changes) throw new ApiError(409, 'Состояние звонка изменилось');
+  } else if (type === 'offer' || type === 'answer') {
     const sdp = clean(b.sdp, 20000, true).replace(/\r?\n/g, '\r\n') + '\r\n';
     if (
       !sdp.startsWith('v=0\r\n') ||
@@ -222,23 +261,44 @@ export async function callsPost(
     )
       throw new ApiError(400, 'Неверное описание соединения');
     const role = type === 'offer' ? 'caller' : 'callee';
-    const r = await d
-      .prepare(
-        `UPDATE calls SET ${type}=? WHERE id=? AND ${role}=? AND ${role}Device=? AND status='accepted' ${type === 'answer' ? 'AND offer IS NOT NULL' : ''} AND (${type} IS NULL OR ${type}=?) AND EXISTS(SELECT 1 FROM users s,users r WHERE s.id=calls.caller AND r.id=calls.callee AND ${callAllowed()})`,
-      )
-      .bind(sdp, id, me, client, sdp)
-      .run();
+    const r =
+      type === 'offer'
+        ? await d
+            .prepare(
+              `UPDATE calls SET answer=CASE WHEN negotiation=? THEN answer ELSE NULL END,restartRequested=CASE WHEN negotiation=? THEN restartRequested ELSE 0 END,offer=?,negotiation=? WHERE id=? AND caller=? AND callerDevice=? AND status='accepted' AND (negotiation=? OR (negotiation=? AND offer=?)) AND EXISTS(SELECT 1 FROM users s,users r WHERE s.id=calls.caller AND r.id=calls.callee AND ${callAllowed()})`,
+            )
+            .bind(
+              negotiation,
+              negotiation,
+              sdp,
+              negotiation,
+              id,
+              me,
+              client,
+              negotiation - 1,
+              negotiation,
+              sdp,
+            )
+            .run()
+        : await d
+            .prepare(
+              `UPDATE calls SET answer=? WHERE id=? AND ${role}=? AND ${role}Device=? AND status='accepted' AND negotiation=? AND offer IS NOT NULL AND (answer IS NULL OR answer=?) AND EXISTS(SELECT 1 FROM users s,users r WHERE s.id=calls.caller AND r.id=calls.callee AND ${callAllowed()})`,
+            )
+            .bind(sdp, id, me, client, negotiation, sdp)
+            .run();
     if (!r.meta.changes) throw new ApiError(409, 'Состояние звонка изменилось');
   } else if (type === 'ice') {
     if (!Array.isArray(b.candidates) || b.candidates.length > 20)
       throw new ApiError(400, 'Неверные сетевые кандидаты');
     const call = await d
       .prepare(
-        `SELECT id FROM calls WHERE id=? AND status='accepted' AND ${ownsDevice}`,
+        `SELECT id,negotiation FROM calls WHERE id=? AND status='accepted' AND ${ownsDevice}`,
       )
       .bind(id, me, client, me, client)
       .first();
     if (!call) throw new ApiError(403, 'Звонок недоступен');
+    if (call.negotiation !== negotiation)
+      throw new ApiError(409, 'Версия соединения изменилась');
     const validated = (b.candidates as unknown[]).map((entry) => {
       if (!entry || typeof entry !== 'object' || Array.isArray(entry))
         throw new ApiError(400, 'Неверный сетевой кандидат');
@@ -262,20 +322,55 @@ export async function callsPost(
         (candidate.sdpMid === null && candidate.sdpMLineIndex === null)
       )
         throw new ApiError(400, 'Неверный сетевой кандидат');
+      if (
+        candidate.usernameFragment != null &&
+        (typeof candidate.usernameFragment !== 'string' ||
+          candidate.usernameFragment.length > 256)
+      )
+        throw new ApiError(400, 'Неверное поколение ICE');
       const data = JSON.stringify({
         candidate: candidate.candidate,
         sdpMid: candidate.sdpMid,
         sdpMLineIndex: candidate.sdpMLineIndex,
+        usernameFragment: candidate.usernameFragment ?? null,
       });
       return { key, data };
     });
     for (const { key, data } of validated) {
-      await d
+      const inserted = await d
         .prepare(
-          `INSERT OR IGNORE INTO call_signals(callId,sender,key,candidate) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM calls WHERE id=? AND status='accepted' AND ${ownsDevice} AND EXISTS(SELECT 1 FROM users s,users r WHERE s.id=calls.caller AND r.id=calls.callee AND ${callAllowed()})) AND (SELECT COUNT(*) FROM call_signals WHERE callId=? AND sender=?)<200`,
+          `INSERT OR IGNORE INTO call_signals(callId,sender,key,candidate,negotiation) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM calls WHERE id=? AND status='accepted' AND negotiation=? AND ${ownsDevice} AND EXISTS(SELECT 1 FROM users s,users r WHERE s.id=calls.caller AND r.id=calls.callee AND ${callAllowed()})) AND (SELECT COUNT(*) FROM call_signals WHERE callId=? AND sender=? AND negotiation=?)<200`,
         )
-        .bind(id, me, key, data, id, me, client, me, client, id, me)
+        .bind(
+          id,
+          me,
+          key,
+          data,
+          negotiation,
+          id,
+          negotiation,
+          me,
+          client,
+          me,
+          client,
+          id,
+          me,
+          negotiation,
+        )
         .run();
+      if (
+        !inserted.meta.changes &&
+        !(await d
+          .prepare(
+            'SELECT id FROM call_signals WHERE callId=? AND sender=? AND key=? AND negotiation=?',
+          )
+          .bind(id, me, key, negotiation)
+          .first())
+      )
+        throw new ApiError(
+          409,
+          'Версия соединения изменилась или очередь кандидатов заполнена',
+        );
     }
   } else throw new ApiError(400, 'Неверный сигнал');
   return Response.json({ ok: true });

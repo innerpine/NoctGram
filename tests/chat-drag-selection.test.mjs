@@ -169,7 +169,7 @@ function fixture(t, initial = []) {
     },
   };
 }
-test('dragging a gutter selects a vertical range; reversing shrinks it and a final click cannot toggle it', (t) => {
+void test('dragging a gutter selects a vertical range; reversing shrinks it and a final click cannot toggle it', (t) => {
   const f = fixture(t);
   assert.equal(f.pointer('pointerdown', 280).defaultPrevented, true);
   assert.equal(
@@ -197,7 +197,7 @@ test('dragging a gutter selects a vertical range; reversing shrinks it and a fin
   assert.equal(f.list.captured, null);
 });
 
-test('a stationary row click keeps its original target so the whole row can toggle selection', (t) => {
+void test('a stationary row click keeps its original target so the whole row can toggle selection', (t) => {
   const f = fixture(t, ['m2']);
   f.pointer('pointerdown', 280, { target: f.rows[2] });
   f.pointer('pointermove', 282);
@@ -218,7 +218,7 @@ test('a stationary row click keeps its original target so the whole row can togg
     'Only the row click handler should toggle, once',
   );
 });
-test('text/media drags, touch, right button and native scrollbars remain untouched', (t) => {
+void test('text/media drags, touch, right button and native scrollbars remain untouched', (t) => {
   const f = fixture(t);
   for (const extra of [
     { target: f.blocked() },
@@ -236,7 +236,7 @@ test('text/media drags, touch, right button and native scrollbars remain untouch
   assert.equal(f.textCleared, 0);
   assert.deepEqual(f.selected, []);
 });
-test('holding at either edge scrolls only the chat, extends selection and enforces the shared 20-message limit', (t) => {
+void test('holding at either edge scrolls only the chat, extends selection and enforces the shared 20-message limit', (t) => {
   const f = fixture(t);
   f.pointer('pointerdown', 280);
   f.pointer('pointermove', 550);
@@ -253,7 +253,7 @@ test('holding at either edge scrolls only the chat, extends selection and enforc
   f.advance(500);
   assert.equal(f.list.scrollTop, ended);
 });
-test('Ctrl adds to the current selection and Escape restores the pre-gesture selection', (t) => {
+void test('Ctrl adds to the current selection and Escape restores the pre-gesture selection', (t) => {
   const f = fixture(t, ['m0']);
   f.pointer('pointerdown', 280, { ctrlKey: true });
   f.pointer('pointermove', 415);
@@ -266,7 +266,7 @@ test('Ctrl adds to the current selection and Escape restores the pre-gesture sel
   assert.equal(escape.defaultPrevented, true);
   assert.equal(f.list.captured, null);
 });
-test('wheel scrolling with the mouse button held in the gutter extends the range without blocking native scrolling', (t) => {
+void test('wheel scrolling with the mouse button held in the gutter extends the range without blocking native scrolling', (t) => {
   const f = fixture(t);
   f.pointer('pointerdown', 280);
   const wheel = new Event('wheel', { cancelable: true });
@@ -279,7 +279,7 @@ test('wheel scrolling with the mouse button held in the gutter extends the range
   assert.deepEqual(f.selected, ['m2', 'm3', 'm4']);
   f.pointer('pointerup', 280);
 });
-test('blur, pointer cancellation, capture loss, hidden document and disposal stop edge scrolling', (t) => {
+void test('blur, pointer cancellation, capture loss, hidden document and disposal stop edge scrolling', (t) => {
   const f = fixture(t);
   for (const stop of [
     () => f.host.dispatchEvent(new Event('blur')),
@@ -302,7 +302,7 @@ test('blur, pointer cancellation, capture loss, hidden document and disposal sto
     assert.equal(f.list.attributes.size, 0);
   }
 });
-test('edge speed is bounded, directional and inactive in the centre', () => {
+void test('edge speed is bounded, directional and inactive in the centre', () => {
   assert.equal(chatDragSpeed(300, 100, 500), 0);
   assert.equal(chatDragSpeed(-1000, 100, 500), -900);
   assert.equal(chatDragSpeed(2000, 100, 500), 900);

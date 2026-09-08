@@ -1,34 +1,12 @@
+import { readMultipart } from '@/lib/request-body';
+import { queueStorageDeletion } from '@/lib/upload-storage';
+import { rateLimit } from '@/lib/rate-limit';
 import { bucket, db, viewer, ApiError, failure } from '@/lib/server';
 import { assertReadable, assertWritable } from '@/lib/account-access';
 import { audioRange, MAX_MUSIC_AUDIO, musicAudioType } from '@/lib/music-audio';
 
 type Params = { params: Promise<{ id: string }> };
 type Audio = { objectKey: string; mime: string; size: number };
-async function audioForm(req: Request) {
-  if (!req.body) throw new ApiError(400, 'Выберите аудиофайл.');
-  const reader = req.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > MAX_MUSIC_AUDIO + 16384) {
-      await reader.cancel();
-      throw new ApiError(413, 'Аудиофайл должен быть не больше 25 МБ.');
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return new Response(bytes, {
-    headers: { 'Content-Type': req.headers.get('content-type') || '' },
-  }).formData();
-}
 export async function GET(req: Request, { params }: Params) {
   try {
     const me = await viewer();
@@ -88,6 +66,7 @@ export async function POST(req: Request, { params }: Params) {
       throw new ApiError(403, 'Недопустимый источник');
     const me = await viewer();
     await assertWritable(me);
+    await rateLimit('uploads', me, 15, 60);
     const { id } = await params;
     const owned = await db()
       .prepare(
@@ -97,9 +76,7 @@ export async function POST(req: Request, { params }: Params) {
       .first();
     if (!owned)
       throw new ApiError(404, 'Сначала добавьте трек Spotify в свою музыку.');
-    if (Number(req.headers.get('content-length')) > MAX_MUSIC_AUDIO + 16384)
-      throw new ApiError(413, 'Аудиофайл должен быть не больше 25 МБ.');
-    const form = await audioForm(req);
+    const form = await readMultipart(req, MAX_MUSIC_AUDIO + 16384);
     const file = form.get('file');
     if (!(file instanceof File) || !file.size || file.size > MAX_MUSIC_AUDIO)
       throw new ApiError(400, 'Выберите аудиофайл размером до 25 МБ.');
@@ -115,6 +92,9 @@ export async function POST(req: Request, { params }: Params) {
       .bind(me, id)
       .first<{ objectKey: string }>();
     pendingKey = 'music/' + crypto.randomUUID();
+    // Register first: an interrupted PUT/commit remains discoverable by cleanup.
+    await queueStorageDeletion(pendingKey);
+    if (previous) await queueStorageDeletion(previous.objectKey);
     await bucket().put(pendingKey, bytes, {
       httpMetadata: { contentType: mime },
     });
@@ -142,7 +122,10 @@ export async function POST(req: Request, { params }: Params) {
         'Трек уже изменился. Обновите музыку и попробуйте ещё раз.',
       );
     pendingKey = '';
-    if (previous) await bucket().delete(previous.objectKey);
+    if (previous)
+      await bucket()
+        .delete(previous.objectKey)
+        .catch(() => {});
     return Response.json(
       { audioUrl: '/api/music/audio/' + id },
       { headers: { 'Cache-Control': 'private, no-store' } },

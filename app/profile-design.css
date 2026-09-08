@@ -23,6 +23,16 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+.colored-channel-name {
+  color: var(--profile-first);
+}
+.channel-profile[data-premium='true'] .profile-cover {
+  background-image: linear-gradient(
+    125deg,
+    color-mix(in srgb, var(--profile-first) 18%, #111114),
+    color-mix(in srgb, var(--profile-second) 8%, #111114)
+  );
+}
 .noct-premium-badge {
   display: inline-block;
   width: 1.05em;

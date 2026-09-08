@@ -14,9 +14,9 @@ type Report = {
   authorId: string;
   name: string;
   kind: string;
-  handle: string;
-  reporterHandle: string;
-  reviewerHandle: string;
+  handle: string | null;
+  reporterHandle: string | null;
+  reviewerHandle: string | null;
   text: string;
   reason: string;
   status: Status;
@@ -27,8 +27,8 @@ type Report = {
 type Removal = {
   id: string;
   targetType: string;
-  handle: string;
-  moderatorHandle: string;
+  handle: string | null;
+  moderatorHandle: string | null;
   text: string;
   reason: string;
   created: number;
@@ -44,6 +44,8 @@ const states = {
   reviewing: 'Рассматривается',
   closed: 'Закрыта',
 };
+const accountLabel = (handle: string | null) =>
+  handle ? '@' + handle : 'Удалённый аккаунт';
 export function ModerationReports({
   onChanged,
   onAuthor,
@@ -163,7 +165,7 @@ export function ModerationReports({
         <article key={r.id}>
           <div className="moderation-editor-title">
             <strong>
-              @{r.handle} ·{' '}
+              {accountLabel(r.handle)} ·{' '}
               {r.targetType === 'story'
                 ? 'История'
                 : r.targetType === 'message'
@@ -183,7 +185,10 @@ export function ModerationReports({
           </p>
           <p className="meta">Жалоба: {r.reason}</p>
           <small>
-            От @{r.reporterHandle} · {accountDate(r.created)}
+            {r.reporterHandle
+              ? 'От @' + r.reporterHandle
+              : 'От удалённого аккаунта'}{' '}
+            · {accountDate(r.created)}
           </small>
           {!r.available && (
             <p className="account-note">
@@ -193,8 +198,10 @@ export function ModerationReports({
           <div className="account-actions">
             <button
               className="secondary"
-              disabled={busy || !!removing}
-              onClick={() => onAuthor(r.authorId, r.handle)}
+              disabled={busy || !!removing || !r.handle}
+              onClick={() => {
+                if (r.handle) onAuthor(r.authorId, r.handle);
+              }}
             >
               Найти автора
             </button>
@@ -361,20 +368,23 @@ export function RemovalHistory() {
       {rows.map((r) => (
         <article key={r.id}>
           <strong>
-            <ShieldCheck size={15} />{' '}
-            {r.targetType === 'post'
-              ? 'Пост'
-              : r.targetType === 'story'
-                ? 'История'
-                : 'Комментарий'}{' '}
-            @{r.handle} удалён
+            <ShieldCheck size={15} />
+            <span>
+              {r.targetType === 'post'
+                ? 'Пост'
+                : r.targetType === 'story'
+                  ? 'История'
+                  : 'Комментарий'}{' '}
+              · {accountLabel(r.handle)} ·{' '}
+              {r.targetType === 'story' ? 'удалена' : 'удалён'}
+            </span>
           </strong>
           <p className="moderation-evidence">
             {r.text || 'Публикация с медиа или кодом'}
           </p>
           <p>Причина: {r.reason}</p>
           <small>
-            @{r.moderatorHandle} · {accountDate(r.created)}
+            {accountLabel(r.moderatorHandle)} · {accountDate(r.created)}
           </small>
         </article>
       ))}

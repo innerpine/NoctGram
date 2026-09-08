@@ -8,10 +8,32 @@ export class ApiError extends Error {
   }
 }
 export function failure(e: unknown) {
+  if (!(e instanceof ApiError)) {
+    const text = String(e);
+    if (text.includes('MEDIA_NOT_READY'))
+      e = new ApiError(
+        409,
+        'Вложение больше недоступно. Загрузите его заново.',
+      );
+    else if (text.includes('STORAGE_QUOTA'))
+      e = new ApiError(
+        413,
+        'Хранилище аудио заполнено: максимум 512 МБ и 500 файлов.',
+        'STORAGE_QUOTA',
+      );
+    else if (text.includes('ACCOUNT_DELETED'))
+      e = new ApiError(401, 'Аккаунт удалён.');
+  }
   if (e instanceof ApiError)
     return Response.json(
       { error: e.message, code: e.code },
-      { status: e.status },
+      {
+        status: e.status,
+        headers:
+          e.status === 429
+            ? { 'Retry-After': String('retryAfter' in e ? e.retryAfter : 60) }
+            : undefined,
+      },
     );
   console.error(e instanceof Error ? e.message : 'API failure');
   return Response.json(

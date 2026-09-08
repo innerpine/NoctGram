@@ -1,0 +1,345 @@
+.noct-verified-badge {
+  display: inline-block;
+  width: 1.12em;
+  height: 1.12em;
+  flex: none;
+  vertical-align: middle;
+  background: linear-gradient(
+    135deg,
+    var(--profile-first, #c9a9ff),
+    var(--profile-second, #9ccaff)
+  );
+  mask: url('/assets/noct-verified.png') center/contain no-repeat;
+  mask-mode: luminance;
+}
+.profile-verification {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid #ffffff10;
+  margin: 18px -20px -20px;
+  padding: 13px 20px;
+  background: #ffffff02;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c9c9ce;
+  border-radius: 0 0 19px 19px;
+}
+.profile-verification .noct-verified-badge {
+  width: 23px;
+  height: 23px;
+}
+.account-panel,
+.administration-panel {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.account-section {
+  padding: 0 0 22px;
+  border-bottom: 1px solid #ffffff10;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.account-section:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.account-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #bcb8c8;
+}
+.account-section-heading h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: #f0eff4;
+}
+.account-section p,
+.account-section-heading p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8b8995;
+  margin: 0;
+}
+.account-section-heading p {
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+.account-section form,
+.admin-grant-form fieldset {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.admin-grant-form fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.account-field {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: #b4b1bf;
+}
+.account-field input,
+.account-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #ffffff12;
+  border-radius: 12px;
+  background: #ffffff05;
+  color: #eeeef2;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 14px;
+  transition:
+    background 0.18s,
+    border-color 0.18s;
+}
+.account-field textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+.account-field input:focus,
+.account-field textarea:focus {
+  outline: none;
+  border-color: #c9a9ff66;
+  background: #ffffff08;
+}
+.account-field input:disabled {
+  opacity: 0.45;
+}
+.account-actions {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.account-panel button,
+.administration-panel button {
+  font-size: 12px;
+}
+.account-panel .primary,
+.account-panel .secondary,
+.administration-panel .primary {
+  width: fit-content;
+  min-height: 38px;
+  gap: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.account-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #a5a1b2;
+  width: fit-content;
+  padding: 5px 0;
+}
+.account-proof {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #a8d0bd !important;
+}
+.account-code {
+  padding: 16px;
+  border: 1px solid #ffffff10;
+  border-radius: 14px;
+  background: #ffffff03;
+}
+.recovery-codes {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #c9a9ff28;
+  border-radius: 14px;
+  background: #c9a9ff06;
+}
+.recovery-codes > div {
+  display: grid;
+  gap: 7px;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+.recovery-codes code {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #d3c6eb;
+}
+.account-section progress {
+  width: 100%;
+  height: 5px;
+  appearance: none;
+  border: 0;
+  background: #ffffff0a;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.account-section progress::-webkit-progress-bar {
+  background: #ffffff0a;
+}
+.account-section progress::-webkit-progress-value {
+  background: #bda4e0;
+}
+.account-section progress::-moz-progress-bar {
+  background: #bda4e0;
+}
+.account-danger .account-section-heading {
+  color: #d799a4;
+}
+.account-danger .danger-button {
+  background: #a14b5d;
+  color: white;
+}
+.account-check {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c6bcc0;
+}
+.admin-people {
+  display: grid;
+  gap: 3px;
+}
+.admin-person {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  padding: 12px;
+  border-radius: 13px;
+  transition: background 0.16s;
+}
+.admin-person:hover {
+  background: #ffffff05;
+}
+.admin-person > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.admin-person small {
+  display: block;
+  color: #888593;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.admin-person > svg {
+  color: #9383a8;
+}
+.admin-target {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.admin-target p {
+  font-size: 12px;
+  color: #928e9c;
+  margin-top: 4px;
+}
+.admin-grant-form {
+  border: 1px solid #ffffff10;
+  border-radius: 18px;
+  padding: 18px;
+  background: #ffffff02;
+  animation: account-reveal 0.2s ease-out;
+}
+.admin-grant-summary {
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 12px;
+  border-radius: 10px;
+  background: #c9a9ff08;
+  color: #cbb9e1;
+}
+.admin-journal {
+  display: grid;
+  gap: 12px;
+}
+.admin-journal h4 {
+  font-size: 13px;
+}
+.admin-journal article {
+  padding: 14px 0;
+  border-top: 1px solid #ffffff0b;
+  font-size: 12px;
+}
+.admin-journal article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.admin-journal time {
+  font-size: 10px;
+  color: #787581;
+}
+.admin-journal p {
+  color: #aaa4b7;
+  margin: 6px 0;
+}
+.admin-journal small {
+  color: #837e8e;
+  overflow-wrap: anywhere;
+}
+.edit-tabs {
+  flex-wrap: wrap;
+}
+.blocked-account-settings {
+  margin-top: 20px;
+  text-align: left;
+}
+.blocked-account-settings [data-slot='collapsible-content'] {
+  padding-top: 20px;
+}
+.moderation-panel [data-slot='tabs-list'] {
+  max-width: 100%;
+  overflow-x: auto;
+  justify-content: flex-start;
+}
+@keyframes account-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 500px) {
+  .profile-verification {
+    margin-left: -18px;
+    margin-right: -18px;
+    padding-left: 18px;
+    padding-right: 18px;
+    font-size: 11px;
+  }
+  .account-actions {
+    align-items: stretch;
+  }
+  .recovery-codes {
+    padding: 12px;
+  }
+  .admin-person {
+    padding: 10px 3px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-grant-form {
+    animation: none;
+  }
+  .account-field input,
+  .account-field textarea,
+  .admin-person {
+    transition: none;
+  }
+}

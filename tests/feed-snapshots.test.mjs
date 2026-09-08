@@ -13,7 +13,7 @@ const { createFeedSnapshots, feedKey, sameSearch } = await import(
     Buffer.from(compiled.outputFiles[0].text).toString('base64')
 );
 
-test('returning to feed and search reuses their own post objects and pagination', () => {
+void test('returning to feed and search reuses their own post objects and pagination', () => {
   const cache = createFeedSnapshots();
   cache.reset('me', 0);
   const feed = {
@@ -40,7 +40,7 @@ test('returning to feed and search reuses their own post objects and pagination'
   cache.save(updated);
   assert.equal(cache.get(feed.key), updated);
 });
-test('account and privacy changes discard snapshots; late results cannot refill the old scope', () => {
+void test('account and privacy changes discard snapshots; late results cannot refill the old scope', () => {
   const cache = createFeedSnapshots();
   cache.reset('me', 0);
   const snapshot = {
@@ -58,7 +58,7 @@ test('account and privacy changes discard snapshots; late results cannot refill 
   cache.save(snapshot);
   assert.equal(cache.get(snapshot.key), undefined);
 });
-test('typing can retain only results from the same account and privacy revision', () => {
+void test('typing can retain only results from the same account and privacy revision', () => {
   const key = feedKey('me', 'search', '', 'one');
   assert.equal(sameSearch(key, feedKey('me', 'search', '', 'two')), true);
   for (const other of [
@@ -69,7 +69,7 @@ test('typing can retain only results from the same account and privacy revision'
   ])
     assert.equal(sameSearch(key, other), false);
 });
-test('snapshots are bounded and exclude profiles and unrelated views', () => {
+void test('snapshots are bounded and exclude profiles and unrelated views', () => {
   const cache = createFeedSnapshots();
   cache.reset('me', 0);
   const keys = Array.from({ length: 10 }, (_, i) =>
@@ -84,7 +84,7 @@ test('snapshots are bounded and exclude profiles and unrelated views', () => {
   assert.equal(cache.get(profile), undefined);
 });
 
-test('post changes propagate to cached views and hidden/deleted posts cannot return from a snapshot', () => {
+void test('post changes propagate to cached views and hidden/deleted posts cannot return from a snapshot', () => {
   const cache = createFeedSnapshots();
   cache.reset('me', 0);
   const keys = [

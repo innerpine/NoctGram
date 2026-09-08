@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { Switch } from '@base-ui/react/switch';
 import type { Appearance } from '@/lib/appearance';
-import { themeFor, chromeTempo } from '@/lib/appearance';
+import { themeFor, chromeTempo, hasProfileDesign } from '@/lib/appearance';
 import { NoctLogo } from './stars-icon';
 
 type Identity = Appearance & { name: string; avatar?: string };
@@ -117,9 +117,11 @@ export function DisplayName({ person }: { person: Identity }) {
     <span className="display-name" style={appearanceStyle(person)}>
       <span
         className={
-          person.premium && person.nameGradient
+          hasProfileDesign(person) && person.nameGradient
             ? 'display-name-text gradient-name'
-            : 'display-name-text'
+            : (person.boostLevel || 0) > 0
+              ? 'display-name-text colored-channel-name'
+              : 'display-name-text'
         }
       >
         {person.name}
@@ -127,6 +129,27 @@ export function DisplayName({ person }: { person: Identity }) {
       <PremiumBadge person={person} />
     </span>
   );
+}
+export function VerifiedBadge({ person }: { person: Appearance }) {
+  return person.verified ? (
+    <span
+      className="noct-verified-badge"
+      style={appearanceStyle(person)}
+      role="img"
+      aria-label="Подтверждённый аккаунт NoctGram"
+      title="Подтверждённый аккаунт NoctGram"
+    />
+  ) : null;
+}
+export function VerifiedProfile({ person }: { person: Appearance }) {
+  return person.verified ? (
+    <div className="profile-verification" style={appearanceStyle(person)}>
+      <VerifiedBadge person={person} />
+      <span>
+        Этот аккаунт подтверждён как официальный представителями NoctGram.
+      </span>
+    </div>
+  ) : null;
 }
 export function Avatar({
   person,
@@ -139,8 +162,8 @@ export function Avatar({
   const root = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false),
     [failed, setFailed] = useState('');
-  const motion = !!person.premium && enabled && !!person.avatarMotion;
-  const chrome = !!person.premium && !!person.chromeFlow;
+  const motion = hasProfileDesign(person) && enabled && !!person.avatarMotion;
+  const chrome = hasProfileDesign(person) && !!person.chromeFlow;
   const observe = enabled && (motion || chrome);
   useEffect(() => {
     if (!observe || !root.current) {
@@ -236,13 +259,15 @@ export function ProfileAvatar({
 }) {
   const id = useId().replace(/:/g, '');
   const enabled = useMotion();
-  const text = person.premium ? person.ringText?.trim() : '';
+  const text = hasProfileDesign(person) ? person.ringText?.trim() : '';
   return (
     <span
       className={
         'avatar profile-identity-avatar' +
         (text ? ' has-text-ring' : '') +
-        (person.premium && person.chromeFlow ? ' has-chrome-flow' : '')
+        (hasProfileDesign(person) && person.chromeFlow
+          ? ' has-chrome-flow'
+          : '')
       }
       style={{ ...appearanceStyle(person), width: size, height: size }}
     >

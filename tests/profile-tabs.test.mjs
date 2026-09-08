@@ -109,13 +109,15 @@ try {
                         const value =
                           name === 'welcome'
                             ? '[]'
-                            : ['appearanceStyle', 'useAudioCalls'].includes(
-                                  name,
-                                )
-                              ? '()=>({})'
-                              : name === 'localDate'
-                                ? '()=>"2026-09-08T12:00"'
-                                : JSON.stringify(name);
+                            : name === 'hasProfileDesign'
+                              ? '()=>false'
+                              : ['appearanceStyle', 'useAudioCalls'].includes(
+                                    name,
+                                  )
+                                ? '()=>({})'
+                                : name === 'localDate'
+                                  ? '()=>"2026-09-08T12:00"'
+                                  : JSON.stringify(name);
                         return `export const ${name}=${value};`;
                       })
                       .join('\n'),
@@ -221,11 +223,13 @@ try {
     profile: 'Профиль',
     design: 'Дизайн',
     privacy: 'Приватность',
+    account: 'Аккаунт',
   };
   for (const tab of [
     'profile',
     'design',
     'privacy',
+    'account',
     'design',
     'profile',
     'privacy',
@@ -235,7 +239,7 @@ try {
       .props.onClick();
     const tree = render(),
       panes = all(tree, 'EditorPane');
-    assert.equal(panes.length, 3);
+    assert.equal(panes.length, 4);
     assert.equal(panes.filter((pane) => pane.props.active).length, 1);
     assert.equal(
       all(tree, 'ProfileDesign').length,
@@ -248,6 +252,28 @@ try {
       'Privacy does not refetch from an unmount on every click',
     );
     assert.equal(states.get(stateSlots.get('editName')), 'Несохранённое имя');
+    assert.equal(all(tree, 'AccountPanel').length, 1);
+  }
+  const channel = {
+    ...account('channel'),
+    kind: 'channel',
+    ownerId: editorMe.id,
+  };
+  states.set(2, channel);
+  states.set(stateSlots.get('editId'), channel.id);
+  for (const tab of ['profile', 'design']) {
+    all(render(), 'button')
+      .find((node) => node.props.children === editorLabels[tab])
+      .props.onClick();
+    const tree = render();
+    assert.equal(all(tree, 'EditorPane').length, 2);
+    assert.equal(
+      all(tree, 'EditorPane').filter((pane) => pane.props.active).length,
+      1,
+    );
+    assert.equal(all(tree, 'AccountPanel').length, 0);
+    assert.equal(all(tree, 'PrivacyPanel').length, 0);
+    assert.equal(all(tree, 'ProfileDesign')[0].props.me.id, channel.id);
   }
   states.set(stateSlots.get('modal'), '');
   console.log(

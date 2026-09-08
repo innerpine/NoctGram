@@ -5,6 +5,7 @@ import {
   primaryKey,
   index,
   uniqueIndex,
+  check,
   type AnySQLiteColumn,
 } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
@@ -18,6 +19,9 @@ export const users = sqliteTable('users', {
   lastSeen: integer().notNull().default(0),
   onboardingComplete: integer().notNull().default(1),
   kind: text().notNull().default('person'),
+  verified: integer().notNull().default(0),
+  deletedAt: integer().notNull().default(0),
+  sessionsRevokedAt: integer().notNull().default(0),
   ownerId: text().references((): AnySQLiteColumn => users.id),
 });
 export const chatThemes = sqliteTable(
@@ -170,6 +174,8 @@ export const uploads = sqliteTable('uploads', {
     .references(() => users.id),
   type: text().notNull(),
   name: text().notNull(),
+  bytes: integer().notNull().default(0),
+  state: text().notNull().default('ready'),
   created: integer().notNull(),
 });
 export const chatUploads = sqliteTable('chat_uploads', {
@@ -364,6 +370,73 @@ export const moderationAppeals = sqliteTable(
   ],
 );
 
+export const administrators = sqliteTable('administrators', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id),
+  created: integer().notNull(),
+});
+export const accountDeletions = sqliteTable('account_deletions', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id),
+  requestId: text().notNull().unique(),
+  created: integer().notNull(),
+});
+export const storageDeletions = sqliteTable('storage_deletions', {
+  objectKey: text().primaryKey(),
+  created: integer().notNull(),
+});
+export const adminEvents = sqliteTable(
+  'admin_events',
+  {
+    id: text().primaryKey(),
+    actorId: text()
+      .notNull()
+      .references(() => users.id),
+    targetId: text()
+      .notNull()
+      .references(() => users.id),
+    action: text().notNull(),
+    amount: integer().notNull().default(0),
+    reason: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [index('admin_events_created').on(t.created)],
+);
+export const recoveryCodes = sqliteTable(
+  'recovery_codes',
+  {
+    hash: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [index('recovery_codes_user').on(t.userId)],
+);
+export const accountChallenges = sqliteTable(
+  'account_challenges',
+  {
+    id: text().primaryKey(),
+    sessionHash: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    purpose: text().notNull(),
+    subject: text().notNull(),
+    email: text().notNull(),
+    attempts: integer().notNull().default(0),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+  },
+  (t) => [
+    index('account_challenges_session').on(t.sessionHash),
+    index('account_challenges_expiry').on(t.expiresAt),
+  ],
+);
+
 // Email proof is owned by Supabase. No OTPs or provider tokens are stored here.
 export const authIdentities = sqliteTable(
   'auth_identities',
@@ -386,6 +459,7 @@ export const authSessions = sqliteTable(
       .references(() => users.id),
     created: integer().notNull(),
     expiresAt: integer().notNull(),
+    verifiedAt: integer().notNull().default(0),
   },
   (t) => [
     index('auth_sessions_user').on(t.userId),
@@ -741,6 +815,7 @@ export const stories = sqliteTable(
     userId: text()
       .notNull()
       .references(() => users.id),
+    publisherId: text().references(() => users.id),
     mediaId: text().references(() => uploads.id),
     text: text().notNull().default(''),
     background: text().notNull().default('night'),
@@ -782,6 +857,8 @@ export const calls = sqliteTable(
     reason: text().notNull().default(''),
     offer: text(),
     answer: text(),
+    negotiation: integer().notNull().default(0),
+    restartRequested: integer().notNull().default(0),
     created: integer().notNull(),
     acceptedAt: integer(),
     endedAt: integer(),
@@ -792,6 +869,21 @@ export const calls = sqliteTable(
   (t) => [
     index('calls_caller').on(t.caller, t.created),
     index('calls_callee').on(t.callee, t.created),
+  ],
+);
+export const callCancellations = sqliteTable(
+  'call_cancellations',
+  {
+    callId: text().notNull(),
+    caller: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    device: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.callId, t.caller, t.device] }),
+    index('call_cancellations_expiry').on(t.created),
   ],
 );
 export const callSignals = sqliteTable(
@@ -806,6 +898,7 @@ export const callSignals = sqliteTable(
       .references(() => users.id),
     key: text().notNull(),
     candidate: text().notNull(),
+    negotiation: integer().notNull().default(1),
   },
   (t) => [
     uniqueIndex('call_signal_once').on(t.callId, t.sender, t.key),
@@ -878,6 +971,23 @@ export const premiumEntitlements = sqliteTable('premium_entitlements', {
   source: text().notNull(),
   created: integer().notNull(),
 });
+export const channelBoostSlots = sqliteTable(
+  'channel_boost_slots',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    slot: integer().notNull(),
+    channelId: text().references(() => users.id, { onDelete: 'set null' }),
+    changedAt: integer().notNull(),
+    availableAt: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.slot] }),
+    check('boost_slot_range', sql`${t.slot} IN (1,2,3,4)`),
+    index('boost_slots_channel').on(t.channelId, t.userId),
+  ],
+);
 export const profileAppearance = sqliteTable('profile_appearance', {
   userId: text()
     .primaryKey()

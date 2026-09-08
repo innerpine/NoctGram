@@ -326,6 +326,8 @@
 }
 .music-services-link {
   display: flex;
+  width: 100%;
+  text-align: left;
   align-items: center;
   gap: 12px;
   padding: 15px 18px;

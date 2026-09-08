@@ -10,6 +10,7 @@ import {
 import { db } from './storage';
 import { ApiError } from './api-error';
 import { identity } from './auth-session';
+import { isAdministrator } from './administration';
 export { db, bucket } from './storage';
 export { ApiError, failure } from './api-error';
 export async function viewer(allowIncomplete = false) {
@@ -17,11 +18,12 @@ export async function viewer(allowIncomplete = false) {
   if (!user) throw new ApiError(401, 'Войдите, чтобы продолжить');
   const d = db();
   const existing = await d
-    .prepare('SELECT id,onboardingComplete,lastSeen FROM users WHERE id=?')
+    .prepare('SELECT id,onboardingComplete,lastSeen,deletedAt FROM users WHERE id=?')
     .bind(user.userId)
     .first();
   if (!existing && user.source === 'email')
     throw new ApiError(401, 'Войдите, чтобы продолжить');
+  if (existing?.deletedAt) throw new ApiError(401, 'Аккаунт удалён.');
   if (existing && !existing.onboardingComplete && !allowIncomplete)
     throw new ApiError(
       428,
@@ -124,7 +126,7 @@ export async function profile(id: string, me: string) {
     )
     .bind(me, id)
     .first();
-  if (!user) throw new ApiError(404, 'Профиль не найден');
+  if (!user || user.deletedAt) throw new ApiError(404, 'Профиль не найден');
   if (!user.onboardingComplete && id !== me)
     throw new ApiError(404, 'Профиль не найден');
   const hs = await d
@@ -172,6 +174,7 @@ export async function profile(id: string, me: string) {
       ? {
           restriction: await restriction(me),
           canModerate: await isModerator(me),
+          canAdmin: await isAdministrator(me),
           appeal: await d
             .prepare(
               'SELECT a.id,a.eventId,a.status,a.text,a.reviewNote,a.created FROM moderation_appeals a WHERE a.userId=? ORDER BY a.created DESC LIMIT 1',

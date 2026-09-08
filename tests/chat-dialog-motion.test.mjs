@@ -109,7 +109,7 @@ const find = (tree, type, predicate = () => true) =>
   nodes(tree).find((node) => node.type === type && predicate(node.props));
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-test('editor panes retain form state, finish their exit and cancel hiding on rapid reversal', (t) => {
+void test('editor panes retain form state, finish their exit and cancel hiding on rapid reversal', (t) => {
   const oldWindow = globalThis.window,
     timers = new Map();
   let serial = 0,
@@ -177,7 +177,7 @@ function mockFetch(t, handler) {
   });
 }
 
-test('cancel keeps operation dialogs mounted until their exit completes and blocks stale submit callbacks', async (t) => {
+void test('cancel keeps operation dialogs mounted until their exit completes and blocks stale submit callbacks', async (t) => {
   mockFetch(t, () => assert.fail('A closing dialog must not submit'));
   for (const Component of [
     ChatDeleteDialog,
@@ -209,7 +209,7 @@ test('cancel keeps operation dialogs mounted until their exit completes and bloc
   }
 });
 
-test('successful deletion refreshes immediately, closes gracefully and cannot submit twice during exit', async (t) => {
+void test('successful deletion refreshes immediately, closes gracefully and cannot submit twice during exit', async (t) => {
   const calls = [];
   mockFetch(t, async (url, init) => {
     calls.push(JSON.parse(init.body));
@@ -243,7 +243,7 @@ test('successful deletion refreshes immediately, closes gracefully and cannot su
   assert.equal(closed, 1);
 });
 
-test('an uncertain edit remains open and preserves its immutable retry while animations are enabled', async (t) => {
+void test('an uncertain edit remains open and preserves its immutable retry while animations are enabled', async (t) => {
   const calls = [];
   mockFetch(t, async (url, init) => {
     calls.push(JSON.parse(init.body));
@@ -286,7 +286,7 @@ test('an uncertain edit remains open and preserves its immutable retry while ani
   assert.equal(component.render().props.open, false);
 });
 
-test('photo content remains visible through the closing transition and is released afterwards', (t) => {
+void test('photo content remains visible through the closing transition and is released afterwards', (t) => {
   const component = mount(t, ChatMessageFiles, {
     files: [{ id: 'photo', kind: 'image', name: 'Фото.png', size: 200 }],
   });
@@ -311,7 +311,7 @@ test('photo content remains visible through the closing transition and is releas
   );
 });
 
-test('pin navigation waits for the dialog to exit and retains send-time ordering', (t) => {
+void test('pin navigation waits for the dialog to exit and retains send-time ordering', (t) => {
   const jumps = [],
     messages = [
       { ...message, id: 'older', created: 50, pinnedAt: 500 },

@@ -2,6 +2,7 @@ import { db, bucket } from './storage';
 import { ApiError } from './api-error';
 import { assertWritable, visibleAccount } from './account-access';
 import { messageAllowed } from './privacy';
+import { reserveUpload } from './upload-storage';
 import {
   CHAT_FILE_LIMIT,
   chatFileKind,
@@ -40,32 +41,48 @@ export async function storeChatUpload(
       file.name.replace(/[\u0000-\u001f\u007f/\\]/g, '_').slice(0, 200) ||
       'Файл',
     id = crypto.randomUUID();
-  await bucket().put(id, bytes, { httpMetadata: { contentType: type } });
+  await reserveUpload(id, me, file);
   try {
-    await db().batch([
+    await bucket().put(id, bytes, { httpMetadata: { contentType: type } });
+    const stored = await db().batch([
       db()
         .prepare(
-          'INSERT INTO uploads(id,userId,type,name,created) VALUES(?,?,?,?,?)',
+          "UPDATE uploads SET type=?,name=?,state='ready' WHERE id=? AND state='uploading'",
         )
-        .bind(id, me, type, name, Date.now()),
+        .bind(type, name, id),
       db()
         .prepare(
           'INSERT INTO chat_uploads(uploadId,recipient,size,kind) VALUES(?,?,?,?)',
         )
         .bind(id, peer, file.size, kind),
     ]);
+    if (!stored[0].meta.changes)
+      throw new ApiError(409, 'Загрузка прервана. Попробуйте ещё раз.');
   } catch (e) {
-    await bucket().delete(id);
+    await db()
+      .prepare("UPDATE uploads SET state='deleting' WHERE id=?")
+      .bind(id)
+      .run();
     throw e;
   }
   return { id, type, name, size: file.size, kind };
 }
 export async function discardChatUpload(me: string, id: string) {
   const removed = await db()
-    .prepare(`DELETE FROM uploads WHERE id=? AND userId=?
+    .prepare(`UPDATE uploads SET state='deleting' WHERE id=? AND userId=?
     AND EXISTS(SELECT 1 FROM chat_uploads c WHERE c.uploadId=uploads.id AND c.messageId IS NULL) RETURNING id`)
     .bind(id, me)
     .first<{ id: string }>();
-  if (removed) await bucket().delete(removed.id);
+  if (removed) {
+    try {
+      await bucket().delete(removed.id);
+      await db()
+        .prepare("DELETE FROM uploads WHERE id=? AND state='deleting'")
+        .bind(removed.id)
+        .run();
+    } catch {
+      // Keep the charged reservation so the storage job can retry a failed R2 deletion.
+    }
+  }
   return { ok: true };
 }

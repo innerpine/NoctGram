@@ -42,7 +42,7 @@ export class RateError extends ApiError {
     );
   }
 }
-async function limit(
+export async function limit(
   scope: string,
   value: string,
   max: number,
@@ -71,11 +71,11 @@ async function limit(
     );
   }
 }
-function clientIp(req: Request) {
+export function clientIp(req: Request) {
   // Cloudflare supplies this header. Do not trust arbitrary forwarded-for chains.
   return req.headers.get('cf-connecting-ip') || 'unknown';
 }
-function emailAddress(value: unknown) {
+export function emailAddress(value: unknown) {
   const email = clean(value, 254, true).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     throw new ApiError(400, 'Введите адрес электронной почты.');
@@ -180,9 +180,9 @@ export async function startEmail(req: Request, b: Record<string, unknown>) {
   await limit('send-ip', clientIp(req), 20, 3600);
   await limit('send-email', email, 5, 3600);
   await limit('resend', email, 1, 60);
+  const now = Date.now();
   await sendEmailCode(email);
-  const token = randomToken(),
-    now = Date.now();
+  const token = randomToken();
   const old = cookieValue(req.headers.get('cookie'), CHALLENGE_COOKIE);
   await db().batch([
     db()
@@ -326,16 +326,28 @@ export async function finishEmail(req: Request, b: Record<string, unknown>) {
   const token = randomToken(),
     now = Date.now();
   const old = cookieValue(req.headers.get('cookie'), SESSION_COOKIE);
-  await db().batch([
+  const sessions = await db().batch([
     db()
       .prepare('DELETE FROM auth_sessions WHERE tokenHash=?')
       .bind(await tokenHash(old)),
     db()
       .prepare(
-        'INSERT INTO auth_sessions(tokenHash,userId,created,expiresAt) VALUES(?,?,?,?)',
+        'INSERT INTO auth_sessions(tokenHash,userId,created,expiresAt,verifiedAt) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM users u JOIN auth_identities a ON a.userId=u.id WHERE u.id=? AND u.deletedAt=0 AND u.sessionsRevokedAt<? AND a.subject=? AND a.email=?)',
       )
-      .bind(await tokenHash(token), me, now, now + SESSION_SECONDS * 1000),
+      .bind(
+        await tokenHash(token),
+        me,
+        now,
+        now + SESSION_SECONDS * 1000,
+        now,
+        me,
+        pending.created,
+        proof.subject,
+        proof.email,
+      ),
   ]);
+  if (!sessions[1].meta.changes)
+    throw new ApiError(409, 'Вход отозван. Запросите новый код.');
   const person = await db()
     .prepare('SELECT onboardingComplete FROM users WHERE id=?')
     .bind(me)

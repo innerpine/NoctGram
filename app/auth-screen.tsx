@@ -24,7 +24,7 @@ import {
 import { upload } from '@/lib/client';
 import { SignOutButton } from './sign-out-button';
 
-function AuthFrame({ children }: { children: React.ReactNode }) {
+export function AuthFrame({ children }: { children: React.ReactNode }) {
   return (
     <main className="auth-shell">
       <a className="auth-brand" href="/" aria-label="Noctgram — на главную">
@@ -259,6 +259,11 @@ export function EmailLogin() {
               Впервые здесь? После подтверждения почты выберите имя, юзернейм и
               аватарку.
             </p>
+          )}
+          {!link && (
+            <a href="/recover" className="auth-text-button">
+              Нет доступа к почте?
+            </a>
           )}
           {status.sitesEnabled && !link && (
             <>

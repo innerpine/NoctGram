@@ -22,7 +22,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { request, upload, type Person, type Media } from '@/lib/client';
+import {
+  request,
+  upload,
+  type Person,
+  type Media,
+  type Profile,
+} from '@/lib/client';
 import { Avatar } from './post-card';
 type Story = Person & {
   userId: string;
@@ -34,6 +40,7 @@ type Story = Person & {
   views: number | null;
   created: number;
   expiresAt: number;
+  canManage: boolean;
 };
 const backgrounds = {
   night: 'Ночь',
@@ -44,9 +51,11 @@ const backgrounds = {
 export function StoriesBar({
   me,
   readOnly,
+  channel,
 }: {
   me: Person;
   readOnly: boolean;
+  channel?: Profile;
 }) {
   const [rows, setRows] = useState<Story[]>([]),
     [revision, setRevision] = useState(0),
@@ -73,6 +82,7 @@ export function StoriesBar({
     elapsed = useRef(0),
     lock = useRef(false);
   const current = playlist[index];
+  const channelId = channel?.id;
   activeStory.current = open ? current?.id || null : null;
   useEffect(() => {
     if (open && current && !rows.some((s) => s.id === current.id)) {
@@ -90,7 +100,10 @@ export function StoriesBar({
   useEffect(() => {
     let live = true;
     const load = () =>
-      request<Story[]>('?action=stories')
+      request<Story[]>(
+        '?action=stories' +
+          (channelId ? '&id=' + encodeURIComponent(channelId) : ''),
+      )
         .then((v) => {
           if (live) setRows(v);
         })
@@ -105,7 +118,7 @@ export function StoriesBar({
       live = false;
       clearInterval(t);
     };
-  }, [revision, me.id]);
+  }, [revision, me.id, channelId]);
   useEffect(() => {
     if (!open || !current) return;
     setViewers(null);
@@ -209,20 +222,26 @@ export function StoriesBar({
   }
   return (
     <>
-      <div className="stories-strip" aria-label="Истории">
-        <button
-          className="story-add"
-          disabled={readOnly}
-          onClick={() => {
-            setError('');
-            setCreating(true);
-          }}
-        >
-          <span>
-            <Plus size={23} />
-          </span>
-          <small>Моя история</small>
-        </button>
+      <div
+        className="stories-strip"
+        aria-label="Истории"
+        hidden={!!channel && !(channel.boostLevel || groups.length)}
+      >
+        {(!channel || !!channel.canPublish) && (
+          <button
+            className="story-add"
+            disabled={readOnly || (!!channel && !channel.boostLevel)}
+            onClick={() => {
+              setError('');
+              setCreating(true);
+            }}
+          >
+            <span>
+              <Plus size={23} />
+            </span>
+            <small>{channel ? 'История канала' : 'Моя история'}</small>
+          </button>
+        )}
         {groups.map((g) => (
           <button
             key={g.userId}
@@ -262,9 +281,12 @@ export function StoriesBar({
       )}
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent className="noct-dialog">
-          <DialogTitle>Твоя история</DialogTitle>
+          <DialogTitle>
+            {channel ? 'История канала «' + channel.name + '»' : 'Твоя история'}
+          </DialogTitle>
           <DialogDescription>
             Фото, видео или несколько слов. Исчезнет через 24 часа.
+            {channel && ` Лимит канала: ${channel.boostLevel || 0} за 24 часа.`}
           </DialogDescription>
           <form
             className="realtime-form"
@@ -273,6 +295,7 @@ export function StoriesBar({
               void action(async () => {
                 await request('', {
                   action: 'story',
+                  channelId: channel?.id,
                   text,
                   mediaId: media?.id,
                   background,
@@ -482,7 +505,7 @@ export function StoriesBar({
                 <ChevronRight />
               </button>
               <div className="story-footer">
-                {current.userId === me.id ? (
+                {current.canManage ? (
                   <>
                     <button
                       className="secondary"

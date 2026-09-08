@@ -10,7 +10,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { request, type Person } from '@/lib/client';
+import { type Person } from '@/lib/client';
+import { callRequest as request, CallHttpError } from '@/lib/call-http';
+import {
+  CallConnection,
+  CallConnectionExpired,
+  type CallCandidate,
+} from '@/lib/call-connection';
+import type { CallIceConfiguration } from '@/lib/turn';
 import type { Appearance } from '@/lib/appearance';
 import { Avatar } from './post-card';
 type Call = Appearance & {
@@ -26,15 +33,20 @@ type Call = Appearance & {
   acceptedAt?: number;
   offer?: string;
   answer?: string;
+  negotiation: number;
+  restartRequested: number;
 };
 type Session = {
   call: Call;
   stream: MediaStream | null;
   pc: RTCPeerConnection | null;
-  out: { key: string; candidate: RTCIceCandidateInit }[];
-  cursor: number;
-  connected: number;
-  disconnect: number;
+  connection: CallConnection | null;
+  abort: AbortController;
+  participating: boolean;
+  failuresSince: number;
+  configPending: boolean;
+  configRetryAt: number;
+  syncing: boolean;
 };
 function errorText(e: unknown) {
   return e instanceof DOMException && e.name === 'NotAllowedError'
@@ -72,7 +84,9 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
     const s = session.current;
     session.current = null;
     if (s) {
-      s.pc?.close();
+      s.abort.abort();
+      s.connection?.close();
+      if (!s.connection) s.pc?.close();
       s.stream?.getTracks().forEach((t) => t.stop());
     }
     if (audio.current) {
@@ -83,9 +97,10 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
     setNeedsPlay(false);
   }
   async function end(reason = 'completed', silent = false) {
-    generation.current++;
+    const ending = ++generation.current;
     const c = session.current?.call;
     release();
+    if (silent) setOpen(false);
     setBusy(false);
     operation.current = false;
     if (c) {
@@ -94,17 +109,59 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
         setStatus(endLabels[reason] || 'Звонок завершён');
       }
       try {
-        await request('', {
-          action: 'callEnd',
-          id: c.id,
-          device: device.current,
-          reason,
-        });
+        await request(
+          '',
+          {
+            action: 'callEnd',
+            id: c.id,
+            device: device.current,
+            reason,
+          },
+          { attempts: 2 },
+        );
       } catch (e) {
-        if (!silent) setError(errorText(e));
+        if (!silent && generation.current === ending) setError(errorText(e));
       }
     }
-    if (silent) setOpen(false);
+  }
+  async function transition(action: 'callStart' | 'callAccept', s: Session) {
+    const signal = s.abort.signal;
+    try {
+      await request(
+        '',
+        {
+          action,
+          id: s.call.id,
+          peer: s.call.callee,
+          device: device.current,
+        },
+        { attempts: 2, signal },
+      );
+    } catch (error) {
+      if (
+        signal.aborted ||
+        !(error instanceof CallHttpError) ||
+        !([0, 200, 408].includes(error.status) || error.status >= 500)
+      )
+        throw error;
+      // A lost HTTP response does not mean the server rejected the call.
+      const state = await request<{ call: Call | null }>(
+        '?action=callState&id=' +
+          encodeURIComponent(s.call.id) +
+          '&device=' +
+          device.current,
+        undefined,
+        { signal },
+      );
+      if (
+        state.call?.id !== s.call.id ||
+        !state.call.deviceOwned ||
+        !(
+          action === 'callStart' ? ['ringing', 'accepted'] : ['accepted']
+        ).includes(state.call.status)
+      )
+        throw error;
+    }
   }
   async function microphone(token: number) {
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)
@@ -135,15 +192,20 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
       handle: peer.handle,
       status: 'preparing',
       deviceOwned: true,
+      negotiation: 0,
+      restartRequested: 0,
     };
     session.current = {
       call: c,
       stream: null,
       pc: null,
-      out: [],
-      cursor: 0,
-      connected: 0,
-      disconnect: 0,
+      connection: null,
+      abort: new AbortController(),
+      participating: true,
+      failuresSince: 0,
+      configPending: false,
+      configRetryAt: 0,
+      syncing: false,
     };
     setCall(c);
     setOpen(true);
@@ -160,12 +222,7 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
         return;
       }
       s.stream = stream;
-      await request('', {
-        action: 'callStart',
-        id: c.id,
-        peer: peer.id,
-        device: device.current,
-      });
+      await transition('callStart', s);
       if (token !== generation.current) {
         void request('', {
           action: 'callEnd',
@@ -203,6 +260,8 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
     if (!c || !me || c.callee !== me || operation.current) return;
     operation.current = true;
     const token = ++generation.current;
+    const accepting = session.current!;
+    accepting.participating = true;
     setBusy(true);
     setError('');
     setStatus('Подключаем микрофон…');
@@ -214,11 +273,7 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
         return;
       }
       session.current.stream = stream;
-      await request('', {
-        action: 'callAccept',
-        id: c.id,
-        device: device.current,
-      });
+      await transition('callAccept', accepting);
       if (token !== generation.current) return;
       session.current.call = { ...c, status: 'accepted', deviceOwned: true };
       setCall(session.current.call);
@@ -238,19 +293,31 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
   useEffect(() => {
     live.current = true;
     let stopped = false,
-      t: ReturnType<typeof setTimeout>,
-      failuresSince = 0;
+      t: ReturnType<typeof setTimeout>;
+    const polling = new AbortController();
+    const fail = (s: Session, error: unknown) => {
+      if (stopped || session.current !== s) return;
+      s.failuresSince ||= Date.now();
+      if (
+        error instanceof CallConnectionExpired ||
+        (error instanceof CallHttpError && [401, 403].includes(error.status)) ||
+        Date.now() - s.failuresSince > 55000
+      ) {
+        setError(errorText(error));
+        void end('failed');
+      }
+    };
     const tick = async () => {
+      const before = session.current;
       try {
         if (!me || disabled) {
           if (session.current) await end('completed', true);
           return;
         }
-        const before = session.current;
         if (before?.call.status === 'preparing' || operation.current) return;
         const data = await request<{
           call: Call | null;
-          signals: { id: number; candidate: string }[];
+          signals: CallCandidate[];
         }>(
           '?action=callState&device=' +
             device.current +
@@ -258,8 +325,10 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
               ? '&id=' +
                 encodeURIComponent(before.call.id) +
                 '&after=' +
-                before.cursor
+                (before.connection?.cursor || 0)
               : ''),
+          undefined,
+          { signal: polling.signal },
         );
         if (stopped || before !== session.current) return;
         const c = data.call;
@@ -288,10 +357,13 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
             call: c,
             stream: null,
             pc: null,
-            out: [],
-            cursor: 0,
-            connected: 0,
-            disconnect: 0,
+            connection: null,
+            abort: new AbortController(),
+            participating: false,
+            failuresSince: 0,
+            configPending: false,
+            configRetryAt: 0,
+            syncing: false,
           };
           setOpen(true);
           setError('');
@@ -302,7 +374,7 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
         s.call = c;
         setCall(c);
         if (c.status !== 'accepted') {
-          failuresSince = 0;
+          s.failuresSince = 0;
           return;
         }
         if (!c.deviceOwned) {
@@ -311,123 +383,95 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
           setStatus('Звонок принят на другом устройстве');
           return;
         }
-        if (!s.connected && c.acceptedAt && Date.now() - c.acceptedAt > 45000) {
-          await end('failed');
-          return;
-        }
         if (!s.stream) {
           await end('failed');
           return;
         }
-        if (!s.pc) {
-          const cfg = await request<{ iceServers: RTCIceServer[] }>(
-            '?action=callConfig',
-          );
-          if (stopped || session.current !== s) return;
-          const pc = new RTCPeerConnection({ iceServers: cfg.iceServers });
-          s.pc = pc;
-          s.stream
-            .getTracks()
-            .forEach((track) => pc.addTrack(track, s.stream!));
-          setStatus('Соединяем…');
-          pc.onicecandidate = (e) => {
-            if (e.candidate && session.current === s)
-              s.out.push({
-                key: crypto.randomUUID(),
-                candidate: e.candidate.toJSON(),
+        // Polling/heartbeat stays independent from slow TURN and SDP requests.
+        if (!s.pc && !s.configPending && Date.now() >= s.configRetryAt) {
+          s.configPending = true;
+          void request<CallIceConfiguration>(
+            '?action=callConfig&id=' +
+              encodeURIComponent(c.id) +
+              '&device=' +
+              device.current,
+            undefined,
+            { signal: s.abort.signal },
+          )
+            .then((cfg) => {
+              if (stopped || session.current !== s) return;
+              const pc = new RTCPeerConnection({ iceServers: cfg.iceServers });
+              s.pc = pc;
+              s.stream!.getTracks().forEach((track) =>
+                pc.addTrack(track, s.stream!),
+              );
+              s.connection = new CallConnection({
+                caller: c.caller === me,
+                pc,
+                send: (body) =>
+                  request(
+                    '',
+                    {
+                      action: 'callSignal',
+                      id: c.id,
+                      device: device.current,
+                      ...body,
+                    },
+                    { signal: s.abort.signal },
+                  ),
+                onState: (state) => {
+                  if (session.current === s)
+                    setStatus(
+                      state === 'connected'
+                        ? 'На связи'
+                        : state === 'reconnecting'
+                          ? 'Восстанавливаем связь…'
+                          : 'Соединяем…',
+                    );
+                },
               });
-          };
-          pc.ontrack = (e) => {
-            if (session.current !== s || !audio.current) return;
-            audio.current.srcObject =
-              e.streams[0] || new MediaStream([e.track]);
-            void audio.current.play().catch(() => {
-              if (session.current === s) setNeedsPlay(true);
+              pc.ontrack = (event) => {
+                if (session.current !== s || !audio.current) return;
+                audio.current.srcObject =
+                  event.streams[0] || new MediaStream([event.track]);
+                void audio.current.play().catch(() => {
+                  if (session.current === s) setNeedsPlay(true);
+                });
+              };
+            })
+            .catch((error) => {
+              s.configRetryAt = Date.now() + 10000;
+              fail(s, error);
+            })
+            .finally(() => {
+              s.configPending = false;
             });
-          };
-          pc.onconnectionstatechange = () => {
-            if (session.current !== s) return;
-            if (pc.connectionState === 'connected') {
-              s.connected ||= Date.now();
-              s.disconnect = 0;
-              setStatus('На связи');
-            } else if (pc.connectionState === 'failed') void end('failed');
-            else if (pc.connectionState === 'disconnected') {
-              s.disconnect ||= Date.now();
-              setStatus('Восстанавливаем связь…');
-            }
-          };
         }
-        const pc = s.pc;
-        const signal = (type: string, sdp: string) =>
-          request('', {
-            action: 'callSignal',
-            id: c.id,
-            device: device.current,
-            type,
-            sdp,
-          });
-        if (c.caller === me && !c.offer) {
-          if (!pc.localDescription) {
-            await pc.setLocalDescription(await pc.createOffer());
-          }
-          if (session.current !== s) return;
-          await signal('offer', pc.localDescription!.sdp);
+        if (s.connection && !s.syncing) {
+          s.syncing = true;
+          void s.connection
+            .sync(c, data.signals)
+            .then(() => {
+              s.failuresSince = 0;
+            })
+            .catch((error) => fail(s, error))
+            .finally(() => {
+              s.syncing = false;
+            });
         }
-        if (c.callee === me && c.offer) {
-          if (!pc.remoteDescription)
-            await pc.setRemoteDescription({ type: 'offer', sdp: c.offer });
-          if (!c.answer) {
-            if (!pc.localDescription)
-              await pc.setLocalDescription(await pc.createAnswer());
-            if (session.current !== s) return;
-            await signal('answer', pc.localDescription!.sdp);
-          }
-        }
-        if (c.caller === me && c.answer && !pc.remoteDescription)
-          await pc.setRemoteDescription({ type: 'answer', sdp: c.answer });
-        if (session.current !== s) return;
-        if (pc.remoteDescription)
-          for (const item of data.signals) {
-            await pc.addIceCandidate(JSON.parse(item.candidate));
-            s.cursor = item.id;
-          }
-        const outgoing = s.out.slice(0, 20);
-        if (outgoing.length) {
-          await request('', {
-            action: 'callSignal',
-            id: c.id,
-            device: device.current,
-            type: 'ice',
-            candidates: outgoing,
-          });
-          s.out.splice(0, outgoing.length);
-        }
-        if (s.connected)
-          setSeconds(Math.floor((Date.now() - s.connected) / 1000));
-        if (
-          (s.disconnect && Date.now() - s.disconnect > 15000) ||
-          (!s.connected && c.acceptedAt && Date.now() - c.acceptedAt > 45000)
-        ) {
-          setError('Не удалось установить связь. Попробуйте ещё раз.');
-          await end('failed');
-        }
-        failuresSince = 0;
+        if (s.connection?.connectedAt)
+          setSeconds(
+            Math.floor((Date.now() - s.connection.connectedAt) / 1000),
+          );
       } catch (e) {
-        if (!stopped && session.current) {
-          failuresSince ||= Date.now();
-          if (Date.now() - failuresSince > 20000) {
-            setError(errorText(e));
-            await end('failed');
-          }
-        }
+        if (!stopped && before && session.current === before) fail(before, e);
       } finally {
         if (!stopped) t = setTimeout(tick, session.current ? 1000 : 3000);
       }
     };
     void tick();
     const unload = () => {
-      const c = session.current?.call;
+      const c = session.current?.participating ? session.current.call : null;
       generation.current++;
       operation.current = false;
       release();
@@ -447,11 +491,19 @@ export function useAudioCalls(me: string | undefined, disabled: boolean) {
           keepalive: true,
         }).catch(() => {});
     };
+    const recover = () => session.current?.connection?.requestRecovery();
+    const network = (navigator as Navigator & { connection?: EventTarget })
+      .connection;
+    window.addEventListener('online', recover);
+    network?.addEventListener('change', recover);
     window.addEventListener('pagehide', unload);
     return () => {
       stopped = true;
       live.current = false;
       clearTimeout(t);
+      polling.abort();
+      window.removeEventListener('online', recover);
+      network?.removeEventListener('change', recover);
       window.removeEventListener('pagehide', unload);
       unload();
     };

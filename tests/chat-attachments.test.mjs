@@ -112,6 +112,14 @@ const compiled = await build({
     {
       name: 'isolated-chat-storage',
       setup(build) {
+        build.onResolve({ filter: /^\.\/auth-session$/ }, ({ path }) => ({
+          path,
+          namespace: 'auth-fixture',
+        }));
+        build.onLoad({ filter: /.*/, namespace: 'auth-fixture' }, () => ({
+          contents:
+            'import {createHash} from "node:crypto"; export const tokenHash=async(value)=>createHash("sha256").update(value).digest("hex");',
+        }));
         build.onResolve(
           { filter: /^(\.\/|@\/lib\/)(storage|server)$/ },
           ({ path }) => ({ path, namespace: 'fixture' }),
@@ -231,8 +239,13 @@ failUpload = true;
 await assert.rejects(upload(), /Upload storage failed/);
 assert.deepEqual(
   [count('uploads'), objects.size],
-  beforeUploadFailure,
-  'Failed DB persistence removes the R2 object',
+  beforeUploadFailure.map((n) => n + 1),
+  'Failed writes retain a charged reservation until durable cleanup removes the object',
+);
+assert.equal(
+  sqlite.prepare("SELECT COUNT(*) n FROM uploads WHERE state='deleting'").get()
+    .n,
+  1,
 );
 
 const ids = [document.id, photo.id, video.id];

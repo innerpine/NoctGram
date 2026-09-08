@@ -1,5 +1,8 @@
 import { assertWritable } from '@/lib/account-access';
 import { bucket, db, viewer, ApiError, failure } from '@/lib/server';
+import { readMultipart } from '@/lib/request-body';
+import { reserveUpload } from '@/lib/upload-storage';
+import { rateLimit } from '@/lib/rate-limit';
 export async function POST(req: Request) {
   try {
     const origin = req.headers.get('origin');
@@ -7,18 +10,14 @@ export async function POST(req: Request) {
       throw new ApiError(403, 'Недопустимый источник');
     const me = await viewer(true);
     await assertWritable(me);
+    await rateLimit('uploads', me, 15, 60);
     const account = await db()
       .prepare('SELECT onboardingComplete FROM users WHERE id=?')
       .bind(me)
       .first<{ onboardingComplete: number }>();
     const pending = !account?.onboardingComplete;
     const max = (pending ? 5 : 25) * 1024 * 1024;
-    if (Number(req.headers.get('content-length')) > max + 16384)
-      throw new ApiError(
-        413,
-        pending ? 'Аватарка — до 5 МБ.' : 'Файл должен быть меньше 25 МБ',
-      );
-    const form = await req.formData();
+    const form = await readMultipart(req, max + 16384);
     const file = form.get('file');
     if (!(file instanceof File) || !file.size || file.size > max)
       throw new ApiError(
@@ -61,16 +60,24 @@ export async function POST(req: Request) {
     if (!valid)
       throw new ApiError(400, 'Содержимое файла не соответствует формату');
     const id = crypto.randomUUID();
-    await bucket().put(id, bytes, { httpMetadata: { contentType: file.type } });
+    await reserveUpload(id, me, file);
     try {
-      await db()
+      await bucket().put(id, bytes, {
+        httpMetadata: { contentType: file.type },
+      });
+      const stored = await db()
         .prepare(
-          'INSERT INTO uploads (id,userId,type,name,created) VALUES (?,?,?,?,?)',
+          "UPDATE uploads SET state='ready' WHERE id=? AND state='uploading'",
         )
-        .bind(id, me, file.type, file.name.slice(0, 200), Date.now())
+        .bind(id)
         .run();
+      if (!stored.meta.changes)
+        throw new ApiError(409, 'Загрузка прервана. Попробуйте ещё раз.');
     } catch (e) {
-      await bucket().delete(id);
+      await db()
+        .prepare("UPDATE uploads SET state='deleting' WHERE id=?")
+        .bind(id)
+        .run();
       throw e;
     }
     return Response.json({

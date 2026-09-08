@@ -158,7 +158,9 @@ export async function forwardMessages(
       );
     return { ids: outputIds };
   }
-  const sourceAccess = `${messagePair('src', 's.id', '?')} AND ${messageVisible('src', 's.id')} AND NOT EXISTS(SELECT 1 FROM json_each(src.media) a JOIN moderated_uploads mu ON mu.uploadId=json_extract(a.value,'$.id'))`;
+  const sourceAccess = `${messagePair('src', 's.id', '?')} AND ${messageVisible('src', 's.id')}
+    AND NOT EXISTS(SELECT 1 FROM json_each(src.media) a WHERE NOT EXISTS(SELECT 1 FROM uploads up WHERE up.id=json_extract(a.value,'$.id') AND up.state='ready'))
+    AND NOT EXISTS(SELECT 1 FROM json_each(src.media) a JOIN moderated_uploads mu ON mu.uploadId=json_extract(a.value,'$.id'))`;
   const results = await db().batch([
     db()
       .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,forwardedName,forwardSourceId)

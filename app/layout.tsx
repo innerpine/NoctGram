@@ -29,6 +29,9 @@ import './chat-actions.css';
 import './chat-motion.css';
 import './navigation.css';
 import './music-queue.css';
+import './account-management.css';
+import './staff-panel.css';
+import './channel-boosts.css';
 import { MusicProvider } from './music-provider';
 export const metadata: Metadata = {
   title: 'Noctgram — лента и диалоги',

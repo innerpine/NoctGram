@@ -97,7 +97,7 @@ export async function sendPrivateMessage(
     AND (? IS NULL OR EXISTS(SELECT 1 FROM messages rp WHERE rp.id=? AND ${messagePair('rp', 's.id', 'r.id')} AND ${messageVisible('rp', 's.id')}))
     AND NOT EXISTS(SELECT 1 FROM json_each(?) j WHERE NOT EXISTS(
       SELECT 1 FROM uploads up JOIN chat_uploads cu ON cu.uploadId=up.id WHERE up.id=j.value AND up.userId=s.id
-        AND cu.recipient=r.id AND cu.messageId IS NULL AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)))
+        AND up.state='ready' AND cu.recipient=r.id AND cu.messageId IS NULL AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)))
     ON CONFLICT(id) DO NOTHING`)
       .bind(
         id,

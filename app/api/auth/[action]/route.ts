@@ -1,5 +1,6 @@
 import { readJsonBody } from '@/lib/request-body';
 import { ApiError, failure } from '@/lib/api-error';
+import { accountAction, accountStatus } from '@/lib/account-management';
 import {
   authStatus,
   finishEmail,
@@ -19,6 +20,8 @@ export async function GET(
   { params }: { params: Promise<{ action: string }> },
 ) {
   try {
+    if ((await params).action === 'account')
+      return privateResponse(Response.json(await accountStatus(req)));
     if ((await params).action !== 'session')
       throw new ApiError(404, 'Не найдено');
     return privateResponse(Response.json(await authStatus(req)));
@@ -51,7 +54,7 @@ export async function POST(
     else if (action === 'verify') response = await finishEmail(req, data);
     else if (action === 'onboarding') response = await finishOnboarding(data);
     else if (action === 'logout') response = await signOut(req);
-    else throw new ApiError(404, 'Не найдено');
+    else response = await accountAction(req, action, data);
     return privateResponse(response);
   } catch (e) {
     if (e instanceof ApiError && e.status === 429) {

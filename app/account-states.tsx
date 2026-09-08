@@ -1,5 +1,11 @@
 'use client';
 import { SignOutButton } from './sign-out-button';
+import { AccountPanel } from './account-panel';
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from '@/components/ui/collapsible';
 /* eslint-disable next/no-html-link-for-pages */
 import { useRef, useState } from 'react';
 import {
@@ -236,6 +242,14 @@ export function BlockedAccount({
           </button>
           <SignOutButton className="account-signout">Выйти</SignOutButton>
         </div>
+        <Collapsible className="blocked-account-settings">
+          <CollapsibleTrigger className="secondary">
+            Управление аккаунтом
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <AccountPanel />
+          </CollapsibleContent>
+        </Collapsible>
         <p className="account-note">
           Копия в JSON содержит тексты и сведения о файлах. Фото и видео в неё
           не включены.

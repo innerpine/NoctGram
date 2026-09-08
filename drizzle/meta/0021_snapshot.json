@@ -1,9 +1,165 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "371630e9-1f2a-4022-b33f-bf169c1c2112",
-  "prevId": "7514acca-efa0-45cf-b689-d825598bdc8c",
+  "id": "c046ab39-4490-4d05-8a1a-7ddfa4a89e9a",
+  "prevId": "8040c339-ec7f-494a-94d9-ce71df5914c6",
   "tables": {
+    "account_challenges": {
+      "name": "account_challenges",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sessionHash": {
+          "name": "sessionHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "account_challenges_session": {
+          "name": "account_challenges_session",
+          "columns": [
+            "sessionHash"
+          ],
+          "isUnique": false
+        },
+        "account_challenges_expiry": {
+          "name": "account_challenges_expiry",
+          "columns": [
+            "expiresAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "account_challenges_userId_users_id_fk": {
+          "name": "account_challenges_userId_users_id_fk",
+          "tableFrom": "account_challenges",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "account_deletions": {
+      "name": "account_deletions",
+      "columns": {
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requestId": {
+          "name": "requestId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "account_deletions_requestId_unique": {
+          "name": "account_deletions_requestId_unique",
+          "columns": [
+            "requestId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "account_deletions_userId_users_id_fk": {
+          "name": "account_deletions_userId_users_id_fk",
+          "tableFrom": "account_deletions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "account_restrictions": {
       "name": "account_restrictions",
       "columns": {
@@ -71,6 +227,139 @@
           "tableTo": "moderation_events",
           "columnsFrom": [
             "eventId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "admin_events": {
+      "name": "admin_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actorId": {
+          "name": "actorId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "targetId": {
+          "name": "targetId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount": {
+          "name": "amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "admin_events_created": {
+          "name": "admin_events_created",
+          "columns": [
+            "created"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "admin_events_actorId_users_id_fk": {
+          "name": "admin_events_actorId_users_id_fk",
+          "tableFrom": "admin_events",
+          "tableTo": "users",
+          "columnsFrom": [
+            "actorId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "admin_events_targetId_users_id_fk": {
+          "name": "admin_events_targetId_users_id_fk",
+          "tableFrom": "admin_events",
+          "tableTo": "users",
+          "columnsFrom": [
+            "targetId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "administrators": {
+      "name": "administrators",
+      "columns": {
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "administrators_userId_users_id_fk": {
+          "name": "administrators_userId_users_id_fk",
+          "tableFrom": "administrators",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
           ],
           "columnsTo": [
             "id"
@@ -287,6 +576,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "verifiedAt": {
+          "name": "verifiedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -383,6 +680,75 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "call_cancellations": {
+      "name": "call_cancellations",
+      "columns": {
+        "callId": {
+          "name": "callId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "caller": {
+          "name": "caller",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "device": {
+          "name": "device",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "call_cancellations_expiry": {
+          "name": "call_cancellations_expiry",
+          "columns": [
+            "created"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "call_cancellations_caller_users_id_fk": {
+          "name": "call_cancellations_caller_users_id_fk",
+          "tableFrom": "call_cancellations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "caller"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "call_cancellations_callId_caller_device_pk": {
+          "columns": [
+            "callId",
+            "caller",
+            "device"
+          ],
+          "name": "call_cancellations_callId_caller_device_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "call_signals": {
       "name": "call_signals",
       "columns": {
@@ -420,6 +786,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "negotiation": {
+          "name": "negotiation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
         }
       },
       "indexes": {
@@ -541,6 +915,22 @@
           "notNull": false,
           "autoincrement": false
         },
+        "negotiation": {
+          "name": "negotiation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "restartRequested": {
+          "name": "restartRequested",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "created": {
           "name": "created",
           "type": "integer",
@@ -634,6 +1024,100 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "channel_boost_slots": {
+      "name": "channel_boost_slots",
+      "columns": {
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slot": {
+          "name": "slot",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "channelId": {
+          "name": "channelId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "changedAt": {
+          "name": "changedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "availableAt": {
+          "name": "availableAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "boost_slots_channel": {
+          "name": "boost_slots_channel",
+          "columns": [
+            "channelId",
+            "userId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "channel_boost_slots_userId_users_id_fk": {
+          "name": "channel_boost_slots_userId_users_id_fk",
+          "tableFrom": "channel_boost_slots",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "channel_boost_slots_channelId_users_id_fk": {
+          "name": "channel_boost_slots_channelId_users_id_fk",
+          "tableFrom": "channel_boost_slots",
+          "tableTo": "users",
+          "columnsFrom": [
+            "channelId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "channel_boost_slots_userId_slot_pk": {
+          "columns": [
+            "userId",
+            "slot"
+          ],
+          "name": "channel_boost_slots_userId_slot_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "boost_slot_range": {
+          "name": "boost_slot_range",
+          "value": "\"channel_boost_slots\".\"slot\" IN (1,2,3,4)"
+        }
+      }
+    },
     "channel_members": {
       "name": "channel_members",
       "columns": {
@@ -712,180 +1196,6 @@
           "name": "channel_members_channelId_userId_pk"
         }
       },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "chat_themes": {
-      "name": "chat_themes",
-      "columns": {
-        "firstId": {
-          "name": "firstId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "secondId": {
-          "name": "secondId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "sharedTheme": {
-          "name": "sharedTheme",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'noct'"
-        },
-        "firstTheme": {
-          "name": "firstTheme",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "secondTheme": {
-          "name": "secondTheme",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "revision": {
-          "name": "revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "chat_themes_firstId_users_id_fk": {
-          "name": "chat_themes_firstId_users_id_fk",
-          "tableFrom": "chat_themes",
-          "tableTo": "users",
-          "columnsFrom": [
-            "firstId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "chat_themes_secondId_users_id_fk": {
-          "name": "chat_themes_secondId_users_id_fk",
-          "tableFrom": "chat_themes",
-          "tableTo": "users",
-          "columnsFrom": [
-            "secondId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "chat_themes_firstId_secondId_pk": {
-          "columns": [
-            "firstId",
-            "secondId"
-          ],
-          "name": "chat_themes_firstId_secondId_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "chat_uploads": {
-      "name": "chat_uploads",
-      "columns": {
-        "uploadId": {
-          "name": "uploadId",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "recipient": {
-          "name": "recipient",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "size": {
-          "name": "size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "messageId": {
-          "name": "messageId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "chat_uploads_uploadId_uploads_id_fk": {
-          "name": "chat_uploads_uploadId_uploads_id_fk",
-          "tableFrom": "chat_uploads",
-          "tableTo": "uploads",
-          "columnsFrom": [
-            "uploadId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "chat_uploads_recipient_users_id_fk": {
-          "name": "chat_uploads_recipient_users_id_fk",
-          "tableFrom": "chat_uploads",
-          "tableTo": "users",
-          "columnsFrom": [
-            "recipient"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "chat_uploads_messageId_messages_id_fk": {
-          "name": "chat_uploads_messageId_messages_id_fk",
-          "tableFrom": "chat_uploads",
-          "tableTo": "messages",
-          "columnsFrom": [
-            "messageId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -1383,65 +1693,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "hidden_messages": {
-      "name": "hidden_messages",
-      "columns": {
-        "messageId": {
-          "name": "messageId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "userId": {
-          "name": "userId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "hidden_messages_messageId_messages_id_fk": {
-          "name": "hidden_messages_messageId_messages_id_fk",
-          "tableFrom": "hidden_messages",
-          "tableTo": "messages",
-          "columnsFrom": [
-            "messageId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "hidden_messages_userId_users_id_fk": {
-          "name": "hidden_messages_userId_users_id_fk",
-          "tableFrom": "hidden_messages",
-          "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "hidden_messages_messageId_userId_pk": {
-          "columns": [
-            "messageId",
-            "userId"
-          ],
-          "name": "hidden_messages_messageId_userId_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "hidden_posts": {
       "name": "hidden_posts",
       "columns": {
@@ -1560,114 +1811,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "message_pins": {
-      "name": "message_pins",
-      "columns": {
-        "messageId": {
-          "name": "messageId",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "firstId": {
-          "name": "firstId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "secondId": {
-          "name": "secondId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "pinnedBy": {
-          "name": "pinnedBy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created": {
-          "name": "created",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "message_pins_pair": {
-          "name": "message_pins_pair",
-          "columns": [
-            "firstId",
-            "secondId",
-            "created"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "message_pins_messageId_messages_id_fk": {
-          "name": "message_pins_messageId_messages_id_fk",
-          "tableFrom": "message_pins",
-          "tableTo": "messages",
-          "columnsFrom": [
-            "messageId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "message_pins_firstId_users_id_fk": {
-          "name": "message_pins_firstId_users_id_fk",
-          "tableFrom": "message_pins",
-          "tableTo": "users",
-          "columnsFrom": [
-            "firstId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "message_pins_secondId_users_id_fk": {
-          "name": "message_pins_secondId_users_id_fk",
-          "tableFrom": "message_pins",
-          "tableTo": "users",
-          "columnsFrom": [
-            "secondId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "message_pins_pinnedBy_users_id_fk": {
-          "name": "message_pins_pinnedBy_users_id_fk",
-          "tableFrom": "message_pins",
-          "tableTo": "users",
-          "columnsFrom": [
-            "pinnedBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "messages": {
       "name": "messages",
       "columns": {
@@ -1698,59 +1841,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "media": {
-          "name": "media",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
-        },
-        "giftReceiptId": {
-          "name": "giftReceiptId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "replyTo": {
-          "name": "replyTo",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "forwardedName": {
-          "name": "forwardedName",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "forwardSourceId": {
-          "name": "forwardSourceId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "editedAt": {
-          "name": "editedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "deletedAt": {
-          "name": "deletedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
         },
         "created": {
           "name": "created",
@@ -1784,13 +1874,6 @@
             "created"
           ],
           "isUnique": false
-        },
-        "messages_gift_receipt": {
-          "name": "messages_gift_receipt",
-          "columns": [
-            "giftReceiptId"
-          ],
-          "isUnique": true
         }
       },
       "foreignKeys": {
@@ -1813,19 +1896,6 @@
           "tableTo": "users",
           "columnsFrom": [
             "recipient"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "messages_giftReceiptId_received_gifts_id_fk": {
-          "name": "messages_giftReceiptId_received_gifts_id_fk",
-          "tableFrom": "messages",
-          "tableTo": "received_gifts",
-          "columnsFrom": [
-            "giftReceiptId"
           ],
           "columnsTo": [
             "id"
@@ -2146,129 +2216,6 @@
             "id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "music_activity": {
-      "name": "music_activity",
-      "columns": {
-        "userId": {
-          "name": "userId",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "sessionId": {
-          "name": "sessionId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "sequence": {
-          "name": "sequence",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "trackUrl": {
-          "name": "trackUrl",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "artist": {
-          "name": "artist",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "artwork": {
-          "name": "artwork",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'soundcloud'"
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'playing'"
-        },
-        "positionMs": {
-          "name": "positionMs",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "durationMs": {
-          "name": "durationMs",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "expiresAt": {
-          "name": "expiresAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "music_activity_userId_users_id_fk": {
-          "name": "music_activity_userId_users_id_fk",
-          "tableFrom": "music_activity",
-          "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -2828,326 +2775,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "music_playlist_members": {
-      "name": "music_playlist_members",
-      "columns": {
-        "playlistId": {
-          "name": "playlistId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "userId": {
-          "name": "userId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'invited'"
-        },
-        "created": {
-          "name": "created",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "listenSession": {
-          "name": "listenSession",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "listenUntil": {
-          "name": "listenUntil",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        }
-      },
-      "indexes": {
-        "music_playlist_members_user": {
-          "name": "music_playlist_members_user",
-          "columns": [
-            "userId"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "music_playlist_members_playlistId_music_playlists_id_fk": {
-          "name": "music_playlist_members_playlistId_music_playlists_id_fk",
-          "tableFrom": "music_playlist_members",
-          "tableTo": "music_playlists",
-          "columnsFrom": [
-            "playlistId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "music_playlist_members_userId_users_id_fk": {
-          "name": "music_playlist_members_userId_users_id_fk",
-          "tableFrom": "music_playlist_members",
-          "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "music_playlist_members_playlistId_userId_pk": {
-          "columns": [
-            "playlistId",
-            "userId"
-          ],
-          "name": "music_playlist_members_playlistId_userId_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "music_playlist_tracks": {
-      "name": "music_playlist_tracks",
-      "columns": {
-        "playlistId": {
-          "name": "playlistId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "trackId": {
-          "name": "trackId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "addedBy": {
-          "name": "addedBy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created": {
-          "name": "created",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "music_playlist_tracks_order": {
-          "name": "music_playlist_tracks_order",
-          "columns": [
-            "playlistId",
-            "created"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "music_playlist_tracks_playlistId_music_playlists_id_fk": {
-          "name": "music_playlist_tracks_playlistId_music_playlists_id_fk",
-          "tableFrom": "music_playlist_tracks",
-          "tableTo": "music_playlists",
-          "columnsFrom": [
-            "playlistId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "music_playlist_tracks_trackId_music_tracks_id_fk": {
-          "name": "music_playlist_tracks_trackId_music_tracks_id_fk",
-          "tableFrom": "music_playlist_tracks",
-          "tableTo": "music_tracks",
-          "columnsFrom": [
-            "trackId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "music_playlist_tracks_addedBy_users_id_fk": {
-          "name": "music_playlist_tracks_addedBy_users_id_fk",
-          "tableFrom": "music_playlist_tracks",
-          "tableTo": "users",
-          "columnsFrom": [
-            "addedBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "music_playlist_tracks_playlistId_trackId_pk": {
-          "columns": [
-            "playlistId",
-            "trackId"
-          ],
-          "name": "music_playlist_tracks_playlistId_trackId_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "music_playlists": {
-      "name": "music_playlists",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "ownerId": {
-          "name": "ownerId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created": {
-          "name": "created",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "trackId": {
-          "name": "trackId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "playing": {
-          "name": "playing",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "positionMs": {
-          "name": "positionMs",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "durationMs": {
-          "name": "durationMs",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "playbackAt": {
-          "name": "playbackAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "revision": {
-          "name": "revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        }
-      },
-      "indexes": {
-        "music_playlists_owner": {
-          "name": "music_playlists_owner",
-          "columns": [
-            "ownerId"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "music_playlists_ownerId_users_id_fk": {
-          "name": "music_playlists_ownerId_users_id_fk",
-          "tableFrom": "music_playlists",
-          "tableTo": "users",
-          "columnsFrom": [
-            "ownerId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "music_playlists_trackId_music_tracks_id_fk": {
-          "name": "music_playlists_trackId_music_tracks_id_fk",
-          "tableFrom": "music_playlists",
-          "tableTo": "music_tracks",
-          "columnsFrom": [
-            "trackId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -4051,59 +3678,22 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "received_gifts": {
-      "name": "received_gifts",
+    "recovery_codes": {
+      "name": "recovery_codes",
       "columns": {
-        "id": {
-          "name": "id",
+        "hash": {
+          "name": "hash",
           "type": "text",
           "primaryKey": true,
           "notNull": true,
           "autoincrement": false
         },
-        "transferId": {
-          "name": "transferId",
+        "userId": {
+          "name": "userId",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "giftId": {
-          "name": "giftId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "sender": {
-          "name": "sender",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "recipient": {
-          "name": "recipient",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "message": {
-          "name": "message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "hidden": {
-          "name": "hidden",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
         },
         "created": {
           "name": "created",
@@ -4111,59 +3701,31 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {
-        "gifts_transfer": {
-          "name": "gifts_transfer",
+        "recovery_codes_user": {
+          "name": "recovery_codes_user",
           "columns": [
-            "transferId"
-          ],
-          "isUnique": true
-        },
-        "gifts_recipient": {
-          "name": "gifts_recipient",
-          "columns": [
-            "recipient",
-            "created",
-            "id"
+            "userId"
           ],
           "isUnique": false
         }
       },
       "foreignKeys": {
-        "received_gifts_transferId_star_transfers_id_fk": {
-          "name": "received_gifts_transferId_star_transfers_id_fk",
-          "tableFrom": "received_gifts",
-          "tableTo": "star_transfers",
-          "columnsFrom": [
-            "transferId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "received_gifts_sender_users_id_fk": {
-          "name": "received_gifts_sender_users_id_fk",
-          "tableFrom": "received_gifts",
+        "recovery_codes_userId_users_id_fk": {
+          "name": "recovery_codes_userId_users_id_fk",
+          "tableFrom": "recovery_codes",
           "tableTo": "users",
           "columnsFrom": [
-            "sender"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "received_gifts_recipient_users_id_fk": {
-          "name": "received_gifts_recipient_users_id_fk",
-          "tableFrom": "received_gifts",
-          "tableTo": "users",
-          "columnsFrom": [
-            "recipient"
+            "userId"
           ],
           "columnsTo": [
             "id"
@@ -4389,6 +3951,30 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "storage_deletions": {
+      "name": "storage_deletions",
+      "columns": {
+        "objectKey": {
+          "name": "objectKey",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "stories": {
       "name": "stories",
       "columns": {
@@ -4404,6 +3990,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "publisherId": {
+          "name": "publisherId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "mediaId": {
@@ -4476,6 +4069,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "stories_publisherId_users_id_fk": {
+          "name": "stories_publisherId_users_id_fk",
+          "tableFrom": "stories",
+          "tableTo": "users",
+          "columnsFrom": [
+            "publisherId"
           ],
           "columnsTo": [
             "id"
@@ -4908,6 +4514,22 @@
           "notNull": true,
           "autoincrement": false
         },
+        "bytes": {
+          "name": "bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'ready'"
+        },
         "created": {
           "name": "created",
           "type": "integer",
@@ -5138,6 +4760,30 @@
           "autoincrement": false,
           "default": "'person'"
         },
+        "verified": {
+          "name": "verified",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "deletedAt": {
+          "name": "deletedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "sessionsRevokedAt": {
+          "name": "sessionsRevokedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "ownerId": {
           "name": "ownerId",
           "type": "text",
@@ -5229,6 +4875,449 @@
           "name": "votes_postId_userId_pk"
         }
       },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "music_activity": {
+      "name": "music_activity",
+      "columns": {
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sessionId": {
+          "name": "sessionId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "trackUrl": {
+          "name": "trackUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "artist": {
+          "name": "artist",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "artwork": {
+          "name": "artwork",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'soundcloud'"
+        },
+        "positionMs": {
+          "name": "positionMs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "durationMs": {
+          "name": "durationMs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'playing'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "music_activity_userId_users_id_fk": {
+          "name": "music_activity_userId_users_id_fk",
+          "tableFrom": "music_activity",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "music_playlist_members": {
+      "name": "music_playlist_members",
+      "columns": {
+        "playlistId": {
+          "name": "playlistId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'invited'"
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "listenSession": {
+          "name": "listenSession",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "listenUntil": {
+          "name": "listenUntil",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "music_playlist_members_user": {
+          "name": "music_playlist_members_user",
+          "columns": [
+            "userId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "music_playlist_members_playlistId_music_playlists_id_fk": {
+          "name": "music_playlist_members_playlistId_music_playlists_id_fk",
+          "tableFrom": "music_playlist_members",
+          "tableTo": "music_playlists",
+          "columnsFrom": [
+            "playlistId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "music_playlist_members_userId_users_id_fk": {
+          "name": "music_playlist_members_userId_users_id_fk",
+          "tableFrom": "music_playlist_members",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "music_playlist_members_playlistId_userId_pk": {
+          "columns": [
+            "playlistId",
+            "userId"
+          ],
+          "name": "music_playlist_members_playlistId_userId_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "music_playlist_tracks": {
+      "name": "music_playlist_tracks",
+      "columns": {
+        "playlistId": {
+          "name": "playlistId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "trackId": {
+          "name": "trackId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "addedBy": {
+          "name": "addedBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "music_playlist_tracks_order": {
+          "name": "music_playlist_tracks_order",
+          "columns": [
+            "playlistId",
+            "created"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "music_playlist_tracks_playlistId_music_playlists_id_fk": {
+          "name": "music_playlist_tracks_playlistId_music_playlists_id_fk",
+          "tableFrom": "music_playlist_tracks",
+          "tableTo": "music_playlists",
+          "columnsFrom": [
+            "playlistId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "music_playlist_tracks_trackId_music_tracks_id_fk": {
+          "name": "music_playlist_tracks_trackId_music_tracks_id_fk",
+          "tableFrom": "music_playlist_tracks",
+          "tableTo": "music_tracks",
+          "columnsFrom": [
+            "trackId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "music_playlist_tracks_addedBy_users_id_fk": {
+          "name": "music_playlist_tracks_addedBy_users_id_fk",
+          "tableFrom": "music_playlist_tracks",
+          "tableTo": "users",
+          "columnsFrom": [
+            "addedBy"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "music_playlist_tracks_playlistId_trackId_pk": {
+          "columns": [
+            "playlistId",
+            "trackId"
+          ],
+          "name": "music_playlist_tracks_playlistId_trackId_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "music_playlists": {
+      "name": "music_playlists",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ownerId": {
+          "name": "ownerId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "trackId": {
+          "name": "trackId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "playing": {
+          "name": "playing",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "positionMs": {
+          "name": "positionMs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "durationMs": {
+          "name": "durationMs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "playbackAt": {
+          "name": "playbackAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "music_playlists_owner": {
+          "name": "music_playlists_owner",
+          "columns": [
+            "ownerId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "music_playlists_ownerId_users_id_fk": {
+          "name": "music_playlists_ownerId_users_id_fk",
+          "tableFrom": "music_playlists",
+          "tableTo": "users",
+          "columnsFrom": [
+            "ownerId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "music_playlists_trackId_music_tracks_id_fk": {
+          "name": "music_playlists_trackId_music_tracks_id_fk",
+          "tableFrom": "music_playlists",
+          "tableTo": "music_tracks",
+          "columnsFrom": [
+            "trackId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     }

@@ -78,7 +78,7 @@ function fixture(t, { reduced = false, hidden = false, animate = true } = {}) {
 }
 const ids = (rows) => rows.map((row) => row.id);
 
-test('confirmed deletion fades then collapses the measured row, retaining it across an immediate refresh', (t) => {
+void test('confirmed deletion fades then collapses the measured row, retaining it across an immediate refresh', (t) => {
   const f = fixture(t);
   f.removal.remove([messages[1]]);
   const animation = f.rows[1].animations[0];
@@ -109,7 +109,7 @@ test('confirmed deletion fades then collapses the measured row, retaining it acr
   assert.equal(f.timers.size, 0);
 });
 
-test('batch deletions finish independently without duplicating rows or restarting repeated IDs', (t) => {
+void test('batch deletions finish independently without duplicating rows or restarting repeated IDs', (t) => {
   const f = fixture(t);
   f.removal.remove([messages[1], messages[2]]);
   f.removal.remove([messages[1]]);
@@ -125,7 +125,7 @@ test('batch deletions finish independently without duplicating rows or restartin
   assert.deepEqual(ids(f.removal.visible(next)), ['m0', 'm3', 'new']);
 });
 
-test('reduced motion, hidden pages and missing animation support remove immediately', (t) => {
+void test('reduced motion, hidden pages and missing animation support remove immediately', (t) => {
   for (const options of [
     { reduced: true },
     { hidden: true },
@@ -139,7 +139,7 @@ test('reduced motion, hidden pages and missing animation support remove immediat
   }
 });
 
-test('animation cancellation, fallback timeout, and unmount clean up without lingering copies', (t) => {
+void test('animation cancellation, fallback timeout, and unmount clean up without lingering copies', (t) => {
   const f = fixture(t);
   f.removal.remove([messages[1]]);
   f.rows[1].animations[0].cancel();
@@ -163,7 +163,7 @@ test('animation cancellation, fallback timeout, and unmount clean up without lin
   assert.equal(f.updates, count);
 });
 
-test('ordinary snapshots and pagination do not animate or hide messages without a confirmed deletion', (t) => {
+void test('ordinary snapshots and pagination do not animate or hide messages without a confirmed deletion', (t) => {
   const f = fixture(t);
   assert.equal(f.removal.visible(messages), messages);
   const page = messages.slice(2);

@@ -255,7 +255,11 @@ export function StarsPanel({
         {!wallet && loading && <p className="meta">Загружаем баланс…</p>}
         {rows.map((t) => (
           <div className="star-transaction" key={t.id}>
-            {t.kind === 'telegram_test' ? (
+            {t.kind === 'admin_grant' ? (
+              <span className="transaction-grant">
+                <StarsIcon size={26} />
+              </span>
+            ) : t.kind === 'telegram_test' ? (
               <span
                 className="transaction-grant telegram-transaction-icon"
                 aria-hidden="true"
@@ -278,7 +282,9 @@ export function StarsPanel({
             )}
             <div>
               <strong>
-                {t.kind === 'telegram_test' ? (
+                {t.kind === 'admin_grant' ? (
+                  'Подарок от NoctGram'
+                ) : t.kind === 'telegram_test' ? (
                   'Пополнение через Telegram'
                 ) : t.kind === 'grant' ? (
                   'Тестовый баланс'
@@ -295,6 +301,8 @@ export function StarsPanel({
                   ? 'Подарок «' +
                     (giftDefinition(t.giftId)?.name || 'Подарок') +
                     '»'
+                  : t.kind === 'admin_grant'
+                    ? 'Начислено администратором'
                   : t.kind === 'telegram_test'
                     ? 'Тестовые звёзды · без оплаты'
                     : t.kind === 'grant'

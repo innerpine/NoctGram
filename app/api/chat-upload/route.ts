@@ -2,6 +2,8 @@ import { viewer, failure, ApiError } from '@/lib/server';
 import { readJsonBody } from '@/lib/request-body';
 import { CHAT_FILE_LIMIT } from '@/lib/chat-files';
 import { storeChatUpload, discardChatUpload } from '@/lib/chat-uploads';
+import { assertWritable } from '@/lib/account-access';
+import { rateLimit } from '@/lib/rate-limit';
 
 function sameOrigin(req: Request) {
   if (
@@ -15,6 +17,8 @@ export async function POST(req: Request) {
   try {
     sameOrigin(req);
     const me = await viewer();
+    await assertWritable(me);
+    await rateLimit('uploads', me, 15, 60);
     const max = CHAT_FILE_LIMIT + 65536;
     if (Number(req.headers.get('content-length')) > max)
       throw new ApiError(413, 'Файл должен быть меньше 25 МБ');
