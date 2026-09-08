@@ -20,16 +20,13 @@
 
 ## Локальный запуск
 
-Для существующей базы с миграциями 0000–0006 применить **только новую** миграцию:
+Для новой базы применить все миграции по порядку из `drizzle/meta/_journal.json`, как описано в CONTRIBUTING.md. Для существующей базы применять только отсутствующие миграции после резервного копирования. Изменения звонков добавляют 0015–0016; команды приведены в [TURN_SETUP.md](TURN_SETUP.md).
 
 ```powershell
-npx wrangler d1 execute DB --local --config wrangler.local.json --file drizzle/0007_organic_slipstream.sql
 npm ci
 npm run setup:realtime
 npm run dev
 ```
-
-Для новой пустой базы следовать CONTRIBUTING.md и применить все миграции один раз. В текущем рабочем окружении миграция 0007 уже применена.
 
 В другом терминале:
 
@@ -53,11 +50,16 @@ npm run dev:jobs
 | `NOCT_VAPID_PRIVATE_KEY` | Секрет подписи push, только сервер |
 | `NOCT_VAPID_SUBJECT` | Контактный `mailto:` или HTTPS-адрес проекта |
 | `NOCT_JOBS_SECRET` | Секрет доступа фонового обработчика |
-| `NOCT_STUN_URLS` | STUN-адреса через запятую, по умолчанию Google STUN |
-| `NOCT_TURN_URLS` | Адреса TURN через запятую |
+| `NOCT_STUN_URLS` | STUN-адреса через запятую, по умолчанию Cloudflare STUN |
+| `NOCT_TURN_PROVIDER` | `cloudflare`, `coturn` или `none` |
+| `NOCT_CF_TURN_KEY_ID` | Идентификатор Cloudflare TURN key |
+| `NOCT_CF_TURN_API_TOKEN` | Токен Cloudflare TURN key, только сервер |
+| `NOCT_TURN_URLS` | Адреса своего coturn через запятую |
 | `NOCT_TURN_SECRET` | Shared secret coturn REST, только сервер |
 
-Для надёжной связи между разными сетями нужен **TURN**, например coturn с `use-auth-secret` и `static-auth-secret`, совпадающим с `NOCT_TURN_SECRET`. Сервер выдаёт браузеру временные credentials на 3 часа. Shared secret клиенту не передаётся. Без TURN звонок может установиться напрямую, но некоторые NAT/мобильные сети не соединятся. Документация: [WebRTC TURN](https://webrtc.org/getting-started/turn-server), [coturn REST credentials](https://github.com/coturn/coturn/blob/master/README.turnserver).
+Подключение Cloudflare TURN, миграции 0015–0016 и проверка восстановления описаны в [TURN_SETUP.md](TURN_SETUP.md).
+
+Для связи между разными сетями нужен **TURN**, например Cloudflare TURN или coturn с `use-auth-secret` и `static-auth-secret`, совпадающим с `NOCT_TURN_SECRET`. Сервер выдаёт браузеру временные credentials на 3 часа. Shared secret клиенту не передаётся. Без TURN звонок может установиться напрямую, но некоторые NAT/мобильные сети не соединятся. Документация: [WebRTC TURN](https://webrtc.org/getting-started/turn-server), [coturn REST credentials](https://github.com/coturn/coturn/blob/master/README.turnserver).
 
 ## Фоновые задачи на хостинге
 
@@ -79,8 +81,14 @@ npm run dev:jobs
 
 ## Изолированные проверки
 
-`tests/realtime.integration.mjs` запускается только против Worker на `127.0.0.1:8787`, использующего `--persist-to work/features-qa`, миграции 0000–0007 и fixture `tests/fixtures/moderation.sql`. Тест меняет время только своих записей в этой тестовой базе для проверки публикации и истечения срока без ожидания. Не направлять его на рабочий сервер.
+`tests/realtime.integration.mjs` запускается только против Worker на `127.0.0.1:8787`, использующего `--persist-to work/features-qa`, все текущие миграции и fixture `tests/fixtures/moderation.sql`. Тест меняет время только своих записей в этой тестовой базе для проверки публикации и истечения срока без ожидания. Не направлять его на рабочий сервер.
 
 ```powershell
 node tests/realtime.integration.mjs
+```
+
+Регрессии звонков без Worker и реальной сети:
+
+```powershell
+node --test tests/calls.test.mjs tests/call-client.test.mjs
 ```

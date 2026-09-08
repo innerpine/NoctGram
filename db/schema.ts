@@ -684,6 +684,8 @@ export const calls = sqliteTable(
     reason: text().notNull().default(''),
     offer: text(),
     answer: text(),
+    negotiation: integer().notNull().default(0),
+    restartRequested: integer().notNull().default(0),
     created: integer().notNull(),
     acceptedAt: integer(),
     endedAt: integer(),
@@ -694,6 +696,21 @@ export const calls = sqliteTable(
   (t) => [
     index('calls_caller').on(t.caller, t.created),
     index('calls_callee').on(t.callee, t.created),
+  ],
+);
+export const callCancellations = sqliteTable(
+  'call_cancellations',
+  {
+    callId: text().notNull(),
+    caller: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    device: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.callId, t.caller, t.device] }),
+    index('call_cancellations_expiry').on(t.created),
   ],
 );
 export const callSignals = sqliteTable(
@@ -708,6 +725,7 @@ export const callSignals = sqliteTable(
       .references(() => users.id),
     key: text().notNull(),
     candidate: text().notNull(),
+    negotiation: integer().notNull().default(1),
   },
   (t) => [
     uniqueIndex('call_signal_once').on(t.callId, t.sender, t.key),
