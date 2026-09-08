@@ -1,0 +1,1455 @@
+{
+  "revision": "2cafb0e3d2be5336ae4741f75900afe499c6a5ac",
+  "assets": [
+    {
+      "file": "algorithm_cup.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/algorithm_cup.tgs",
+      "sha256": "2e8a674c114a76df7b8090c206d9ddc74945f3c532814be5003a7e2d07078aa5"
+    },
+    {
+      "file": "algorithm_cup.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/algorithm_cup.webp",
+      "sha256": "1d9c61c2ab1c6b02283e92822844fdc06f2799e445dcafc9af94cc7943a4768b"
+    },
+    {
+      "file": "artisan_brick.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/artisan_brick.tgs",
+      "sha256": "381b61fe0c305b4fb9f0e019799b19d6b713405aec80b622892abfe7afa3b083"
+    },
+    {
+      "file": "artisan_brick.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/artisan_brick.webp",
+      "sha256": "c890780b18490156a21e368e222745daee4b0072a011e936b24cbd68b3b5f7b9"
+    },
+    {
+      "file": "astral_shard.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/astral_shard.tgs",
+      "sha256": "4b69778b720819db02cb35c22657afb536f22b319cec6c203096002204688959"
+    },
+    {
+      "file": "astral_shard.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/astral_shard.webp",
+      "sha256": "3ed298054798421c50fbee3e16510a334f56350aaabd3f7d9d3447f43eab7387"
+    },
+    {
+      "file": "bday_candle.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/bday_candle.tgs",
+      "sha256": "b6f2133e703270783788eaab780e5e3913ad6d380fb4c94ac84ef5a70ebceec1"
+    },
+    {
+      "file": "bday_candle.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/bday_candle.webp",
+      "sha256": "f546fce70fdee9486e10f1de4cd0f6420d44401bc7385c595bd66ed3a32afb2d"
+    },
+    {
+      "file": "berry_box.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/berry_box.tgs",
+      "sha256": "67775a0a30a9842fc480b2cd68d0a7e6be4e81e3f7c51b8d3606e5dc92dac8ca"
+    },
+    {
+      "file": "berry_box.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/berry_box.webp",
+      "sha256": "335d5e1d886133732485e649dbdfde1c5942a6ce068b454223233277f482dfa8"
+    },
+    {
+      "file": "big_year.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/big_year.tgs",
+      "sha256": "4f295656feb178b1e5f602b8c73f29c6f088ac54299e7bc2bdc859e7ab1269ab"
+    },
+    {
+      "file": "big_year.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/big_year.webp",
+      "sha256": "036aaef3f327ccb562bba0add44b8cb8fa9f4670b42536cdafe0e52f5f81f358"
+    },
+    {
+      "file": "bling_binky.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/bling_binky.tgs",
+      "sha256": "1dd329608845c595f5b0539eca488cd49b2e78f80ed7dc1431610d9b1c2bd832"
+    },
+    {
+      "file": "bling_binky.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/bling_binky.webp",
+      "sha256": "27b9c353a00f482816a5a0d9234cc1a8f7cd23aa1cb8c2c750c5547124f3b5ed"
+    },
+    {
+      "file": "bonded_ring.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/bonded_ring.tgs",
+      "sha256": "b13a77531038b61641e7c265522a1a3c898c6d907256b53beb2cc8369dc52bd1"
+    },
+    {
+      "file": "bonded_ring.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/bonded_ring.webp",
+      "sha256": "5bc05a9fd4de61818058bf315ff8f128abe415e7ec6875cc7e9a5b47569ffebe"
+    },
+    {
+      "file": "bow_tie.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/bow_tie.tgs",
+      "sha256": "60c056217a60371d54c2aaae44472e2e835dd49e6db96a9e0276bee8555563a5"
+    },
+    {
+      "file": "bow_tie.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/bow_tie.webp",
+      "sha256": "11aabb668e8f84da430280902f45dba7d66f3f96e0eb6f713bbf263401bcac5e"
+    },
+    {
+      "file": "bunny_muffin.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/bunny_muffin.tgs",
+      "sha256": "216be4d7a5e019703675c8274e7b92da14e20f8474277839a771cdf4dc8328b4"
+    },
+    {
+      "file": "bunny_muffin.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/bunny_muffin.webp",
+      "sha256": "d2954a9b4d6094074f7a7f8df104ccdb76712034a6251e533ec2130aeaa39845"
+    },
+    {
+      "file": "candy_cane.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/candy_cane.tgs",
+      "sha256": "c0814d2c3791c6521a6d60467ac81e025f89f72219a1a9a48857f80d708f76e5"
+    },
+    {
+      "file": "candy_cane.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/candy_cane.webp",
+      "sha256": "c4cad3194015db0035d035cd676074a9510f474b38f6b6084dff932fb0c7684f"
+    },
+    {
+      "file": "case.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/case.tgs",
+      "sha256": "7285efba0840ec875a9a11381b431693f20235b7be9b0b6606c7675ccafc3d12"
+    },
+    {
+      "file": "case.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/case.webp",
+      "sha256": "9cf2215b26921092849377cde29e4f627ac987741bcf21a366afb8b5b858672c"
+    },
+    {
+      "file": "chill_flame.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/chill_flame.tgs",
+      "sha256": "4fcc14e1be0c601858fa35d7427d667d3a3da54dd145a17c78732219f2a58a9c"
+    },
+    {
+      "file": "chill_flame.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/chill_flame.webp",
+      "sha256": "7e59fb50c036674cff541ff579ade06e2a7fcf01c8fe8f3b11a8ab4548dcf2db"
+    },
+    {
+      "file": "clover_pin.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/clover_pin.tgs",
+      "sha256": "3b63c4dbef57f4202f31ed4eb41593335fbb5c57e9ad3ffea142efea46b4dcf3"
+    },
+    {
+      "file": "clover_pin.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/clover_pin.webp",
+      "sha256": "0e36d97725a91d630bd452b9a57704236cb2df9dff97e6dc700ecdf1a9de1766"
+    },
+    {
+      "file": "coconut_drink.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/coconut_drink.tgs",
+      "sha256": "7bd48cea779e2333ba79c1c80f5e9eaa3a6f4b118072cac11fac7194ca6e350a"
+    },
+    {
+      "file": "coconut_drink.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/coconut_drink.webp",
+      "sha256": "ff6db49183e1c4beb5e5ba76e36614fc8cb786e8458de1ac12c1a7ca4e682b9f"
+    },
+    {
+      "file": "coffin.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/coffin.tgs",
+      "sha256": "cb439b64ecbd61ae39ccddb65b42b675245ccab9133e1f18e15c598b5a1080af"
+    },
+    {
+      "file": "coffin.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/coffin.webp",
+      "sha256": "5c581fa384aaab614354f4528964105963b60610f5dcfd7b8fa015a1d66bf484"
+    },
+    {
+      "file": "cookie_heart.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/cookie_heart.tgs",
+      "sha256": "5ba204def11917d78fd225a44fe13e3ad99795a36683387949bf1691fbda8832"
+    },
+    {
+      "file": "cookie_heart.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/cookie_heart.webp",
+      "sha256": "495995c7e20f3df2b52e692dc83a06d3fd7994ab6a0ab316fcb6dd7a6c60c012"
+    },
+    {
+      "file": "crystal_ball.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/crystal_ball.tgs",
+      "sha256": "899938b849a3e2f04d81a3f9e7590c2bdd7af2aa44d9c8e9ebb050cdc0ec14cc"
+    },
+    {
+      "file": "crystal_ball.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/crystal_ball.webp",
+      "sha256": "9eecdb55e46179b007e26a24e97c0f48e6c5efff6a2dc30892debed33bc11831"
+    },
+    {
+      "file": "cupid_charm.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/cupid_charm.tgs",
+      "sha256": "a5a7b3cae17d4266b68326e55946ce84394217cffc54fb3ce1be7193a14e0c75"
+    },
+    {
+      "file": "cupid_charm.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/cupid_charm.webp",
+      "sha256": "126ef9bd17c077cfb4f47d384b11792d579d2352aaf0539f536104cbbd050dd7"
+    },
+    {
+      "file": "desk_calendar.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/desk_calendar.tgs",
+      "sha256": "6c7a806435ad6426421607522db3014c6a589fa921a60b9d8504cf6abfdd8339"
+    },
+    {
+      "file": "desk_calendar.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/desk_calendar.webp",
+      "sha256": "54521d17a9f10d50712e76eb1c84c1fc4b30c1fc0632853aa6c486e2eace8b3b"
+    },
+    {
+      "file": "diamond_ring.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/diamond_ring.tgs",
+      "sha256": "0a590cde6e946d820a133708e10a5c5a193ae5cf5a1df0d1f7d3f4148c7fd441"
+    },
+    {
+      "file": "diamond_ring.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/diamond_ring.webp",
+      "sha256": "fb7a79da5e262530d816009d96220a3dc8b50ff94286688be2e2d42abe0376a5"
+    },
+    {
+      "file": "durovs_boots.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/durovs_boots.tgs",
+      "sha256": "b5b6440102c4389a77387729e18af06859dac5b6553dcbd59ccfc449afd8e64a"
+    },
+    {
+      "file": "durovs_boots.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/durovs_boots.webp",
+      "sha256": "400d03d6e4f80642678e4e98d4317246a2904dc8373155a7d07106ce7055dfdc"
+    },
+    {
+      "file": "durovs_cap.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/durovs_cap.tgs",
+      "sha256": "a825bce37d78e141b4c54816e648e3ec408f05a4e2e1a8d41e2afb4a77f02088"
+    },
+    {
+      "file": "durovs_cap.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/durovs_cap.webp",
+      "sha256": "597ad4542523e8b91fdca28bd50dccb475d68003e30e17437fa5fed07d8ff590"
+    },
+    {
+      "file": "durovs_coat.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/durovs_coat.tgs",
+      "sha256": "7477dda8e90fae5964ef338e1cf729d25ffc6924f3aa6e198a5ce261a2cde33b"
+    },
+    {
+      "file": "durovs_coat.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/durovs_coat.webp",
+      "sha256": "dbe0a8e6abb4ea0c87331fe2a34dfc0541545f0252e6fe7bce277068ea50ec22"
+    },
+    {
+      "file": "durovs_figurine.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/durovs_figurine.tgs",
+      "sha256": "a65cb2bd5a8c92073fc3e6842aeb05c6ae3874f7cba0e7e505b0c9cc387d1b8a"
+    },
+    {
+      "file": "durovs_figurine.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/durovs_figurine.webp",
+      "sha256": "e25f389449d104844647842a2eecf36d023634dea9ad8a9fd99bbdd6906622fb"
+    },
+    {
+      "file": "durovs_glasses.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/durovs_glasses.tgs",
+      "sha256": "c5249c5a03c868fa05fdf2ed16f4940cc1f4f99b868cdcec4e4087093980566e"
+    },
+    {
+      "file": "durovs_glasses.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/durovs_glasses.webp",
+      "sha256": "e98a425754df6fa384f86b544e78270ce7cdc606cc3d8d45e2ccde8b98f188e1"
+    },
+    {
+      "file": "easter_cake.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/easter_cake.tgs",
+      "sha256": "a3056a86af5d1b4a34585bc9e1c2cc77dce7f77fcae8ee8e5f1081acd09a45a9"
+    },
+    {
+      "file": "easter_cake.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/easter_cake.webp",
+      "sha256": "b5f3a07cb54ba6b4bc03e04c42ed239884855dfdbda6abeba21ae1f955239d86"
+    },
+    {
+      "file": "easter_egg.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/easter_egg.tgs",
+      "sha256": "9fccb9f7bf1455752c2651a2fdfa82c0589cbd300bcdcedc61cbff769f894ba2"
+    },
+    {
+      "file": "easter_egg.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/easter_egg.webp",
+      "sha256": "f9d2c2f56b53a1c1cf1e94344d90718af71147e7874d6d274ba60043259f23db"
+    },
+    {
+      "file": "eight_roses.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/eight_roses.tgs",
+      "sha256": "b2f0014dfbfba1f71cf72a8b3372afc269bd72c67644e6c181c3d5f2b923e4a7"
+    },
+    {
+      "file": "eight_roses.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/eight_roses.webp",
+      "sha256": "1439e0fcb001ecaaeb8ade9e79b3418dff961525d7c62ab09b873f7f70ca129d"
+    },
+    {
+      "file": "electric_skull.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/electric_skull.tgs",
+      "sha256": "59fb7161dcb140f777ce9e6845e6a1741720cdc2b251f85b2a5078bf8343d427"
+    },
+    {
+      "file": "electric_skull.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/electric_skull.webp",
+      "sha256": "274af9fb5d26d9c469a22b4dfc00c1513655c3d8462606376f2b2ddd4c645686"
+    },
+    {
+      "file": "eternal_candle.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/eternal_candle.tgs",
+      "sha256": "f397e1335365ea9c629e28fa39e8d3ef04f1b33165ecbf2349f2315a57b8e0a9"
+    },
+    {
+      "file": "eternal_candle.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/eternal_candle.webp",
+      "sha256": "7543b3e0402a52382b1683fc3edb6b419e88238db29aa78e7280db2e333c94a3"
+    },
+    {
+      "file": "eternal_rose.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/eternal_rose.tgs",
+      "sha256": "c39f2f4e0a1a58560b5ca649756b819ef690b84904f17f21d9517a468cf27d96"
+    },
+    {
+      "file": "eternal_rose.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/eternal_rose.webp",
+      "sha256": "819152b314422f8a06678306e51c2f9dd4f0d9b838f9f65c06b1b1606827f79c"
+    },
+    {
+      "file": "evil_eye.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/evil_eye.tgs",
+      "sha256": "39617ecad535db12b3cfcc52cffae6f8b91ef9a8aa70afe951b7be4efbf08164"
+    },
+    {
+      "file": "evil_eye.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/evil_eye.webp",
+      "sha256": "df93fbf9c7795d5c218c322aad5dfb1a5e7d6159fd13182e798fec7215331e4e"
+    },
+    {
+      "file": "faith_amulet.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/faith_amulet.tgs",
+      "sha256": "8f083ccd7d4f150c1bff145173f15adb798e14990566fe505d7a3093adc6c2fc"
+    },
+    {
+      "file": "faith_amulet.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/faith_amulet.webp",
+      "sha256": "fea6d62e4c8f5970d6d077512789e43e4b0790f9f4488dc15423d7aeba1f91f1"
+    },
+    {
+      "file": "flying_broom.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/flying_broom.tgs",
+      "sha256": "fb61edd56676b9cafda0c979700506c8ef20f33a9b1609d7626856f960c6c31c"
+    },
+    {
+      "file": "flying_broom.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/flying_broom.webp",
+      "sha256": "cbc7f513cf71df6dbcd4bba01fe3593483398a6d60cfc8aa98b7817661b9bd64"
+    },
+    {
+      "file": "fresh_socks.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/fresh_socks.tgs",
+      "sha256": "a17d704d718dbd98a9a91054dbd8fab563fbe4450a017b9dcbef94852ead48a4"
+    },
+    {
+      "file": "fresh_socks.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/fresh_socks.webp",
+      "sha256": "d585ef6b0c6045d0426bbe70873f3080d61c2670d72aeeee8b9b72ee50fc00ef"
+    },
+    {
+      "file": "gem_signet.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/gem_signet.tgs",
+      "sha256": "39366d11696b91e4950493a681b8ac0258cf9af615d7a819f6b1c59459f82545"
+    },
+    {
+      "file": "gem_signet.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/gem_signet.webp",
+      "sha256": "c1430a46e1990140d7a6da758447d135f46d58cab7ed484e31747196e80628a1"
+    },
+    {
+      "file": "genie_lamp.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/genie_lamp.tgs",
+      "sha256": "114a25be260e2e1868288bbf29d57337d2e10e0312684c5ecca071668706a4b2"
+    },
+    {
+      "file": "genie_lamp.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/genie_lamp.webp",
+      "sha256": "aa7c66e8d854bf70e6b76c52a07308915646f668c885f19a2e0be40a937f234d"
+    },
+    {
+      "file": "gift_5168043875654172773.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/gift_5168043875654172773.tgs",
+      "sha256": "d505f25db04ef9a62f9ea7b9702641d7de11a855b5c4bea37250d6706285dafd"
+    },
+    {
+      "file": "gift_5168043875654172773.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/gift_5168043875654172773.webp",
+      "sha256": "8255e8cd7644fb5bedad6cc121ffa2737b0e41fde4edb2f437f0a52d4c4f61b5"
+    },
+    {
+      "file": "gift_5168103777563050263.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/gift_5168103777563050263.tgs",
+      "sha256": "97d1ce2339c1fe746f1edaaf8a299faddd9f8941bb25cfcafb56779b896e3ff1"
+    },
+    {
+      "file": "gift_5168103777563050263.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/gift_5168103777563050263.webp",
+      "sha256": "348352b35bde3717fb6b2265152e1a2940cc312c8211bd9297c1504400d079ad"
+    },
+    {
+      "file": "gift_5170144170496491616.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/gift_5170144170496491616.tgs",
+      "sha256": "8717316d3ecd0e57adedc7a38bd19fabd81deb834b6ec3c2fbd0e84dbddf7968"
+    },
+    {
+      "file": "gift_5170144170496491616.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/gift_5170144170496491616.webp",
+      "sha256": "b74b4b22091c2a80c72cb5a486ba349e7ea811b5d4f9df893a68e7e5d6ce138c"
+    },
+    {
+      "file": "gift_5170145012310081615.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/gift_5170145012310081615.tgs",
+      "sha256": "333ffd5b09fb2b34b885d6ba60e96727f958bc86185a17ca0439ae5700d3b9ea"
+    },
+    {
+      "file": "gift_5170145012310081615.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/gift_5170145012310081615.webp",
+      "sha256": "5f8f28c7d73930f14a5b235f4ce98d8ff7838cd0f0c37154057df7c7c237292b"
+    },
+    {
+      "file": "gift_5170233102089322756.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/gift_5170233102089322756.tgs",
+      "sha256": "6dda81db259910dbd3e317ff8d6e86c89b99b9e3c6739b61b51d5bb386fc1b80"
+    },
+    {
+      "file": "gift_5170233102089322756.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/gift_5170233102089322756.webp",
+      "sha256": "6128fe7f05e6f835043af6f89b096a212f91f7ee2535c5a15aec4c8cf6df86ca"
+    },
+    {
+      "file": "gift_5170250947678437525.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/gift_5170250947678437525.tgs",
+      "sha256": "e856922c4b12b1382283d310ea6dc7162167e80d94b9a459f292cb59731fd373"
+    },
+    {
+      "file": "gift_5170250947678437525.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/gift_5170250947678437525.webp",
+      "sha256": "be99beb2d5a7ba1614ea533dd44c774d834b941f704e33df31258f54c8c37d22"
+    },
+    {
+      "file": "gift_5170314324215857265.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/gift_5170314324215857265.tgs",
+      "sha256": "721aa36d79566a0dfe0b40a9eafd2d32720701966f1342423515435f5bb3f6a6"
+    },
+    {
+      "file": "gift_5170314324215857265.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/gift_5170314324215857265.webp",
+      "sha256": "86b571c372b02883035261ec6571d70f7ce7afd484ff7546a770fec4c4158b06"
+    },
+    {
+      "file": "gift_5170521118301225164.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/gift_5170521118301225164.tgs",
+      "sha256": "9b7ded3bd70ec639eff765bf5f30ea72e2fb2caa38f2d67ef7eaaff213eba255"
+    },
+    {
+      "file": "gift_5170521118301225164.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/gift_5170521118301225164.webp",
+      "sha256": "b7b874f1eb133ac955fe29eab5329577e01909ada87cc9b47fc9fea8dcdacca0"
+    },
+    {
+      "file": "gift_6028601630662853006.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/gift_6028601630662853006.tgs",
+      "sha256": "310b2be0ce8de5d514db2b2a38b68575daf9b41df9de3d0c9f9be359bbc87000"
+    },
+    {
+      "file": "gift_6028601630662853006.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/gift_6028601630662853006.webp",
+      "sha256": "4d7feac3c3dcdea70347409e33757e788e6362901782991b8cfbcdcdda771d03"
+    },
+    {
+      "file": "ginger_cookie.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/ginger_cookie.tgs",
+      "sha256": "896ea47a4e691d6d9c498a3d23b11cbf04c4a216857ccadc2727dc5262ce8a1a"
+    },
+    {
+      "file": "ginger_cookie.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/ginger_cookie.webp",
+      "sha256": "d12f470bf3afdf50d3f0b453c752f6aa400e6470cff499412e9e03797a2b220f"
+    },
+    {
+      "file": "gravestone.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/gravestone.tgs",
+      "sha256": "ae6f43cf3661caa2247d0641036c3c1855cad19ca5ff7c5bcedc1d98d9957608"
+    },
+    {
+      "file": "gravestone.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/gravestone.webp",
+      "sha256": "0a2101d2f787ee3d2888e480948558b3af599869f5e6e2f96891eda63ba535bf"
+    },
+    {
+      "file": "hanging_star.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/hanging_star.tgs",
+      "sha256": "6b1d8f5b41d4da17f8946194f16bbd65b087916b5f07120184d03c4bbe78f7b1"
+    },
+    {
+      "file": "hanging_star.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/hanging_star.webp",
+      "sha256": "23fc8825a59fe0f8eff84eb3e3fa6bc883a91580803c24f48d313286bc31aa53"
+    },
+    {
+      "file": "happy_brownie.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/happy_brownie.tgs",
+      "sha256": "2498c8c95c0901f6380c5db82b8cac1b1b151873d1dba931fe615dd76fdf9cdd"
+    },
+    {
+      "file": "happy_brownie.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/happy_brownie.webp",
+      "sha256": "a6581686fac19f1e373bc18b86cfa1ef2fb510c25dc246c310c8a83b351e70d0"
+    },
+    {
+      "file": "heart_locket.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/heart_locket.tgs",
+      "sha256": "9959bad88f6bbb1786abd14662751f6380d1c4ccb75b510793e7d6a23c15cadf"
+    },
+    {
+      "file": "heart_locket.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/heart_locket.webp",
+      "sha256": "eb47e31be21737b6a8c22215bb3934b9197db2947af379f946b3f89b20f7073b"
+    },
+    {
+      "file": "heart_pendant.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/heart_pendant.tgs",
+      "sha256": "077bea26515a2c82882ddf9f3d1c071b9416f614d681b498bdab106fb85c9e1c"
+    },
+    {
+      "file": "heart_pendant.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/heart_pendant.webp",
+      "sha256": "8da2bfad7911c444709e67d5ea8aba0ef1bdf64f1d62efbebbcd115d9519ec1b"
+    },
+    {
+      "file": "heroic_helmet.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/heroic_helmet.tgs",
+      "sha256": "42a4f721c3cb233fab8e26aa4f322eec9494325d3f1dcec5d56adfee6e9783ac"
+    },
+    {
+      "file": "heroic_helmet.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/heroic_helmet.webp",
+      "sha256": "c235d50a90fc8f11c8fd2bdb81650f7e514711389ab273676c99aab6b6650848"
+    },
+    {
+      "file": "hex_pot.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/hex_pot.tgs",
+      "sha256": "c458217ef37a4b834066de76470272b2827725a6d96198fccf18eead046d4678"
+    },
+    {
+      "file": "hex_pot.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/hex_pot.webp",
+      "sha256": "f80f66d611f9b40229e5bd4e0075770e9a0bbeed2203de691bdcc8b4f4b5d5ca"
+    },
+    {
+      "file": "holiday_drink.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/holiday_drink.tgs",
+      "sha256": "7cccd0ade52242540e470215b07bef89d8382b86790d3ffcb6dcb93990d92b1d"
+    },
+    {
+      "file": "holiday_drink.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/holiday_drink.webp",
+      "sha256": "7b6bbd41538558deda9260ac1a0e71a1d8cac1513d951b6eb9b7804860615dc5"
+    },
+    {
+      "file": "homemade_cake.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/homemade_cake.tgs",
+      "sha256": "084b139057fc8f7513de372c9490083286814fad30458837352f79f8d9da0807"
+    },
+    {
+      "file": "homemade_cake.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/homemade_cake.webp",
+      "sha256": "c0709e14fb1df99c455a635fc36aec17543475ba132ea4db8c1724ff5890a337"
+    },
+    {
+      "file": "hypno_lollipop.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/hypno_lollipop.tgs",
+      "sha256": "8e3968f734c2b8fa4b86c4d45e865f99e84da848df56399638075da12cb926f9"
+    },
+    {
+      "file": "hypno_lollipop.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/hypno_lollipop.webp",
+      "sha256": "0bb1fd1c5af8c2112f4a2f9487f3aa00259f1b17650ab7dc91fa33ca8dcb343b"
+    },
+    {
+      "file": "ice_cream.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/ice_cream.tgs",
+      "sha256": "72c27cdea1e0239409950add2481026f5c9835784405681131bccd33acd4aa37"
+    },
+    {
+      "file": "ice_cream.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/ice_cream.webp",
+      "sha256": "ed2e011c314f4406afc0f5da9249227ef80135ed7b857db2398c21817846dd55"
+    },
+    {
+      "file": "input_key.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/input_key.tgs",
+      "sha256": "bf324a085f960f6effe8716b01bceaaa8dd1aad2cbe4fe379ec91783d4db3f87"
+    },
+    {
+      "file": "input_key.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/input_key.webp",
+      "sha256": "1b688cc2f61a4d319330405a5ab1bdc1978d24b3af168f5a6f04351693bb0028"
+    },
+    {
+      "file": "instant_ramen.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/instant_ramen.tgs",
+      "sha256": "17d4f8c2fe03c5cc248619bf29fd05845892a28845cd38606ffe09830a76d009"
+    },
+    {
+      "file": "instant_ramen.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/instant_ramen.webp",
+      "sha256": "0f92f5e34e9cda3a559a95878f50b7916f62608595d6c4256f03143f879ea9b2"
+    },
+    {
+      "file": "intelligence_cup.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/intelligence_cup.tgs",
+      "sha256": "81bcc6e41a5371ce5dcdc88274595959c615a1ca2fe8c2ec05000775b7908a0c"
+    },
+    {
+      "file": "intelligence_cup.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/intelligence_cup.webp",
+      "sha256": "9489c1fec0e10c7bec36f8de4989ebaaca076d47991eacec99db1a41a6c47afc"
+    },
+    {
+      "file": "ion_gem.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/ion_gem.tgs",
+      "sha256": "19fbd265aebf26c9c89bf3ab203455d17b9f36e3790c7488186b2ee909b76f1a"
+    },
+    {
+      "file": "ion_gem.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/ion_gem.webp",
+      "sha256": "5ea76f879c3eae7ce9c6d3e8f3f163d982ea493d40caf675ec4d9cfc52fbc3d3"
+    },
+    {
+      "file": "ionic_dryer.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/ionic_dryer.tgs",
+      "sha256": "8a95cdcc4969418951c0f1452f7a3a8abb933a0c3a8f73d0865d00f018652f3a"
+    },
+    {
+      "file": "ionic_dryer.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/ionic_dryer.webp",
+      "sha256": "61c2ef3906cfb92fa37253dbb4e7360809708fa15a2ff11f9f2aa7e1c95de6e8"
+    },
+    {
+      "file": "jackinthebox.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/jackinthebox.tgs",
+      "sha256": "2bc98911c85b68ea095d7d76961021117b82b905e1d6502cd3adbd19d0ba88ef"
+    },
+    {
+      "file": "jackinthebox.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/jackinthebox.webp",
+      "sha256": "61666a830470e5b5bf9534fd431cc4812fbce81457ed298b83e2a082663a9ddd"
+    },
+    {
+      "file": "jelly_bunny.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/jelly_bunny.tgs",
+      "sha256": "7ebe82e1eb2747a634665aaac7e9e9e9e8b8061e0107ef39d1aa76f52152ec89"
+    },
+    {
+      "file": "jelly_bunny.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/jelly_bunny.webp",
+      "sha256": "8d1e77b761dba5ac3745ced831abd90667ffce662ae5be95f546f1305023aa4a"
+    },
+    {
+      "file": "jester_hat.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/jester_hat.tgs",
+      "sha256": "52bca3dac3992ed82bf6b61be63f1db42759ee025f96193cf998628d5e66395b"
+    },
+    {
+      "file": "jester_hat.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/jester_hat.webp",
+      "sha256": "700e5bc66dd17aabd584c3b245357378f482668a6540a0008b20907ea5254449"
+    },
+    {
+      "file": "jingle_bells.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/jingle_bells.tgs",
+      "sha256": "a380431ef980bf7c4de6c1da46fb033c643e218894e79258b12b0ca5aff1e49f"
+    },
+    {
+      "file": "jingle_bells.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/jingle_bells.webp",
+      "sha256": "89ce7b52359b8183b6399091bbd22f084bdb9fddf3a80f84a6043b5c4fd10d37"
+    },
+    {
+      "file": "jolly_chimp.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/jolly_chimp.tgs",
+      "sha256": "9fafbde3efa192f7abb920a22696b0f746cea6e44324ffb5b34b73a636346b0e"
+    },
+    {
+      "file": "jolly_chimp.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/jolly_chimp.webp",
+      "sha256": "af9db9730b78c979eb92df164ebd16555d5b72892c4420bf7f9fbcede57d67c8"
+    },
+    {
+      "file": "joyful_bundle.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/joyful_bundle.tgs",
+      "sha256": "5eff847e5517e122cad51c84c781e13131802f1196a2ec46fec322e2b95bdc7c"
+    },
+    {
+      "file": "joyful_bundle.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/joyful_bundle.webp",
+      "sha256": "5c2a8fea2cff4d35a3b1fbb2fbd1e8844bda19dac9f066d95a462f7948ce5af8"
+    },
+    {
+      "file": "khabibs_papakha.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/khabibs_papakha.tgs",
+      "sha256": "9668daa341a35da2861e0b76fbba7d48eeb3ebe43f673f4fb054278331e115bb"
+    },
+    {
+      "file": "khabibs_papakha.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/khabibs_papakha.webp",
+      "sha256": "e43220d0a4c2687083f87b5ac649ffc69c0367fa57f92d5b78fab507e680d11c"
+    },
+    {
+      "file": "kissed_frog.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/kissed_frog.tgs",
+      "sha256": "e91b889e059953786876f698094163f5b671dbf9191db561d9c25a994b235795"
+    },
+    {
+      "file": "kissed_frog.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/kissed_frog.webp",
+      "sha256": "1e88d9ef528dde49f26e4a4acc39d974eeb5d0fcdf0a409e2005d6d847e45d26"
+    },
+    {
+      "file": "liberty_figure.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/liberty_figure.tgs",
+      "sha256": "32e2c3078bdb39b6322ebb02513520494278122068734b0f182170b07d7ccf50"
+    },
+    {
+      "file": "liberty_figure.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/liberty_figure.webp",
+      "sha256": "38c35ea399202423c26d108887cff26cb562105b002d6b4deb8d4b3f5477334a"
+    },
+    {
+      "file": "light_sword.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/light_sword.tgs",
+      "sha256": "9185085e768026d0f40d3c0f7bbdeb6eff8a3a93cfe454bdaf0820d43be3e66a"
+    },
+    {
+      "file": "light_sword.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/light_sword.webp",
+      "sha256": "d71d05c868ee664e084e8762509c43b7c08b4b37948e4041ceaceb7907ed056c"
+    },
+    {
+      "file": "lol_pop.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/lol_pop.tgs",
+      "sha256": "01e81c719c48c847dc6e16d70dbde043e611afba16da75330c3099139d0d71f6"
+    },
+    {
+      "file": "lol_pop.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/lol_pop.webp",
+      "sha256": "3315de6e1541eeec15ad2ce3c32e0688981e227c7ff19f79262f05a728a52ed3"
+    },
+    {
+      "file": "loot_bag.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/loot_bag.tgs",
+      "sha256": "a09c8a9414217032433fff498af1df54b3f8c29c0ad5108ff4b25b07fe32308c"
+    },
+    {
+      "file": "loot_bag.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/loot_bag.webp",
+      "sha256": "e95db8699720a75287f994b852faabe4d6fdbf85757c58cb10aa4eead779869b"
+    },
+    {
+      "file": "love_candle.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/love_candle.tgs",
+      "sha256": "220b4e79a08b214b07b83867d60b2488fbf3d0019f2f356b29165708cfefead3"
+    },
+    {
+      "file": "love_candle.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/love_candle.webp",
+      "sha256": "7f5920178a75c51940be593cac5ac6d938b4aea74c521cc59f8272f6a4d788ac"
+    },
+    {
+      "file": "love_potion.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/love_potion.tgs",
+      "sha256": "d2d94a1d1dd41955dc585eb90a815c649e3bca0915332155ef62d4889ea8db7a"
+    },
+    {
+      "file": "love_potion.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/love_potion.webp",
+      "sha256": "250def5d46eeac82278e6d23b56c8ecae5a315254e230adc6701ec766d194bab"
+    },
+    {
+      "file": "low_rider.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/low_rider.tgs",
+      "sha256": "363c9fab7a140b194feebb74446b1a06ed8cb45f7c8aa9f8279665a971558ecd"
+    },
+    {
+      "file": "low_rider.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/low_rider.webp",
+      "sha256": "d63e27b6de557a86839d668ebadcbcb4baeca2f5dceab24cea2dfb119c25e059"
+    },
+    {
+      "file": "lunar_snake.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/lunar_snake.tgs",
+      "sha256": "455f54236f31cdef3257512bc17fa718951199fa4243266a11c6be9a415acb81"
+    },
+    {
+      "file": "lunar_snake.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/lunar_snake.webp",
+      "sha256": "8b41873d45d2edcbe2e9fec8ec7111abdcf03709478aed96756880361e3f3ab8"
+    },
+    {
+      "file": "lush_bouquet.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/lush_bouquet.tgs",
+      "sha256": "74994080ecfd4b2c5775185749f10dc298b89988921a62fc087265befa19a73b"
+    },
+    {
+      "file": "lush_bouquet.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/lush_bouquet.webp",
+      "sha256": "d97631d12d3bd4fd0eb394bb52770dd9a57d6f188d3bef2e59bc8b519dc3abfd"
+    },
+    {
+      "file": "mad_pumpkin.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/mad_pumpkin.tgs",
+      "sha256": "638e784ce8d8407811c37d78c9efbabd35150e38d2e766a4d853f6ac0971328a"
+    },
+    {
+      "file": "mad_pumpkin.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/mad_pumpkin.webp",
+      "sha256": "74936c28f6049272a39559a65e98850583063c0a89b6208e8ff002d8e8e9fc41"
+    },
+    {
+      "file": "magic_potion.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/magic_potion.tgs",
+      "sha256": "c9eec3e378a6571cb7e32cb4b003a22d89ffd02eb84fde91245ea9a394f243e1"
+    },
+    {
+      "file": "magic_potion.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/magic_potion.webp",
+      "sha256": "7e1fc587e83df2f7fa4b8448a9917ce99f6c0c3b4f50bd2e4bd43182636ebb58"
+    },
+    {
+      "file": "may.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/may.tgs",
+      "sha256": "41dc39a46d09501ce7bffb36fae213854a74ed9f4500f6be8e1d649338167c4e"
+    },
+    {
+      "file": "may.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/may.webp",
+      "sha256": "538c480a6cd392b9310b17cb1b9625c5296307ce54597db263c3ead0a71d9bbe"
+    },
+    {
+      "file": "mighty_arm.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/mighty_arm.tgs",
+      "sha256": "2152a948fa96f6ee6309679e669a8872ff2e402692abe52230fea80b7bd825ce"
+    },
+    {
+      "file": "mighty_arm.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/mighty_arm.webp",
+      "sha256": "832197ee6711d9236ebd5300f7328b989af66265a8304b36d85ef531482e180c"
+    },
+    {
+      "file": "mini_oscar.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/mini_oscar.tgs",
+      "sha256": "4b68eaae0a296f3cf3c0a79d6c3750803f4c859988e18d490cb4c4698f3b8729"
+    },
+    {
+      "file": "mini_oscar.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/mini_oscar.webp",
+      "sha256": "378a3f5a9efe4f68c98d830e6c0892d9a993ace7b15e2449cbb5852c8596875e"
+    },
+    {
+      "file": "money_pot.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/money_pot.tgs",
+      "sha256": "975c67bb50ad60b5b38453d6ff69711fb04895b28b478c83b90a4cd1ce97a258"
+    },
+    {
+      "file": "money_pot.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/money_pot.webp",
+      "sha256": "8f97e0297c886adfa581f2e92fc2d8bbe31e266b40e590cb57f84ddf456b502f"
+    },
+    {
+      "file": "mood_pack.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/mood_pack.tgs",
+      "sha256": "14671332bf93d2c453f45d14fd42a703f3f7c240481642a18ce4104047ce0f3b"
+    },
+    {
+      "file": "mood_pack.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/mood_pack.webp",
+      "sha256": "bbd2797e8ec125412dd754d47523bcd0d8f2033769fd9ae6b40385ff46b2130d"
+    },
+    {
+      "file": "moon_pendant.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/moon_pendant.tgs",
+      "sha256": "a30ac86f7309b7210e4f179371a3de3d579694c97fa0e011bb8622bbd2301c69"
+    },
+    {
+      "file": "moon_pendant.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/moon_pendant.webp",
+      "sha256": "7d3aa802851019518797d8f0431a162f27376ce31052634ea857454b0a094b5b"
+    },
+    {
+      "file": "mousse_cake.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/mousse_cake.tgs",
+      "sha256": "102d7550c851561075427a48050534668ea3128bb295ad5025664fc03f32e3a4"
+    },
+    {
+      "file": "mousse_cake.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/mousse_cake.webp",
+      "sha256": "dd061e10b851d9c0e7422178345f12579997567ac91e81abdbbe012d51808a2c"
+    },
+    {
+      "file": "nail_bracelet.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/nail_bracelet.tgs",
+      "sha256": "13612c2cf2b3c88176af53c3272069fc7d4379ba82bc9fe905af1e303875749b"
+    },
+    {
+      "file": "nail_bracelet.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/nail_bracelet.webp",
+      "sha256": "eda16a933aea0e9db24caee460191eb4e60f14d44caaa116e8738d30b6ccea82"
+    },
+    {
+      "file": "neko_helmet.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/neko_helmet.tgs",
+      "sha256": "85ca23e3c647ce52b9aedf472f15829688d7cb965199549731c1dd3d5a3a01fc"
+    },
+    {
+      "file": "neko_helmet.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/neko_helmet.webp",
+      "sha256": "d6a29ca38d9dd3dccc8a0fd3ff634a4e3ac6cc30d2d947c8bf66eccbdd2c72be"
+    },
+    {
+      "file": "party_sparkler.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/party_sparkler.tgs",
+      "sha256": "cfff167512c71885924219ea0e1b98b3e4cf2124a0733d4a8f74c063a33c6184"
+    },
+    {
+      "file": "party_sparkler.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/party_sparkler.webp",
+      "sha256": "42e78a6abad705bbaf8040f57534037e9124d5605366031f84ee887ce037d384"
+    },
+    {
+      "file": "perfume_bottle.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/perfume_bottle.tgs",
+      "sha256": "d736f37a93984ab686f01c424f27d0148308a626f2e5ee2c084047bccd485042"
+    },
+    {
+      "file": "perfume_bottle.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/perfume_bottle.webp",
+      "sha256": "41f9ef11da0a276f8832b274399a431bc29d5951eb42620f859a2c1d24713a19"
+    },
+    {
+      "file": "pet_snake.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/pet_snake.tgs",
+      "sha256": "6759db6b45bbbae15c2bdaa2a66f8f916337d63f4adc086d9edfb892001161e9"
+    },
+    {
+      "file": "pet_snake.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/pet_snake.webp",
+      "sha256": "1dcfe9856619b50483d40e210bd24ae89836a11d19c2d9d0e514237c4d34923c"
+    },
+    {
+      "file": "plush_pepe.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/plush_pepe.tgs",
+      "sha256": "303a4f668bab9b860cfc77a25bce72ee0ccb48791f8b1a29dcaa8c890591cd63"
+    },
+    {
+      "file": "plush_pepe.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/plush_pepe.webp",
+      "sha256": "d92642e04d20c3054e040abc92b894d7079882c358ec3be2d79017bb36b7e082"
+    },
+    {
+      "file": "pool_float.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/pool_float.tgs",
+      "sha256": "38bd4c30fa758689eb309f36c4df29c445569e6d02ed589988ca1e6027e670f8"
+    },
+    {
+      "file": "pool_float.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/pool_float.webp",
+      "sha256": "0a92d3a000d19a0e44dacb69834cd613babfe4882d8c1696f5299c1d0f0b72ca"
+    },
+    {
+      "file": "precious_peach.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/precious_peach.tgs",
+      "sha256": "430f04e09767ebcedd5b203ed6e599c569d26cdee3f2e85420320875f7b78588"
+    },
+    {
+      "file": "precious_peach.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/precious_peach.webp",
+      "sha256": "ce3990ed3f2e0fb57505b4768b6b06f4bb570ddbea6fe69aad5b61aa2145112c"
+    },
+    {
+      "file": "pretty_posy.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/pretty_posy.tgs",
+      "sha256": "49a6dd029d33a5e5a9c89f2e79c0c09cfe0fa01cdfa2395759bfa8ef9be149f9"
+    },
+    {
+      "file": "pretty_posy.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/pretty_posy.webp",
+      "sha256": "450433cdf825fdfa04e2d6667939809b9481af664990ab7aff22055fef6825da"
+    },
+    {
+      "file": "rare_bird.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/rare_bird.tgs",
+      "sha256": "b1495813948749460e01f2adaf842f9176177f6e78e7d2e28736eae202de6017"
+    },
+    {
+      "file": "rare_bird.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/rare_bird.webp",
+      "sha256": "ef67a5f11460a92127c0ff94c4e61231bf6d11405326356eca5adb727da5002c"
+    },
+    {
+      "file": "record_player.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/record_player.tgs",
+      "sha256": "b8ef11ac71bc47055020af3eb640079995fcde464671e725100eaa7acff7c9df"
+    },
+    {
+      "file": "record_player.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/record_player.webp",
+      "sha256": "9d5c81344aa973f5728207bbc82be885e77080d37e980462f1dce970d0b19bae"
+    },
+    {
+      "file": "red_star.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/red_star.tgs",
+      "sha256": "f637158f3fdd6f4316cbc8ba54284262e976703bb1683d05f94b344b1b071490"
+    },
+    {
+      "file": "red_star.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/red_star.webp",
+      "sha256": "ecfc5b229b9ae7828cb9a260897f6d1834d51de7cf0e181c5f5d8cd6cbebf181"
+    },
+    {
+      "file": "redo.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/redo.tgs",
+      "sha256": "5286595884f4456fea4f65ae37f6b512e40259916cb205c34f134ba9f7dd0674"
+    },
+    {
+      "file": "redo.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/redo.webp",
+      "sha256": "b4e72853c2a0f001d4a57466ec57ed7aa6e14d139817b51b2c11a3a18ee5cf47"
+    },
+    {
+      "file": "restless_jar.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/restless_jar.tgs",
+      "sha256": "557e3bde7248de6a41642d562e1d167234e96c5bf0605c4c7a28c5711cf1e90c"
+    },
+    {
+      "file": "restless_jar.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/restless_jar.webp",
+      "sha256": "57bf0def5ee5774afdf1103cb5904e97f123a00250d682adef08c627cc619932"
+    },
+    {
+      "file": "sakura_flower.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/sakura_flower.tgs",
+      "sha256": "4b6c31349911d268c4509e184aac61d877269d7e57745a32c750c851d8a25153"
+    },
+    {
+      "file": "sakura_flower.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/sakura_flower.webp",
+      "sha256": "8f5af2996c42eb86757a6ccce9b2e436b4af5df49edfe337ab03a48165dc28c9"
+    },
+    {
+      "file": "sand_castle.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/sand_castle.tgs",
+      "sha256": "eac201da576925b14e3e9aa8fdda4ddcd0002af036ccadd84ca9eff57e25fbf5"
+    },
+    {
+      "file": "sand_castle.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/sand_castle.webp",
+      "sha256": "8a15c3eabb59e0244e88c2c4f4b1296aa7b3619c35c8851fb3e5467de165299d"
+    },
+    {
+      "file": "santa_hat.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/santa_hat.tgs",
+      "sha256": "13789188fd1e90ac53de7df4e9df94a7dd329b210cd667d3beb1827d950f7283"
+    },
+    {
+      "file": "santa_hat.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/santa_hat.webp",
+      "sha256": "d30ddf725be6f46e6a075b536df693b6bf95a2461e31571c8dc2ddee26fadfb6"
+    },
+    {
+      "file": "scared_cat.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/scared_cat.tgs",
+      "sha256": "fd54fad93ab3e486c77526073c150a7ad5ca0ae5bd8d65c0f92a42a28541b6ab"
+    },
+    {
+      "file": "scared_cat.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/scared_cat.webp",
+      "sha256": "f4f451b504489e6b10bfc872bb010c1822646da572fdab001b2603b49a74857c"
+    },
+    {
+      "file": "sharp_tongue.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/sharp_tongue.tgs",
+      "sha256": "d146a673651f53cc122506e0e65a3617561a3b84f2892ab319ba4afe16f47e14"
+    },
+    {
+      "file": "sharp_tongue.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/sharp_tongue.webp",
+      "sha256": "2de0d865a9a93bc2f951f61d937065b5aea32272e1b6349b2923ea8ace314391"
+    },
+    {
+      "file": "signet_ring.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/signet_ring.tgs",
+      "sha256": "778a3dd5f3732d582d8a94ebb49fa73067e1b141f3516b0e0093b7d424d873cb"
+    },
+    {
+      "file": "signet_ring.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/signet_ring.webp",
+      "sha256": "42af2f9b9c826882e2a7d93037773201b7d5c4cd085d398e2880638576e834d9"
+    },
+    {
+      "file": "skull_flower.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/skull_flower.tgs",
+      "sha256": "e75e410cbe490449eee0a0ddb3bf4d70b6ecc122bf7931213c67072c5546e38c"
+    },
+    {
+      "file": "skull_flower.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/skull_flower.webp",
+      "sha256": "21a5eb848a9fdb65ff2c15f6153cc69e304e5804baa41b5e52d6ac72447a87b5"
+    },
+    {
+      "file": "sky_stilettos.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/sky_stilettos.tgs",
+      "sha256": "2484ad1ecb6108f45c184574c0e3edff0e6203f1416f9542c2c8a4533c2e7a0f"
+    },
+    {
+      "file": "sky_stilettos.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/sky_stilettos.webp",
+      "sha256": "4bac00ca656baaa1b24388f6a34132806be4fb4b6c62993d19db353c866d1340"
+    },
+    {
+      "file": "sleigh_bell.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/sleigh_bell.tgs",
+      "sha256": "de8defef3eda914f8abaaa09df84775888067207477423f6ccc0ec388417a391"
+    },
+    {
+      "file": "sleigh_bell.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/sleigh_bell.webp",
+      "sha256": "6b52e721306866316dfaeeada50c9b79fec35abb810cae36897572c26ef40fab"
+    },
+    {
+      "file": "snake_box.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/snake_box.tgs",
+      "sha256": "cf0bb33528c09e25d2742b82c85d7825257f63e141b7fd62ebe0ef8fa7dfbfcb"
+    },
+    {
+      "file": "snake_box.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/snake_box.webp",
+      "sha256": "b50781a8cb238383d800f94a1638660e9071d2c0d31a3ba06f5748732559c76e"
+    },
+    {
+      "file": "snoop_cigar.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/snoop_cigar.tgs",
+      "sha256": "fb15312fa737de2dc65d67d2b94bddc1bb66cd72d0f2f50d2481ae241786155e"
+    },
+    {
+      "file": "snoop_cigar.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/snoop_cigar.webp",
+      "sha256": "22bea464a09464573ac0e8b38fe42558f2027ad5d897e338586830a492079024"
+    },
+    {
+      "file": "snoop_dogg.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/snoop_dogg.tgs",
+      "sha256": "7dc1cefb7a234a8be45e36695d5a431f435082fffe7823d0db6555e12d8609af"
+    },
+    {
+      "file": "snoop_dogg.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/snoop_dogg.webp",
+      "sha256": "39931a3dcb147ab6a65df4f0c2f5ed6f81da229340f0a420648e0e6a7357655f"
+    },
+    {
+      "file": "snow_globe.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/snow_globe.tgs",
+      "sha256": "34c7325ea0950d99f16ff6d43264d4087c34a60f29804db2468e2fd077dbd942"
+    },
+    {
+      "file": "snow_globe.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/snow_globe.webp",
+      "sha256": "4800f84ec7eb6cc51dd0f5ea2061d62581e99aedb058e61e588ecdaa5a69f4cc"
+    },
+    {
+      "file": "snow_mittens.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/snow_mittens.tgs",
+      "sha256": "0480f29efcdda72170cddb77efe6712b51208fdf4c5c79dbacebb3ce5dbd72b9"
+    },
+    {
+      "file": "snow_mittens.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/snow_mittens.webp",
+      "sha256": "54bd9a94a4795cb77b5afbee392fae34aa531cba252542a63ee9ebc21770612c"
+    },
+    {
+      "file": "spiced_wine.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/spiced_wine.tgs",
+      "sha256": "ad2ed64633b81b26e25a2706005ec0361fce1a11606c85843987aff7f685ab1d"
+    },
+    {
+      "file": "spiced_wine.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/spiced_wine.webp",
+      "sha256": "626459e2e4df1354c05ca65101ec71ca0a1ccfefcfd49f73729abd9fdd52df30"
+    },
+    {
+      "file": "spring_basket.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/spring_basket.tgs",
+      "sha256": "ab9256bedf6f812e524911dc2bd315b678db920591b492677ec45bedb7cfd68c"
+    },
+    {
+      "file": "spring_basket.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/spring_basket.webp",
+      "sha256": "0161b86fd2c911e85508be3456de377fa801dce6469347b859aa03732f4d6377"
+    },
+    {
+      "file": "spy_agaric.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/spy_agaric.tgs",
+      "sha256": "e5a9e38343b6a01af3703d4d7ef1ecb160dcd580f86c6f56638298dd2ddf70df"
+    },
+    {
+      "file": "spy_agaric.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/spy_agaric.webp",
+      "sha256": "26a63976d5319bb9d008bccd0c9727a8342b8a4f1c5c86941dad7197e63c0c85"
+    },
+    {
+      "file": "star_notepad.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/star_notepad.tgs",
+      "sha256": "855e28ae5a886f0a3881592aef9045784bc19e4626d36c3fee2bd9fbaabb6b80"
+    },
+    {
+      "file": "star_notepad.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/star_notepad.webp",
+      "sha256": "1636bc163a2384dd1c522f98cc672f646b61e44bf89a6352934382dd8857d25f"
+    },
+    {
+      "file": "stellar_rocket.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/stellar_rocket.tgs",
+      "sha256": "73466b587dd07d8a58cb016a1aa2321a848f6819f23fe69c5cc98ee46e10415b"
+    },
+    {
+      "file": "stellar_rocket.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/stellar_rocket.webp",
+      "sha256": "14d15ef733800ad6f803bf56a3489297bb7253685a3a5e0da5f04c279765f0f0"
+    },
+    {
+      "file": "surge_board.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/surge_board.tgs",
+      "sha256": "ad9f64a4e2a3083cf6a60fc7fc44d80ef14135723f12ce3f691f202bb0f97ba4"
+    },
+    {
+      "file": "surge_board.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/surge_board.webp",
+      "sha256": "369ba0e5921368d2c44c1198361bd03acf9c6856cf3d964704ab4a86a5895543"
+    },
+    {
+      "file": "swag_bag.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/swag_bag.tgs",
+      "sha256": "95e2c52a6d01be123abcf903349592f8da8a4d550aba20833446a15ce5011f0e"
+    },
+    {
+      "file": "swag_bag.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/swag_bag.webp",
+      "sha256": "5fc5397bb1205c271de596dd305c1dbb99d99d9bea484a5fe16e9eab4d1325a3"
+    },
+    {
+      "file": "swiss_watch.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/swiss_watch.tgs",
+      "sha256": "cff9dad1cd52d7dd34a80e51ad7d82d942bdc72837058034d8e98347232db111"
+    },
+    {
+      "file": "swiss_watch.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/swiss_watch.webp",
+      "sha256": "7e0f5cceb505a72e39b4df58468c854d103d39486a34b05b24fba1a3efdef3e3"
+    },
+    {
+      "file": "tama_gadget.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/tama_gadget.tgs",
+      "sha256": "3d6dd25dcf15143b2a5d94679df9242383ef5569dcfeaf3804ac278bd6831bdb"
+    },
+    {
+      "file": "tama_gadget.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/tama_gadget.webp",
+      "sha256": "776a4067b97463571d1b2947b237ba0eda1b96623868596cfac67afca1cd23aa"
+    },
+    {
+      "file": "telegram_pin.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/telegram_pin.tgs",
+      "sha256": "ced9a4d056f898f20cb1b84068451067cdebb7d231bfb1c9107f45c3067f2cac"
+    },
+    {
+      "file": "telegram_pin.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/telegram_pin.webp",
+      "sha256": "8e909b4994da877d94a00788ffc5e5fed21a0f25c44be499225ed294b919a746"
+    },
+    {
+      "file": "timeless_book.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/timeless_book.tgs",
+      "sha256": "48d31b6485da14fd1dbc3555c328b5f4ceebdbbd8122eef0c122e88d01a7a9df"
+    },
+    {
+      "file": "timeless_book.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/timeless_book.webp",
+      "sha256": "088ae30d816fc0ce6ef8d1e57b6b4e96a9d616078f9a7ca9884dfbb814c0c2b9"
+    },
+    {
+      "file": "top_hat.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/top_hat.tgs",
+      "sha256": "656538a518077d9b1009d9450f1e1d04eedbbf03ea8239223933a857c4d36cb2"
+    },
+    {
+      "file": "top_hat.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/top_hat.webp",
+      "sha256": "9d0811109631920d0f8222098f08a1c960cbb433bb8febd64ee28f66cf078588"
+    },
+    {
+      "file": "toy_bear.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/toy_bear.tgs",
+      "sha256": "2ae05f9bea52df5554975cf8b3267f8511cbd81de1fcec7bd0706175f0e627bc"
+    },
+    {
+      "file": "toy_bear.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/toy_bear.webp",
+      "sha256": "fdaf93a8fd5c3a2c8d65f5bb5d078a8ea0b6306655e259b572aa0c65475e15d1"
+    },
+    {
+      "file": "trapped_heart.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/trapped_heart.tgs",
+      "sha256": "b6ad533122f10962c2019214708fc01ba1250d1e085ab432894108616de2bf00"
+    },
+    {
+      "file": "trapped_heart.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/trapped_heart.webp",
+      "sha256": "a43c5da9c9ee3203d9ded17ce73f0eb1c0ed5700ede7727ec82b1686c26c443c"
+    },
+    {
+      "file": "triple_meow.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/triple_meow.tgs",
+      "sha256": "8ec125c8b0ec0f330911b2224d356cb3155398b112960cf41a1d5e304c3cb12e"
+    },
+    {
+      "file": "triple_meow.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/triple_meow.webp",
+      "sha256": "f1cbfba36d7b0d6d9c469908f22ae71cb5e57fb050db7fcfe514b25a2940ba56"
+    },
+    {
+      "file": "trojan_horse.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/trojan_horse.tgs",
+      "sha256": "e6b427d9c1bad172761828a0f7891a4732f2c19ea6ad51116c915cbe608d1a94"
+    },
+    {
+      "file": "trojan_horse.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/trojan_horse.webp",
+      "sha256": "f4f264c878448f1606260c36c33de1bda1f60547c9a85c4f4a2b9d4f9653c278"
+    },
+    {
+      "file": "ufc_strike.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/ufc_strike.tgs",
+      "sha256": "5b8fdd4dbc89eb50c6ac684e6d772af26f9d810880fdb2d67ba3c024abd0080c"
+    },
+    {
+      "file": "ufc_strike.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/ufc_strike.webp",
+      "sha256": "6126a964332a44ba2b173a588e0c1e4447da42b495cf15f825ee346b22fb949e"
+    },
+    {
+      "file": "valentine_box.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/valentine_box.tgs",
+      "sha256": "4004f99b90bf172727d2e863cab04dbe525ab4a05c1f47359d9b1b786ba4ba0d"
+    },
+    {
+      "file": "valentine_box.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/valentine_box.webp",
+      "sha256": "0ba20fe81fba3647b39fb39922d8eba4398a7bbd73b8507480a28f6e5c4e1c43"
+    },
+    {
+      "file": "vice_cream.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/vice_cream.tgs",
+      "sha256": "cdaf955a00a7e0ff23181e05cdba624f06a0c1e3092eeb610e5c7abac89cd5aa"
+    },
+    {
+      "file": "vice_cream.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/vice_cream.webp",
+      "sha256": "0ba1952bb5fd64a374564a809f2cedb10aecb7d823462f12393a62f219c1cbf4"
+    },
+    {
+      "file": "victory_medal.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/victory_medal.tgs",
+      "sha256": "7de11e4eacdbfc936a3fc4457972bc76a577327f23d2e2b56f271511cab5cb61"
+    },
+    {
+      "file": "victory_medal.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/victory_medal.webp",
+      "sha256": "d207435ec3e7071f1042d2b31b17e285510f137fc1e859897a98d1861875f23a"
+    },
+    {
+      "file": "vintage_cigar.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/vintage_cigar.tgs",
+      "sha256": "4507e57d9d9b876044fb54cc9ca5de9d4b65fc087b643d847bceaf8c15e2ac10"
+    },
+    {
+      "file": "vintage_cigar.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/vintage_cigar.webp",
+      "sha256": "0c4f2b35304474aa43f151067b0d3661f821749106898dc0b4f9d7a3dccde5a6"
+    },
+    {
+      "file": "voodoo_doll.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/voodoo_doll.tgs",
+      "sha256": "ad63e9f7202b5a04668018a1c8c5fa45330dd0c181f0f1abf67bcb68d94f0e37"
+    },
+    {
+      "file": "voodoo_doll.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/voodoo_doll.webp",
+      "sha256": "392f49fdab56204f5f960e94f53d27aca69a1de924fa3e2e5a5696dbaf0a6dd7"
+    },
+    {
+      "file": "westside_sign.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/westside_sign.tgs",
+      "sha256": "069721ef303ee14038f25b2968b0c70bf4038e0008804d9b717e750dc8fd6045"
+    },
+    {
+      "file": "westside_sign.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/westside_sign.webp",
+      "sha256": "e96442c545f006ebb946e13d05e0fa87c5385c3111b9d72601f22aef36746ce5"
+    },
+    {
+      "file": "whip_cupcake.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/whip_cupcake.tgs",
+      "sha256": "f49fca581a3b746ab91d656bb76f0f442bd475fb62acde5c7476270facaa49b0"
+    },
+    {
+      "file": "whip_cupcake.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/whip_cupcake.webp",
+      "sha256": "1bc3a0a31650c87e69eb2bde8051808f5ea39316ac75ab7cc8f5cd2ec0e346a7"
+    },
+    {
+      "file": "winter_wreath.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/winter_wreath.tgs",
+      "sha256": "18ef4504bbe5ee7ce85f51eb012b51aff006c47da8299bbd38f9bcf6c9962a31"
+    },
+    {
+      "file": "winter_wreath.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/winter_wreath.webp",
+      "sha256": "b9166204760de7f225779043259ab21ed1e5ce80da2d95dd45487755ab13128a"
+    },
+    {
+      "file": "witch_hat.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/witch_hat.tgs",
+      "sha256": "859a0f8d01e17d545716f9d58cab06b433d2e2121ce0e3b05d357f44bb997388"
+    },
+    {
+      "file": "witch_hat.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/witch_hat.webp",
+      "sha256": "6736822c278ab75b206e4b1ddc26f8ead02ffc89f20d265cba6e0d69a425bbc5"
+    },
+    {
+      "file": "xmas_stocking.json",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/tgs/by_name/xmas_stocking.tgs",
+      "sha256": "41db9ab50343f3f5586409219e5754e2ec7cfdefa2d0c94078ba8eac228e05eb"
+    },
+    {
+      "file": "xmas_stocking.webp",
+      "source": "https://raw.githubusercontent.com/ssamy2/TelegramGiftsAssests/2cafb0e3d2be5336ae4741f75900afe499c6a5ac/webp/by_name/xmas_stocking.webp",
+      "sha256": "71ad936e907ccbc689c8c1e201351a8288ac20cb5eac893a4e7eec78f53603ce"
+    }
+  ]
+}

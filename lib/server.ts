@@ -17,7 +17,7 @@ export async function viewer(allowIncomplete = false) {
   if (!user) throw new ApiError(401, 'Войдите, чтобы продолжить');
   const d = db();
   const existing = await d
-    .prepare('SELECT id,onboardingComplete FROM users WHERE id=?')
+    .prepare('SELECT id,onboardingComplete,lastSeen FROM users WHERE id=?')
     .bind(user.userId)
     .first();
   if (!existing && user.source === 'email')
@@ -41,58 +41,71 @@ export async function viewer(allowIncomplete = false) {
         .bind('user_' + suffix, user.userId, user.userId),
     ]);
   }
-  await d
-    .prepare('UPDATE users SET lastSeen=? WHERE id=? AND lastSeen<?')
-    .bind(Date.now(), user.userId, Date.now() - 60000)
-    .run();
+  const now = Date.now();
+  if (!existing || Number(existing.lastSeen) < now - 60000)
+    await d
+      .prepare('UPDATE users SET lastSeen=? WHERE id=? AND lastSeen<?')
+      .bind(now, user.userId, now - 60000)
+      .run();
   return user.userId;
 }
-export async function seed() {
+const initialized = new WeakMap<object, Promise<void>>();
+export function seed() {
   const d = db();
-  await d.batch([
-    d
-      .prepare(
-        "INSERT OR IGNORE INTO users (id,name,bio,created) VALUES ('noctgram','Noctgram','Обновления и жизнь Noctgram. Место для тех, кто на своей волне.',?)",
-      )
-      .bind(1788609600000),
-    d.prepare(
-      "INSERT OR IGNORE INTO handles (handle,userId,main) VALUES ('noctgram','noctgram',1)",
-    ),
-    d
-      .prepare(
-        "INSERT OR IGNORE INTO posts (id,userId,text,poll,created) SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM content_removals WHERE targetType='post' AND targetId='welcome')",
-      )
-      .bind(
-        'welcome',
-        'noctgram',
-        'У каждого времени суток есть своё настроение. У этой ночи теперь есть своё место.\n\nДелись мыслями, фотографиями и моментами. Начинай разговоры и находи своих. Добро пожаловать в Noctgram ☾',
-        '[]',
-        1788609600000,
+  const ready = initialized.get(d);
+  if (ready) return ready;
+  const pending = d
+    .batch([
+      d
+        .prepare(
+          "INSERT OR IGNORE INTO users (id,name,bio,created) VALUES ('noctgram','Noctgram','Обновления и жизнь Noctgram. Место для тех, кто на своей волне.',?)",
+        )
+        .bind(1788609600000),
+      d.prepare(
+        "INSERT OR IGNORE INTO handles (handle,userId,main) VALUES ('noctgram','noctgram',1)",
       ),
-    d
-      .prepare(
-        "INSERT OR IGNORE INTO posts (id,userId,text,poll,created) SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM content_removals WHERE targetType='post' AND targetId='first-poll')",
-      )
-      .bind(
-        'first-poll',
-        'noctgram',
-        'Что не даёт тебе уснуть?',
-        [
-          'Мысли обо всём',
-          'Музыка и новые открытия',
-          'Разговоры с близкими',
-          'Просто люблю ночь',
-        ].length
-          ? JSON.stringify([
-              'Мысли обо всём',
-              'Музыка и новые открытия',
-              'Разговоры с близкими',
-              'Просто люблю ночь',
-            ])
-          : '[]',
-        1788609500000,
-      ),
-  ]);
+      d
+        .prepare(
+          "INSERT OR IGNORE INTO posts (id,userId,text,poll,created) SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM content_removals WHERE targetType='post' AND targetId='welcome')",
+        )
+        .bind(
+          'welcome',
+          'noctgram',
+          'У каждого времени суток есть своё настроение. У этой ночи теперь есть своё место.\n\nДелись мыслями, фотографиями и моментами. Начинай разговоры и находи своих. Добро пожаловать в Noctgram ☾',
+          '[]',
+          1788609600000,
+        ),
+      d
+        .prepare(
+          "INSERT OR IGNORE INTO posts (id,userId,text,poll,created) SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM content_removals WHERE targetType='post' AND targetId='first-poll')",
+        )
+        .bind(
+          'first-poll',
+          'noctgram',
+          'Что не даёт тебе уснуть?',
+          [
+            'Мысли обо всём',
+            'Музыка и новые открытия',
+            'Разговоры с близкими',
+            'Просто люблю ночь',
+          ].length
+            ? JSON.stringify([
+                'Мысли обо всём',
+                'Музыка и новые открытия',
+                'Разговоры с близкими',
+                'Просто люблю ночь',
+              ])
+            : '[]',
+          1788609500000,
+        ),
+    ])
+    .then(() => {})
+    .catch((error) => {
+      initialized.delete(d);
+      throw error;
+    });
+  initialized.set(d, pending);
+  return pending;
 }
 export function clean(value: unknown, max: number, required = false) {
   if (

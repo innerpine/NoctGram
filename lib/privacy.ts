@@ -1,6 +1,8 @@
 import { appearanceColumns } from '@/lib/premium-access';
 import { db, clean, ApiError } from './server';
 import { assertReadable, visibleAccount } from './account-access';
+import { CHAT_ATTACHMENT_LIMIT, type ChatAttachment } from './chat-files';
+import { messageVisible, messagePair } from './chat-access';
 
 // Each predicate consumes one viewer binding; aliases are internal identifiers.
 export function personalVisibility(alias: string) {
@@ -33,28 +35,108 @@ export async function sendPrivateMessage(
   me: string,
   recipient: string,
   text: string,
+  attachments: unknown = [],
+  key: unknown = crypto.randomUUID(),
+  replyTo: unknown = null,
 ) {
-  const id = crypto.randomUUID();
+  if (
+    replyTo !== null &&
+    (typeof replyTo !== 'string' || !replyTo || replyTo.length > 250)
+  )
+    throw new ApiError(400, 'Некорректное сообщение для ответа');
+  if (
+    !Array.isArray(attachments) ||
+    attachments.length > CHAT_ATTACHMENT_LIMIT ||
+    attachments.some(
+      (id) => typeof id !== 'string' || !id || id.length > 100,
+    ) ||
+    new Set(attachments).size !== attachments.length
+  )
+    throw new ApiError(400, 'Можно прикрепить до 10 разных файлов');
+  if (!text.trim() && !attachments.length)
+    throw new ApiError(400, 'Напиши сообщение или прикрепи файл');
+  if (typeof key !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(key))
+    throw new ApiError(400, 'Некорректный запрос отправки');
+  const id = `message:${me}:${key}`,
+    ids = JSON.stringify(attachments);
+  const existing = await db()
+    .prepare(
+      'SELECT recipient,text,media,replyTo FROM messages WHERE id=? AND sender=?',
+    )
+    .bind(id, me)
+    .first<{
+      recipient: string;
+      text: string;
+      media: string;
+      replyTo: string | null;
+    }>();
+  const same = (row: NonNullable<typeof existing>) =>
+    row.recipient === recipient &&
+    row.text === text &&
+    row.replyTo === replyTo &&
+    JSON.stringify(
+      (JSON.parse(row.media) as ChatAttachment[]).map((file) => file.id),
+    ) === ids;
+  if (existing) {
+    if (!same(existing))
+      throw new ApiError(
+        409,
+        'Этот запрос уже использован для другого сообщения',
+      );
+    return { id };
+  }
   const results = await db().batch([
     db()
-      .prepare(`INSERT INTO messages(id,sender,recipient,text,created)
-    SELECT ?,s.id,r.id,?,? FROM users s,users r
+      .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,replyTo)
+    SELECT ?,s.id,r.id,?,(SELECT json_group_array(json_object('id',up.id,'name',up.name,'type',up.type,'size',cu.size,'kind',cu.kind))
+      FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_uploads cu ON cu.uploadId=up.id),?,? FROM users s,users r
     WHERE s.id=? AND r.id=? AND s.id<>r.id AND r.kind='person'
     AND ${visibleAccount('s')} AND ${visibleAccount('r')}
     AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=s.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
-    AND ${messageAllowed}`)
-      .bind(id, text, Date.now(), me, recipient),
+    AND ${messageAllowed}
+    AND (? IS NULL OR EXISTS(SELECT 1 FROM messages rp WHERE rp.id=? AND ${messagePair('rp', 's.id', 'r.id')} AND ${messageVisible('rp', 's.id')}))
+    AND NOT EXISTS(SELECT 1 FROM json_each(?) j WHERE NOT EXISTS(
+      SELECT 1 FROM uploads up JOIN chat_uploads cu ON cu.uploadId=up.id WHERE up.id=j.value AND up.userId=s.id
+        AND cu.recipient=r.id AND cu.messageId IS NULL AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)))
+    ON CONFLICT(id) DO NOTHING`)
+      .bind(
+        id,
+        text,
+        ids,
+        Date.now(),
+        replyTo,
+        me,
+        recipient,
+        replyTo,
+        replyTo,
+        ids,
+      ),
+    db()
+      .prepare(`UPDATE chat_uploads SET messageId=? WHERE messageId IS NULL AND EXISTS(
+      SELECT 1 FROM messages m,json_each(m.media) j WHERE m.id=? AND m.sender=? AND json_extract(j.value,'$.id')=chat_uploads.uploadId)`)
+      .bind(id, id, me),
     db()
       .prepare(
         "INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created) SELECT ?,recipient,sender,'message',id,created FROM messages WHERE id=?",
       )
       .bind('message:' + id, id),
   ]);
-  if (!results[0].meta.changes)
+  if (!results[0].meta.changes) {
+    const saved = await db()
+      .prepare(
+        'SELECT recipient,text,media,replyTo FROM messages WHERE id=? AND sender=?',
+      )
+      .bind(id, me)
+      .first<NonNullable<typeof existing>>();
+    if (saved && same(saved)) return { id };
     throw new ApiError(
-      403,
-      'Отправка сообщений недоступна из-за настроек приватности',
+      saved ? 409 : 403,
+      saved
+        ? 'Этот запрос уже использован'
+        : 'Не удалось отправить: проверь доступ к диалогу и вложения',
     );
+  }
+  return { id };
 }
 export async function privacyGet(
   action: string,
@@ -138,7 +220,7 @@ export async function privacyPost(
     // The rest of the conversation and the recipient's settings remain private.
     const row = await db()
       .prepare(
-        'SELECT id,sender,text,created FROM messages WHERE id=? AND recipient=? AND sender<>?',
+        `SELECT id,sender,text,created FROM messages WHERE id=? AND recipient=? AND sender<>? AND ${messageVisible('messages', 'messages.recipient')}`,
       )
       .bind(id, me, me)
       .first();
@@ -146,7 +228,7 @@ export async function privacyPost(
     await db()
       .prepare(`INSERT OR IGNORE INTO content_reports
       (id,targetType,targetId,postId,userId,authorId,text,snapshot,reason,created,updated)
-      SELECT ?,'message',?,'',?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM messages WHERE id=? AND recipient=?)`)
+      SELECT ?,'message',?,'',?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM messages WHERE id=? AND recipient=? AND ${messageVisible('messages', 'messages.recipient')})`)
       .bind(
         crypto.randomUUID(),
         id,

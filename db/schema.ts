@@ -20,6 +20,22 @@ export const users = sqliteTable('users', {
   kind: text().notNull().default('person'),
   ownerId: text().references((): AnySQLiteColumn => users.id),
 });
+export const chatThemes = sqliteTable(
+  'chat_themes',
+  {
+    firstId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    secondId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sharedTheme: text().notNull().default('noct'),
+    firstTheme: text(),
+    secondTheme: text(),
+    revision: integer().notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.firstId, t.secondId] })],
+);
 export const handles = sqliteTable(
   'handles',
   {
@@ -131,12 +147,20 @@ export const messages = sqliteTable(
       .notNull()
       .references(() => users.id),
     text: text().notNull(),
+    media: text().notNull().default('[]'),
+    giftReceiptId: text().references(() => receivedGifts.id),
+    replyTo: text(),
+    forwardedName: text().notNull().default(''),
+    forwardSourceId: text(),
+    editedAt: integer().notNull().default(0),
+    deletedAt: integer().notNull().default(0),
     created: integer().notNull(),
     read: integer().notNull().default(0),
   },
   (t) => [
     index('messages_recipient').on(t.recipient, t.created),
     index('messages_sender').on(t.sender, t.created),
+    uniqueIndex('messages_gift_receipt').on(t.giftReceiptId),
   ],
 );
 export const uploads = sqliteTable('uploads', {
@@ -148,6 +172,48 @@ export const uploads = sqliteTable('uploads', {
   name: text().notNull(),
   created: integer().notNull(),
 });
+export const chatUploads = sqliteTable('chat_uploads', {
+  uploadId: text()
+    .primaryKey()
+    .references(() => uploads.id, { onDelete: 'cascade' }),
+  recipient: text()
+    .notNull()
+    .references(() => users.id),
+  size: integer().notNull(),
+  kind: text().notNull(),
+  messageId: text().references(() => messages.id),
+});
+export const messagePins = sqliteTable(
+  'message_pins',
+  {
+    messageId: text()
+      .primaryKey()
+      .references(() => messages.id, { onDelete: 'cascade' }),
+    firstId: text()
+      .notNull()
+      .references(() => users.id),
+    secondId: text()
+      .notNull()
+      .references(() => users.id),
+    pinnedBy: text()
+      .notNull()
+      .references(() => users.id),
+    created: integer().notNull(),
+  },
+  (t) => [index('message_pins_pair').on(t.firstId, t.secondId, t.created)],
+);
+export const hiddenMessages = sqliteTable(
+  'hidden_messages',
+  {
+    messageId: text()
+      .notNull()
+      .references(() => messages.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.messageId, t.userId] })],
+);
 
 export const hiddenPosts = sqliteTable(
   'hidden_posts',
@@ -212,6 +278,30 @@ export const starTransfers = sqliteTable(
     uniqueIndex('stars_one_grant')
       .on(t.recipient)
       .where(sql`${t.kind} = 'grant'`),
+  ],
+);
+
+export const receivedGifts = sqliteTable(
+  'received_gifts',
+  {
+    id: text().primaryKey(),
+    transferId: text()
+      .notNull()
+      .references(() => starTransfers.id),
+    giftId: text().notNull(),
+    sender: text()
+      .notNull()
+      .references(() => users.id),
+    recipient: text()
+      .notNull()
+      .references(() => users.id),
+    message: text().notNull().default(''),
+    hidden: integer().notNull().default(0),
+    created: integer().notNull(),
+  },
+  (t) => [
+    uniqueIndex('gifts_transfer').on(t.transferId),
+    index('gifts_recipient').on(t.recipient, t.created, t.id),
   ],
 );
 
@@ -392,7 +482,88 @@ export const userPrivacy = sqliteTable('user_privacy', {
     .references(() => users.id, { onDelete: 'cascade' }),
   hideAdult: integer().notNull().default(0),
   messagePolicy: text().notNull().default('everyone'),
+  showMusicActivity: integer().notNull().default(1),
 });
+// A short-lived playback lease, not a listening history. Only its owner may clear it.
+export const musicActivity = sqliteTable('music_activity', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  sessionId: text().notNull(),
+  sequence: integer().notNull(),
+  trackUrl: text().notNull().default(''),
+  title: text().notNull().default(''),
+  artist: text().notNull().default(''),
+  artwork: text().notNull().default(''),
+  provider: text().notNull().default('soundcloud'),
+  state: text().notNull().default('playing'),
+  positionMs: integer().notNull().default(0),
+  durationMs: integer().notNull().default(0),
+  updatedAt: integer().notNull(),
+  expiresAt: integer().notNull(),
+});
+export const musicPlaylists = sqliteTable(
+  'music_playlists',
+  {
+    id: text().primaryKey(),
+    ownerId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    created: integer().notNull(),
+    updatedAt: integer().notNull(),
+    trackId: text().references(() => musicTracks.id, { onDelete: 'set null' }),
+    playing: integer().notNull().default(0),
+    positionMs: integer().notNull().default(0),
+    durationMs: integer().notNull().default(0),
+    playbackAt: integer().notNull().default(0),
+    revision: integer().notNull().default(0),
+  },
+  (t) => [index('music_playlists_owner').on(t.ownerId)],
+);
+export const musicPlaylistMembers = sqliteTable(
+  'music_playlist_members',
+  {
+    playlistId: text()
+      .notNull()
+      .references(() => musicPlaylists.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    status: text().notNull().default('invited'),
+    created: integer().notNull(),
+    listenSession: text().notNull().default(''),
+    listenUntil: integer().notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.playlistId, t.userId] }),
+    index('music_playlist_members_user').on(t.userId),
+  ],
+);
+export const musicPlaylistTracks = sqliteTable(
+  'music_playlist_tracks',
+  {
+    playlistId: text()
+      .notNull()
+      .references(() => musicPlaylists.id, { onDelete: 'cascade' }),
+    trackId: text()
+      .notNull()
+      .references(() => musicTracks.id, { onDelete: 'cascade' }),
+    addedBy: text()
+      .notNull()
+      .references(() => users.id),
+    created: integer().notNull(),
+    sortOrder: integer().notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.playlistId, t.trackId] }),
+    index('music_playlist_tracks_order').on(
+      t.playlistId,
+      t.sortOrder,
+      t.created,
+    ),
+  ],
+);
 export const userBlocks = sqliteTable(
   'user_blocks',
   {

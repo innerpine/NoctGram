@@ -45,21 +45,29 @@ export function loadSpotifySDK(): Promise<SpotifySDK> {
   loading = new Promise<SpotifySDK>((resolve, reject) => {
     const script = document.createElement('script');
     const previous = window.onSpotifyWebPlaybackSDKReady;
+    let settled = false;
     const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
+      script.onerror = null;
       window.onSpotifyWebPlaybackSDKReady = previous;
       if (error) {
         script.remove();
         reject(error);
       } else if (window.Spotify) resolve(window.Spotify);
+      else reject(new Error('Spotify не загрузился. Повторите попытку.'));
     };
     const timer = setTimeout(
       () => finish(new Error('Spotify не загрузился. Повторите попытку.')),
       20000,
     );
     window.onSpotifyWebPlaybackSDKReady = () => {
-      previous?.();
-      finish();
+      try {
+        previous?.();
+      } finally {
+        finish();
+      }
     };
     script.src = 'https://sdk.scdn.co/spotify-player.js';
     script.async = true;
@@ -324,6 +332,10 @@ export class SpotifyPlayback {
     void this.device.activateElement().catch(() => {});
     this.manualPause = false;
     void this.device.resume().catch((error) => this.fail(error));
+  }
+  pause() {
+    this.manualPause = true;
+    void this.device.pause().catch((error) => this.fail(error));
   }
   seek(ms: number) {
     this.ending = false;

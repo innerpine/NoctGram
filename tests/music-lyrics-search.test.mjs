@@ -52,6 +52,71 @@ assert.equal(
     .length,
   1,
 );
+const reupload = {
+  title: 'LIZER & FLESH - FALSE MIRROR (Prod. by Taz Taylor)',
+  artist: 'ЗАКАТ 99.1',
+  duration: 142000,
+};
+const mirror = {
+  ...correct,
+  trackName: 'False Mirror',
+  artistName: 'FLESH, LIZER',
+  duration: 142,
+};
+// LRCLIB 14191291 has its title and artist fields reversed.
+const reversedMirror = {
+  ...mirror,
+  trackName: 'LIZER & FLESH',
+  artistName: 'False Mirror',
+};
+for (const entry of [mirror, reversedMirror]) {
+  assert.equal(chooseLyricMatch([entry], reupload)?.lines.length, 1);
+  assert.equal(
+    chooseLyricMatch([entry], {
+      ...reupload,
+      title: 'FALSE MIRROR — LIZER & FLESH',
+    })?.lines.length,
+    1,
+  );
+  assert.equal(
+    chooseLyricMatch([entry], {
+      ...reupload,
+      title: reupload.title + ' by ЗАКАТ 99.1',
+    })?.lines.length,
+    1,
+  );
+}
+assert.equal(
+  chooseLyricMatch([mirror], {
+    title: 'FALSE MIRROR',
+    artist: 'LIZER and FLESH',
+    duration: 142000,
+  })?.lines.length,
+  1,
+);
+for (const entry of [
+  { ...mirror, artistName: 'Unrelated artist' },
+  { ...mirror, trackName: 'Broken Mirror' },
+  { ...mirror, trackName: 'False Mirror II' },
+  { ...mirror, trackName: 'False Mirror (slowed)' },
+  { ...mirror, duration: 136 },
+  { ...reversedMirror, artistName: 'False Mirror (sped up)' },
+  { ...reversedMirror, trackName: 'Different performer' },
+])
+  assert.equal(chooseLyricMatch([entry], reupload), null);
+assert.equal(
+  chooseLyricMatch([mirror, reversedMirror], {
+    ...reupload,
+    title: reupload.title + ' (sped up)',
+  }),
+  null,
+  'Reversed fields must not bypass recording version checks',
+);
+assert.equal(
+  chooseLyricMatch([mirror], { ...reupload, title: 'FALSE MIRROR' }),
+  null,
+  'A title and duration alone cannot identify an unknown uploader recording',
+);
 const calls = [];
 const fake = async (url, init) => {
   assert.equal(init.credentials, 'omit');
@@ -71,6 +136,39 @@ assert.equal(found.lines.length, 1);
 assert.equal(calls.length, 3);
 assert.equal(calls[1].searchParams.get('track_name'), 'Vendetta!');
 assert.equal(calls[2].searchParams.get('q'), 'Sadfriendd Vendetta!');
+const reuploadCalls = [];
+const reuploadLyrics = await findTrackLyrics(
+  reupload,
+  new AbortController().signal,
+  async (url) => {
+    const u = new URL(url);
+    reuploadCalls.push(u);
+    if (!u.pathname.endsWith('/search'))
+      return new Response(null, { status: 404 });
+    // An uploader in this query produces no results on the real service.
+    return Response.json(
+      u.searchParams.get('q').includes('ЗАКАТ') ? [] : [reversedMirror],
+    );
+  },
+);
+assert.equal(reuploadLyrics?.lines.length, 1);
+assert.equal(reuploadCalls[0].searchParams.get('artist_name'), 'LIZER & FLESH');
+assert.equal(reuploadCalls[0].searchParams.get('track_name'), 'FALSE MIRROR');
+assert.equal(
+  reuploadCalls
+    .find((url) => url.pathname.endsWith('/search'))
+    .searchParams.get('q'),
+  'LIZER & FLESH FALSE MIRROR',
+);
+// Even an exact-get response must pass metadata validation.
+assert.equal(
+  await findTrackLyrics(reupload, new AbortController().signal, async (url) =>
+    new URL(url).pathname.endsWith('/search')
+      ? Response.json([])
+      : Response.json({ ...mirror, artistName: 'Wrong artist' }),
+  ),
+  null,
+);
 let count = 0;
 await assert.rejects(
   findTrackLyrics(recording, new AbortController().signal, async () => {
@@ -96,11 +194,11 @@ console.log(
   'Lyrics lookup: production credits, artist/duration/version matching, fallback search, rate limit and cancellation passed.',
 );
 if (process.argv.includes('--live')) {
-  const lyrics = await findTrackLyrics(recording, AbortSignal.timeout(20000));
-  assert.ok(lyrics?.lines.length > 0);
-  console.log(
-    'Live LRCLIB regression: Vendetta! (prod. Mupp), Sadfriendd, 107 seconds -> synchronized lyrics found (' +
-      lyrics.lines.length +
-      ' lines).',
-  );
+  for (const sample of [recording, reupload]) {
+    const lyrics = await findTrackLyrics(sample, AbortSignal.timeout(20000));
+    assert.ok(lyrics?.lines.length > 0, sample.title);
+    console.log(
+      `Live LRCLIB: ${sample.title} -> synchronized lyrics found (${lyrics.lines.length} lines).`,
+    );
+  }
 }

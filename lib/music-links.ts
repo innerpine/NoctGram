@@ -1,7 +1,15 @@
+export type MusicProviderId = 'soundcloud' | 'spotify' | 'youtube';
+export function musicProviderName(provider?: string) {
+  return provider === 'youtube'
+    ? 'YouTube'
+    : provider === 'spotify'
+      ? 'Spotify'
+      : 'SoundCloud';
+}
 export type MusicLink = {
   url: string;
   kind: 'track' | 'playlist';
-  provider: 'soundcloud' | 'spotify';
+  provider: MusicProviderId;
   playback?: 'file' | 'spotify';
 };
 export type MusicTrack = MusicLink & {
@@ -21,6 +29,35 @@ export function parseMusicLink(value: unknown): MusicLink | null {
   if (typeof value !== 'string' || value.length > 1000) return null;
   try {
     const u = new URL(value.trim());
+    if (
+      u.protocol === 'https:' &&
+      !u.username &&
+      !u.password &&
+      !u.port &&
+      [
+        'youtube.com',
+        'www.youtube.com',
+        'm.youtube.com',
+        'music.youtube.com',
+        'youtu.be',
+      ].includes(u.hostname)
+    ) {
+      const id =
+        u.hostname === 'youtu.be'
+          ? u.pathname.match(/^\/([\w-]{11})\/?$/)?.[1]
+          : u.pathname === '/watch'
+            ? u.searchParams.get('v')
+            : u.pathname.match(
+                /^\/(?:shorts|live|embed)\/([\w-]{11})\/?$/,
+              )?.[1];
+      return id && /^[\w-]{11}$/.test(id)
+        ? {
+            url: 'https://www.youtube.com/watch?v=' + id,
+            kind: 'track',
+            provider: 'youtube',
+          }
+        : null;
+    }
     if (
       u.protocol === 'https:' &&
       u.hostname === 'open.spotify.com' &&
@@ -98,6 +135,7 @@ export function findMusicLink(text: string) {
   return null;
 }
 export function musicLabel(link: MusicLink) {
+  if (link.provider === 'youtube') return 'Трек YouTube';
   if (link.provider === 'spotify') return 'Трек Spotify';
   return decodeURIComponent(link.url.split('/').at(-1) || '').replaceAll(
     '-',
@@ -116,13 +154,16 @@ export async function musicRequest<T>(
   const response = await fetch(
     '/api/music' +
       (body ? '' : '?' + new URLSearchParams({ ...query, action })),
-    body
-      ? {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...body, action }),
-        }
-      : { cache: 'no-store' },
+    {
+      signal: AbortSignal.timeout(15000),
+      ...(body
+        ? {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...body, action }),
+          }
+        : { cache: 'no-store' }),
+    },
   );
   const data = (await response.json()) as T & { error?: string; code?: string };
   if (!response.ok) {

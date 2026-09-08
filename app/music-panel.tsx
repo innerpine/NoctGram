@@ -8,7 +8,6 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -17,7 +16,6 @@ import {
   LoaderCircle,
   Play,
   Plus,
-  RefreshCw,
   Sparkles,
   Trophy,
   X,
@@ -25,10 +23,12 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   musicRequest,
+  musicProviderName,
   parseMusicLink,
   type MusicTrack,
 } from '@/lib/music-links';
 import { useMusic } from '@/lib/music-context';
+import { MusicPlaylists } from './music-playlists';
 import { MusicAudioUpload } from './music-audio-upload';
 import { MusicLeaderboard, type ListenerScore } from './music-leaderboard';
 import type { Person } from '@/lib/client';
@@ -56,19 +56,19 @@ export function MusicPanel({
   signedIn,
   readOnly,
   onProfile,
+  onServices,
+  tab,
+  onTabChange,
 }: {
   signedIn: boolean;
   readOnly: boolean;
   onProfile: (id: string) => void;
+  onServices?: () => void;
+  tab: string;
+  onTabChange: (value: string) => void;
 }) {
-  const [tab, setTab] = useState('discover'),
-    [chart, setChart] = useState('listeners');
+  const [chart, setChart] = useState('listeners');
   const [period, setPeriod] = useState('7');
-  const searchParams = useSearchParams();
-  const requestedTab = searchParams.get('tab');
-  useEffect(() => {
-    if (requestedTab === 'charts') setTab('charts');
-  }, [requestedTab]);
   const [url, setUrl] = useState(''),
     [error, setError] = useState('');
   const [data, setData] = useState<MusicData | null>(null),
@@ -120,7 +120,7 @@ export function MusicPanel({
     const link = parseMusicLink(url);
     if (!link) {
       setError(
-        'Вставьте ссылку на трек Spotify или публичный трек/плейлист SoundCloud.',
+        'Вставьте ссылку SoundCloud, Spotify, YouTube или YouTube Music.',
       );
       return;
     }
@@ -130,7 +130,7 @@ export function MusicPanel({
       await musicRequest('save', { url: link.url });
       setUrl('');
       await refresh();
-      setTab('library');
+      onTabChange('library');
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -149,8 +149,7 @@ export function MusicPanel({
       setBusy(false);
     }
   }
-  const rows =
-    tab === 'library' ? data?.library || [] : data?.discoveries || [];
+  const rows = data?.library || [];
   function trackRows(tracks: MusicTrack[], ranked = false) {
     return (
       <div className="music-track-list">
@@ -190,7 +189,7 @@ export function MusicPanel({
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                {track.provider === 'spotify' ? 'Spotify' : 'SoundCloud'}
+                {musicProviderName(track.provider)}
                 {track.kind === 'playlist' ? ' · плейлист' : ''}
               </a>
               {track.provider === 'spotify' && (
@@ -251,16 +250,17 @@ export function MusicPanel({
           <h2>На своей волне</h2>
           <p>Музыка рядом. Разговор продолжается.</p>
         </div>
-        <button
-          className="icon-button"
-          aria-label="Обновить музыку"
-          disabled={loading || !signedIn}
-          onClick={() => void refresh()}
-        >
-          <RefreshCw size={17} className={loading ? 'spin' : ''} />
-        </button>
       </div>
-      <Link href="/music/services" className="music-services-link">
+      <Link
+        href="/music/services"
+        className="music-services-link"
+        onNavigate={(event) => {
+          if (onServices) {
+            event.preventDefault();
+            onServices();
+          }
+        }}
+      >
         <Headphones size={21} />
         <span>
           <strong>Подключить музыкальные сервисы</strong>
@@ -270,46 +270,48 @@ export function MusicPanel({
       </Link>
       <Tabs
         value={tab}
-        onValueChange={(v) => setTab(String(v))}
+        onValueChange={(v) => onTabChange(String(v))}
         className="music-tabs"
       >
         <TabsList>
-          <TabsTrigger value="discover">Открытия</TabsTrigger>
+          <TabsTrigger value="playlists">Плейлисты</TabsTrigger>
           <TabsTrigger value="charts">Чарты</TabsTrigger>
           <TabsTrigger value="library">Моя музыка</TabsTrigger>
         </TabsList>
       </Tabs>
-      <form
-        className="music-link-search"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
-        <Link2 size={19} aria-hidden="true" />
-        <input
-          id="music-link"
-          type="url"
-          aria-label="Добавить музыку по ссылке"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="Вставьте ссылку на музыку"
-          disabled={busy || readOnly || !signedIn}
-          autoComplete="off"
-        />
-        <button
-          className="music-link-submit"
-          aria-label="Добавить музыку"
-          title="Добавить музыку"
-          disabled={busy || readOnly || !signedIn || !url.trim()}
+      {tab !== 'playlists' && (
+        <form
+          className="music-link-search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
         >
-          {busy ? (
-            <LoaderCircle className="spin" size={18} />
-          ) : (
-            <Plus size={20} />
-          )}
-        </button>
-      </form>
+          <Link2 size={19} aria-hidden="true" />
+          <input
+            id="music-link"
+            type="url"
+            aria-label="Добавить музыку по ссылке"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Вставьте ссылку на музыку"
+            disabled={busy || readOnly || !signedIn}
+            autoComplete="off"
+          />
+          <button
+            className="music-link-submit"
+            aria-label="Добавить музыку"
+            title="Добавить музыку"
+            disabled={busy || readOnly || !signedIn || !url.trim()}
+          >
+            {busy ? (
+              <LoaderCircle className="spin" size={18} />
+            ) : (
+              <Plus size={20} />
+            )}
+          </button>
+        </form>
+      )}
       {error && (
         <p className="music-error" role="alert">
           {error}
@@ -319,7 +321,7 @@ export function MusicPanel({
         <div className="music-empty">
           <Headphones size={30} />
           <h3>Ваша музыка — рядом с друзьями</h3>
-          <p>Войдите, чтобы сохранять треки и открывать музыку сообщества.</p>
+          <p>Войдите, чтобы сохранять треки и слушать вместе с друзьями.</p>
           <a href="/login">
             Войти в Noctgram <ArrowUpRight size={16} />
           </a>
@@ -332,7 +334,9 @@ export function MusicPanel({
       ) : (
         data && (
           <>
-            {tab === 'charts' ? (
+            {tab === 'playlists' ? (
+              <MusicPlaylists readOnly={readOnly} library={data.library} />
+            ) : tab === 'charts' ? (
               <section
                 className="music-chart music-content-enter card"
                 key="charts"
@@ -423,22 +427,14 @@ export function MusicPanel({
               >
                 <div className="music-section-heading">
                   <Sparkles size={18} />
-                  <h3>
-                    {tab === 'library'
-                      ? 'Ваши сохранённые треки'
-                      : 'Открыто сообществом'}
-                  </h3>
+                  <h3>Ваши сохранённые треки</h3>
                   <span>{rows.length}</span>
                 </div>
                 {trackRows(rows)}
                 {rows.length === 0 && (
                   <div className="music-empty">
                     <Headphones size={30} />
-                    <h3>
-                      {tab === 'library'
-                        ? 'Соберите своё звучание'
-                        : 'У каждой ночи свой саундтрек'}
-                    </h3>
+                    <h3>Соберите своё звучание</h3>
                     <p>
                       Добавьте первую ссылку выше. Плеер останется с вами в
                       ленте и диалогах.
@@ -447,7 +443,7 @@ export function MusicPanel({
                 )}
               </section>
             )}
-            {tab === 'discover' && (
+            {tab === 'playlists' && (
               <div className="music-content-enter card">
                 <MusicLeaderboard
                   listeners={data.listeners}

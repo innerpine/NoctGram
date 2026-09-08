@@ -1,5 +1,7 @@
 'use client';
 import { DisplayName } from './profile-identity';
+import { reconcileSnapshot } from '@/lib/reconcile-snapshot';
+import { ProfileLink } from './profile-link';
 /* eslint-disable react/react-compiler */
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -9,6 +11,7 @@ import {
   Phone,
   MessageCircle,
   Newspaper,
+  Gift,
 } from 'lucide-react';
 import {
   Dialog,
@@ -166,10 +169,12 @@ export function NotificationsBell({
   me,
   onPost,
   onChat,
+  onGift,
 }: {
   me: string;
   onPost: (id: string) => void;
   onChat: (id: string) => void;
+  onGift: () => void;
 }) {
   const [rows, setRows] = useState<NotificationRow[]>([]),
     [open, setOpen] = useState(false),
@@ -179,9 +184,10 @@ export function NotificationsBell({
       t: ReturnType<typeof setTimeout>;
     const tick = async () => {
       try {
+        if (document.hidden) return;
         const data = await request<NotificationRow[]>('?action=notifications');
         if (!live) return;
-        setRows(data);
+        setRows((previous) => reconcileSnapshot(previous, data));
         setError('');
         if (open && data.some((n) => !n.read)) {
           await request('', {
@@ -226,33 +232,49 @@ export function NotificationsBell({
           <div className="notification-list">
             {rows.length ? (
               rows.map((n) => (
-                <button
+                <div
                   key={n.id}
                   className={'notification-row ' + (!n.read ? 'unread' : '')}
-                  onClick={() => {
-                    setOpen(false);
-                    if (n.kind === 'post') onPost(n.targetId);
-                    else onChat(n.actorId);
-                  }}
                 >
-                  <Avatar person={n} size={38} />
-                  <span>
+                  <ProfileLink
+                    target={{ id: n.actorId }}
+                    aria-label={'Профиль ' + n.name}
+                  >
+                    <Avatar person={n} size={38} />
+                  </ProfileLink>
+                  <span className="notification-copy">
                     <strong>
-                      <DisplayName person={n} />
+                      <ProfileLink target={{ id: n.actorId }}>
+                        <DisplayName person={n} />
+                      </ProfileLink>
                     </strong>
                     <small>
-                      {n.kind === 'call' ? (
-                        <Phone size={13} />
-                      ) : n.kind === 'post' ? (
-                        <Newspaper size={13} />
-                      ) : (
-                        <MessageCircle size={13} />
-                      )}{' '}
-                      {n.kind === 'call'
-                        ? 'Аудиозвонок'
-                        : n.kind === 'post'
-                          ? 'Новая публикация'
-                          : 'Новое сообщение'}
+                      <button
+                        className="notification-open"
+                        onClick={() => {
+                          setOpen(false);
+                          if (n.kind === 'gift') onGift();
+                          else if (n.kind === 'post') onPost(n.targetId);
+                          else onChat(n.actorId);
+                        }}
+                      >
+                        {n.kind === 'gift' ? (
+                          <Gift size={13} />
+                        ) : n.kind === 'call' ? (
+                          <Phone size={13} />
+                        ) : n.kind === 'post' ? (
+                          <Newspaper size={13} />
+                        ) : (
+                          <MessageCircle size={13} />
+                        )}{' '}
+                        {n.kind === 'gift'
+                          ? 'Новый подарок'
+                          : n.kind === 'call'
+                            ? 'Аудиозвонок'
+                            : n.kind === 'post'
+                              ? 'Новая публикация'
+                              : 'Новое сообщение'}
+                      </button>
                     </small>
                   </span>
                   <time>
@@ -261,7 +283,7 @@ export function NotificationsBell({
                       month: 'short',
                     })}
                   </time>
-                </button>
+                </div>
               ))
             ) : (
               <p className="realtime-empty">Здесь появятся новые события.</p>

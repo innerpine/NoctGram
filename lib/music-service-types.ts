@@ -25,6 +25,7 @@ export type ServiceStatus = {
   provider: MusicServiceId;
   configured: boolean;
   status:
+    | 'link_only'
     | 'unavailable'
     | 'setup_required'
     | 'disconnected'

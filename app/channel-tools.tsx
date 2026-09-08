@@ -1,5 +1,6 @@
 'use client';
 import { DisplayName } from './profile-identity';
+import { ProfileLink } from './profile-link';
 /* eslint-disable react/react-compiler */
 import { useEffect, useRef, useState } from 'react';
 import { Clock3, UsersRound, Trash2, Check, Search } from 'lucide-react';
@@ -141,10 +142,21 @@ export function ChannelTools({
               <p className="meta">Владелец канала сохраняет полный доступ.</p>
               {members.map((p) => (
                 <div className="realtime-person" key={p.id}>
-                  <Avatar person={p} size={36} />
+                  <ProfileLink
+                    target={{ id: p.id }}
+                    aria-label={'Профиль ' + p.name}
+                  >
+                    <Avatar person={p} size={36} />
+                  </ProfileLink>
                   <span>
-                    <DisplayName person={p} />
-                    <small>@{p.handle}</small>
+                    <ProfileLink target={{ id: p.id }}>
+                      <DisplayName person={p} />
+                    </ProfileLink>
+                    <small>
+                      <ProfileLink target={{ id: p.id }}>
+                        @{p.handle}
+                      </ProfileLink>
+                    </small>
                   </span>
                   <span className="grow" />
                   {profile.canManageMembers ? (
@@ -218,10 +230,21 @@ export function ChannelTools({
                     .filter((p) => !members.some((m) => m.id === p.id))
                     .map((p) => (
                       <div key={p.id} className="realtime-person">
-                        <Avatar person={p} size={32} />
+                        <ProfileLink
+                          target={{ id: p.id }}
+                          aria-label={'Профиль ' + p.name}
+                        >
+                          <Avatar person={p} size={32} />
+                        </ProfileLink>
                         <span>
-                          <DisplayName person={p} />
-                          <small>@{p.handle}</small>
+                          <ProfileLink target={{ id: p.id }}>
+                            <DisplayName person={p} />
+                          </ProfileLink>
+                          <small>
+                            <ProfileLink target={{ id: p.id }}>
+                              @{p.handle}
+                            </ProfileLink>
+                          </small>
                         </span>
                         <span className="grow" />
                         <button

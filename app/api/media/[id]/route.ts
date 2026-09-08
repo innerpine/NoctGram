@@ -11,10 +11,15 @@ export async function GET(
     const { id } = await params;
     const upload = await db()
       .prepare(
-        'SELECT up.userId,u.onboardingComplete FROM uploads up JOIN users u ON u.id=up.userId WHERE up.id=?',
+        'SELECT up.userId,up.name,u.onboardingComplete,c.kind FROM uploads up JOIN users u ON u.id=up.userId LEFT JOIN chat_uploads c ON c.uploadId=up.id WHERE up.id=?',
       )
       .bind(id)
-      .first<{ userId: string; onboardingComplete: number }>();
+      .first<{
+        userId: string;
+        name: string;
+        kind: string | null;
+        onboardingComplete: number;
+      }>();
     if (!upload) throw new ApiError(404, 'Файл не найден');
     const account = await db()
       .prepare('SELECT onboardingComplete FROM users WHERE id=?')
@@ -35,6 +40,17 @@ export async function GET(
     if (!object) throw new ApiError(404, 'Файл не найден');
     const headers = new Headers();
     object.writeHttpMetadata(headers);
+    if (
+      upload.kind === 'file' ||
+      new URL(req.url).searchParams.has('download')
+    ) {
+      headers.set(
+        'Content-Disposition',
+        `attachment; filename="file"; filename*=UTF-8''${encodeURIComponent(upload.name).replace(/['()*]/g, (char) => '%' + char.charCodeAt(0).toString(16))}`,
+      );
+      if (upload.kind === 'file')
+        headers.set('Content-Type', 'application/octet-stream');
+    }
     headers.set('X-Content-Type-Options', 'nosniff');
     headers.set('Cache-Control', 'private, no-store');
     headers.set('Accept-Ranges', 'bytes');

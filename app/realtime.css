@@ -413,7 +413,7 @@
 .notification-row.unread {
   background: #ffffff05;
 }
-.notification-row > span {
+.notification-copy {
   flex: 1;
   min-width: 0;
 }
@@ -501,8 +501,11 @@
 .chat-header .call-button {
   margin-left: auto;
 }
-.chat-header .call-button + .chat-block {
+.chat-header .call-button ~ .chat-block {
   margin-left: 0;
+}
+.chat-header .profile-gift-button {
+  flex-shrink: 0;
 }
 @keyframes call-ring {
   0% {

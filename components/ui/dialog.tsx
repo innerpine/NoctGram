@@ -6,9 +6,25 @@ import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { XIcon } from 'lucide-react';
+import { ProfileLinkDialogs } from '@/lib/profile-navigation-context';
 
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
+function Dialog({ actionsRef, ...props }: DialogPrimitive.Root.Props) {
+  const localActions = React.useRef<DialogPrimitive.Root.Actions | null>(null);
+  const actions = actionsRef || localActions;
+  const parents = React.useContext(ProfileLinkDialogs);
+  const dialogs = React.useMemo(
+    () => [...parents, () => actions.current?.close()],
+    [parents, actions],
+  );
+  return (
+    <ProfileLinkDialogs.Provider value={dialogs}>
+      <DialogPrimitive.Root
+        data-slot="dialog"
+        actionsRef={actions}
+        {...props}
+      />
+    </ProfileLinkDialogs.Provider>
+  );
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
@@ -43,13 +59,15 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  overlayClassName,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean;
+  overlayClassName?: string;
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(

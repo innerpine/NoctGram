@@ -1,0 +1,148 @@
+.main-column[data-page='profile'] .profile-card {
+  animation: profile-enter 280ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.main-column[data-page='profile'] .profile-tabs {
+  animation: profile-enter 240ms cubic-bezier(0.2, 0.75, 0.25, 1) 35ms both;
+}
+.stream-intro,
+.stream-results {
+  animation: stream-enter 200ms ease-out both;
+}
+.stream-results .post {
+  animation: stream-enter 160ms ease-out both;
+  animation-delay: 0ms;
+}
+.stream-results .post-skeleton {
+  animation: none;
+}
+@keyframes stream-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+html:has(.app-shell) {
+  scrollbar-gutter: stable;
+}
+.page-loading-indicator {
+  display: inline-flex;
+  width: 15px;
+  flex: 0 0 15px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.page-loading-indicator[data-loading='true'] {
+  opacity: 1;
+}
+
+.noct-dialog.profile-editor-dialog {
+  display: flex;
+  flex-direction: column;
+  height: min(800px, 88dvh);
+  overflow: hidden;
+}
+.profile-editor-dialog > :not(.profile-editor-body) {
+  flex-shrink: 0;
+}
+.profile-editor-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.privacy-content {
+  display: grid;
+  gap: 20px;
+  animation: stream-enter 160ms ease-out both;
+}
+.profile-editor-pane {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 3px;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.profile-editor-pane[data-active='true'] {
+  opacity: 1;
+  animation: editor-pane-in 200ms ease both;
+}
+.profile-editor-pane[hidden] {
+  display: none;
+}
+@keyframes editor-pane-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+.profile-editor-dialog .edit-tabs {
+  position: relative;
+  gap: 0;
+}
+.profile-editor-dialog .edit-tabs::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / 3);
+  border-radius: 9px;
+  background: #242426;
+  transition: translate 200ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+.profile-editor-dialog .edit-tabs[data-selected='1']::before {
+  translate: 100% 0;
+}
+.profile-editor-dialog .edit-tabs[data-selected='2']::before {
+  translate: 200% 0;
+}
+.profile-editor-dialog .edit-tabs button {
+  position: relative;
+  background: transparent;
+}
+.main-column[data-page='search'] .searchbox {
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+@media (max-width: 767px) {
+  .main-column[data-page='search'] .searchbox input {
+    font-size: 16px;
+  }
+}
+@keyframes profile-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .main-column[data-page='profile'] :is(.profile-card, .profile-tabs),
+  .stream-intro,
+  .stream-results,
+  .stream-results .post,
+  .profile-editor-pane[data-active='true'],
+  .privacy-content {
+    animation: none;
+  }
+  .main-column[data-page='search'] .searchbox {
+    transition: none;
+  }
+  .profile-editor-pane,
+  .page-loading-indicator,
+  .profile-editor-dialog .edit-tabs::before {
+    transition: none;
+  }
+}

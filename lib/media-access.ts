@@ -2,6 +2,7 @@ import { premiumActive } from './premium-access';
 import { db, ApiError } from './server';
 import { published, channelPermission, sqlNow } from './channel-access';
 import { visibleAccount } from './account-access';
+import { messageVisible } from './chat-access';
 export async function assertMediaRead(
   id: string,
   me: string,
@@ -9,6 +10,24 @@ export async function assertMediaRead(
 ) {
   const d = db(),
     url = '/api/media/' + id;
+  const privateFile = await d
+    .prepare('SELECT recipient,messageId FROM chat_uploads WHERE uploadId=?')
+    .bind(id)
+    .first<{ recipient: string; messageId: string | null }>();
+  if (privateFile) {
+    if (me === uploader && !privateFile.messageId) return;
+    if (
+      privateFile.messageId &&
+      (await d
+        .prepare(
+          `SELECT 1 FROM messages m,json_each(m.media) j WHERE (m.sender=? OR m.recipient=?) AND ${messageVisible('m', '?')} AND json_extract(j.value,'$.id')=? LIMIT 1`,
+        )
+        .bind(me, me, me, id)
+        .first())
+    )
+      return;
+    throw new ApiError(404, 'Файл недоступен');
+  }
   const publicRef = await d
     .prepare(`SELECT 1 FROM users u WHERE (u.avatar=? OR u.cover=?) AND ${visibleAccount('u')}
     UNION SELECT 1 FROM profile_appearance pa JOIN users u ON u.id=pa.userId WHERE pa.avatarMotion=? AND ${premiumActive('u.id')} AND ${visibleAccount('u')}
@@ -39,7 +58,7 @@ export async function assertMediaRead(
 // Only internal SQL expressions are accepted here. Keep the same access rule in
 // content writes so revoking a channel editor cannot race an attachment check.
 export function mediaPermission(idExpr: string, actorExpr: string) {
-  return `NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=${idExpr}) AND (
+  return `NOT EXISTS(SELECT 1 FROM chat_uploads cu WHERE cu.uploadId=${idExpr}) AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=${idExpr}) AND (
  EXISTS(SELECT 1 FROM users pu WHERE (pu.avatar='/api/media/'||${idExpr} OR pu.cover='/api/media/'||${idExpr}) AND ${visibleAccount('pu')})
  OR EXISTS(SELECT 1 FROM profile_appearance ma JOIN users pu ON pu.id=ma.userId WHERE ma.avatarMotion='/api/media/'||${idExpr} AND ${premiumActive('pu.id')} AND ${visibleAccount('pu')})
  OR EXISTS(SELECT 1 FROM posts mp JOIN users pu ON pu.id=mp.userId WHERE ${published('mp')} AND ${visibleAccount('pu')} AND EXISTS(SELECT 1 FROM json_each(mp.media) mm WHERE json_extract(mm.value,'$.id')=${idExpr}))

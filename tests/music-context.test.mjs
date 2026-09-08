@@ -59,6 +59,25 @@ try {
     'The mounted provider identity survives',
   );
   const music = readThrough(first.MusicContext, refreshed.useMusic, value);
+  assert.equal(
+    first.MusicPlaybackContext,
+    refreshed.MusicPlaybackContext,
+    'Progress context also survives HMR',
+  );
+  assert.notEqual(
+    first.MusicContext,
+    first.MusicPlaybackContext,
+    'Progress and control consumers use separate subscriptions',
+  );
+  const position = { ready: true, position: 1234, duration: 90000 };
+  assert.equal(
+    readThrough(
+      first.MusicPlaybackContext,
+      refreshed.useMusicPlayback,
+      position,
+    ),
+    position,
+  );
   assert.equal(music, value);
   music.play({
     url: 'https://soundcloud.com/noctgram-qa/test-track',

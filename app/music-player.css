@@ -9,6 +9,17 @@
   pointer-events: none;
   border: 0;
 }
+.music-activation {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #ffffff0a;
+  color: #ccc;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 8px;
+}
 .music-cover {
   position: relative;
   padding: 0;
@@ -516,9 +527,6 @@
 }
 .music-lyrics-footer button {
   color: #ffffffd9;
-}
-.music-lyrics-footer a:hover {
-  color: #fff;
 }
 .music-stage-queue {
   display: flex;

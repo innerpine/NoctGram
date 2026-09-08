@@ -1,5 +1,6 @@
 'use client';
 import { DisplayName } from './profile-identity';
+import { ProfileLink } from './profile-link';
 /* Loading effects subscribe to the API; the React compiler is not enabled. */
 /* eslint-disable react/react-compiler */
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -15,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, Empty, Stamp } from './post-card';
 import { StarScene } from './star-scene';
 import { StarsIcon } from './stars-icon';
+import { giftDefinition } from '@/lib/gift-catalog';
 import { TelegramLink } from './telegram-link';
 import { StarsTopupCelebration } from './stars-topup-celebration';
 import { observeTopups, type TopupCursor } from '@/lib/stars-topup';
@@ -150,12 +152,17 @@ export function StarsPanel({
   useEffect(() => {
     live.current = true;
     void load();
+    const giftsChanged = () => {
+      void load(false, undefined, true);
+    };
+    window.addEventListener('noctgram:gifts-changed', giftsChanged);
     const poll = window.setInterval(() => {
       if (!document.hidden && !requesting.current)
         void load(false, undefined, true);
     }, 8000);
     return () => {
       live.current = false;
+      window.removeEventListener('noctgram:gifts-changed', giftsChanged);
       window.clearInterval(poll);
     };
   }, [load]);
@@ -259,6 +266,13 @@ export function StarsPanel({
               <span className="transaction-grant">
                 <StarsIcon size={26} />
               </span>
+            ) : t.actorId ? (
+              <ProfileLink
+                target={{ id: t.actorId }}
+                aria-label={'Профиль ' + t.name}
+              >
+                <Avatar person={t} size={38} />
+              </ProfileLink>
             ) : (
               <Avatar person={t} size={38} />
             )}
@@ -268,18 +282,26 @@ export function StarsPanel({
                   'Пополнение через Telegram'
                 ) : t.kind === 'grant' ? (
                   'Тестовый баланс'
+                ) : t.actorId ? (
+                  <ProfileLink target={{ id: t.actorId }}>
+                    <DisplayName person={t} />
+                  </ProfileLink>
                 ) : (
                   <DisplayName person={t} />
                 )}
               </strong>
               <span>
-                {t.kind === 'telegram_test'
-                  ? 'Тестовые звёзды · без оплаты'
-                  : t.kind === 'grant'
-                    ? 'Стартовые звёзды'
-                    : t.sender === me.id
-                      ? 'Поддержка автора'
-                      : 'Поддержали твою публикацию'}
+                {t.kind === 'gift'
+                  ? 'Подарок «' +
+                    (giftDefinition(t.giftId)?.name || 'Подарок') +
+                    '»'
+                  : t.kind === 'telegram_test'
+                    ? 'Тестовые звёзды · без оплаты'
+                    : t.kind === 'grant'
+                      ? 'Стартовые звёзды'
+                      : t.sender === me.id
+                        ? 'Поддержка автора'
+                        : 'Поддержали твою публикацию'}
               </span>
               <Stamp time={t.created} />
             </div>
@@ -366,9 +388,16 @@ export function SupportPanel({
         }
       }}
     >
-      <Avatar person={post} size={54} />
+      <ProfileLink
+        target={{ id: post.userId }}
+        aria-label={'Профиль ' + post.name}
+      >
+        <Avatar person={post} size={54} />
+      </ProfileLink>
       <h3>
-        <DisplayName person={post} />
+        <ProfileLink target={{ id: post.userId }}>
+          <DisplayName person={post} />
+        </ProfileLink>
       </h3>
       <p className="meta">
         За эту публикацию можно отправить ещё {num(remaining)} звёзд.

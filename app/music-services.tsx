@@ -32,6 +32,7 @@ import {
 import { parseMusicLink, type MusicTrack } from '@/lib/music-links';
 import { useMusic } from '@/lib/music-context';
 import { MusicYandex } from './music-yandex';
+import { MusicYouTubeService } from './music-youtube-service';
 
 async function serviceRequest<T>(
   path: string,
@@ -73,9 +74,11 @@ function ServiceMark({
 export function MusicServices({
   signedIn,
   readOnly,
+  onMusic,
 }: {
   signedIn: boolean;
   readOnly: boolean;
+  onMusic?: () => void;
 }) {
   const [provider, setProvider] = useState<MusicServiceId>('soundcloud');
   const [statuses, setStatuses] = useState<ServiceStatus[]>([]),
@@ -133,7 +136,7 @@ export function MusicServices({
           'Не удалось завершить вход. Попробуйте подключить аккаунт заново.',
         );
       window.history.replaceState(
-        null,
+        window.history.state,
         '',
         '/music/services' +
           (choice ? '?provider=' + encodeURIComponent(choice) : ''),
@@ -278,6 +281,12 @@ export function MusicServices({
           href="/music"
           className="icon-button"
           aria-label="Вернуться к музыке"
+          onNavigate={(event) => {
+            if (onMusic) {
+              event.preventDefault();
+              onMusic();
+            }
+          }}
         >
           <ArrowLeft size={18} />
         </Link>
@@ -314,6 +323,8 @@ export function MusicServices({
       )}
       {provider === 'yandex' ? (
         <MusicYandex signedIn={signedIn} readOnly={readOnly} />
+      ) : provider === 'youtube' ? (
+        <MusicYouTubeService signedIn={signedIn} readOnly={readOnly} />
       ) : (
         <>
           <section className="service-connection-card">

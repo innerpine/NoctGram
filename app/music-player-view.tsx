@@ -3,6 +3,8 @@
 /* The lyric scroll region intentionally accepts keyboard focus. */
 /* eslint-disable react/react-compiler, next/no-img-element, jsx-a11y/no-noninteractive-tabindex */
 import {
+  memo,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -17,6 +19,7 @@ import {
   ListMusic,
   LoaderCircle,
   Mic2,
+  PanelRightOpen,
   Pause,
   Play,
   SkipBack,
@@ -36,7 +39,11 @@ import { Popover, PopoverContent, PopoverTitle } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatMusicTime } from '@/lib/music-links';
+import {
+  formatMusicTime,
+  musicProviderName,
+  type MusicProviderId,
+} from '@/lib/music-links';
 import type { ListenState } from '@/lib/music-listening';
 import Link from 'next/link';
 import {
@@ -45,18 +52,23 @@ import {
   playerArtwork,
   readAppearance,
   type PlayerAppearance,
-  type TrackLyrics,
 } from '@/lib/music-player';
-import { findTrackLyrics, LyricsRateLimit } from '@/lib/music-lyrics-search';
+import { useTrackLyrics, type LyricLookup } from '@/lib/use-track-lyrics';
+import { MusicSeekControl } from './music-seek-control';
+import { MusicFavorite } from './music-favorite';
+import { MusicReorderList } from './music-reorder-list';
 
 export type PlayerTrack = {
   url: string;
-  provider?: 'soundcloud' | 'spotify';
+  provider?: MusicProviderId;
   title: string;
   artist: string;
   artwork: string;
 };
 type Props = {
+  roomName?: string;
+  roomError?: string;
+  onLeaveRoom?: () => void;
   track: PlayerTrack;
   queue: PlayerTrack[];
   queueIndex: number;
@@ -65,6 +77,7 @@ type Props = {
   playing: boolean;
   ready: boolean;
   error: string;
+  needsGesture?: boolean;
   position: number;
   duration: number;
   volume: number;
@@ -78,19 +91,38 @@ type Props = {
   onSeek: (ms: number) => void;
   onVolume: (volume: number) => void;
   onSelect: (index: number) => void;
+  onReorder?: (fromUrl: string, toUrl: string) => Promise<void>;
   onStop: () => void;
   onRetry: () => void;
 };
 
-const lyricCache = new Map<
-  string,
-  { lyrics: TrackLyrics | null; until: number }
->();
-let lyricCooldown = 0;
+const LyricLines = memo(function LyricLines({
+  lines,
+  active,
+  activeLine,
+  onChoose,
+}: {
+  lines: { time: number; text: string }[];
+  active: number;
+  activeLine: RefObject<HTMLButtonElement | null>;
+  onChoose: (time: number) => void;
+}) {
+  return lines.map((line, index) => (
+    <button
+      key={`${line.time}:${index}`}
+      ref={index === active ? activeLine : undefined}
+      className={'music-lyric-line' + (index === active ? ' current' : '')}
+      aria-current={index === active ? 'true' : undefined}
+      aria-label={`${formatMusicTime(line.time)} — ${line.text || 'Проигрыш'}`}
+      onClick={() => onChoose(line.time)}
+    >
+      {line.text || '•••'}
+    </button>
+  ));
+});
 
 function Lyrics({
-  track,
-  duration,
+  lookup,
   position,
   enabled,
   appearance,
@@ -98,8 +130,7 @@ function Lyrics({
   onQueue,
   onSeek,
 }: {
-  track: PlayerTrack;
-  duration: number;
+  lookup: LyricLookup;
   position: number;
   enabled: boolean;
   appearance: PlayerAppearance;
@@ -107,57 +138,20 @@ function Lyrics({
   onQueue: () => void;
   onSeek: (time: number) => void;
 }) {
-  const [result, setResult] = useState<{
-    key: string;
-    lyrics: TrackLyrics | null;
-    error?: boolean;
-  } | null>(null);
+  const { key, lyrics } = lookup;
   const [follow, setFollow] = useState(true);
-  const [attempt, setAttempt] = useState(0);
   const container = useRef<HTMLDivElement>(null);
   const activeLine = useRef<HTMLButtonElement>(null);
-  const key = `${track.url}:${track.artist}:${track.title}:${Math.round(duration)}`;
-  const lyrics = result?.key === key ? result.lyrics : null;
+  const latestSeek = useRef({ onSeek, offset });
+  latestSeek.current = { onSeek, offset };
+  const chooseLine = useCallback((time: number) => {
+    latestSeek.current.onSeek(Math.max(0, time - latestSeek.current.offset));
+    setFollow(true);
+  }, []);
   const active = currentLyric(lyrics?.lines || [], position + offset);
   useEffect(() => {
-    if (!enabled || !duration || !track.artist) return;
     setFollow(true);
-    const cached = lyricCache.get(key);
-    if (cached && cached.until > Date.now()) {
-      setResult({ key, lyrics: cached.lyrics });
-      return;
-    }
-    if (lyricCooldown > Date.now()) {
-      setResult({ key, lyrics: null, error: true });
-      return;
-    }
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
-    let cancelled = false;
-    // Only metadata for the open lyrics pane is sent. No library, account or tokens.
-    void findTrackLyrics(
-      { title: track.title, artist: track.artist, duration },
-      controller.signal,
-    )
-      .then((found) => {
-        if (cancelled) return;
-        if (lyricCache.size >= 30)
-          lyricCache.delete(lyricCache.keys().next().value!);
-        lyricCache.set(key, { lyrics: found, until: Date.now() + 600000 });
-        setResult({ key, lyrics: found });
-      })
-      .catch((error) => {
-        if (error instanceof LyricsRateLimit) lyricCooldown = error.until;
-        if (!cancelled) setResult({ key, lyrics: null, error: true });
-      })
-      .finally(() => clearTimeout(timeout));
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-      controller.abort();
-    };
-  }, [key, enabled, duration, track.artist, track.title, attempt]);
-
+  }, [key, enabled]);
   useEffect(() => {
     if (!enabled || !follow || !container.current || !activeLine.current)
       return;
@@ -173,7 +167,7 @@ function Lyrics({
     });
   }, [active, follow, enabled, key, appearance.textSize, appearance.motion]);
 
-  if (!duration || !track.artist || result?.key !== key)
+  if (lookup.loading)
     return (
       <output className="music-stage-empty">
         <LoaderCircle className="spin" size={26} />
@@ -187,7 +181,7 @@ function Lyrics({
         <h3>
           {lyrics?.instrumental
             ? 'Без слов'
-            : result.error
+            : lookup.error
               ? 'Текст сейчас недоступен'
               : 'Текст пока не найден'}
         </h3>
@@ -200,15 +194,7 @@ function Lyrics({
           <ListMusic size={17} /> Открыть очередь
         </button>
         {!lyrics?.instrumental && (
-          <button
-            onClick={() => {
-              lyricCache.delete(key);
-              setResult(null);
-              setAttempt((value) => value + 1);
-            }}
-          >
-            Повторить поиск текста
-          </button>
+          <button onClick={lookup.retry}>Повторить поиск текста</button>
         )}
       </div>
     );
@@ -241,31 +227,18 @@ function Lyrics({
         aria-label="Текст песни"
       >
         {lyrics.lines.length ? (
-          lyrics.lines.map((line, index) => (
-            <button
-              key={`${line.time}:${index}`}
-              ref={index === active ? activeLine : undefined}
-              className={
-                'music-lyric-line' + (index === active ? ' current' : '')
-              }
-              aria-current={index === active ? 'true' : undefined}
-              aria-label={`${formatMusicTime(line.time)} — ${line.text || 'Проигрыш'}`}
-              onClick={() => {
-                onSeek(Math.max(0, line.time - offset));
-                setFollow(true);
-              }}
-            >
-              {line.text || '•••'}
-            </button>
-          ))
+          <LyricLines
+            lines={lyrics.lines}
+            active={active}
+            activeLine={activeLine}
+            onChoose={chooseLine}
+          />
         ) : (
           <p className="music-lyrics-plain">{lyrics.plain}</p>
         )}
       </section>
       <div className="music-lyrics-footer">
-        <a href="https://lrclib.net" target="_blank" rel="noopener noreferrer">
-          Текст · LRCLIB
-        </a>
+        <span>Текст · LRCLIB</span>
         {!follow && lyrics.lines.length > 0 ? (
           <button onClick={() => setFollow(true)}>К текущей строке</button>
         ) : (
@@ -321,6 +294,64 @@ function Range({
 export function MusicPlayerView(p: Props) {
   const [appearance, setAppearance] = useState(defaultAppearance);
   const [pane, setPane] = useState('lyrics');
+  const [dockOpen, setDockOpen] = useState(false);
+  const [dockAvailable, setDockAvailable] = useState(false);
+  const dockButton = useRef<HTMLButtonElement>(null);
+  const [miniCollapsed, setMiniCollapsed] = useState(false);
+  const [sheetDragging, setSheetDragging] = useState(false);
+  const sheetHandle = useRef<HTMLButtonElement>(null);
+  const sheetDrag = useRef<{ id: number; y: number } | null>(null);
+  const suppressSheetClickUntil = useRef(0);
+  const changeMini = (collapsed: boolean) => {
+    setMiniCollapsed(collapsed);
+    sheetHandle.current?.focus({ preventScroll: true });
+    try {
+      localStorage.setItem('noctgram:player-collapsed', String(collapsed));
+    } catch {
+      /* The sheet works without device storage. */
+    }
+  };
+  const resetSheetDrag = () => {
+    sheetDrag.current = null;
+    setSheetDragging(false);
+    p.playerRef.current?.style.removeProperty('--music-sheet-drag');
+  };
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1100px)');
+    const update = () => setDockAvailable(query.matches);
+    update();
+    query.addEventListener('change', update);
+    try {
+      const savedDock = localStorage.getItem('noctgram:lyrics-dock') === 'true';
+      setDockOpen(savedDock);
+      const savedMini = localStorage.getItem('noctgram:player-collapsed');
+      setMiniCollapsed(savedMini === null ? savedDock : savedMini === 'true');
+    } catch {
+      /* Device storage is optional. */
+    }
+    return () => query.removeEventListener('change', update);
+  }, []);
+  const changeDock = (open: boolean) => {
+    setDockOpen(open);
+    if (open) changeMini(true);
+    try {
+      localStorage.setItem('noctgram:lyrics-dock', String(open));
+    } catch {
+      /* The panel still works without storage. */
+    }
+  };
+  const closeDock = () => {
+    changeDock(false);
+    (miniCollapsed ? sheetHandle : dockButton).current?.focus({
+      preventScroll: true,
+    });
+  };
+  const dockVisible = dockOpen && dockAvailable && !p.expanded;
+  const lyricLookup = useTrackLyrics(
+    p.track,
+    p.duration,
+    (dockVisible || (p.expanded && pane === 'lyrics')) && p.ready && !p.error,
+  );
   const [offset, setOffset] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [menuPoint, setMenuPoint] = useState({ x: 0, y: 0 });
@@ -363,7 +394,7 @@ export function MusicPlayerView(p: Props) {
     return () => document.removeEventListener('contextmenu', close, true);
   }, [settingsOpen]);
   const coverButton = useRef<HTMLButtonElement>(null);
-  const lastVolume = useRef(70);
+  const lastVolume = useRef(25);
   useEffect(() => {
     try {
       setAppearance(
@@ -396,24 +427,52 @@ export function MusicPlayerView(p: Props) {
       p.onVolume(0);
     } else p.onVolume(lastVolume.current);
   };
-  const progress = (full = false) => (
-    <div className="music-progress">
-      <span>{formatMusicTime(p.position)}</span>
+  const volumeControl = (location: 'mini' | 'dock') => (
+    <div
+      className={
+        'music-mini-volume' + (location === 'dock' ? ' music-dock-volume' : '')
+      }
+    >
+      <button
+        className="icon-button"
+        aria-label={p.volume ? 'Выключить звук' : 'Включить звук'}
+        title={p.volume ? 'Выключить звук' : 'Включить звук'}
+        onClick={toggleVolume}
+      >
+        {p.volume ? <Volume2 size={17} /> : <VolumeX size={17} />}
+      </button>
       <Slider
         aria-label={
-          full ? 'Позиция в большом плеере' : 'Позиция воспроизведения'
+          location === 'dock'
+            ? 'Громкость в боковом плеере'
+            : 'Громкость в компактном плеере'
         }
         min={0}
-        max={Math.max(p.duration, 1)}
-        step={1000}
-        value={[Math.min(p.position, p.duration)]}
-        disabled={!p.ready || !p.duration || !!p.error}
-        onValueChange={(values) =>
-          p.onSeek(Array.isArray(values) ? values[0] : values)
+        max={100}
+        step={1}
+        value={[p.volume]}
+        onValueChange={(value) =>
+          p.onVolume(Array.isArray(value) ? value[0] : value)
         }
       />
-      <span>{formatMusicTime(p.duration)}</span>
+      <span>{p.volume}%</span>
     </div>
+  );
+  const progress = (location: 'mini' | 'full' | 'dock' = 'mini') => (
+    <MusicSeekControl
+      key={p.track.url}
+      label={
+        location === 'full'
+          ? 'Позиция в большом плеере'
+          : location === 'dock'
+            ? 'Позиция в боковом плеере'
+            : 'Позиция воспроизведения'
+      }
+      position={p.position}
+      duration={p.duration}
+      disabled={!p.ready || !p.duration || !!p.error}
+      onSeek={p.onSeek}
+    />
   );
   const transport = () => (
     <div className="music-transport">
@@ -449,15 +508,19 @@ export function MusicPlayerView(p: Props) {
       </button>
     </div>
   );
-  const error = p.error && (
+  const error = p.error ? (
     <div className="music-error" role="alert">
       {p.error} <button onClick={p.onRetry}>Повторить</button>
       {p.track.provider === 'spotify' && (
         <Link href="/music/services?provider=spotify">Подключение Spotify</Link>
       )}
     </div>
-  );
-  const sourceName = p.track.provider === 'spotify' ? 'Spotify' : 'SoundCloud';
+  ) : p.needsGesture && p.ready ? (
+    <button className="music-activation" onClick={p.onToggle}>
+      Нажмите ▶, чтобы включить звук
+    </button>
+  ) : null;
+  const sourceName = musicProviderName(p.track.provider);
   const source = (
     <a
       className="music-source-credit"
@@ -473,96 +536,286 @@ export function MusicPlayerView(p: Props) {
     <>
       <section
         ref={p.playerRef}
-        className="music-player"
+        className="music-player music-sheet"
         aria-label="Музыкальный плеер"
+        data-collapsed={miniCollapsed}
+        data-dragging={sheetDragging}
+        data-motion={appearance.motion ? 'on' : 'off'}
       >
-        <div className="music-player-row">
-          <button
-            ref={coverButton}
-            className="music-cover"
-            aria-label="Развернуть плеер"
-            aria-haspopup="dialog"
-            aria-expanded={p.expanded}
-            onClick={() => p.onExpanded(true)}
-          >
-            {p.track.artwork ? (
-              <img src={playerArtwork(p.track.artwork)} alt="" />
-            ) : (
-              <Headphones size={21} />
+        <button
+          ref={sheetHandle}
+          className="music-sheet-handle"
+          aria-label={
+            miniCollapsed ? 'Раскрыть нижний плеер' : 'Свернуть нижний плеер'
+          }
+          aria-expanded={!miniCollapsed}
+          aria-controls="music-sheet-controls"
+          title={
+            miniCollapsed
+              ? 'Раскрыть плеер — нажми или потяни вверх'
+              : 'Свернуть плеер — нажми или потяни вниз'
+          }
+          onClick={(event) => {
+            if (
+              event.detail > 0 &&
+              Date.now() < suppressSheetClickUntil.current
+            )
+              return;
+            changeMini(!miniCollapsed);
+          }}
+          onKeyDown={(event) => {
+            if (['ArrowUp', 'ArrowDown', 'Escape'].includes(event.key)) {
+              event.preventDefault();
+              changeMini(event.key !== 'ArrowUp');
+            }
+          }}
+          onPointerDown={(event) => {
+            if (!event.isPrimary || event.button !== 0) return;
+            sheetDrag.current = { id: event.pointerId, y: event.clientY };
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setSheetDragging(true);
+          }}
+          onPointerMove={(event) => {
+            if (sheetDrag.current?.id !== event.pointerId) return;
+            const delta = event.clientY - sheetDrag.current.y;
+            p.playerRef.current?.style.setProperty(
+              '--music-sheet-drag',
+              `${Math.max(-14, Math.min(24, delta * 0.3))}px`,
+            );
+          }}
+          onPointerUp={(event) => {
+            if (sheetDrag.current?.id !== event.pointerId) return;
+            const delta = event.clientY - sheetDrag.current.y;
+            if (Math.abs(delta) >= 24) {
+              suppressSheetClickUntil.current = Date.now() + 400;
+              changeMini(delta > 0);
+            }
+            resetSheetDrag();
+            if (event.currentTarget.hasPointerCapture(event.pointerId))
+              event.currentTarget.releasePointerCapture(event.pointerId);
+          }}
+          onPointerCancel={resetSheetDrag}
+          onLostPointerCapture={resetSheetDrag}
+        >
+          <span className="music-sheet-grip" aria-hidden="true" />
+          <span className="music-sheet-peek" aria-hidden="true">
+            <span>{p.error ? 'Плеер · нужна проверка' : p.track.title}</span>
+            <ChevronUp size={15} />
+          </span>
+        </button>
+        <div
+          id="music-sheet-controls"
+          className="music-sheet-content"
+          aria-hidden={miniCollapsed}
+          inert={miniCollapsed}
+        >
+          <div className="music-sheet-inner">
+            {p.roomName && (
+              <div className="music-room-strip">
+                <Headphones size={14} />
+                <span>Вместе · {p.roomName}</span>
+                <button onClick={p.onLeaveRoom}>Выйти</button>
+              </div>
             )}
-            <span>
-              <ChevronUp size={20} />
-            </span>
-          </button>
-          <div className="music-player-title">
-            <button onClick={() => p.onExpanded(true)} title={p.track.title}>
-              {p.track.title}
-            </button>
-            <div>
-              <span>{p.track.artist || 'Музыка'}</span>
-              <span aria-hidden="true"> · </span>
-              {source}
+            {p.roomError && (
+              <p className="music-error" role="alert">
+                {p.roomError}
+              </p>
+            )}
+            <div className="music-player-row">
+              <button
+                ref={coverButton}
+                className="music-cover"
+                aria-label="Развернуть плеер"
+                aria-haspopup="dialog"
+                aria-expanded={p.expanded}
+                onClick={() => p.onExpanded(true)}
+              >
+                {p.track.artwork ? (
+                  <img src={playerArtwork(p.track.artwork)} alt="" />
+                ) : (
+                  <Headphones size={21} />
+                )}
+                <span>
+                  <ChevronUp size={20} />
+                </span>
+              </button>
+              <div className="music-player-title">
+                <button
+                  onClick={() => p.onExpanded(true)}
+                  title={p.track.title}
+                >
+                  {p.track.title}
+                </button>
+                <div>
+                  <span>{p.track.artist || 'Музыка'}</span>
+                  <span aria-hidden="true"> · </span>
+                  {source}
+                </div>
+              </div>
+              <MusicFavorite track={p.track} />
+              {transport()}
+              <button
+                ref={dockButton}
+                className="icon-button music-dock-toggle"
+                aria-label="Текст справа"
+                title={
+                  dockOpen
+                    ? 'Скрыть текст справа'
+                    : 'Текст справа — слушай и общайся'
+                }
+                aria-pressed={dockOpen}
+                aria-expanded={dockVisible}
+                aria-controls="music-lyrics-dock"
+                onClick={() => changeDock(!dockOpen)}
+              >
+                <PanelRightOpen size={19} />
+                <span>Текст</span>
+              </button>
+              <button
+                className="icon-button music-expand-button"
+                aria-label="Развернуть плеер"
+                aria-haspopup="dialog"
+                onClick={() => p.onExpanded(true)}
+              >
+                <ChevronUp size={18} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Остановить и закрыть плеер"
+                onClick={p.onStop}
+              >
+                <X size={18} />
+              </button>
             </div>
+            {progress()}
+            <div className="music-mini-footer">
+              <Link
+                className="music-listen-status"
+                href="/music?tab=charts"
+                title="Открыть чарт прослушиваний"
+              >
+                {p.listening.status === 'counted'
+                  ? 'Учтено в чарте сегодня'
+                  : p.listening.status === 'tracking'
+                    ? `В чарт · ${p.listening.seconds} / 30 с`
+                    : p.listening.status === 'error'
+                      ? 'Учёт недоступен'
+                      : p.listening.status === 'checking'
+                        ? 'Проверяем учёт…'
+                        : p.listening.status === 'excluded'
+                          ? `${sourceName} · без учёта в чарте`
+                          : 'Чарт прослушиваний'}
+              </Link>
+              {volumeControl('mini')}
+            </div>
+            {!p.expanded && error}
           </div>
-          {transport()}
+        </div>
+      </section>
+
+      {/* Escape bubbles from the panel's controls; the panel never traps focus. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+      <aside
+        id="music-lyrics-dock"
+        className="music-lyrics-dock"
+        aria-label="Текст песни справа"
+        data-open={dockVisible}
+        data-playing={p.playing}
+        data-motion={appearance.motion ? 'on' : 'off'}
+        aria-hidden={!dockVisible}
+        inert={!dockVisible}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.stopPropagation();
+            closeDock();
+          }
+        }}
+        style={
+          {
+            '--music-darkness': Math.max(appearance.darkness / 100, 0.65),
+            '--music-blur': `${appearance.blur}px`,
+            '--music-text-size': `${Math.max(20, Math.min(28, appearance.textSize * 0.75))}px`,
+          } as CSSProperties
+        }
+      >
+        <div className="music-stage-atmosphere" aria-hidden="true">
+          {artwork && <img key={artwork} src={artwork} alt="" />}
+        </div>
+        <header className="music-dock-header">
+          <div>
+            <span className="music-live-mark" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span>ТЕКСТ РЯДОМ</span>
+          </div>
           <button
-            className="icon-button music-expand-button"
-            aria-label="Развернуть плеер"
-            aria-haspopup="dialog"
-            onClick={() => p.onExpanded(true)}
-          >
-            <ChevronUp size={18} />
-          </button>
-          <button
-            className="icon-button"
-            aria-label="Остановить и закрыть плеер"
-            onClick={p.onStop}
+            className="music-stage-icon"
+            aria-label="Скрыть текст справа"
+            onClick={closeDock}
           >
             <X size={18} />
           </button>
-        </div>
-        {progress()}
-        <div className="music-mini-footer">
-          <Link
-            className="music-listen-status"
-            href="/music?tab=charts"
-            title="Открыть чарт прослушиваний"
-          >
-            {p.listening.status === 'counted'
-              ? 'Учтено в чарте сегодня'
-              : p.listening.status === 'tracking'
-                ? `В чарт · ${p.listening.seconds} / 30 с`
-                : p.listening.status === 'error'
-                  ? 'Учёт недоступен'
-                  : p.listening.status === 'checking'
-                    ? 'Проверяем учёт…'
-                    : p.listening.status === 'excluded'
-                      ? 'Spotify · без учёта в чарте'
-                      : 'Чарт прослушиваний'}
-          </Link>
-          <div className="music-mini-volume">
-            <button
-              className="icon-button"
-              aria-label={p.volume ? 'Выключить звук' : 'Включить звук'}
-              onClick={toggleVolume}
-            >
-              {p.volume ? <Volume2 size={17} /> : <VolumeX size={17} />}
-            </button>
-            <Slider
-              aria-label="Громкость в компактном плеере"
-              min={0}
-              max={100}
-              step={1}
-              value={[p.volume]}
-              onValueChange={(value) =>
-                p.onVolume(Array.isArray(value) ? value[0] : value)
-              }
+        </header>
+        <button
+          className="music-dock-track"
+          onClick={() => {
+            setPane('lyrics');
+            p.onExpanded(true);
+          }}
+          aria-label={'Открыть полный плеер: ' + p.track.title}
+          aria-haspopup="dialog"
+        >
+          <span className="music-dock-artwork">
+            {artwork ? (
+              <img key={artwork} src={artwork} alt="" />
+            ) : (
+              <Headphones size={24} />
+            )}
+          </span>
+          <span className="music-dock-track-copy" key={p.track.url}>
+            <strong>{p.track.title}</strong>
+            <small>{p.track.artist || sourceName}</small>
+          </span>
+          <ChevronUp size={16} />
+        </button>
+        <div className="music-dock-lyrics">
+          {p.error ? (
+            error
+          ) : (
+            <Lyrics
+              lookup={lyricLookup}
+              position={p.position}
+              enabled={dockVisible}
+              appearance={appearance}
+              offset={offset}
+              onQueue={() => {
+                setPane('queue');
+                p.onExpanded(true);
+              }}
+              onSeek={p.onSeek}
             />
-            <span>{p.volume}%</span>
-          </div>
+          )}
         </div>
-        {!p.expanded && error}
-      </section>
+        <footer className="music-dock-footer">
+          {progress('dock')}
+          <div className="music-dock-now">
+            <span>
+              {p.error
+                ? 'Воспроизведение недоступно'
+                : !p.ready
+                  ? 'Подключаем…'
+                  : p.playing
+                    ? 'Сейчас играет'
+                    : 'На паузе'}
+            </span>
+            {transport()}
+          </div>
+          {volumeControl('dock')}
+        </footer>
+      </aside>
 
       <Dialog open={p.expanded} onOpenChange={p.onExpanded}>
         <Popover
@@ -583,7 +836,7 @@ export function MusicPlayerView(p: Props) {
         >
           <DialogContent
             showCloseButton={false}
-            finalFocus={coverButton}
+            finalFocus={miniCollapsed ? sheetHandle : coverButton}
             className="music-stage"
             onContextMenu={(event) => {
               event.preventDefault();
@@ -632,7 +885,18 @@ export function MusicPlayerView(p: Props) {
                 </span>{' '}
                 NOCTGRAM <span>/ МУЗЫКА</span>
               </div>
-              <span className="music-stage-header-spacer" aria-hidden="true" />
+              <button
+                className="music-stage-icon music-dock-toggle"
+                aria-label="Показать текст справа и вернуться к переписке"
+                title="Текст справа"
+                onClick={() => {
+                  changeDock(true);
+                  p.onExpanded(false);
+                }}
+              >
+                <PanelRightOpen size={22} />
+              </button>
+              <span className="music-dock-mobile-spacer" aria-hidden="true" />
             </header>
             <DialogDescription className="sr-only">
               Плеер Noctgram. Настройки открываются правой кнопкой мыши или
@@ -667,8 +931,9 @@ export function MusicPlayerView(p: Props) {
                     <span> · </span>
                     {source}
                   </p>
+                  <MusicFavorite track={p.track} />
                 </div>
-                {progress(true)}
+                {progress('full')}
                 <div className="music-stage-controls">
                   <button
                     className="music-stage-icon"
@@ -716,8 +981,7 @@ export function MusicPlayerView(p: Props) {
                   inert={pane !== 'lyrics'}
                 >
                   <Lyrics
-                    track={p.track}
-                    duration={p.duration}
+                    lookup={lyricLookup}
                     position={p.position}
                     enabled={
                       p.expanded && pane === 'lyrics' && p.ready && !p.error
@@ -739,50 +1003,56 @@ export function MusicPlayerView(p: Props) {
                       <h3>Очередь</h3>
                       <span>{p.queue.length}</span>
                     </div>
-                    <div className="music-queue-scroll">
-                      {p.queue.map((track, index) => (
-                        <button
-                          key={`${track.url}:${index}`}
-                          className={
-                            'music-queue-track' +
-                            (index === p.queueIndex ? ' current' : '')
-                          }
-                          aria-current={
-                            index === p.queueIndex ? 'true' : undefined
-                          }
-                          disabled={!p.ready}
-                          onClick={() => p.onSelect(index)}
-                        >
-                          <span className="music-queue-number">
-                            {index === p.queueIndex && p.playing ? (
-                              <span className="music-live-mark">
-                                <i />
-                                <i />
-                                <i />
-                              </span>
-                            ) : (
-                              String(index + 1).padStart(2, '0')
-                            )}
-                          </span>
-                          <span className="music-queue-artwork">
-                            {track.artwork ? (
-                              <img
-                                src={playerArtwork(track.artwork)}
-                                alt=""
-                                loading="lazy"
-                              />
-                            ) : (
-                              <Headphones size={18} />
-                            )}
-                          </span>
-                          <span className="music-queue-title">
-                            <strong>{track.title}</strong>
-                            <small>{track.artist || 'SoundCloud'}</small>
-                          </span>
-                          <Play size={16} />
-                        </button>
-                      ))}
-                    </div>
+                    <MusicReorderList
+                      className="music-queue-scroll"
+                      onMove={p.onReorder}
+                      rows={p.queue.map((track, index) => ({
+                        id: track.url,
+                        label: track.title,
+                        content: (
+                          <button
+                            key={track.url}
+                            className={
+                              'music-queue-track' +
+                              (index === p.queueIndex ? ' current' : '')
+                            }
+                            aria-current={
+                              index === p.queueIndex ? 'true' : undefined
+                            }
+                            disabled={!p.ready}
+                            onClick={() => p.onSelect(index)}
+                          >
+                            <span className="music-queue-number">
+                              {index === p.queueIndex && p.playing ? (
+                                <span className="music-live-mark">
+                                  <i />
+                                  <i />
+                                  <i />
+                                </span>
+                              ) : (
+                                String(index + 1).padStart(2, '0')
+                              )}
+                            </span>
+                            <span className="music-queue-artwork">
+                              {track.artwork ? (
+                                <img
+                                  src={playerArtwork(track.artwork)}
+                                  alt=""
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <Headphones size={18} />
+                              )}
+                            </span>
+                            <span className="music-queue-title">
+                              <strong>{track.title}</strong>
+                              <small>{track.artist || 'SoundCloud'}</small>
+                            </span>
+                            <Play size={16} />
+                          </button>
+                        ),
+                      }))}
+                    />
                   </div>
                 </div>
               </aside>

@@ -5,6 +5,7 @@ import { db, clean, ApiError } from './server';
 import { setting } from './auth-session';
 import { assertReadable, visibleAccount } from './account-access';
 import { published, sqlNow } from './channel-access';
+import { messageVisible } from './chat-access';
 
 export function validPushEndpoint(endpoint: string) {
   const u = new URL(endpoint),
@@ -76,7 +77,8 @@ export async function removePushDevice(me?: string) {
 }
 function notificationVisible() {
   return `${visibleAccount('u')} AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE (b.blocker=n.userId AND b.blocked IN(u.id,u.ownerId)) OR (b.blocker IN(u.id,u.ownerId) AND b.blocked=n.userId))
-    AND ((n.kind='message' AND EXISTS(SELECT 1 FROM messages m WHERE m.id=n.targetId AND m.recipient=n.userId))
+    AND ((n.kind='message' AND EXISTS(SELECT 1 FROM messages m WHERE m.id=n.targetId AND m.recipient=n.userId AND ${messageVisible('m', 'n.userId')}))
+      OR (n.kind='gift' AND EXISTS(SELECT 1 FROM received_gifts g WHERE g.id=n.targetId AND g.recipient=n.userId AND g.sender=n.actorId AND NOT EXISTS(SELECT 1 FROM messages m WHERE m.giftReceiptId=g.id AND NOT (${messageVisible('m', 'n.userId')}))))
       OR n.kind='call' OR (n.kind='post' AND EXISTS(SELECT 1 FROM posts p WHERE p.id=n.targetId AND ${published('p')}
         AND NOT EXISTS(SELECT 1 FROM user_privacy pref WHERE pref.userId=n.userId AND pref.hideAdult=1 AND p.adult=1))))`;
 }
@@ -267,15 +269,19 @@ export async function flushPush() {
         const payload = {
           title: String(r.name),
           body:
-            r.kind === 'call'
-              ? 'Входящий аудиозвонок'
-              : r.kind === 'post'
-                ? 'Новая публикация'
-                : 'Новое сообщение',
+            r.kind === 'gift'
+              ? 'Тебе подарили подарок'
+              : r.kind === 'call'
+                ? 'Входящий аудиозвонок'
+                : r.kind === 'post'
+                  ? 'Новая публикация'
+                  : 'Новое сообщение',
           url:
-            r.kind === 'post'
-              ? '/?post=' + encodeURIComponent(String(r.targetId))
-              : '/?chat=' + encodeURIComponent(String(r.actorId)),
+            r.kind === 'gift'
+              ? '/?gifts=1'
+              : r.kind === 'post'
+                ? '/?post=' + encodeURIComponent(String(r.targetId))
+                : '/?chat=' + encodeURIComponent(String(r.actorId)),
           tag: r.kind + ':' + r.targetId,
         };
         const init = await buildPushPayload(

@@ -26,6 +26,31 @@ function words(value: string) {
 function includesWords(haystack: string[], needle: string[]) {
   return needle.length > 0 && needle.every((word) => haystack.includes(word));
 }
+const artistConnectors = new Set(['x', 'feat', 'ft', 'featuring', 'and', 'и']);
+function artistWords(value: string) {
+  return words(value).filter((word) => !artistConnectors.has(word));
+}
+function recordingIdentities(recording: Recording): Recording[] {
+  let title = cleanLyricTitle(recording.title);
+  const uploaderSuffix = ' by ' + recording.artist.trim();
+  if (
+    recording.artist.trim() &&
+    title.toLowerCase().endsWith(uploaderSuffix.toLowerCase())
+  )
+    title = title.slice(0, -uploaderSuffix.length).trim();
+  const identities = [{ ...recording, title }];
+  // SoundCloud's artist can be the uploader. Recover the performers from an
+  // explicit title separator, then require BOTH fields to match a catalog row.
+  // Keep hyphens within names/titles (e.g. J-Hope) and recording version labels.
+  const parts = title.split(/\s+[-–—|]\s+/);
+  if (parts.length === 2 && parts.every((part) => words(part).length)) {
+    identities.push(
+      { ...recording, artist: parts[0], title: parts[1] },
+      { ...recording, artist: parts[1], title: parts[0] },
+    );
+  }
+  return identities;
+}
 function version(value: string) {
   return words(value)
     .filter((word) =>
@@ -50,8 +75,7 @@ export function chooseLyricMatch(
   recording: Recording,
 ): TrackLyrics | null {
   if (!Array.isArray(values)) return null;
-  const title = words(cleanLyricTitle(recording.title)),
-    artist = words(recording.artist);
+  const identities = recordingIdentities(recording);
   const credits = words(
     recording.title.match(/[([]\s*prod[^\])]*[\])]/i)?.[0] || '',
   ).filter((word) => !['prod', 'produced', 'by'].includes(word));
@@ -65,32 +89,54 @@ export function chooseLyricMatch(
         typeof row.artistName !== 'string'
       )
         return [];
-      const candidateTitle = words(cleanLyricTitle(row.trackName)),
-        candidateArtist = words(row.artistName);
-      if (
-        version(recording.title) !== version(row.trackName) ||
-        !includesWords(candidateArtist, artist)
-      )
-        return [];
-      const exact = candidateTitle.join(' ') === title.join(' ');
-      // Extra title words may identify the performers, never an unrelated song/sequel.
-      const extras = candidateTitle.filter(
-        (word) =>
-          !title.includes(word) &&
-          !artist.includes(word) &&
-          !candidateArtist.includes(word) &&
-          !credits.includes(word) &&
-          !['x', 'feat', 'ft', 'featuring', 'and'].includes(word),
-      );
-      if (!exact && (!includesWords(candidateTitle, title) || extras.length))
-        return [];
       const lyrics = readLyrics(row, recording.duration);
       if (!lyrics) return [];
-      const score =
-        (exact ? 100 : 70) +
-        (lyrics.lines.length ? 20 : 0) +
-        (candidateArtist.join(' ') === artist.join(' ') ? 10 : 0) -
-        Math.abs(Number(row.duration) * 1000 - recording.duration) / 1000;
+      let score = -Infinity;
+      // Community entries sometimes reverse trackName and artistName. This is
+      // only accepted when both reversed fields match, never by title alone.
+      const orientations = [
+        { title: row.trackName, artist: row.artistName },
+        { title: row.artistName, artist: row.trackName },
+      ];
+      for (const [index, candidate] of orientations.entries()) {
+        const candidateTitle = words(cleanLyricTitle(candidate.title)),
+          candidateArtist = artistWords(candidate.artist);
+        for (const [identityIndex, identity] of identities.entries()) {
+          const title = words(identity.title),
+            artist = artistWords(identity.artist);
+          if (
+            version(identity.title) !== version(candidate.title) ||
+            version(identity.artist) !== version(candidate.artist) ||
+            !includesWords(candidateArtist, artist) ||
+            (identityIndex > 0 && !includesWords(artist, candidateArtist))
+          )
+            continue;
+          const exact = candidateTitle.join(' ') === title.join(' ');
+          // Extra words may be performer/producer credits, not another song.
+          const extras = candidateTitle.filter(
+            (word) =>
+              !title.includes(word) &&
+              !artist.includes(word) &&
+              !candidateArtist.includes(word) &&
+              !credits.includes(word) &&
+              !artistConnectors.has(word),
+          );
+          if (
+            !exact &&
+            (!includesWords(candidateTitle, title) || extras.length)
+          )
+            continue;
+          score = Math.max(
+            score,
+            (exact ? 100 : 70) +
+              (lyrics.lines.length ? 20 : 0) +
+              (includesWords(artist, candidateArtist) ? 10 : 0) -
+              index * 15 -
+              Math.abs(Number(row.duration) * 1000 - recording.duration) / 1000,
+          );
+        }
+      }
+      if (!Number.isFinite(score)) return [];
       return [{ lyrics, score, id: Number(row.id) || 0 }];
     })
     .sort(
@@ -110,12 +156,13 @@ export class LyricsRateLimit extends Error {
 export async function findTrackLyrics(
   recording: Recording,
   signal: AbortSignal,
-  request = fetch,
+  request: typeof fetch = (input, init) => fetch(input, init),
 ): Promise<TrackLyrics | null> {
   const get = async (
     path: string,
     params: Record<string, string>,
   ): Promise<unknown> => {
+    signal.throwIfAborted();
     const response = await request(
       'https://lrclib.net/api/' + path + '?' + new URLSearchParams(params),
       {
@@ -140,20 +187,27 @@ export async function findTrackLyrics(
     if (!response.ok) throw new Error('Lyrics unavailable');
     return response.json();
   };
-  const titles = [
-    ...new Set([recording.title, cleanLyricTitle(recording.title)]),
-  ];
+  const identities = recordingIdentities(recording);
+  const lookups = [...identities.slice(1), recording, identities[0]].filter(
+    (identity, index, all) =>
+      all.findIndex(
+        (item) =>
+          item.title === identity.title && item.artist === identity.artist,
+      ) === index,
+  );
   let plain: TrackLyrics | null = null;
-  for (const title of titles) {
+  for (const identity of lookups) {
     let found: TrackLyrics | null;
     try {
-      found = readLyrics(
-        await get('get', {
-          track_name: title,
-          artist_name: recording.artist,
-          duration: String(recording.duration / 1000),
-        }),
-        recording.duration,
+      found = chooseLyricMatch(
+        [
+          await get('get', {
+            track_name: identity.title,
+            artist_name: identity.artist,
+            duration: String(recording.duration / 1000),
+          }),
+        ],
+        recording,
       );
     } catch (error) {
       if (signal.aborted || error instanceof LyricsRateLimit) throw error;
@@ -164,10 +218,22 @@ export async function findTrackLyrics(
   }
   // Full-text search is more tolerant of uploaded titles and multiple performers.
   try {
-    const candidates = await get('search', {
-      q: recording.artist + ' ' + cleanLyricTitle(recording.title),
-    });
-    return chooseLyricMatch(candidates, recording) || plain;
+    const queries = [...identities.slice(1), identities[0]].map(
+      (identity) => identity.artist + ' ' + identity.title,
+    );
+    const seen = new Set<string>();
+    for (const query of queries) {
+      const signature = words(query).sort().join(' ');
+      if (seen.has(signature)) continue;
+      seen.add(signature);
+      const found = chooseLyricMatch(
+        await get('search', { q: query }),
+        recording,
+      );
+      if (found?.lines.length || found?.instrumental) return found;
+      plain ||= found;
+    }
+    return plain;
   } catch (error) {
     if (plain && !signal.aborted && !(error instanceof LyricsRateLimit))
       return plain;
