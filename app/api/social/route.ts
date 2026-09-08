@@ -415,9 +415,11 @@ export async function POST(req: Request) {
         verified.push(item);
       }
       const publishAt = scheduleTime(b.publishAt);
+      // A nested NOT EXISTS here exceeds D1's depth limit even for empty media.
+      // The left join rejects missing, foreign and inaccessible files atomically.
       const inserted = await d
         .prepare(
-          `WITH input AS (SELECT ? AS actor,? AS media) INSERT INTO posts (id,userId,text,media,poll,code,codeLang,adult,created,publishAt,publisherId,notifyPending) SELECT ?,u.id,?,?,?,?,?,?,?,?,?,1 FROM users u,input i WHERE u.id=? AND ${channelPermission('u')} AND ${writableTarget('u')} AND NOT EXISTS(SELECT 1 FROM json_each(i.media) j WHERE NOT EXISTS(SELECT 1 FROM uploads up WHERE up.id=j.value AND up.userId=i.actor AND ${mediaPermission('up.id', 'i.actor')}))`,
+          `WITH input AS (SELECT ? AS actor,? AS media) INSERT INTO posts (id,userId,text,media,poll,code,codeLang,adult,created,publishAt,publisherId,notifyPending) SELECT ?,u.id,?,?,?,?,?,?,?,?,?,1 FROM users u,input i WHERE u.id=? AND ${channelPermission('u')} AND ${writableTarget('u')} AND NOT EXISTS(SELECT 1 FROM json_each(i.media) j LEFT JOIN uploads up ON up.id=j.value AND up.userId=i.actor WHERE up.id IS NULL OR NOT (${mediaPermission('up.id', 'i.actor')}))`,
         )
         .bind(
           me,

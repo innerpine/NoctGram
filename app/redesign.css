@@ -192,6 +192,28 @@ textarea::placeholder {
   min-height: 64px;
   resize: none;
 }
+.composer-error {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #e19baa30;
+  border-radius: 12px;
+  background: #e19baa08;
+  color: #eeb3c0;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.composer-error strong {
+  display: block;
+  font-weight: 500;
+}
+.composer-error p {
+  margin: 4px 0;
+}
+.composer-error small {
+  color: #b49da3;
+  font-size: 12px;
+}
 .toolbar {
   gap: 4px;
   padding-top: 12px;
@@ -711,7 +733,9 @@ textarea::placeholder {
   color: #ffffffd9;
   font-size: 14px;
   text-align: left;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
 }
 .profile-saved-link span {
   flex: 1;

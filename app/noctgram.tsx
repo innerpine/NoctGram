@@ -132,6 +132,7 @@ export default function Noctgram({
   useEffect(() => {
     setPage(initialPage);
   }, [initialPage]);
+  const [publishError, setPublishError] = useState('');
   const [draft, setDraft] = useState(''),
     [attachments, setAttachments] = useState<Media[]>([]),
     [poll, setPoll] = useState<string[] | null>(null),
@@ -187,12 +188,12 @@ export default function Noctgram({
     if (next) setModalContent(next);
     setModalOpen(!!next);
   };
-  const notify = (s: string, undo: Post | null = null) => {
+  const notify = useCallback((s: string, undo: Post | null = null) => {
     setToastLeaving(false);
     setUndoHidden(undo);
     setNotice(s);
     setNoticeVersion((v) => v + 1);
-  };
+  }, []);
   const auth = () => {
     if (!me) {
       setModal('signin');
@@ -238,13 +239,13 @@ export default function Noctgram({
     } catch (e) {
       if ((e as Error).message.startsWith('Войдите')) setGuest(true);
       else {
-        setNotice((e as Error).message);
+        notify((e as Error).message);
         setLoadError(true);
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [notify]);
   useEffect(() => {
     void bootstrap();
   }, [bootstrap]);
@@ -389,8 +390,9 @@ export default function Noctgram({
         }
       } catch (e) {
         if (version === requestVersion.current) {
-          setNotice((e as Error).message);
+          notify((e as Error).message);
           setLoadError(true);
+          return false;
         }
       } finally {
         if (version === requestVersion.current) setLoading(false);
@@ -406,6 +408,7 @@ export default function Noctgram({
       pinnedId,
       accountBlocked,
       profile?.blocked,
+      notify,
     ],
   );
   const latestRefresh = useRef(refresh);
@@ -466,7 +469,7 @@ export default function Noctgram({
     return () => {
       active = false;
     };
-  }, [myId, privacyVersion, updateAccount]);
+  }, [myId, privacyVersion, updateAccount, notify]);
   useEffect(() => {
     if (!myId) return;
     const params = new URLSearchParams(window.location.search);
@@ -500,7 +503,7 @@ export default function Noctgram({
     return () => {
       active = false;
     };
-  }, [myId]);
+  }, [myId, notify]);
   const refreshPost = async (id: string) => {
     try {
       const updated = await request<Post>(
@@ -577,7 +580,7 @@ export default function Noctgram({
         void loadThreads().catch(() => {});
     }, 5000);
     return () => clearInterval(t);
-  }, [page, me, loadThreads]);
+  }, [page, me, loadThreads, notify]);
   useEffect(() => {
     if (page !== 'messages' || !peer || accountBlocked) return;
     activePeer.current = peer.id;
@@ -593,7 +596,7 @@ export default function Noctgram({
       activePeer.current = '';
       generationRef.current++;
     };
-  }, [peer, page, loadMessages, accountBlocked]);
+  }, [peer, page, loadMessages, accountBlocked, notify]);
   useEffect(() => {
     messageEnd.current?.scrollIntoView({ block: 'end' });
   }, [messages.length]);
@@ -613,7 +616,7 @@ export default function Noctgram({
       active = false;
       clearTimeout(t);
     };
-  }, [peopleQuery, modal, me]);
+  }, [peopleQuery, modal, me, notify]);
   useEffect(() => {
     if (!myId) return;
     const id = new URLSearchParams(window.location.search).get('boost');
@@ -634,7 +637,7 @@ export default function Noctgram({
     return () => {
       active = false;
     };
-  }, [myId]);
+  }, [myId, notify]);
   const openProfile = async (id: string) => {
     if (!auth()) return;
     await run(async () => {
@@ -684,36 +687,61 @@ export default function Noctgram({
     const publisher =
       page === 'profile' && profile?.kind === 'channel' ? profile.id : me!.id;
     void run(async () => {
-      await request('', {
-        action: 'post',
-        as: publisher,
-        text: draft,
-        media: attachments.map((x) => x.id),
-        poll: poll || [],
-        code: code || '',
-        codeLang,
-        adult,
-        publishAt: scheduledAt ? new Date(scheduledAt).getTime() : 0,
-      });
+      setPublishError('');
+      try {
+        await request('', {
+          action: 'post',
+          as: publisher,
+          text: draft,
+          media: attachments.map((x) => x.id),
+          poll: poll || [],
+          code: code || '',
+          codeLang,
+          adult,
+          publishAt: scheduledAt ? new Date(scheduledAt).getTime() : 0,
+        });
+      } catch (error) {
+        setPublishError(
+          error instanceof Error && error.message
+            ? error.message
+            : 'Не удалось отправить публикацию. Попробуй ещё раз.',
+        );
+        return;
+      }
+      // Clear the draft only after the server confirms the publication.
       setDraft('');
       setAttachments([]);
       setPoll(null);
       setCode(null);
       setCodeLang('text');
       setAdult(false);
-      await latestRefresh.current();
-      const updated = await request<Profile>(
-        '?action=profile&id=' + encodeURIComponent(publisher),
-      );
-      if (updated.id === me?.id) setMe(updated);
-      setProfile((current) => (current?.id === updated.id ? updated : current));
+      setScheduledAt('');
+      setScheduleVersion((v) => v + 1);
       notify(
         scheduledAt
           ? 'Публикация добавлена в очередь'
           : 'Публикация появилась в ленте',
       );
-      setScheduledAt('');
-      setScheduleVersion((v) => v + 1);
+      const results = await Promise.allSettled([
+        latestRefresh.current(),
+        request<Profile>('?action=profile&id=' + encodeURIComponent(publisher)),
+      ]);
+      const updated = results[1];
+      if (updated.status === 'fulfilled') {
+        if (updated.value.id === me?.id) setMe(updated.value);
+        setProfile((current) =>
+          current?.id === updated.value.id ? updated.value : current,
+        );
+      }
+      if (
+        results.some((result) => result.status === 'rejected') ||
+        (results[0].status === 'fulfilled' && results[0].value === false)
+      )
+        notify(
+          scheduledAt
+            ? 'Публикация добавлена в очередь, но обновить данные не удалось. Обнови страницу.'
+            : 'Пост опубликован, но обновить данные не удалось. Обнови страницу.',
+        );
     });
   };
   const recordView = useCallback(
@@ -922,7 +950,11 @@ export default function Noctgram({
     });
   };
   const composer = (
-    <fieldset className="composer" disabled={busy || readOnly}>
+    <fieldset
+      className="composer"
+      disabled={busy || readOnly}
+      aria-describedby={publishError ? 'composer-publish-error' : undefined}
+    >
       <div className="composer-top">
         <Avatar
           person={
@@ -1157,6 +1189,17 @@ export default function Noctgram({
           <ArrowUpRight size={14} />
         </button>
       </div>
+      {publishError && (
+        <div
+          id="composer-publish-error"
+          className="composer-error"
+          role="alert"
+        >
+          <strong>Не удалось отправить публикацию</strong>
+          <p>{publishError}</p>
+          <small>Текст, вложения и настройки остались в редакторе.</small>
+        </div>
+      )}
     </fieldset>
   );
   const cards = (items: Post[]) =>
