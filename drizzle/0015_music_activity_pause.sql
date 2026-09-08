@@ -1,0 +1,1 @@
+ALTER TABLE `music_activity` ADD `state` text DEFAULT 'playing' NOT NULL;

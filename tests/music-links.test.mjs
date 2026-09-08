@@ -69,4 +69,34 @@ for (const url of [
   'https://spotify.link/short',
 ])
   assert.equal(parseMusicLink(url), null);
-console.log('Music URL boundary tests passed.');
+for (const url of [
+  'https://www.youtube.com/watch?v=jfKfPfyJRdk&list=RDjunk&t=20',
+  'https://youtu.be/jfKfPfyJRdk?si=private-tracking',
+  'https://music.youtube.com/watch?v=jfKfPfyJRdk&feature=share',
+  'https://m.youtube.com/watch?v=jfKfPfyJRdk',
+  'https://youtube.com/shorts/jfKfPfyJRdk',
+  'https://www.youtube.com/live/jfKfPfyJRdk',
+])
+  assert.deepEqual(parseMusicLink(url), {
+    url: 'https://www.youtube.com/watch?v=jfKfPfyJRdk',
+    kind: 'track',
+    provider: 'youtube',
+  });
+for (const url of [
+  'https://www.youtube.com.evil.test/watch?v=jfKfPfyJRdk',
+  'https://user@youtube.com/watch?v=jfKfPfyJRdk',
+  'https://youtube.com:8443/watch?v=jfKfPfyJRdk',
+  'http://youtube.com/watch?v=jfKfPfyJRdk',
+  'https://youtube.com/playlist?list=PLprivate',
+  'https://youtube.com/watch?v=invalid',
+  'https://youtu.be/jfKfPfyJRdk/extra',
+])
+  assert.equal(parseMusicLink(url), null, url);
+assert.equal(
+  findMusicLink('Музыка: https://music.youtube.com/watch?v=jfKfPfyJRdk.')
+    .provider,
+  'youtube',
+);
+console.log(
+  'Music URL boundary: SoundCloud, Spotify, YouTube and YouTube Music passed.',
+);

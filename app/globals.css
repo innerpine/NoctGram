@@ -27,6 +27,8 @@
 }
 :root,
 .dark {
+  --app-nav-inset: 0px;
+  --app-player-space: 0px;
   color-scheme: dark;
   --background: #000;
   --foreground: #fff;
@@ -222,6 +224,9 @@ small {
   position: sticky;
   top: 0;
   height: 100dvh;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   display: flex;
   flex-direction: column;
   padding: 28px 0 20px;
@@ -343,10 +348,14 @@ small {
 }
 .main-column {
   min-width: 0;
-  padding-bottom: 40px;
+  /* Reserve fixed controls inside the content, not below the full-height rail. */
+  padding-bottom: calc(
+    var(--app-nav-inset) + max(12px, var(--app-player-space))
+  );
 }
 .page-header {
   height: 78px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1009,14 +1018,18 @@ small {
 }
 .messages-main {
   grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
 }
 .messenger {
   display: flex;
   border: 1px solid #ffffff15;
   border-radius: 16px;
   overflow: hidden;
-  height: calc(100dvh - 105px);
-  min-height: 400px;
+  flex: 1;
+  min-height: 0;
   background: var(--card);
 }
 .threads-panel {
@@ -1024,6 +1037,7 @@ small {
   flex-shrink: 0;
   border-right: 1px solid #ffffff12;
   overflow: auto;
+  overscroll-behavior-y: contain;
 }
 .threads-heading {
   display: flex;
@@ -1074,6 +1088,7 @@ small {
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  min-height: 0;
 }
 .chat-header {
   min-height: 65px;
@@ -1102,6 +1117,7 @@ small {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior-y: contain;
   display: flex;
   flex-direction: column;
   padding: 22px 16px;
@@ -1707,9 +1723,13 @@ small {
   }
 }
 @media (max-width: 500px) {
+  :root,
+  .dark {
+    --app-nav-inset: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
   .app-shell {
     display: block;
-    padding: 0 12px 74px;
+    padding: 0 12px;
   }
   .sidebar {
     position: fixed;
@@ -1717,11 +1737,11 @@ small {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 64px;
+    height: var(--app-nav-inset);
     background: #080808ef;
     border-top: 1px solid #ffffff14;
     z-index: 35;
-    padding: 5px 8px;
+    padding: 5px 8px calc(5px + env(safe-area-inset-bottom, 0px));
     backdrop-filter: blur(14px);
   }
   .sidebar > .brand,
@@ -1860,10 +1880,6 @@ small {
   }
   .profile-tabs {
     margin: 13px 0;
-  }
-  .messenger {
-    height: calc(100dvh - 150px);
-    min-height: 320px;
   }
   .toast {
     bottom: 78px;

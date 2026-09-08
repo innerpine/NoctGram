@@ -790,6 +790,61 @@ test('music cleanup preserves a live reference and an unfinished recent upload',
     assert.equal(ctx.objects.has('music/pending'), true);
   }));
 
+test('chat attachments survive source deletion while a forwarded copy still references them', () =>
+  using(async (ctx) => {
+    ctx.upload('chat-file');
+    ctx.sql.exec(
+      "INSERT INTO chat_uploads(uploadId,recipient,size,kind) VALUES('chat-file','bob',512,'image')",
+    );
+    const media = JSON.stringify([{ id: 'chat-file', kind: 'image' }]);
+    const insert = ctx.sql.prepare(
+      "INSERT INTO messages(id,sender,recipient,text,media,created) VALUES(?,'alice','bob','',?,?)",
+    );
+    insert.run('source', media, old);
+    insert.run('forwarded', media, now);
+    ctx.sql.exec(
+      "UPDATE messages SET deletedAt=1,media='[]' WHERE id='source'",
+    );
+    await storage.cleanUploads();
+    assert.equal(ctx.has('chat-file'), true);
+    assert.equal(ctx.objects.has('chat-file'), true);
+    ctx.sql.exec("DELETE FROM messages WHERE id='forwarded'");
+    await storage.cleanUploads();
+    assert.equal(ctx.has('chat-file'), false);
+    assert.equal(ctx.objects.has('chat-file'), false);
+  }));
+test('chat inserts and edits cannot attach a file claimed by cleanup or still uploading', () =>
+  using(async (ctx) => {
+    ctx.sql.exec(
+      "INSERT INTO messages(id,sender,recipient,text,created) VALUES('editable','alice','bob','hello',1)",
+    );
+    for (const state of ['uploading', 'deleting']) {
+      ctx.upload(state, { state });
+      const media = JSON.stringify([{ id: state }]);
+      assert.throws(
+        () =>
+          ctx.sql
+            .prepare(
+              "INSERT INTO messages(id,sender,recipient,text,media,created) VALUES(?,'alice','bob','',?,1)",
+            )
+            .run(state, media),
+        /MEDIA_NOT_READY/,
+      );
+      assert.throws(
+        () =>
+          ctx.sql
+            .prepare("UPDATE messages SET media=? WHERE id='editable'")
+            .run(media),
+        /MEDIA_NOT_READY/,
+      );
+    }
+    assert.equal(
+      ctx.sql.prepare("SELECT text FROM messages WHERE id='editable'").get()
+        .text,
+      'hello',
+    );
+  }));
+
 let failures = 0;
 for (const { name, fn } of tests) {
   try {

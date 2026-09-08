@@ -1,5 +1,6 @@
 'use client';
 import { DisplayName } from './profile-identity';
+import { ProfileLink, MentionText } from './profile-link';
 /* The subscription starts an asynchronous request and updates its loading state. */
 /* eslint-disable react/react-compiler */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -139,12 +140,21 @@ export function CommentsPanel({
   return (
     <div className="comments-panel">
       <div className="comment-context">
-        <Avatar person={post} size={32} />
+        <ProfileLink
+          target={{ id: post.userId }}
+          aria-label={'Профиль ' + post.name}
+        >
+          <Avatar person={post} size={32} />
+        </ProfileLink>
         <div>
           <strong>
-            <DisplayName person={post} />
+            <ProfileLink target={{ id: post.userId }}>
+              <DisplayName person={post} />
+            </ProfileLink>
           </strong>
-          <p>{post.text}</p>
+          <p>
+            <MentionText text={post.text} />
+          </p>
         </div>
       </div>
       <div className="comments-heading">
@@ -172,11 +182,18 @@ export function CommentsPanel({
         )}
         {comments.map((c) => (
           <article key={c.id} className="comment">
-            <Avatar person={c} size={32} />
+            <ProfileLink
+              target={{ id: c.userId }}
+              aria-label={'Профиль ' + c.name}
+            >
+              <Avatar person={c} size={32} />
+            </ProfileLink>
             <div>
               <div className="row">
                 <strong>
-                  <DisplayName person={c} />
+                  <ProfileLink target={{ id: c.userId }}>
+                    <DisplayName person={c} />
+                  </ProfileLink>
                 </strong>
                 <span className="grow" />
                 <Stamp time={c.created} compact />
@@ -191,7 +208,9 @@ export function CommentsPanel({
                   </button>
                 )}
               </div>
-              <p>{c.text}</p>
+              <p>
+                <MentionText text={c.text} />
+              </p>
               {c.userId !== me.id && !readOnly && (
                 <div className="comment-moderation-actions">
                   <button

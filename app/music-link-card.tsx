@@ -1,6 +1,10 @@
 'use client';
 import { Play } from 'lucide-react';
-import { findMusicLink, musicLabel } from '@/lib/music-links';
+import {
+  findMusicLink,
+  musicLabel,
+  musicProviderName,
+} from '@/lib/music-links';
 import { useMusic } from '@/lib/music-context';
 
 export function MusicLinkCard({ text }: { text: string }) {
@@ -27,12 +31,9 @@ export function MusicLinkCard({ text }: { text: string }) {
         target="_blank"
         rel="noopener noreferrer"
         className="music-source"
-        aria-label={
-          'Источник: ' +
-          (link.provider === 'spotify' ? 'Spotify' : 'SoundCloud')
-        }
+        aria-label={'Источник: ' + musicProviderName(link.provider)}
       >
-        {link.provider === 'spotify' ? 'Spotify' : 'SoundCloud'}
+        {musicProviderName(link.provider)}
       </a>
     </div>
   );

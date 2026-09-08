@@ -117,6 +117,8 @@ export async function deleteAccount(
     'story_views',
     'user_privacy',
     'music_audio',
+    'music_activity',
+    'music_playlist_members',
     'music_library',
     'music_preferences',
     'music_sessions',
@@ -153,6 +155,14 @@ export async function deleteAccount(
       .bind(me, me, ...args),
   );
   statements.push(
+    d
+      .prepare(`DELETE FROM music_playlists WHERE ownerId=? AND ${gate}`)
+      .bind(me, ...args),
+    d
+      .prepare(
+        `DELETE FROM chat_themes WHERE (firstId=? OR secondId=?) AND ${gate}`,
+      )
+      .bind(me, me, ...args),
     d
       .prepare(
         `UPDATE users SET name='Удалённый аккаунт',bio='',avatar='',cover='',verified=0,lastSeen=0,onboardingComplete=0,deletedAt=?,sessionsRevokedAt=? WHERE (id=? OR ownerId=?) AND ${gate}`,

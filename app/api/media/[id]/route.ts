@@ -11,11 +11,13 @@ export async function GET(
     const { id } = await params;
     const upload = await db()
       .prepare(
-        "SELECT up.userId,u.onboardingComplete,u.deletedAt FROM uploads up JOIN users u ON u.id=up.userId WHERE up.id=? AND up.state='ready'",
+        "SELECT up.userId,up.name,u.onboardingComplete,u.deletedAt,c.kind FROM uploads up JOIN users u ON u.id=up.userId LEFT JOIN chat_uploads c ON c.uploadId=up.id WHERE up.id=? AND up.state='ready'",
       )
       .bind(id)
       .first<{
         userId: string;
+        name: string;
+        kind: string | null;
         onboardingComplete: number;
         deletedAt: number;
       }>();
@@ -40,6 +42,17 @@ export async function GET(
     if (!object) throw new ApiError(404, 'Файл не найден');
     const headers = new Headers();
     object.writeHttpMetadata(headers);
+    if (
+      upload.kind === 'file' ||
+      new URL(req.url).searchParams.has('download')
+    ) {
+      headers.set(
+        'Content-Disposition',
+        `attachment; filename="file"; filename*=UTF-8''${encodeURIComponent(upload.name).replace(/['()*]/g, (char) => '%' + char.charCodeAt(0).toString(16))}`,
+      );
+      if (upload.kind === 'file')
+        headers.set('Content-Type', 'application/octet-stream');
+    }
     headers.set('X-Content-Type-Options', 'nosniff');
     headers.set('Cache-Control', 'private, no-store');
     headers.set('Accept-Ranges', 'bytes');

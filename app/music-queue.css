@@ -1,0 +1,213 @@
+.music-sort-list {
+  position: relative;
+}
+.music-sort-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+  border-radius: 12px;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+.music-sort-row > :not(.music-sort-handle) {
+  flex: 1;
+  min-width: 0;
+}
+.music-sort-row[data-dragging='true'] {
+  z-index: 1;
+  background: #ffffff12;
+  box-shadow:
+    inset 0 0 0 1px #d8c7ff75,
+    0 8px 24px #0003;
+}
+.music-sort-handle {
+  align-self: stretch;
+  width: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  color: #ffffff50;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  border-radius: 9px;
+  transition:
+    color 160ms ease,
+    background 160ms ease;
+}
+.music-sort-handle:hover,
+.music-sort-handle:focus-visible {
+  color: #e2d5ff;
+  background: #ffffff09;
+}
+.music-sort-handle:active {
+  cursor: grabbing;
+}
+.music-sort-handle:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.playlist-tracks.music-sort-list {
+  max-height: min(60dvh, 600px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.music-favorite-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.music-favorite-button[data-saved='true'] {
+  color: #e5b3d8;
+}
+.music-favorite-button[data-saved='true'] > svg:not(.spin) {
+  animation: music-heart-in 260ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+.music-player-row .music-favorite-button {
+  width: 34px;
+  height: 34px;
+}
+.music-stage-track {
+  position: relative;
+  padding-inline: 44px;
+}
+.music-stage-track > .music-favorite-wrap {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+.music-favorite-note {
+  position: absolute;
+  z-index: 5;
+  bottom: calc(100% + 9px);
+  right: 0;
+  width: max-content;
+  max-width: min(260px, 70vw);
+  padding: 9px 12px;
+  border: 1px solid #ffffff20;
+  border-radius: 12px;
+  background: #201e25;
+  color: #eee;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 8px 28px #0004;
+  animation: music-heart-note 180ms ease both;
+  pointer-events: none;
+}
+.music-favorite-dialog.noct-dialog {
+  z-index: 82;
+  max-width: 430px !important;
+  background: #1b1920 !important;
+  transition:
+    opacity 200ms ease,
+    scale 200ms cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+.music-favorite-overlay {
+  z-index: 81;
+}
+.music-favorite-choices {
+  display: grid;
+  gap: 7px;
+  max-height: min(52dvh, 460px);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.music-favorite-choice {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  min-width: 0;
+  border-radius: 13px;
+  text-align: left;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+.music-favorite-choice:hover {
+  background: #ffffff0b;
+}
+.music-favorite-choice:active {
+  transform: scale(0.985);
+}
+.music-favorite-choice > svg {
+  flex: 0 0 19px;
+  color: #d9b7e2;
+}
+.music-favorite-art {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: #ffffff08;
+  color: #c2a8dc;
+}
+.music-favorite-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.music-favorite-copy {
+  flex: 1;
+  min-width: 0;
+}
+.music-favorite-copy strong {
+  display: block;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.music-favorite-copy small {
+  display: block;
+  font-size: 12px;
+  color: #ffffff70;
+  margin-top: 3px;
+}
+@keyframes music-heart-in {
+  0% {
+    transform: scale(0.75);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes music-heart-note {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (max-width: 600px) {
+  .music-sort-handle {
+    width: 25px;
+    flex-basis: 25px;
+  }
+  .music-stage-track {
+    padding-inline: 32px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .music-sort-row,
+  .music-sort-handle,
+  .music-favorite-choice,
+  .music-favorite-dialog.noct-dialog {
+    transition: none;
+  }
+  .music-favorite-note,
+  .music-favorite-button[data-saved='true'] > svg:not(.spin) {
+    animation: none;
+  }
+}

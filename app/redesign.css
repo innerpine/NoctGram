@@ -711,7 +711,9 @@ textarea::placeholder {
   color: #ffffffd9;
   font-size: 14px;
   text-align: left;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
 }
 .profile-saved-link span {
   flex: 1;
@@ -1668,11 +1670,11 @@ textarea::placeholder {
 }
 @media (max-width: 500px) {
   .app-shell {
-    padding: 0 12px 76px;
+    padding: 0 12px;
     display: block;
   }
   .sidebar {
-    padding: 5px 8px;
+    padding: 5px 8px calc(5px + env(safe-area-inset-bottom, 0px));
     background: rgba(8, 8, 8, 0.94);
   }
   .sidebar nav button {

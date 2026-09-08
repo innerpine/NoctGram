@@ -600,7 +600,44 @@ await test('deletion requires explicit owned-channel confirmation; revoked sessi
     0,
   );
   assert.equal(count('posts', 'id', ownPost), 1);
+  statement(
+    'INSERT INTO music_playlists(id,ownerId,name,created,updatedAt) VALUES(?,?,?,?,?)',
+    'own-playlist',
+    f.id,
+    'Own',
+    now,
+    now,
+  );
+  statement(
+    'INSERT INTO music_playlists(id,ownerId,name,created,updatedAt) VALUES(?,?,?,?,?)',
+    'peer-playlist',
+    peer.id,
+    'Peer',
+    now,
+    now,
+  );
+  statement(
+    "INSERT INTO music_playlist_members(playlistId,userId,status,created) VALUES('peer-playlist',?,'accepted',?)",
+    f.id,
+    now,
+  );
+  statement(
+    "INSERT INTO music_activity(userId,sessionId,sequence,updatedAt,expiresAt) VALUES(?,'test',1,?,?)",
+    f.id,
+    now,
+    now + 30000,
+  );
+  statement(
+    'INSERT INTO chat_themes(firstId,secondId) VALUES(?,?)',
+    f.id,
+    peer.id,
+  );
   await deleteAccount(f.id, f.h, true);
+  assert.equal(count('music_playlists', 'ownerId', f.id), 0);
+  assert.equal(count('music_playlists', 'ownerId', peer.id), 1);
+  assert.equal(count('music_playlist_members', 'userId', f.id), 0);
+  assert.equal(count('music_activity', 'userId', f.id), 0);
+  assert.equal(count('chat_themes', 'firstId', f.id), 0);
   assert(one('SELECT deletedAt FROM users WHERE id=?', f.id).deletedAt > 0);
   assert(one('SELECT deletedAt FROM users WHERE id=?', ca).deletedAt > 0);
   assert.equal(

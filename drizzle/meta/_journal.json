@@ -134,6 +134,76 @@
       "when": 1788877958498,
       "tag": "0018_reflective_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1788877958499,
+      "tag": "0014_music_activity",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1788877958500,
+      "tag": "0015_music_activity_pause",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1788877958501,
+      "tag": "0016_shared_music_playlists",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1788877958502,
+      "tag": "0017_gifts",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1788877958503,
+      "tag": "0018_gift_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1788877958504,
+      "tag": "0019_chat_themes",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1788877958505,
+      "tag": "0020_chat_attachments_pins",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1788877958506,
+      "tag": "0021_chat_message_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1788879448711,
+      "tag": "0022_music_queue_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1788882205013,
+      "tag": "0028_chat_storage_guards",
+      "breakpoints": true
     }
   ]
 }

@@ -17,7 +17,10 @@ import { NoctLogo } from './stars-icon';
 type Identity = Appearance & { name: string; avatar?: string };
 const motionEvent = 'noct:avatar-motion';
 let fallbackMotion = true;
-function motionSnapshot() {
+let cachedMotion: boolean | undefined;
+const motionListeners = new Set<() => void>();
+let motionMedia: MediaQueryList | undefined;
+function readMotion() {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches)
     return false;
   try {
@@ -26,15 +29,35 @@ function motionSnapshot() {
     return fallbackMotion;
   }
 }
+function motionSnapshot() {
+  return (cachedMotion ??= readMotion());
+}
+function refreshMotion() {
+  const next = readMotion();
+  if (next === cachedMotion) return;
+  cachedMotion = next;
+  motionListeners.forEach((listener) => listener());
+}
 function subscribeMotion(callback: () => void) {
-  const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-  media.addEventListener('change', callback);
-  window.addEventListener('storage', callback);
-  window.addEventListener(motionEvent, callback);
+  const media = (motionMedia ??= window.matchMedia(
+    '(prefers-reduced-motion: reduce)',
+  ));
+  if (!motionListeners.size) {
+    media.addEventListener('change', refreshMotion);
+    window.addEventListener('storage', refreshMotion);
+    window.addEventListener(motionEvent, refreshMotion);
+  }
+  motionListeners.add(callback);
+  refreshMotion();
   return () => {
-    media.removeEventListener('change', callback);
-    window.removeEventListener('storage', callback);
-    window.removeEventListener(motionEvent, callback);
+    motionListeners.delete(callback);
+    if (!motionListeners.size) {
+      media.removeEventListener('change', refreshMotion);
+      window.removeEventListener('storage', refreshMotion);
+      window.removeEventListener(motionEvent, refreshMotion);
+      cachedMotion = undefined;
+      motionMedia = undefined;
+    }
   };
 }
 function useMotion() {
@@ -186,7 +209,7 @@ export function Avatar({
         onError={() => setFailed(person.avatarMotion!)}
       />
     ) : person.avatar ? (
-      <img src={person.avatar} alt="" />
+      <img src={person.avatar} alt="" loading="lazy" decoding="async" />
     ) : person.name === 'Noctgram' ? (
       <NoctLogo size={size * 1.08} />
     ) : (

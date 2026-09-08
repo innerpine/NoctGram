@@ -1,5 +1,6 @@
 'use client';
 import { DisplayName, AnimationPreference } from './profile-identity';
+import { ProfileLink } from './profile-link';
 /* Async effects load private settings and cancel stale search results. */
 /* eslint-disable react/react-compiler */
 import { useEffect, useId, useRef, useState } from 'react';
@@ -18,6 +19,7 @@ import { Select } from '@base-ui/react/select';
 import { Switch } from '@base-ui/react/switch';
 import { request, type Person } from '@/lib/client';
 import { PushSettings } from './notifications';
+import { MusicActivitySettings } from './music-activity';
 import { Avatar } from './post-card';
 
 type Settings = {
@@ -137,7 +139,8 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
         <p className="connections-status">Загружаем настройки…</p>
       )}
       {settings && (
-        <>
+        <div className="privacy-content">
+          <MusicActivitySettings />
           <PushSettings />
           <AnimationPreference />
           <form
@@ -299,12 +302,23 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
               const blocked = settings.blocked.some((b) => b.id === p.id);
               return (
                 <div className="privacy-person" key={p.id}>
-                  <Avatar person={p} size={36} />
+                  <ProfileLink
+                    target={{ id: p.id }}
+                    aria-label={'Профиль ' + p.name}
+                  >
+                    <Avatar person={p} size={36} />
+                  </ProfileLink>
                   <span>
                     <strong>
-                      <DisplayName person={p} />
+                      <ProfileLink target={{ id: p.id }}>
+                        <DisplayName person={p} />
+                      </ProfileLink>
                     </strong>
-                    <small>@{p.handle}</small>
+                    <small>
+                      <ProfileLink target={{ id: p.id }}>
+                        @{p.handle}
+                      </ProfileLink>
+                    </small>
                   </span>
                   <button
                     className="secondary"
@@ -325,7 +339,7 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
             рядом с ним. Модератор увидит только выбранное сообщение и причину
             жалобы.
           </p>
-        </>
+        </div>
       )}
       {notice && (
         <output className="moderation-notice" aria-live="polite">

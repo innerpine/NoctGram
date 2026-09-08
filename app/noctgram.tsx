@@ -7,6 +7,8 @@ import { hasProfileDesign } from '@/lib/appearance';
    Async subscription effects intentionally set loading state; no React compiler is enabled. */
 /* eslint-disable next/no-img-element, next/no-html-link-for-pages, react/react-compiler */
 import { StoriesBar } from './stories-bar';
+import { reconcileSnapshot } from '@/lib/reconcile-snapshot';
+import { createFeedSnapshots, feedKey, sameSearch } from '@/lib/feed-snapshots';
 import { ChannelTools, localDate } from './channel-tools';
 import { NotificationsBell } from './notifications';
 import { useAudioCalls } from './audio-calls';
@@ -14,11 +16,25 @@ import { Clock3, Phone } from 'lucide-react';
 import { PrivacyPanel } from './privacy-panel';
 import { MusicPanel } from './music-panel';
 import { MusicServices } from './music-services';
-import { MusicLinkCard } from './music-link-card';
 import { MusicAccountGuard } from './music-provider';
+import { MusicActivityStatus } from './music-activity';
+import { Settings } from 'lucide-react';
 import { Music2 } from 'lucide-react';
-import { Ban, Flag } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Ban } from 'lucide-react';
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  createAppHistory,
+  type AppRoute,
+  type PreparedRoute,
+} from '@/lib/app-history';
 import {
   Moon,
   Home,
@@ -32,7 +48,6 @@ import {
   Bookmark,
   ChevronRight,
   Check,
-  CheckCheck,
   ArrowLeft,
   Pencil,
   Camera,
@@ -66,6 +81,7 @@ import { Avatar, Empty, PostCard, PostSkeleton } from './post-card';
 import { CommentsPanel } from './comments-panel';
 import { ContentDecisionForm } from './content-decision-form';
 import { ProfileDesign } from './profile-design';
+import { EditorPane } from './editor-pane';
 import {
   DisplayName,
   ProfileAvatar,
@@ -75,6 +91,16 @@ import { PremiumPanel } from './premium-panel';
 import { PremiumIcon } from './premium-icon';
 import { StarsIcon, NoctLogo } from './stars-icon';
 import { StarsPanel, SupportPanel } from './stars-panel';
+import { SendGiftButton, ProfileGifts } from './gifts';
+import { ChatThemeMenu } from './chat-theme-menu';
+import { ChatConversation } from './chat-conversation';
+import {
+  chatTheme,
+  DEFAULT_CHAT_THEME,
+  type ChatThemeState,
+} from '@/lib/chat-themes';
+import { MentionText } from './profile-link';
+import { PROFILE_NAVIGATE, type ProfileNavigation } from '@/lib/profile-links';
 import { ChannelsPanel } from './channels-panel';
 import { NoctMascot } from './noct-mascot';
 import { ConnectionsPanel } from './connections-panel';
@@ -100,13 +126,7 @@ export default function Noctgram({
 }: {
   initialPage?: 'feed' | 'music' | 'music-services';
 }) {
-  const [boostOpen, setBoostOpen] = useState<{
-    id: string;
-    revision: number;
-    open: boolean;
-  } | null>(null);
-  const pendingBoostOpen = useRef<string | null>(null);
-  const [page, setPage] = useState<string>(initialPage),
+  const [page, setPageState] = useState<string>(initialPage),
     [me, setMe] = useState<Profile | null>(null),
     [profile, setProfile] = useState<Profile | null>(null),
     [people, setPeople] = useState<Person[]>([]),
@@ -130,7 +150,7 @@ export default function Noctgram({
     [lightboxOpen, setLightboxOpen] = useState(false),
     [hasMore, setHasMore] = useState(false);
   useEffect(() => {
-    setPage(initialPage);
+    setPageState(initialPage);
   }, [initialPage]);
   const [draft, setDraft] = useState(''),
     [attachments, setAttachments] = useState<Media[]>([]),
@@ -147,6 +167,12 @@ export default function Noctgram({
     [topics, setTopics] = useState<{ tag: string; count: number }[]>([]),
     [toastLeaving, setToastLeaving] = useState(false),
     [privacyVersion, setPrivacyVersion] = useState(0);
+  const [boostOpen, setBoostOpen] = useState<{
+    id: string;
+    revision: number;
+    open: boolean;
+  } | null>(null);
+  const pendingBoostOpen = useRef<string | null>(null);
   const [editTab, setEditTab] = useState<
       'profile' | 'privacy' | 'design' | 'account'
     >('profile'),
@@ -168,21 +194,73 @@ export default function Noctgram({
     [messageText, setMessageText] = useState(''),
     [peopleQuery, setPeopleQuery] = useState(''),
     [found, setFound] = useState<Person[]>([]);
+  const [chatAppearance, setChatAppearance] = useState<{
+    viewer: string;
+    peer: string;
+    value: ChatThemeState;
+  } | null>(null);
   const [scheduledAt, setScheduledAt] = useState(''),
     [scheduleVersion, setScheduleVersion] = useState(0);
+  const [musicTab, setMusicTab] = useState('playlists');
+  const [postsKey, setPostsKey] = useState('');
+  const snapshots = useRef(createFeedSnapshots());
+  snapshots.current.reset(me?.id || '', privacyVersion);
+  const publicationKey = feedKey(
+    me?.id || '',
+    page,
+    mode,
+    query,
+    profile?.id,
+    profileTab,
+    privacyVersion,
+  );
+  const currentPosts = useRef({ key: postsKey, posts, hasMore });
+  currentPosts.current = { key: postsKey, posts, hasMore };
+  const cachedPublication = snapshots.current.get(publicationKey);
+  const searchUpdating = sameSearch(postsKey, publicationKey);
+  const displayPosts =
+    !me || postsKey === publicationKey
+      ? posts
+      : (cachedPublication?.posts ?? (searchUpdating ? posts : []));
+  const displayMore =
+    postsKey === publicationKey
+      ? hasMore
+      : (cachedPublication?.hasMore ?? false);
+  const publicationLoading =
+    loading ||
+    (!!me &&
+      postsKey !== publicationKey &&
+      !cachedPublication &&
+      !searchUpdating &&
+      !loadError);
+  useEffect(() => {
+    if (!loading && !loadError)
+      snapshots.current.save({ key: postsKey, posts, hasMore });
+  }, [postsKey, posts, hasMore, loading, loadError]);
   const readOnly = me?.restriction?.mode === 'read_only';
   const accountBlocked = me?.restriction?.mode === 'blocked';
   const audioCalls = useAudioCalls(me?.id, readOnly || accountBlocked);
   const fileRef = useRef<HTMLInputElement>(null),
     searchRef = useRef<HTMLInputElement>(null),
     draftRef = useRef<HTMLTextAreaElement>(null),
-    messageEnd = useRef<HTMLDivElement>(null),
+    messageFocus = useRef(''),
     requestVersion = useRef(0),
     messageVersion = useRef(0),
     activePeer = useRef(''),
     premiumReturn = useRef('feed'),
     starsReturn = useRef('feed'),
     actionLock = useRef(false);
+  const appHistory = useRef<ReturnType<typeof createAppHistory> | null>(null);
+  const navigationCache = useRef({
+    owner: '',
+    profiles: new Map<string, Profile>(),
+    peers: new Map<string, Person>(),
+    drafts: new Map<string, string>(),
+  });
+  const setPage = useCallback((value: string) => {
+    appHistory.current?.cancelPending();
+    setPageState(value);
+  }, []);
   const setModal = (next: string) => {
     if (next) setModalContent(next);
     setModalOpen(!!next);
@@ -234,6 +312,7 @@ export default function Noctgram({
       setProfile(r.me);
       setPeople(r.people);
       setPosts(r.posts);
+      setPostsKey(feedKey(r.me.id, 'feed', 'all', ''));
       setGuest(false);
     } catch (e) {
       if ((e as Error).message.startsWith('Войдите')) setGuest(true);
@@ -262,8 +341,10 @@ export default function Noctgram({
     };
   }, [notice, noticeVersion]);
   const updateAccount = useCallback((next: Profile) => {
-    setMe(next);
-    setProfile((current) => (current?.id === next.id ? next : current));
+    setMe((current) => reconcileSnapshot(current, next));
+    setProfile((current) =>
+      current?.id === next.id ? reconcileSnapshot(current, next) : current,
+    );
     if (next.restriction?.mode === 'blocked') {
       setPosts([]);
       setThreads([]);
@@ -328,6 +409,7 @@ export default function Noctgram({
     async (append = false, before = Date.now() + 1, afterId = '') => {
       if (
         !myId ||
+        (page === 'profile' && profileTab === 'gifts') ||
         accountBlocked ||
         (page === 'profile' && profile?.blocked) ||
         [
@@ -379,10 +461,11 @@ export default function Noctgram({
           }
         }
         if (version === requestVersion.current) {
+          setPostsKey(publicationKey);
           setPosts((p) =>
             append
               ? [...p, ...r.filter((n) => !p.some((x) => x.id === n.id))]
-              : r,
+              : reconcileSnapshot(p, r),
           );
           setHasMore(count === 30);
           setLoadError(false);
@@ -406,6 +489,7 @@ export default function Noctgram({
       pinnedId,
       accountBlocked,
       profile?.blocked,
+      publicationKey,
     ],
   );
   const latestRefresh = useRef(refresh);
@@ -428,8 +512,21 @@ export default function Noctgram({
       ].includes(page)
     )
       return;
-    setPosts([]);
-    setHasMore(false);
+    const cached = snapshots.current.get(publicationKey);
+    const current = currentPosts.current;
+    if (
+      current.key !== publicationKey &&
+      (cached || !sameSearch(current.key, publicationKey))
+    ) {
+      setPosts(cached?.posts || []);
+      setHasMore(cached?.hasMore || false);
+      setPostsKey(publicationKey);
+    }
+    setLoadError(false);
+    if (page === 'profile' && profileTab === 'gifts') {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const t = setTimeout(() => void refresh(), query ? 250 : 0);
     const version = requestVersion;
@@ -437,7 +534,16 @@ export default function Noctgram({
       clearTimeout(t);
       version.current++;
     };
-  }, [myId, page, query, refresh, accountBlocked, profile?.blocked]);
+  }, [
+    myId,
+    page,
+    query,
+    refresh,
+    accountBlocked,
+    profile?.blocked,
+    profileTab,
+    publicationKey,
+  ]);
   useEffect(() => {
     if (!myId) return;
     let active = true;
@@ -470,20 +576,6 @@ export default function Noctgram({
   useEffect(() => {
     if (!myId) return;
     const params = new URLSearchParams(window.location.search);
-    const chat = params.get('chat');
-    if (chat)
-      void request<Profile>('?action=profile&id=' + encodeURIComponent(chat))
-        .then((person) => {
-          if (person.kind === 'channel') return;
-          messageVersion.current++;
-          activePeer.current = person.id;
-          setMessages([]);
-          setPeer(person);
-          setMessageAccess(null);
-          setMessageText('');
-          setPage('messages');
-        })
-        .catch((e) => notify(e.message));
     const id = params.get('post');
     if (!id) return;
     let active = true;
@@ -506,6 +598,7 @@ export default function Noctgram({
       const updated = await request<Post>(
         '?action=post&id=' + encodeURIComponent(id),
       );
+      snapshots.current.update(updated);
       setPosts((rows) => rows.map((p) => (p.id === id ? updated : p)));
     } catch (e) {
       notify((e as Error).message);
@@ -526,32 +619,37 @@ export default function Noctgram({
       setProfile(me);
       setProfileTab('posts');
     }
-    if (v === 'search') setTimeout(() => searchRef.current?.focus(), 0);
+    if (v === 'search') searchRef.current?.focus({ preventScroll: true });
   };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         setPage('search');
-        setTimeout(() => searchRef.current?.focus(), 0);
+        searchRef.current?.focus({ preventScroll: true });
       }
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, []);
+  }, [setPage]);
   const loadThreads = useCallback(async () => {
-    if (me && me.restriction?.mode !== 'blocked')
-      setThreads(await request<Person[]>('?action=threads'));
-  }, [me]);
+    if (myId && !accountBlocked) {
+      const next = await request<Person[]>('?action=threads');
+      setThreads((previous) => reconcileSnapshot(previous, next));
+    }
+  }, [myId, accountBlocked]);
   const loadMessages = useCallback(async () => {
     if (!peer || activePeer.current !== peer.id) return;
     const version = ++messageVersion.current;
-    let r: Message[];
+    let r: { messages: Message[]; theme: ChatThemeState };
     let access: { allowed: boolean; blockedByMe: boolean };
     try {
       [r, access] = await Promise.all([
-        request<Message[]>(
-          '?action=messages&peer=' + encodeURIComponent(peer.id),
+        request<{ messages: Message[]; theme: ChatThemeState }>(
+          '?action=messages&includeTheme=1&peer=' +
+            encodeURIComponent(peer.id) +
+            '&focus=' +
+            encodeURIComponent(messageFocus.current),
         ),
         request<{ allowed: boolean; blockedByMe: boolean }>(
           '?action=messageAccess&peer=' + encodeURIComponent(peer.id),
@@ -565,38 +663,77 @@ export default function Noctgram({
       throw e;
     }
     if (version === messageVersion.current && activePeer.current === peer.id) {
-      setMessages(r);
-      setMessageAccess(access);
+      setMessages((previous) => reconcileSnapshot(previous, r.messages));
+      setChatAppearance((previous) => {
+        if (
+          previous &&
+          previous.viewer === myId &&
+          previous.peer === peer.id &&
+          previous.value.revision > r.theme.revision
+        )
+          return previous;
+        return reconcileSnapshot(previous, {
+          viewer: myId || '',
+          peer: peer.id,
+          value: r.theme,
+        });
+      });
+      setMessageAccess((previous) => reconcileSnapshot(previous, access));
     }
-  }, [peer]);
+  }, [peer, myId]);
   useEffect(() => {
-    if (!me) return;
+    if (!myId) return;
     void loadThreads().catch((e) => notify(e.message));
+    let pending = false;
     const t = setInterval(() => {
-      if (document.visibilityState === 'visible')
-        void loadThreads().catch(() => {});
+      if (!pending && document.visibilityState === 'visible') {
+        pending = true;
+        void loadThreads()
+          .catch(() => {})
+          .finally(() => {
+            pending = false;
+          });
+      }
     }, 5000);
-    return () => clearInterval(t);
-  }, [page, me, loadThreads]);
+    const giftsChanged = () => {
+      void loadThreads().catch(() => {});
+    };
+    window.addEventListener('noctgram:gifts-changed', giftsChanged);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('noctgram:gifts-changed', giftsChanged);
+    };
+  }, [myId, loadThreads]);
   useEffect(() => {
     if (page !== 'messages' || !peer || accountBlocked) return;
     activePeer.current = peer.id;
+    messageFocus.current = '';
     const generationRef = messageVersion;
     setMessages([]);
+    setMessageAccess(null);
     void loadMessages().catch((e) => notify(e.message));
+    let pending = false;
     const t = setInterval(() => {
-      if (document.visibilityState === 'visible')
-        void loadMessages().catch(() => {});
+      if (!pending && document.visibilityState === 'visible') {
+        pending = true;
+        void loadMessages()
+          .catch(() => {})
+          .finally(() => {
+            pending = false;
+          });
+      }
     }, 3000);
+    const giftsChanged = () => {
+      void loadMessages().catch(() => {});
+    };
+    window.addEventListener('noctgram:gifts-changed', giftsChanged);
     return () => {
       clearInterval(t);
+      window.removeEventListener('noctgram:gifts-changed', giftsChanged);
       activePeer.current = '';
       generationRef.current++;
     };
   }, [peer, page, loadMessages, accountBlocked]);
-  useEffect(() => {
-    messageEnd.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length]);
   useEffect(() => {
     if (modal !== 'people' || !me) return;
     let active = true;
@@ -614,51 +751,198 @@ export default function Noctgram({
       clearTimeout(t);
     };
   }, [peopleQuery, modal, me]);
+  const route: AppRoute = {
+    page,
+    musicTab,
+    profileId: profile?.id,
+    profileTab,
+    peerId: peer?.id,
+    mode,
+    query,
+    ...(page === 'profile' && boostOpen?.open && boostOpen.id === profile?.id
+      ? { boost: true }
+      : {}),
+  };
+  const cache = navigationCache.current;
+  if (cache.owner !== (myId || '')) {
+    cache.owner = myId || '';
+    cache.profiles.clear();
+    cache.peers.clear();
+    cache.drafts.clear();
+  }
+  if (profile) cache.profiles.set(profile.id, profile);
+  if (peer) {
+    cache.peers.set(peer.id, peer);
+    cache.drafts.set(peer.id, messageText);
+  }
+  if (cache.profiles.size > 24)
+    cache.profiles.delete(cache.profiles.keys().next().value!);
+  if (cache.peers.size > 50)
+    cache.peers.delete(cache.peers.keys().next().value!);
+  if (cache.drafts.size > 50)
+    cache.drafts.delete(cache.drafts.keys().next().value!);
+  const navigationLatest = useRef<{
+    route: AppRoute;
+    prepare: (route: AppRoute) => Promise<PreparedRoute>;
+    notify: (message: string) => void;
+  } | null>(null);
+  navigationLatest.current = {
+    route,
+    notify,
+    prepare: async (next) => {
+      if (
+        !me &&
+        ['profile', 'messages', 'saved', 'channels', 'stars'].includes(
+          next.page,
+        )
+      )
+        throw new Error('Войдите, чтобы открыть раздел');
+      if (next.page === 'moderation' && !me?.canModerate)
+        throw new Error('Раздел недоступен');
+      let person: Profile | null = null,
+        conversation: Person | null = null;
+      if (next.page === 'profile') {
+        const id = next.profileId || (!next.handle ? myId : '');
+        person = id === myId ? me : id ? cache.profiles.get(id) || null : null;
+        person ??= await request<Profile>(
+          '?' +
+            new URLSearchParams({
+              action: 'profile',
+              ...(id ? { id } : { handle: next.handle || '' }),
+            }),
+        );
+        next = {
+          page: 'profile',
+          profileId: person.id,
+          ...(next.boost && person.kind === 'channel' && !person.blocked
+            ? { boost: true }
+            : {}),
+          profileTab:
+            person.kind === 'channel' && next.profileTab === 'gifts'
+              ? 'posts'
+              : next.profileTab || 'posts',
+        };
+      }
+      if (next.page === 'messages' && next.peerId) {
+        conversation =
+          cache.peers.get(next.peerId) ||
+          threads.find((item) => item.id === next.peerId) ||
+          (await request<Profile>(
+            '?action=profile&id=' + encodeURIComponent(next.peerId),
+          ));
+        if (conversation.kind === 'channel' || conversation.id === 'noctgram')
+          throw new Error('Выберите личный диалог');
+      }
+      const destination = next;
+      return {
+        route: destination,
+        commit: () => {
+          if (destination.page === 'profile' && destination.boost && person)
+            setBoostOpen({ id: person.id, revision: Date.now(), open: true });
+          else
+            setBoostOpen((current) =>
+              current ? { ...current, open: false } : null,
+            );
+          if (destination.page === 'profile' && person) setProfile(person);
+          if (destination.page === 'profile')
+            setProfileTab(destination.profileTab || 'posts');
+          if (
+            destination.page === 'messages' &&
+            (navigationLatest.current!.route.page !== 'messages' ||
+              navigationLatest.current!.route.peerId !== conversation?.id)
+          ) {
+            messageVersion.current++;
+            activePeer.current = conversation?.id || '';
+            setPeer(conversation);
+            setMessages([]);
+            setMessageAccess(null);
+            setMessageText(
+              conversation ? cache.drafts.get(conversation.id) || '' : '',
+            );
+          }
+          setQuery(destination.query || '');
+          if (destination.page === 'feed') setMode(destination.mode || 'all');
+          if (destination.page === 'music')
+            setMusicTab(destination.musicTab || 'playlists');
+          setPageState(destination.page);
+          setModalOpen(false);
+          setLightboxOpen(false);
+        },
+      };
+    },
+  };
   useEffect(() => {
-    if (!myId) return;
-    const id = new URLSearchParams(window.location.search).get('boost');
-    if (!id) return;
-    let active = true;
-    void request<Profile>('?action=profile&id=' + encodeURIComponent(id))
-      .then((p) => {
-        if (!active || p.kind !== 'channel' || p.blocked) return;
-        setProfile(p);
-        setProfileTab('posts');
-        setQuery('');
-        setPage('profile');
-        setBoostOpen({ id: p.id, revision: Date.now(), open: true });
-      })
-      .catch((e) => {
-        if (active) notify(e.message);
-      });
+    if (!myId && !guest) return;
+    const history = createAppHistory(window, {
+      owner: myId || 'guest',
+      initial: navigationLatest.current!.route,
+      prepare: (next) => navigationLatest.current!.prepare(next),
+      error: (message) => navigationLatest.current!.notify(message),
+    });
+    appHistory.current = history;
     return () => {
-      active = false;
+      history.dispose();
+      appHistory.current = null;
+    };
+  }, [myId, guest]);
+  useEffect(() => {
+    appHistory.current?.observe({
+      page,
+      musicTab,
+      profileId: viewedId,
+      profileTab,
+      peerId: peer?.id,
+      mode,
+      query,
+    });
+  }, [page, viewedId, profileTab, peer?.id, mode, query, musicTab]);
+  const profileView = page === 'profile' ? viewedId : '';
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    if (page === 'search') searchRef.current?.focus({ preventScroll: true });
+  }, [page, profileView]);
+  const openProfile = async (id: string, tab = 'posts') => {
+    if (!auth()) return false;
+    return (
+      appHistory.current?.navigate({
+        page: 'profile',
+        profileId: id,
+        profileTab: tab,
+      }) ?? false
+    );
+  };
+  useEffect(() => {
+    const navigateProfile = (event: Event) => {
+      event.preventDefault();
+      if (!myId) {
+        setModal('signin');
+        return;
+      }
+      const target = (event as CustomEvent<ProfileNavigation>).detail;
+      void appHistory.current
+        ?.navigate({
+          page: 'profile',
+          profileId: target.id,
+          handle: target.handle,
+          profileTab: 'posts',
+        })
+        .then((opened) => {
+          if (opened) target.onNavigated?.();
+        });
+    };
+    window.addEventListener(PROFILE_NAVIGATE, navigateProfile);
+    return () => {
+      window.removeEventListener(PROFILE_NAVIGATE, navigateProfile);
     };
   }, [myId]);
-  const openProfile = async (id: string) => {
-    if (!auth()) return;
-    await run(async () => {
-      setProfile(
-        await request<Profile>('?action=profile&id=' + encodeURIComponent(id)),
-      );
-      setProfileTab('posts');
-      setQuery('');
-      setPage('profile');
-    });
-  };
   const openChat = (person: Person) => {
     if (!auth()) return;
     if (person.id === 'noctgram') {
       notify('Это официальный канал. Общайтесь с командой в комментариях.');
       return;
     }
-    messageVersion.current++;
-    activePeer.current = person.id;
-    setMessages([]);
-    setPeer(person);
-    setMessageAccess(null);
-    setMessageText('');
-    setPage('messages');
+    cache.peers.set(person.id, person);
+    void appHistory.current?.navigate({ page: 'messages', peerId: person.id });
     setModal('');
   };
   const addFiles = async (files: FileList | null) => {
@@ -749,6 +1033,7 @@ export default function Noctgram({
       const updated = await request<Post>(
         '?action=post&id=' + encodeURIComponent(p.id),
       );
+      snapshots.current.update(updated);
       setPosts((rows) => rows.map((x) => (x.id === p.id ? updated : x)));
       return true;
     } catch (e) {
@@ -792,6 +1077,7 @@ export default function Noctgram({
         value: kind === 'pin' ? !p.pinned : true,
       });
       if (kind === 'hide') {
+        snapshots.current.remove(p.id);
         setPosts((rows) => rows.filter((x) => x.id !== p.id));
         notify('Публикация скрыта', p);
       } else {
@@ -858,6 +1144,7 @@ export default function Noctgram({
     setModal('edit');
   }, [me]);
   const applyAppearance = (updated: Profile) => {
+    snapshots.current.clear();
     setMe((current) => (current?.id === updated.id ? updated : current));
     setProfile((current) => (current?.id === updated.id ? updated : current));
     const appearance = {
@@ -1159,6 +1446,57 @@ export default function Noctgram({
       </div>
     </fieldset>
   );
+  const cardActions = useRef({
+    openProfile,
+    action,
+    openComments,
+    postMenu,
+    writable,
+  });
+  cardActions.current = {
+    openProfile,
+    action,
+    openComments,
+    postMenu,
+    writable,
+  };
+  const cardCallbacks = useMemo(
+    () => ({
+      onProfile: (id: string) => {
+        void cardActions.current.openProfile(id);
+      },
+      onAction: (post: Post, kind: string, value: unknown) =>
+        cardActions.current.action(post, kind, value),
+      onComments: (post: Post) => cardActions.current.openComments(post),
+      onMenu: (post: Post, kind: string) =>
+        cardActions.current.postMenu(post, kind),
+      onMedia: (media: Media) => {
+        setLightbox(media);
+        setLightboxOpen(true);
+      },
+      onSupport: (post: Post) => {
+        if (cardActions.current.writable()) {
+          setSupportPost(post);
+          setModalContent('support');
+          setModalOpen(true);
+        }
+      },
+    }),
+    [],
+  );
+  const messageCallbacks = useMemo(
+    () => ({
+      onProfile: (id: string) => {
+        void cardActions.current.openProfile(id, 'gifts');
+      },
+      onReport: (message: Message) => {
+        setReportedMessage(message);
+        setModalContent('reportMessage');
+        setModalOpen(true);
+      },
+    }),
+    [],
+  );
   const cards = (items: Post[]) =>
     items.map((p) => (
       <PostCard
@@ -1167,32 +1505,19 @@ export default function Noctgram({
         p={p}
         me={me?.id}
         busy={busy || readOnly}
-        onProfile={(id) => void openProfile(id)}
-        onAction={action}
-        onComments={openComments}
+        {...cardCallbacks}
         onDelete={setDeleteId}
-        onMedia={(media) => {
-          setLightbox(media);
-          setLightboxOpen(true);
-        }}
-        onMenu={postMenu}
         onView={recordView}
-        onSupport={(p) => {
-          if (writable()) {
-            setSupportPost(p);
-            setModal('support');
-          }
-        }}
       />
     ));
   const shownPosts =
     page === 'profile' && profileTab === 'media'
-      ? posts.filter((p) => p.media.length)
+      ? displayPosts.filter((p) => p.media.length)
       : page === 'profile'
-        ? [...posts].sort((a, b) => (b.pinned || 0) - (a.pinned || 0))
+        ? [...displayPosts].sort((a, b) => (b.pinned || 0) - (a.pinned || 0))
         : page === 'saved'
-          ? posts.filter((p) => p.saved)
-          : posts;
+          ? displayPosts.filter((p) => p.saved)
+          : displayPosts;
   const unread = threads.reduce((sum, t) => sum + (t.unread || 0), 0);
   const online = !!profile?.lastSeen && Date.now() - profile.lastSeen < 120000;
   if (accountBlocked && me)
@@ -1206,8 +1531,19 @@ export default function Noctgram({
         />
       </>
     );
+  const currentChatTheme =
+    chatAppearance &&
+    chatAppearance.viewer === myId &&
+    chatAppearance.peer === peer?.id
+      ? chatAppearance.value
+      : DEFAULT_CHAT_THEME;
   return (
-    <div className="app-shell">
+    <div
+      className={
+        'app-shell' +
+        (['music', 'music-services'].includes(page) ? ' music-shell' : '')
+      }
+    >
       {audioCalls.panel}
       <aside className="sidebar">
         <button className="brand" onClick={() => navigate('feed')}>
@@ -1278,15 +1614,25 @@ export default function Noctgram({
           </div>
           {me ? (
             <>
-              <button className="account" onClick={() => navigate('profile')}>
-                <Avatar person={me} />
-                <span>
-                  <strong>
-                    <DisplayName person={me} />
-                  </strong>
-                  <small>@{me.handle}</small>
-                </span>
-              </button>
+              <div className="sidebar-account-row">
+                <button className="account" onClick={() => navigate('profile')}>
+                  <Avatar person={me} />
+                  <span>
+                    <strong>
+                      <DisplayName person={me} />
+                    </strong>
+                    <small>@{me.handle}</small>
+                  </span>
+                </button>
+                <button
+                  className="account-settings-button"
+                  aria-label="Настройки мессенджера"
+                  title="Настройки"
+                  onClick={() => setModal('settings')}
+                >
+                  <Settings size={20} />
+                </button>
+              </div>
               <SignOutButton className="logout">
                 <LogOut size={17} />
                 <span>Выйти</span>
@@ -1301,6 +1647,7 @@ export default function Noctgram({
         </div>
       </aside>
       <main
+        data-page={page}
         className={
           'main-column ' +
           (page === 'messages'
@@ -1353,6 +1700,10 @@ export default function Noctgram({
           {me && (
             <NotificationsBell
               me={me.id}
+              onGift={() => {
+                navigate('profile');
+                setProfileTab('gifts');
+              }}
               onPost={(id) => {
                 void request<Post>('?action=post&id=' + encodeURIComponent(id))
                   .then((p) => {
@@ -1370,8 +1721,17 @@ export default function Noctgram({
               }}
             />
           )}
-          {loading && page !== 'premium' && page !== 'messages' && (
-            <LoaderCircle className="spin" size={15} />
+          {page !== 'premium' && page !== 'messages' && (
+            <span
+              className="page-loading-indicator"
+              data-loading={loading}
+              aria-hidden="true"
+            >
+              <LoaderCircle
+                className={loading ? 'spin' : undefined}
+                size={15}
+              />
+            </span>
           )}
           <button
             className="icon-button"
@@ -1449,80 +1809,92 @@ export default function Noctgram({
         {page === 'profile' && profile?.blocked && (
           <SuspendedProfile profile={profile} onBack={() => navigate('feed')} />
         )}
-        {page === 'feed' && (
-          <>
-            <div
-              className="feed-tabs"
-              data-selected={mode === 'following' ? 1 : 0}
-            >
-              <Tabs
-                value={mode}
-                onValueChange={(v) => {
-                  if (v !== 'all' && !auth()) return;
-                  setMode(String(v));
-                }}
-              >
-                <TabsList>
-                  <TabsTrigger value="all">Для вас</TabsTrigger>
-                  <TabsTrigger value="following">Подписки</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-            {guest && (
-              <div className="welcome-banner">
-                <div>
-                  <strong>Свои люди. Твои мысли.</strong>
-                  <span>Войди, чтобы стать частью Noctgram.</span>
+        {['feed', 'search'].includes(page) && (
+          <div className="stream-intro" key={page}>
+            {page === 'feed' && (
+              <>
+                <div
+                  className="feed-tabs"
+                  data-selected={mode === 'following' ? 1 : 0}
+                >
+                  <Tabs
+                    value={mode}
+                    onValueChange={(v) => {
+                      if (v !== 'all' && !auth()) return;
+                      appHistory.current?.cancelPending();
+                      setMode(String(v));
+                    }}
+                  >
+                    <TabsList>
+                      <TabsTrigger value="all">Для вас</TabsTrigger>
+                      <TabsTrigger value="following">Подписки</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 </div>
-                <a href="/login" target="_top" className="primary">
-                  Войти <ArrowUpRight size={14} />
-                </a>
+                {guest && (
+                  <div className="welcome-banner">
+                    <div>
+                      <strong>Свои люди. Твои мысли.</strong>
+                      <span>Войди, чтобы стать частью Noctgram.</span>
+                    </div>
+                    <a href="/login" target="_top" className="primary">
+                      Войти <ArrowUpRight size={14} />
+                    </a>
+                  </div>
+                )}
+                {me && <StoriesBar me={me} readOnly={readOnly} />}
+                {composer}
+                {me && !readOnly && (
+                  <ChannelTools profile={me} revision={scheduleVersion} />
+                )}
+              </>
+            )}
+            {page === 'search' && (
+              <div className="search-panel">
+                <div className="searchbox">
+                  <Search size={18} />
+                  <input
+                    ref={searchRef}
+                    value={query}
+                    onChange={(e) => {
+                      appHistory.current?.cancelPending();
+                      setQuery(e.target.value);
+                    }}
+                    aria-label="Поиск в ленте"
+                    placeholder="Публикации, темы, люди"
+                  />
+                  {query && (
+                    <button
+                      aria-label="Очистить поиск"
+                      onClick={() => {
+                        appHistory.current?.cancelPending();
+                        setQuery('');
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    if (auth()) {
+                      setPeopleQuery(query);
+                      setModal('people');
+                    }
+                  }}
+                >
+                  <UserRound size={16} /> Найти человека по юзернейму{' '}
+                  <ArrowUpRight size={14} />
+                </button>
               </div>
             )}
-            {me && <StoriesBar me={me} readOnly={readOnly} />}
-            {composer}
-            {me && !readOnly && (
-              <ChannelTools profile={me} revision={scheduleVersion} />
-            )}
-          </>
-        )}
-        {page === 'search' && (
-          <div className="search-panel">
-            <div className="searchbox">
-              <Search size={18} />
-              <input
-                ref={searchRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                aria-label="Поиск в ленте"
-                placeholder="Публикации, темы, люди"
-              />
-              {query && (
-                <button
-                  aria-label="Очистить поиск"
-                  onClick={() => setQuery('')}
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-            <button
-              className="text-button"
-              onClick={() => {
-                if (auth()) {
-                  setPeopleQuery(query);
-                  setModal('people');
-                }
-              }}
-            >
-              <UserRound size={16} /> Найти человека по юзернейму{' '}
-              <ArrowUpRight size={14} />
-            </button>
           </div>
         )}
         {page === 'profile' && profile && !profile.blocked && (
           <>
             <section
+              key={'profile-card:' + profile.id}
               style={
                 hasProfileDesign(profile) ? appearanceStyle(profile) : undefined
               }
@@ -1575,6 +1947,16 @@ export default function Noctgram({
                       >
                         Редактировать
                       </button>
+                      {profile.id === me?.id && (
+                        <button
+                          className="icon-button"
+                          aria-label="Настройки мессенджера"
+                          title="Настройки"
+                          onClick={() => setModal('settings')}
+                        >
+                          <Settings size={20} />
+                        </button>
+                      )}
                       <button
                         className="icon-button cosmetic"
                         aria-label="Оформление профиля"
@@ -1594,6 +1976,15 @@ export default function Noctgram({
                       </button>
                       {profile.id !== 'noctgram' &&
                         profile.kind !== 'channel' && (
+                          <SendGiftButton
+                            key={profile.id}
+                            recipient={profile}
+                            senderId={me?.id || ''}
+                            disabled={!me || readOnly || busy}
+                          />
+                        )}
+                      {profile.id !== 'noctgram' &&
+                        profile.kind !== 'channel' && (
                           <button
                             className="icon-button"
                             aria-label="Написать сообщение"
@@ -1605,44 +1996,59 @@ export default function Noctgram({
                     </>
                   )}
                 </div>
-                <h2>
-                  <DisplayName person={profile} />
-                </h2>
-                <button
-                  className="handle-main meta"
-                  title="Скопировать юзернейм"
-                  onClick={() =>
-                    void navigator.clipboard
-                      .writeText('@' + profile.handle)
-                      .then(() => notify('Юзернейм скопирован'))
-                      .catch(() => notify('@' + profile.handle))
-                  }
-                >
-                  @{profile.handle}
-                  <Copy size={12} />
-                </button>
-                {profile.kind === 'channel' && (
-                  <span className="channel-profile-label">
-                    <Megaphone size={13} />
-                    Канал
-                  </span>
-                )}
-                {!!profile.lastSeen && (
-                  <div
-                    className={'profile-presence ' + (online ? 'online' : '')}
-                  >
-                    <i />
-                    {online
-                      ? 'В сети'
-                      : 'Был(а) ' +
-                        new Date(profile.lastSeen).toLocaleString('ru-RU', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                <div className="profile-identity-row">
+                  <div className="profile-identity-main">
+                    <h2>
+                      <DisplayName person={profile} />
+                    </h2>
+                    <button
+                      className="handle-main meta"
+                      title="Скопировать юзернейм"
+                      onClick={() =>
+                        void navigator.clipboard
+                          .writeText('@' + profile.handle)
+                          .then(() => notify('Юзернейм скопирован'))
+                          .catch(() => notify('@' + profile.handle))
+                      }
+                    >
+                      @{profile.handle}
+                      <Copy size={12} />
+                    </button>
+                    {profile.kind === 'channel' && (
+                      <span className="channel-profile-label">
+                        <Megaphone size={13} />
+                        Канал
+                      </span>
+                    )}
+                    {!!profile.lastSeen && (
+                      <div
+                        className={
+                          'profile-presence ' + (online ? 'online' : '')
+                        }
+                      >
+                        <i />
+                        {online
+                          ? 'В сети'
+                          : 'Был(а) ' +
+                            new Date(profile.lastSeen).toLocaleString('ru-RU', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                      </div>
+                    )}
                   </div>
-                )}
+                  <MusicActivityStatus
+                    userId={profile.id}
+                    own={profile.id === me?.id}
+                    onSettings={
+                      profile.id === me?.id
+                        ? () => setModal('settings')
+                        : undefined
+                    }
+                  />
+                </div>
                 <div className="profile-aliases">
                   {profile.handles.some((h) => h !== profile.handle) && (
                     <>
@@ -1669,10 +2075,13 @@ export default function Noctgram({
                   )}
                 </div>
                 <p className="bio">
-                  {profile.bio ||
-                    (profile.id === me?.id
-                      ? 'Расскажи о себе — пусть свои тебя узнают.'
-                      : 'Пока без описания.')}
+                  {profile.bio ? (
+                    <MentionText text={profile.bio} />
+                  ) : profile.id === me?.id ? (
+                    'Расскажи о себе — пусть свои тебя узнают.'
+                  ) : (
+                    'Пока без описания.'
+                  )}
                 </p>
                 <div className="profile-details">
                   <CalendarDays size={14} /> В Noctgram с{' '}
@@ -1757,26 +2166,48 @@ export default function Noctgram({
               />
             )}
             <div
-              className="feed-tabs profile-tabs"
-              data-selected={profileTab === 'media' ? 1 : 0}
+              key={'profile-tabs:' + profile.id}
+              className={
+                'feed-tabs profile-tabs' +
+                (profile.kind !== 'channel' ? ' has-gifts' : '')
+              }
+              data-selected={
+                profileTab === 'gifts' ? 2 : profileTab === 'media' ? 1 : 0
+              }
             >
               <Tabs
                 value={profileTab}
-                onValueChange={(v) => setProfileTab(String(v))}
+                onValueChange={(v) => {
+                  appHistory.current?.cancelPending();
+                  setProfileTab(String(v));
+                }}
               >
                 <TabsList>
                   <TabsTrigger value="posts">Публикации</TabsTrigger>
                   <TabsTrigger value="media">Медиа</TabsTrigger>
+                  {profile.kind !== 'channel' && (
+                    <TabsTrigger value="gifts">Подарки</TabsTrigger>
+                  )}
                 </TabsList>
               </Tabs>
             </div>
-            {profilePublisher && !readOnly && !channelRestricted && (
-              <ChannelTools
-                key={profile.id}
-                profile={profile}
-                revision={scheduleVersion}
+            {profileTab === 'gifts' && me && profile.kind !== 'channel' && (
+              <ProfileGifts
+                key={'gifts:' + profile.id}
+                userId={profile.id}
+                own={profile.id === me.id}
               />
             )}
+            {profilePublisher &&
+              !readOnly &&
+              !channelRestricted &&
+              profileTab === 'posts' && (
+                <ChannelTools
+                  key={'publishing:' + profile.id}
+                  profile={profile}
+                  revision={scheduleVersion}
+                />
+              )}
             {profilePublisher &&
               !readOnly &&
               !channelRestricted &&
@@ -1788,13 +2219,18 @@ export default function Noctgram({
           <MusicServices
             signedIn={!!me}
             readOnly={!!readOnly}
-            onBack={() => navigate('music')}
+            onMusic={() => navigate('music')}
           />
         )}
         {page === 'music' && (
           <MusicPanel
             signedIn={!!me}
             readOnly={!!readOnly}
+            tab={musicTab}
+            onTabChange={(value) => {
+              appHistory.current?.cancelPending();
+              setMusicTab(value);
+            }}
             onProfile={(id) => void openProfile(id)}
             onServices={() => navigate('music-services')}
           />
@@ -1832,9 +2268,18 @@ export default function Noctgram({
           'music',
           'music-services',
         ].includes(page) &&
-          !(page === 'profile' && profile?.blocked) && (
-            <>
-              {loading && !posts.length ? (
+          !(
+            page === 'profile' &&
+            (profile?.blocked || profileTab === 'gifts')
+          ) && (
+            <div
+              className={
+                ['feed', 'search'].includes(page) ? 'stream-results' : undefined
+              }
+              key={'results:' + page}
+              aria-busy={publicationLoading}
+            >
+              {publicationLoading && !displayPosts.length ? (
                 <>
                   <PostSkeleton />
                   <PostSkeleton />
@@ -1842,7 +2287,7 @@ export default function Noctgram({
               ) : (
                 cards(shownPosts)
               )}
-              {shownPosts.length === 0 && !loading && (
+              {shownPosts.length === 0 && !publicationLoading && (
                 <Empty>
                   {query
                     ? 'Ничего не найдено. Попробуйте другой запрос.'
@@ -1855,15 +2300,15 @@ export default function Noctgram({
                           : 'Поделись первой мыслью.'}
                 </Empty>
               )}
-              {hasMore && (
+              {displayMore && (
                 <button
                   className="secondary load-more"
                   disabled={loading}
                   onClick={() =>
                     void refresh(
                       true,
-                      posts[posts.length - 1]?.created,
-                      posts[posts.length - 1]?.id,
+                      displayPosts[displayPosts.length - 1]?.created,
+                      displayPosts[displayPosts.length - 1]?.id,
                     )
                   }
                 >
@@ -1872,11 +2317,11 @@ export default function Noctgram({
               )}
               <div className="feed-end">
                 <Moon size={13} />
-                {loading
+                {publicationLoading
                   ? 'Загружаем публикации…'
                   : 'Ты на одной волне с ночью'}
               </div>
-            </>
+            </div>
           )}
         {page === 'messages' && (
           <div className={'messenger ' + (peer ? 'peer-open' : '')}>
@@ -1897,21 +2342,20 @@ export default function Noctgram({
               </div>
               {threads.map((t) => (
                 <button
+                  type="button"
                   key={t.id}
                   className={
                     'thread-row ' + (peer?.id === t.id ? 'active' : '')
                   }
-                  onClick={() => {
-                    setPeer(t);
-                    setMessageText('');
-                  }}
+                  aria-label={'Открыть диалог с ' + t.name}
+                  onClick={() => openChat(t)}
                 >
                   <Avatar person={t} size={38} />
                   <span className="thread-copy">
                     <strong>
                       <DisplayName person={t} />
                     </strong>
-                    <small>{t.lastText}</small>
+                    <small>{t.lastText || 'Открыть диалог'}</small>
                   </span>
                   {!!t.unread && <span className="unread">{t.unread}</span>}
                 </button>
@@ -1928,18 +2372,33 @@ export default function Noctgram({
                 </Empty>
               )}
             </section>
-            <section className="chat-panel">
-              {peer ? (
+            <section
+              className={'chat-panel' + (peer ? ' chat-themed' : '')}
+              style={
+                peer
+                  ? chatTheme(
+                      currentChatTheme.personal || currentChatTheme.shared,
+                    ).style
+                  : undefined
+              }
+            >
+              {peer && me ? (
                 <>
                   <div className="chat-header">
                     <button
                       className="chat-back icon-button"
                       aria-label="Назад к диалогам"
-                      onClick={() => setPeer(null)}
+                      onClick={() => {
+                        appHistory.current?.cancelPending();
+                        setPeer(null);
+                      }}
                     >
                       <ArrowLeft size={18} />
                     </button>
-                    <button onClick={() => void openProfile(peer.id)}>
+                    <button
+                      className="chat-peer"
+                      onClick={() => void openProfile(peer.id)}
+                    >
                       <Avatar person={peer} size={34} />
                       <span>
                         <strong>
@@ -1959,6 +2418,14 @@ export default function Noctgram({
                     >
                       <Phone size={18} />
                     </button>
+                    {me && peer.id !== me.id && (
+                      <SendGiftButton
+                        key={'chat-gift:' + me.id + ':' + peer.id}
+                        recipient={peer}
+                        senderId={me.id}
+                        disabled={busy || readOnly || !messageAccess?.allowed}
+                      />
+                    )}
                     <button
                       className="chat-block icon-button"
                       disabled={busy || !messageAccess}
@@ -1991,108 +2458,66 @@ export default function Noctgram({
                     >
                       <Ban size={17} />
                     </button>
-                  </div>
-                  <div className="message-list">
-                    {messages.length === 0 && (
-                      <Empty>Здесь начинается ваш разговор.</Empty>
-                    )}
-                    {messages.map((m) => (
-                      <div
-                        className={
-                          'bubble ' + (m.sender === me?.id ? 'self' : 'other')
-                        }
-                        key={m.id}
-                      >
-                        <p>{m.text}</p>
-                        <MusicLinkCard text={m.text} />
-                        <span className="message-time">
-                          {m.sender !== me?.id && (
-                            <button
-                              className="message-report"
-                              aria-label="Пожаловаться на сообщение"
-                              title="Пожаловаться на сообщение"
-                              onClick={() => {
-                                setReportedMessage(m);
-                                setModal('reportMessage');
-                              }}
-                            >
-                              <Flag size={13} />
-                            </button>
-                          )}
-                          {new Date(m.created).toLocaleTimeString('ru-RU', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                          {m.sender === me?.id &&
-                            (m.read ? (
-                              <CheckCheck size={13} />
-                            ) : (
-                              <Check size={13} />
-                            ))}
-                        </span>
-                      </div>
-                    ))}
-                    <div ref={messageEnd} />
-                  </div>
-                  {!messageAccess?.allowed && (
-                    <p className="message-privacy-note">
-                      {!messageAccess
-                        ? 'Проверяем доступ к сообщениям…'
-                        : messageAccess.blockedByMe
-                          ? 'Собеседник в чёрном списке. История переписки сохранена.'
-                          : 'Отправка сообщений недоступна из-за настроек приватности.'}
-                    </p>
-                  )}
-                  <form
-                    className="message-composer"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (
-                        !messageText.trim() ||
-                        busy ||
-                        !messageAccess?.allowed ||
-                        !writable()
-                      )
-                        return;
-                      void run(async () => {
-                        await request('', {
-                          action: 'message',
-                          id: peer.id,
-                          text: messageText,
+                    <ChatThemeMenu
+                      key={'chat-theme:' + myId + ':' + peer.id}
+                      value={currentChatTheme}
+                      canShare={!readOnly && !!messageAccess?.allowed}
+                      onSave={async (scope, theme) => {
+                        const saved = await request<ChatThemeState>('', {
+                          action: 'chatTheme',
+                          peer: peer.id,
+                          scope,
+                          theme,
                         });
-                        if (activePeer.current === peer.id) setMessageText('');
-                        await loadMessages();
-                        await loadThreads();
-                      });
-                    }}
-                  >
-                    <textarea
-                      disabled={busy || readOnly || !messageAccess?.allowed}
-                      aria-label="Сообщение"
-                      placeholder="Написать сообщение…"
-                      maxLength={4000}
-                      value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          e.currentTarget.form?.requestSubmit();
+                        if (activePeer.current === peer.id) {
+                          setChatAppearance((previous) => {
+                            if (
+                              previous &&
+                              previous.viewer === myId &&
+                              previous.peer === peer.id &&
+                              previous.value.revision > saved.revision
+                            )
+                              return previous;
+                            return {
+                              viewer: myId || '',
+                              peer: peer.id,
+                              value: saved,
+                            };
+                          });
                         }
                       }}
                     />
-                    <button
-                      className="send-button"
-                      aria-label="Отправить сообщение"
-                      disabled={
-                        busy ||
-                        readOnly ||
-                        !messageAccess?.allowed ||
-                        !messageText.trim()
-                      }
-                    >
-                      <Send size={18} />
-                    </button>
-                  </form>
+                  </div>
+                  <ChatConversation
+                    key={'conversation:' + myId + ':' + peer.id}
+                    messages={messages}
+                    me={me}
+                    peer={peer}
+                    threads={threads}
+                    disabled={busy || !!readOnly}
+                    canSend={!!messageAccess?.allowed}
+                    privacyNote={
+                      messageAccess?.allowed
+                        ? ''
+                        : !messageAccess
+                          ? 'Проверяем доступ к сообщениям…'
+                          : messageAccess.blockedByMe
+                            ? 'Собеседник в чёрном списке. История переписки сохранена.'
+                            : 'Отправка сообщений недоступна из-за настроек приватности.'
+                    }
+                    text={messageText}
+                    onText={setMessageText}
+                    onRefresh={() =>
+                      Promise.all([loadMessages(), loadThreads()])
+                    }
+                    onFocus={async (id) => {
+                      if (activePeer.current !== peer.id) return;
+                      messageFocus.current = id;
+                      await loadMessages();
+                    }}
+                    notify={notify}
+                    {...messageCallbacks}
+                  />
                 </>
               ) : (
                 <div className="chat-empty">
@@ -2109,7 +2534,7 @@ export default function Noctgram({
           </div>
         )}
       </main>
-      {page !== 'messages' && (
+      {!['messages', 'music', 'music-services'].includes(page) && (
         <aside className="right-column">
           <section className="side-card">
             <div className="side-card-heading">
@@ -2228,17 +2653,20 @@ export default function Noctgram({
         <DialogContent
           className={
             'noct-dialog ' +
-            (modal === 'comments'
-              ? 'comments-dialog'
-              : modal === 'followers' || modal === 'following'
-                ? 'connections-dialog'
-                : '')
+            (modal === 'edit'
+              ? 'profile-editor-dialog'
+              : modal === 'comments'
+                ? 'comments-dialog'
+                : modal === 'followers' || modal === 'following'
+                  ? 'connections-dialog'
+                  : '')
           }
         >
           <DialogTitle>
             {(
               {
                 signin: 'Войти в Noctgram',
+                settings: 'Настройки',
                 premium: 'Noct Premium',
                 edit: 'Редактировать профиль',
                 support: 'Поддержать автора',
@@ -2257,6 +2685,7 @@ export default function Noctgram({
               (
                 {
                   signin: 'Публикуй, общайся и сохраняй важное.',
+                  settings: 'Активность, уведомления и личное пространство.',
                   premium: 'Больше способов быть собой. В разработке.',
                   edit: 'Профиль и твоё личное пространство.',
                   reportMessage:
@@ -2283,8 +2712,33 @@ export default function Noctgram({
               Войти по почте <ArrowUpRight size={15} />
             </a>
           )}
+          {modal === 'settings' && me && (
+            <PrivacyPanel
+              onChanged={() => {
+                setPrivacyVersion((value) => value + 1);
+                void latestRefresh.current();
+                void loadThreads().catch(() => {});
+                if (peer) void loadMessages().catch(() => {});
+              }}
+            />
+          )}
           {modal === 'edit' && editTarget && (
-            <div className="edit-tabs" aria-label="Раздел редактирования">
+            <div
+              className="edit-tabs"
+              data-selected={
+                editTab === 'design'
+                  ? 1
+                  : editTab === 'privacy'
+                    ? 2
+                    : editTab === 'account'
+                      ? 3
+                      : 0
+              }
+              style={
+                { '--editor-tabs': editId === me?.id ? 4 : 2 } as CSSProperties
+              }
+              aria-label="Раздел редактирования"
+            >
               <button
                 aria-pressed={editTab === 'profile'}
                 disabled={uploading || busy}
@@ -2319,41 +2773,6 @@ export default function Noctgram({
               )}
             </div>
           )}
-          {modal === 'edit' && editTab === 'account' && editId === me?.id && (
-            <AccountPanel />
-          )}
-          {modal === 'edit' && editTarget && (
-            <div hidden={editTab !== 'design'}>
-              <ProfileDesign
-                key={editTarget.id}
-                me={editTarget}
-                disabled={readOnly}
-                onBusy={setUploading}
-                onSaved={(updated) => {
-                  applyAppearance(updated);
-                  setEditAvatar(updated.avatar);
-                  setModal('');
-                  notify('Оформление сохранено');
-                }}
-                onPremium={() => {
-                  setModal('');
-                  if (editTarget.kind === 'channel')
-                    pendingBoostOpen.current = editTarget.id;
-                  else navigate('premium');
-                }}
-              />
-            </div>
-          )}
-          {modal === 'edit' && editTab === 'privacy' && editId === me?.id && (
-            <PrivacyPanel
-              onChanged={() => {
-                setPrivacyVersion((v) => v + 1);
-                void latestRefresh.current();
-                void loadThreads().catch(() => {});
-                if (peer) void loadMessages().catch(() => {});
-              }}
-            />
-          )}
           {modal === 'reportMessage' && reportedMessage && (
             <ContentDecisionForm
               key={reportedMessage.id}
@@ -2368,168 +2787,218 @@ export default function Noctgram({
               }}
             />
           )}
-          {modal === 'edit' && editTab === 'profile' && (
-            <form
-              className="edit-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                saveProfile();
-              }}
-            >
-              <fieldset
-                className="edit-fields"
-                disabled={busy || uploading || readOnly}
-              >
-                {editId === me?.id && (
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => window.location.assign('/login?link=1')}
-                  >
-                    <Mail size={15} /> Почта для входа
-                  </button>
-                )}
-                <div className="edit-photo">
-                  <Avatar
-                    person={{ name: editName, avatar: editAvatar }}
-                    size={66}
-                  />
-                  <label className="secondary">
-                    <Camera size={14} /> Аватар
-                    <input
-                      className="hidden"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      disabled={uploading}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (!f) return;
-                        setUploading(true);
-                        void upload(f)
-                          .then((m) => setEditAvatar(m.url!))
-                          .catch((e) => notify(e.message))
-                          .finally(() => setUploading(false));
-                      }}
-                    />
-                  </label>
-                  <label className="secondary">
-                    Обложка
-                    <input
-                      className="hidden"
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      disabled={uploading}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (!f) return;
-                        setUploading(true);
-                        void upload(f)
-                          .then((m) => setEditCover(m.url!))
-                          .catch((e) => notify(e.message))
-                          .finally(() => setUploading(false));
-                      }}
-                    />
-                  </label>
-                </div>
-                {editCover && (
-                  <div className="edit-cover">
-                    <img src={editCover} alt="Новая обложка" />
-                    <button
-                      type="button"
-                      aria-label="Убрать обложку"
-                      onClick={() => setEditCover('')}
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-                <label>
-                  Имя
-                  <input
-                    required
-                    maxLength={40}
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                  />
-                </label>
-                <fieldset
-                  className="edit-usernames"
-                  disabled={editId !== me?.id && !profileOwned}
+          {modal === 'edit' && (
+            <div className="profile-editor-body">
+              <EditorPane active={editTab === 'profile'}>
+                <form
+                  className="edit-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    saveProfile();
+                  }}
                 >
-                  <h3>Юзернеймы</h3>
-                  <label>
-                    Основной юзернейм
-                    <input
-                      required
-                      value={editHandle}
-                      maxLength={25}
-                      onChange={(e) => setEditHandle(e.target.value)}
-                      placeholder="@username"
-                    />
-                  </label>
-                  <p className="meta">
-                    По этому имени тебя находят в Noctgram.
-                  </p>
-                  <span className="field-label">Под-юзернеймы</span>
-                  {editAliases.map((h, i) => (
-                    <div className="row" key={i}>
-                      <input
-                        aria-label={'Под-юзернейм ' + (i + 1)}
-                        value={h}
-                        maxLength={25}
-                        placeholder="@another_name"
-                        onChange={(e) =>
-                          setEditAliases((rows) =>
-                            rows.map((v, n) => (n === i ? e.target.value : v)),
-                          )
-                        }
-                      />
+                  <fieldset
+                    className="edit-fields"
+                    disabled={busy || uploading || readOnly}
+                  >
+                    {editId === me?.id && (
                       <button
                         type="button"
-                        aria-label={'Удалить под-юзернейм ' + (i + 1)}
-                        onClick={() =>
-                          setEditAliases((rows) =>
-                            rows.filter((_, n) => n !== i),
-                          )
-                        }
+                        className="secondary"
+                        onClick={() => window.location.assign('/login?link=1')}
                       >
-                        <X size={15} />
+                        <Mail size={15} /> Почта для входа
                       </button>
+                    )}
+                    <div className="edit-photo">
+                      <Avatar
+                        person={{ name: editName, avatar: editAvatar }}
+                        size={66}
+                      />
+                      <label className="secondary">
+                        <Camera size={14} /> Аватар
+                        <input
+                          className="hidden"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          disabled={uploading}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (!f) return;
+                            setUploading(true);
+                            void upload(f)
+                              .then((m) => setEditAvatar(m.url!))
+                              .catch((e) => notify(e.message))
+                              .finally(() => setUploading(false));
+                          }}
+                        />
+                      </label>
+                      <label className="secondary">
+                        Обложка
+                        <input
+                          className="hidden"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          disabled={uploading}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (!f) return;
+                            setUploading(true);
+                            void upload(f)
+                              .then((m) => setEditCover(m.url!))
+                              .catch((e) => notify(e.message))
+                              .finally(() => setUploading(false));
+                          }}
+                        />
+                      </label>
                     </div>
-                  ))}
-                  {editAliases.length < 4 && (
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={() => setEditAliases((rows) => [...rows, ''])}
+                    {editCover && (
+                      <div className="edit-cover">
+                        <img src={editCover} alt="Новая обложка" />
+                        <button
+                          type="button"
+                          aria-label="Убрать обложку"
+                          onClick={() => setEditCover('')}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
+                    <label>
+                      Имя
+                      <input
+                        required
+                        maxLength={40}
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                      />
+                    </label>
+                    <fieldset
+                      className="edit-usernames"
+                      disabled={editId !== me?.id && !profileOwned}
                     >
-                      <Plus size={14} />
-                      Добавить под-юзернейм
+                      <h3>Юзернеймы</h3>
+                      <label>
+                        Основной юзернейм
+                        <input
+                          required
+                          value={editHandle}
+                          maxLength={25}
+                          onChange={(e) => setEditHandle(e.target.value)}
+                          placeholder="@username"
+                        />
+                      </label>
+                      <p className="meta">
+                        По этому имени тебя находят в Noctgram.
+                      </p>
+                      <span className="field-label">Под-юзернеймы</span>
+                      {editAliases.map((h, i) => (
+                        <div className="row" key={i}>
+                          <input
+                            aria-label={'Под-юзернейм ' + (i + 1)}
+                            value={h}
+                            maxLength={25}
+                            placeholder="@another_name"
+                            onChange={(e) =>
+                              setEditAliases((rows) =>
+                                rows.map((v, n) =>
+                                  n === i ? e.target.value : v,
+                                ),
+                              )
+                            }
+                          />
+                          <button
+                            type="button"
+                            aria-label={'Удалить под-юзернейм ' + (i + 1)}
+                            onClick={() =>
+                              setEditAliases((rows) =>
+                                rows.filter((_, n) => n !== i),
+                              )
+                            }
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                      ))}
+                      {editAliases.length < 4 && (
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={() =>
+                            setEditAliases((rows) => [...rows, ''])
+                          }
+                        >
+                          <Plus size={14} />
+                          Добавить под-юзернейм
+                        </button>
+                      )}
+                      <span className="meta">
+                        До 4 дополнительных имён. 4–24 латинские буквы, цифры
+                        или _.
+                      </span>
+                    </fieldset>
+                    <label>
+                      О себе
+                      <textarea
+                        rows={3}
+                        maxLength={300}
+                        value={editBio}
+                        onChange={(e) => setEditBio(e.target.value)}
+                        placeholder="Немного о тебе"
+                      />
+                      <span className="meta">{editBio.length} / 300</span>
+                    </label>
+                    <button
+                      className="primary"
+                      disabled={busy || uploading || !editName.trim()}
+                    >
+                      {uploading ? 'Загрузка…' : 'Сохранить изменения'}
                     </button>
+                  </fieldset>
+                </form>
+              </EditorPane>
+              {editTarget && (
+                <>
+                  <EditorPane active={editTab === 'design'}>
+                    <ProfileDesign
+                      key={editTarget.id}
+                      me={editTarget}
+                      disabled={readOnly}
+                      onBusy={setUploading}
+                      onSaved={(updated) => {
+                        applyAppearance(updated);
+                        setEditAvatar(updated.avatar);
+                        setModal('');
+                        notify('Оформление сохранено');
+                      }}
+                      onPremium={() => {
+                        setModal('');
+                        if (editTarget.kind === 'channel')
+                          pendingBoostOpen.current = editTarget.id;
+                        else navigate('premium');
+                      }}
+                    />
+                  </EditorPane>
+                  {editId === me?.id && (
+                    <>
+                      <EditorPane active={editTab === 'account'}>
+                        <AccountPanel />
+                      </EditorPane>
+                      <EditorPane active={editTab === 'privacy'}>
+                        <PrivacyPanel
+                          onChanged={() => {
+                            setPrivacyVersion((v) => v + 1);
+                            void latestRefresh.current();
+                            void loadThreads().catch(() => {});
+                            if (peer) void loadMessages().catch(() => {});
+                          }}
+                        />
+                      </EditorPane>
+                    </>
                   )}
-                  <span className="meta">
-                    До 4 дополнительных имён. 4–24 латинские буквы, цифры или _.
-                  </span>
-                </fieldset>
-                <label>
-                  О себе
-                  <textarea
-                    rows={3}
-                    maxLength={300}
-                    value={editBio}
-                    onChange={(e) => setEditBio(e.target.value)}
-                    placeholder="Немного о тебе"
-                  />
-                  <span className="meta">{editBio.length} / 300</span>
-                </label>
-                <button
-                  className="primary"
-                  disabled={busy || uploading || !editName.trim()}
-                >
-                  {uploading ? 'Загрузка…' : 'Сохранить изменения'}
-                </button>
-              </fieldset>
-            </form>
+                </>
+              )}
+            </div>
           )}
           {modal === 'support' && supportPost && (
             <SupportPanel
@@ -2598,6 +3067,7 @@ export default function Noctgram({
               text={reportPost.text}
               onCancel={() => setModal('')}
               onDone={() => {
+                snapshots.current.remove(reportPost.id);
                 setPosts((old) => old.filter((p) => p.id !== reportPost.id));
                 setModal('');
                 notify('Публикация удалена. Решение сохранено.');
@@ -2710,6 +3180,7 @@ export default function Noctgram({
               onClick={() =>
                 void run(async () => {
                   await request('', { action: 'delete', id: deleteId });
+                  snapshots.current.remove(deleteId);
                   setDeleteId('');
                   await latestRefresh.current();
                   const p = await request<Profile>('?action=profile');

@@ -2,7 +2,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { queueStorageDeletion } from '@/lib/upload-storage';
 import { appearanceColumns } from '@/lib/premium-access';
 import { bucket, db, viewer, ApiError, failure } from '@/lib/server';
-import { resolveSpotifyMetadata } from '@/lib/spotify-metadata';
+import { resolveTrack } from '@/lib/music-track-resolver';
 import {
   assertReadable,
   assertWritable,
@@ -10,11 +10,7 @@ import {
 } from '@/lib/account-access';
 import { personalVisibility } from '@/lib/privacy';
 import { readJsonBody } from '@/lib/request-body';
-import {
-  parseMusicLink,
-  type MusicLink,
-  type MusicTrack,
-} from '@/lib/music-links';
+import { parseMusicLink, type MusicTrack } from '@/lib/music-links';
 
 export const dynamic = 'force-dynamic';
 const DAY = 86400000;
@@ -23,105 +19,6 @@ const DAY = 86400000;
 const eligible = `EXISTS(SELECT 1 FROM users u
   WHERE u.id=? AND ${visibleAccount('u')}
   AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=u.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000)))`;
-
-async function resolveTrack(link: MusicLink): Promise<MusicTrack> {
-  const existing = await db()
-    .prepare('SELECT * FROM music_tracks WHERE url=?')
-    .bind(link.url)
-    .first<MusicTrack>();
-  if (existing) return existing;
-  if (link.provider === 'spotify') {
-    const track = await resolveSpotifyMetadata(link.url);
-    await db()
-      .prepare(
-        'INSERT OR IGNORE INTO music_tracks(id,url,kind,provider,title,artist,artwork,authorUrl,durationMs,created) VALUES(?,?,?,?,?,?,?,?,?,?)',
-      )
-      .bind(
-        track.id,
-        track.url,
-        track.kind,
-        track.provider,
-        track.title,
-        track.artist,
-        track.artwork,
-        track.authorUrl,
-        track.durationMs || 0,
-        Date.now(),
-      )
-      .run();
-    return (await db()
-      .prepare('SELECT * FROM music_tracks WHERE url=?')
-      .bind(link.url)
-      .first<MusicTrack>())!;
-  }
-  // Fixed endpoint, canonical public URL, no redirects, no client-provided HTML.
-  let response: Response;
-  try {
-    response = await fetch(
-      'https://soundcloud.com/oembed?' +
-        new URLSearchParams({ format: 'json', url: link.url }),
-      { redirect: 'manual', signal: AbortSignal.timeout(8000) },
-    );
-  } catch (error) {
-    console.warn(
-      'SoundCloud oEmbed request failed:',
-      error instanceof Error ? error.message : 'Network error',
-    );
-    throw new ApiError(502, 'SoundCloud не отвечает. Попробуйте позже.');
-  }
-  if (!response.ok)
-    throw new ApiError(
-      422,
-      'SoundCloud не нашёл публичную запись по этой ссылке.',
-    );
-  const info = (await response.json()) as {
-    title?: unknown;
-    author_name?: unknown;
-    author_url?: unknown;
-    thumbnail_url?: unknown;
-  };
-  if (typeof info.title !== 'string' || typeof info.author_name !== 'string')
-    throw new ApiError(
-      422,
-      'Не удалось получить название записи из SoundCloud.',
-    );
-  const author = typeof info.author_url === 'string' ? info.author_url : '';
-  if (!/^https:\/\/soundcloud\.com\/[a-zA-Z0-9_-]+\/?$/.test(author))
-    throw new ApiError(422, 'Не удалось проверить автора записи.');
-  const artwork =
-    typeof info.thumbnail_url === 'string' &&
-    /^https:\/\/i\d+\.sndcdn\.com\//.test(info.thumbnail_url)
-      ? info.thumbnail_url
-      : '';
-  const track: MusicTrack = {
-    ...link,
-    id: crypto.randomUUID(),
-    title: info.title.slice(0, 300),
-    artist: info.author_name.slice(0, 160),
-    artwork,
-    authorUrl: author,
-  };
-  await db()
-    .prepare(
-      'INSERT OR IGNORE INTO music_tracks(id,url,kind,provider,title,artist,artwork,authorUrl,created) VALUES(?,?,?,?,?,?,?,?,?)',
-    )
-    .bind(
-      track.id,
-      track.url,
-      track.kind,
-      track.provider,
-      track.title,
-      track.artist,
-      track.artwork,
-      track.authorUrl,
-      Date.now(),
-    )
-    .run();
-  return (await db()
-    .prepare('SELECT * FROM music_tracks WHERE url=?')
-    .bind(link.url)
-    .first<MusicTrack>())!;
-}
 
 export async function GET(req: Request) {
   try {
@@ -263,14 +160,25 @@ export async function POST(req: Request) {
         'Прослушивания учитываются автоматически. Обновите страницу.',
       );
     await assertWritable(me);
-    if (body.action === 'save' || body.action === 'start') {
+    if (
+      body.action === 'save' ||
+      body.action === 'start' ||
+      body.action === 'resolve'
+    ) {
       const link = parseMusicLink(body.url);
       if (!link)
         throw new ApiError(
           400,
-          'Нужна ссылка на трек Spotify или публичный трек/плейлист SoundCloud',
+          'Нужна ссылка SoundCloud, Spotify, YouTube или YouTube Music',
         );
+      if (body.action === 'resolve' && link.provider !== 'youtube')
+        throw new ApiError(400, 'Неизвестный источник видео.');
       if (body.action === 'start') {
+        if (link.provider === 'youtube')
+          throw new ApiError(
+            400,
+            'Просмотры YouTube не участвуют в рейтинге слушателей.',
+          );
         if (link.kind !== 'track')
           throw new ApiError(400, 'Засчитываются отдельные треки');
         if (
@@ -302,6 +210,7 @@ export async function POST(req: Request) {
         .bind('music:' + me + ':%', now)
         .run();
       const track = await resolveTrack(link);
+      if (body.action === 'resolve') return Response.json(track);
       if (body.action === 'save') {
         const result = await d
           .prepare(`INSERT OR IGNORE INTO music_library(userId,trackId,created) SELECT ?,?,? WHERE

@@ -24,18 +24,35 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, DisplayName } from './profile-identity';
+import { ProfileLink, MentionText } from './profile-link';
 export { Avatar } from './profile-identity';
 import { StarsIcon } from './stars-icon';
 import { CodeBlock } from './code-block';
 import { MusicLinkCard } from './music-link-card';
 import type { Post, Media } from '@/lib/client';
 import {
+  memo,
+  useMemo,
   useEffect,
   useRef,
   useState,
   type ReactNode,
   type CSSProperties,
 } from 'react';
+const stampFormat = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+const stampTitleFormat = new Intl.DateTimeFormat('ru-RU', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+});
 export function Stamp({
   time,
   compact = false,
@@ -50,6 +67,14 @@ export function Stamp({
     return () => clearInterval(tick);
   }, [compact]);
   const age = Math.max(0, Math.floor((now - time) / 60000));
+  const stamp = useMemo(
+    () => ({
+      title: stampTitleFormat.format(time),
+      label: stampFormat.format(time),
+      iso: new Date(time).toISOString(),
+    }),
+    [time],
+  );
   const label = compact
     ? age < 1
       ? 'сейчас'
@@ -58,18 +83,13 @@ export function Stamp({
         : age < 1440
           ? Math.floor(age / 60) + ' ч'
           : Math.floor(age / 1440) + ' д'
-    : new Date(time).toLocaleString('ru-RU', {
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+    : stamp.label;
   return (
     <time
       className="meta"
       suppressHydrationWarning
-      title={new Date(time).toLocaleString('ru-RU')}
-      dateTime={new Date(time).toISOString()}
+      title={stamp.title}
+      dateTime={stamp.iso}
     >
       {label}
     </time>
@@ -96,7 +116,7 @@ export function PostSkeleton() {
     </div>
   );
 }
-export function PostCard({
+export const PostCard = memo(function PostCard({
   p,
   me,
   busy,
@@ -212,7 +232,11 @@ export function PostCard({
           <button className="author-button" onClick={() => onProfile(p.userId)}>
             <DisplayName person={p} />
           </button>
-          <span className="meta handle">@{p.handle}</span>
+
+          <ProfileLink target={{ id: p.userId }} className="meta handle">
+            @{p.handle}
+          </ProfileLink>
+
           <span className="meta-dot" />
           <Stamp time={p.created} compact />
           <span className="grow" />
@@ -281,7 +305,9 @@ export function PostCard({
           className={'post-text-wrap ' + (long && !expanded ? 'collapsed' : '')}
           id={'text-' + p.id}
         >
-          <p className="post-text">{p.text}</p>
+          <p className="post-text">
+            <MentionText text={p.text} />
+          </p>
         </div>
         {long && (
           <button
@@ -483,4 +509,4 @@ export function PostCard({
       </div>
     </article>
   );
-}
+});

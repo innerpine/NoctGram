@@ -1,5 +1,6 @@
 'use client';
 import { DisplayName } from './profile-identity';
+import { ProfileLink } from './profile-link';
 /* eslint-disable next/no-img-element, react/react-compiler, jsx-a11y/media-has-caption */
 /* Uploaded videos have no caption track supplied by their author. */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -110,7 +111,9 @@ export function StoriesBar({
           if (live) setError(e.message);
         });
     void load();
-    const t = setInterval(() => void load(), 30000);
+    const t = setInterval(() => {
+      if (!document.hidden) void load();
+    }, 30000);
     return () => {
       live = false;
       clearInterval(t);
@@ -411,10 +414,17 @@ export function StoriesBar({
                 ))}
               </div>
               <div className="story-heading">
-                <Avatar person={current} size={34} />
+                <ProfileLink
+                  target={{ id: current.userId }}
+                  aria-label={'Профиль ' + current.name}
+                >
+                  <Avatar person={current} size={34} />
+                </ProfileLink>
                 <div>
                   <strong>
-                    <DisplayName person={current} />
+                    <ProfileLink target={{ id: current.userId }}>
+                      <DisplayName person={current} />
+                    </ProfileLink>
                   </strong>
                   <small>
                     {new Date(current.created).toLocaleTimeString('ru-RU', {
@@ -572,10 +582,21 @@ export function StoriesBar({
                   {viewers.length ? (
                     viewers.map((p) => (
                       <div className="realtime-person" key={p.id}>
-                        <Avatar person={p} size={32} />
+                        <ProfileLink
+                          target={{ id: p.id }}
+                          aria-label={'Профиль ' + p.name}
+                        >
+                          <Avatar person={p} size={32} />
+                        </ProfileLink>
                         <span>
-                          <DisplayName person={p} />
-                          <small>@{p.handle}</small>
+                          <ProfileLink target={{ id: p.id }}>
+                            <DisplayName person={p} />
+                          </ProfileLink>
+                          <small>
+                            <ProfileLink target={{ id: p.id }}>
+                              @{p.handle}
+                            </ProfileLink>
+                          </small>
                         </span>
                       </div>
                     ))

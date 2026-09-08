@@ -1,5 +1,6 @@
 import type { Appearance } from './appearance';
 import { readApiJson } from './http-response';
+import type { ChatAttachment } from './chat-files';
 export type Person = Appearance & {
   id: string;
   name: string;
@@ -101,6 +102,24 @@ export type Message = {
   text: string;
   created: number;
   read: number;
+  attachments?: ChatAttachment[];
+  pinnedAt?: number | null;
+  editedAt?: number;
+  forwardedName?: string;
+  forwardedSender?: string | null;
+  reply?: {
+    id: string;
+    sender: string;
+    name: string;
+    text: string;
+    unavailable: boolean;
+  };
+  gift?: {
+    id: string;
+    giftId: string;
+    price: number;
+    message: string;
+  };
 };
 export const welcome: Post[] = [
   {
@@ -185,6 +204,8 @@ export async function upload(file: File): Promise<Media> {
 }
 
 export type StarTransaction = Appearance & {
+  actorId?: string | null;
+  giftId?: string;
   id: string;
   sender: string | null;
   recipient: string;

@@ -142,6 +142,8 @@ function fixture(t) {
     'lib/account-access.ts',
     'lib/channel-access.ts',
     'lib/privacy.ts',
+    'lib/chat-files.ts',
+    'lib/chat-access.ts',
     'lib/api-error.ts',
     'lib/premium.ts',
     'lib/stories.ts',
@@ -408,7 +410,7 @@ function fixture(t) {
   return ctx;
 }
 function scenario(name, fn) {
-  test(name, { concurrency: false, timeout: 15000 }, (t) => fn(fixture(t), t));
+  void test(name, { concurrency: false, timeout: 15000 }, (t) => fn(fixture(t), t));
 }
 async function rejectsApi(f, task, statuses) {
   const allowed = Array.isArray(statuses) ? statuses : [statuses];
