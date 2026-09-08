@@ -110,7 +110,7 @@ function fixture(t) {
   for (const row of sql.prepare('SELECT id FROM users').all()) {
     sql
       .prepare('INSERT INTO handles(handle,userId,main) VALUES(?,?,1)')
-      .run(`h_${row.id}`, row.id);
+      .run(`h_${String(row.id)}`, row.id);
   }
   sql
     .prepare('UPDATE users SET deletedAt=? WHERE id=?')
@@ -352,7 +352,7 @@ function fixture(t) {
 
 const options = { concurrency: false, timeout: 10000 };
 function scenario(name, run) {
-  test(name, options, async (t) => {
+  void test(name, options, async (t) => {
     await run(fixture(t), t);
   });
 }

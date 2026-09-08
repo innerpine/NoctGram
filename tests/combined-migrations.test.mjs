@@ -123,6 +123,85 @@ for (const { label, applied } of [
     db.close();
   }
 }
+// Both parents of the September 8 integration already have the earlier merge.
+const localAdditions = [
+  '0014_music_activity',
+  '0015_music_activity_pause',
+  '0016_shared_music_playlists',
+  '0017_gifts',
+  '0018_gift_messages',
+  '0019_chat_themes',
+  '0020_chat_attachments_pins',
+  '0021_chat_message_actions',
+  '0022_music_queue_order',
+];
+for (const label of ['remote-main-472cb91', 'local-chat-music-628d699']) {
+  const db = new DatabaseSync(':memory:');
+  const applied = new Set(
+    label.startsWith('remote')
+      ? journal.slice(0, 19).map((e) => e.tag)
+      : [...journal.slice(0, 14).map((e) => e.tag), ...localAdditions],
+  );
+  try {
+    db.exec('PRAGMA foreign_keys=ON');
+    for (const tag of applied) db.exec(scripts.get(tag));
+    db.exec(
+      "INSERT INTO users(id,name,created) VALUES('upgrade-owner','Owner',1),('upgrade-peer','Peer',1); INSERT INTO messages(id,sender,recipient,text,created) VALUES('upgrade-message','upgrade-owner','upgrade-peer','Keep this message',123)",
+    );
+    if (label.startsWith('remote')) {
+      db.exec(
+        "INSERT INTO administrators(userId,created) VALUES('upgrade-owner',1); UPDATE users SET verified=1 WHERE id='upgrade-owner'",
+      );
+    } else {
+      db.exec(
+        "INSERT INTO music_tracks(id,url,kind,title,artist,authorUrl,created) VALUES('upgrade-track','https://soundcloud.com/upgrade/song','track','Song','Artist','https://soundcloud.com/upgrade',1); INSERT INTO music_playlists(id,ownerId,name,created,updatedAt) VALUES('upgrade-playlist','upgrade-owner','My playlist',1,1); INSERT INTO music_playlist_tracks(playlistId,trackId,addedBy,created,sortOrder) VALUES('upgrade-playlist','upgrade-track','upgrade-owner',1,7); INSERT INTO message_pins(messageId,firstId,secondId,pinnedBy,created) VALUES('upgrade-message','upgrade-owner','upgrade-peer','upgrade-owner',456)",
+      );
+    }
+    for (const [tag, sql] of scripts) if (!applied.has(tag)) db.exec(sql);
+    assert.deepEqual(
+      schema(db),
+      expected,
+      label + ' converges without replaying original files',
+    );
+    assert.equal(
+      db.prepare("SELECT text FROM messages WHERE id='upgrade-message'").get()
+        .text,
+      'Keep this message',
+    );
+    if (label.startsWith('remote')) {
+      assert.equal(
+        db.prepare("SELECT verified FROM users WHERE id='upgrade-owner'").get()
+          .verified,
+        1,
+      );
+      assert.ok(
+        db
+          .prepare("SELECT 1 FROM administrators WHERE userId='upgrade-owner'")
+          .get(),
+      );
+    } else {
+      assert.equal(
+        db
+          .prepare(
+            "SELECT sortOrder FROM music_playlist_tracks WHERE playlistId='upgrade-playlist'",
+          )
+          .get().sortOrder,
+        7,
+      );
+      assert.equal(
+        db
+          .prepare(
+            "SELECT created FROM message_pins WHERE messageId='upgrade-message'",
+          )
+          .get().created,
+        456,
+      );
+    }
+    assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
+  } finally {
+    db.close();
+  }
+}
 const alphabetic = new DatabaseSync(':memory:');
 for (const tag of [...scripts.keys()].sort((a, b) => a.localeCompare(b)))
   alphabetic.exec(scripts.get(tag));

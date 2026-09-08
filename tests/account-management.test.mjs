@@ -600,7 +600,44 @@ await test('deletion requires explicit owned-channel confirmation; revoked sessi
     0,
   );
   assert.equal(count('posts', 'id', ownPost), 1);
+  statement(
+    'INSERT INTO music_playlists(id,ownerId,name,created,updatedAt) VALUES(?,?,?,?,?)',
+    'own-playlist',
+    f.id,
+    'Own',
+    now,
+    now,
+  );
+  statement(
+    'INSERT INTO music_playlists(id,ownerId,name,created,updatedAt) VALUES(?,?,?,?,?)',
+    'peer-playlist',
+    peer.id,
+    'Peer',
+    now,
+    now,
+  );
+  statement(
+    "INSERT INTO music_playlist_members(playlistId,userId,status,created) VALUES('peer-playlist',?,'accepted',?)",
+    f.id,
+    now,
+  );
+  statement(
+    "INSERT INTO music_activity(userId,sessionId,sequence,updatedAt,expiresAt) VALUES(?,'test',1,?,?)",
+    f.id,
+    now,
+    now + 30000,
+  );
+  statement(
+    'INSERT INTO chat_themes(firstId,secondId) VALUES(?,?)',
+    f.id,
+    peer.id,
+  );
   await deleteAccount(f.id, f.h, true);
+  assert.equal(count('music_playlists', 'ownerId', f.id), 0);
+  assert.equal(count('music_playlists', 'ownerId', peer.id), 1);
+  assert.equal(count('music_playlist_members', 'userId', f.id), 0);
+  assert.equal(count('music_activity', 'userId', f.id), 0);
+  assert.equal(count('chat_themes', 'firstId', f.id), 0);
   assert(one('SELECT deletedAt FROM users WHERE id=?', f.id).deletedAt > 0);
   assert(one('SELECT deletedAt FROM users WHERE id=?', ca).deletedAt > 0);
   assert.equal(
@@ -722,6 +759,147 @@ await test('legacy logout-all must reject unsupported scope or revoke Sites fall
     'another browser still receives its Sites identity after logout-all',
   );
 });
+async function chatDeletionFixture() {
+  const owner = await fixture(),
+    peer = await fixture(),
+    reader = await fixture();
+  const ids = {
+    original: owner.id + '-original',
+    forward: owner.id + '-forward',
+    privateMessage: owner.id + '-private',
+    forwardedUpload: owner.id + '-forwarded-upload',
+    privateUpload: owner.id + '-private-upload',
+  };
+  for (const uploadId of [ids.forwardedUpload, ids.privateUpload]) {
+    statement(
+      "INSERT INTO uploads(id,userId,type,name,created,bytes,state) VALUES(?,?,'image/png','fixture.png',?,12,'ready')",
+      uploadId,
+      owner.id,
+      now,
+    );
+  }
+  const media = (id) =>
+    JSON.stringify([
+      { id, type: 'image/png', name: 'fixture.png', size: 12, kind: 'image' },
+    ]);
+  for (const [messageId, uploadId] of [
+    [ids.original, ids.forwardedUpload],
+    [ids.privateMessage, ids.privateUpload],
+  ]) {
+    statement(
+      'INSERT INTO messages(id,sender,recipient,text,media,created) VALUES(?,?,?,?,?,?)',
+      messageId,
+      owner.id,
+      peer.id,
+      'attachment',
+      media(uploadId),
+      now,
+    );
+    statement(
+      "INSERT INTO chat_uploads(uploadId,recipient,size,kind,messageId) VALUES(?,?,12,'image',?)",
+      uploadId,
+      peer.id,
+      messageId,
+    );
+  }
+  statement(
+    'INSERT INTO messages(id,sender,recipient,text,media,created,forwardSourceId) VALUES(?,?,?,?,?,?,?)',
+    ids.forward,
+    peer.id,
+    reader.id,
+    'forward',
+    media(ids.forwardedUpload),
+    now + 1,
+    ids.original,
+  );
+  return { owner, peer, reader, ids };
+}
+
+await test('account deletion clears attachment FK and preserves private access to a surviving forwarded file', async () => {
+  const { owner, peer, reader, ids } = await chatDeletionFixture();
+  const outsider = await fixture();
+  const { messageVisible } = load('lib/chat-access.ts', {}, ['messageVisible']);
+  const { assertMediaRead } = load(
+    'lib/media-access.ts',
+    { db: () => d, ApiError, messageVisible },
+    ['assertMediaRead'],
+  );
+  await deleteAccount(owner.id, owner.h, false);
+  assert(one('SELECT deletedAt FROM users WHERE id=?', owner.id).deletedAt > 0);
+  assert.equal(count('messages', 'id', ids.original), 0);
+  assert.equal(count('messages', 'id', ids.privateMessage), 0);
+  assert.equal(count('messages', 'id', ids.forward), 1);
+  assert.equal(
+    one(
+      'SELECT messageId FROM chat_uploads WHERE uploadId=?',
+      ids.privateUpload,
+    ).messageId,
+    null,
+  );
+  assert.equal(
+    one(
+      'SELECT messageId FROM chat_uploads WHERE uploadId=?',
+      ids.forwardedUpload,
+    ).messageId,
+    ids.forward,
+  );
+  await assertMediaRead(ids.forwardedUpload, reader.id, owner.id);
+  await assert.rejects(
+    () => assertMediaRead(ids.forwardedUpload, outsider.id, owner.id),
+    (e) => e.status === 404,
+  );
+  await assert.rejects(
+    () => assertMediaRead(ids.privateUpload, peer.id, owner.id),
+    (e) => e.status === 404,
+  );
+  assert.deepEqual(sql.prepare('PRAGMA foreign_key_check').all(), []);
+});
+
+await test('session revocation before deletion batch leaves chat attachment links and messages unchanged', async () => {
+  const { owner, ids } = await chatDeletionFixture();
+  let revoked = false;
+  beforeBatch = (list) => {
+    if (
+      !revoked &&
+      list.some((s) => /INSERT INTO account_deletions/.test(s.query))
+    ) {
+      revoked = true;
+      statement('DELETE FROM auth_sessions WHERE tokenHash=?', owner.h);
+    }
+  };
+  await assert.rejects(
+    () => deleteAccount(owner.id, owner.h, false),
+    (e) => e.status === 409,
+  );
+  assert.equal(
+    revoked,
+    true,
+    'revocation must occur after the preflight reads',
+  );
+  assert.equal(
+    one('SELECT deletedAt FROM users WHERE id=?', owner.id).deletedAt,
+    0,
+  );
+  assert.equal(count('account_deletions', 'userId', owner.id), 0);
+  for (const id of [ids.original, ids.privateMessage, ids.forward])
+    assert.equal(count('messages', 'id', id), 1);
+  assert.equal(
+    one(
+      'SELECT messageId FROM chat_uploads WHERE uploadId=?',
+      ids.privateUpload,
+    ).messageId,
+    ids.privateMessage,
+  );
+  assert.equal(
+    one(
+      'SELECT messageId FROM chat_uploads WHERE uploadId=?',
+      ids.forwardedUpload,
+    ).messageId,
+    ids.original,
+  );
+  assert.deepEqual(sql.prepare('PRAGMA foreign_key_check').all(), []);
+});
+
 await test('all test mutations preserve foreign keys', async () => {
   assert.deepEqual(sql.prepare('PRAGMA foreign_key_check').all(), []);
 });

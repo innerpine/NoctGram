@@ -224,6 +224,8 @@ export async function musicServiceStatus(
     .bind(user)
     .all<Connection>();
   return MUSIC_SERVICES.map((provider) => {
+    if (provider === 'youtube')
+      return { provider, configured: true, status: 'link_only' };
     if (provider === 'yandex') return yandex;
     if (provider !== 'soundcloud' && provider !== 'spotify')
       return { provider, configured: false, status: 'unavailable' };

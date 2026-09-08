@@ -618,12 +618,9 @@
   backdrop-filter: blur(20px);
   animation: music-player-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
-body:has(.music-player) .app-shell {
-  padding-bottom: calc(var(--music-player-height, 100px) + 48px);
-}
-body:has(.music-player) .messenger {
-  height: calc(100dvh - 120px - var(--music-player-height, 100px));
-  min-height: 260px;
+body:has(.music-player) {
+  /* Measured player + its 18px bottom offset + a 12px content gap. */
+  --app-player-space: calc(var(--music-player-height, 100px) + 30px);
 }
 .music-player-row {
   display: flex;
@@ -762,11 +759,9 @@ body:has(.music-player) .messenger {
   .music-intro h2 {
     font-size: 21px;
   }
-  body:has(.music-player) .app-shell {
-    padding-bottom: calc(var(--music-player-height, 100px) + 100px);
-  }
-  body:has(.music-player) .messenger {
-    height: calc(100dvh - 175px - var(--music-player-height, 100px));
+  body:has(.music-player) {
+    /* The mobile player sits 10px above the navigation; its inset is separate. */
+    --app-player-space: calc(var(--music-player-height, 100px) + 22px);
   }
   .sidebar nav {
     overflow-x: auto;

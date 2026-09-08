@@ -129,7 +129,7 @@ const widgetJs = ts.transpileModule(widgetSource, {
     module: ts.ModuleKind.ES2022,
   },
 }).outputText;
-const { releaseSoundCloudWidget } = await import(
+const { releaseSoundCloudWidget, SoundCloudStateMonitor } = await import(
   'data:text/javascript;base64,' + Buffer.from(widgetJs).toString('base64')
 );
 const disposed = [];
@@ -159,3 +159,116 @@ assert.doesNotThrow(() =>
 );
 assert.equal(attempts, 3);
 console.log('Music player: detached SoundCloud iframe cleanup passed.');
+
+// Reproduce a missed PAUSE event and delayed cross-frame getter responses.
+const savedPerformance = Object.getOwnPropertyDescriptor(
+  globalThis,
+  'performance',
+);
+let clock = 0;
+Object.defineProperty(globalThis, 'performance', {
+  configurable: true,
+  value: { now: () => clock },
+});
+try {
+  const states = [],
+    positions = [],
+    stateReads = [],
+    positionReads = [];
+  const monitor = new SoundCloudStateMonitor(
+    {
+      isPaused: (callback) => stateReads.push(callback),
+      getPosition: (callback) => positionReads.push(callback),
+    },
+    (value) => states.push(value),
+    (value) => positions.push(value),
+  );
+  monitor.playing(true);
+  monitor.refresh();
+  monitor.refresh();
+  assert.equal(stateReads.length, 1, 'Only one confirmation is in flight');
+  stateReads.shift()(true); // Audio paused, but the PAUSE event never arrived.
+  positionReads.shift()(94191);
+  assert.equal(
+    states.at(-1),
+    false,
+    'Real audio state repairs a stuck playing icon',
+  );
+  assert.equal(
+    positions.at(-1),
+    94191,
+    'Paused position comes from the actual engine',
+  );
+
+  monitor.refresh();
+  monitor.playing(false);
+  stateReads.shift()(false); // A playing sample from before the pause.
+  positionReads.shift()(92000);
+  assert.equal(
+    states.at(-1),
+    false,
+    'An old getter cannot undo a newer pause event',
+  );
+  assert.equal(positions.at(-1), 94191);
+
+  monitor.refresh();
+  monitor.invalidate(); // A new seek command invalidates both pending getters.
+  monitor.position(50000);
+  stateReads.shift()(false);
+  positionReads.shift()(94000);
+  assert.equal(states.at(-1), false);
+  assert.equal(
+    positions.at(-1),
+    50000,
+    'An old getter cannot rewind a new seek',
+  );
+
+  monitor.refresh();
+  monitor.position(52000); // A newer PLAY_PROGRESS arrived during the query.
+  stateReads.shift()(false);
+  positionReads.shift()(51000);
+  assert.equal(
+    positions.at(-1),
+    52000,
+    'New progress wins over delayed position reads',
+  );
+  assert.equal(
+    states.at(-1),
+    true,
+    'Confirmation also recovers a missed PLAY event',
+  );
+
+  monitor.refresh();
+  clock += 3000; // A frame did not answer; the next poll must recover.
+  monitor.refresh();
+  stateReads.shift()(false);
+  positionReads.shift()(53000);
+  stateReads.shift()(true);
+  positionReads.shift()(54000);
+  assert.equal(states.at(-1), false);
+  assert.equal(
+    positions.at(-1),
+    54000,
+    'Expired replies cannot replace a new snapshot',
+  );
+
+  monitor.refresh();
+  monitor.dispose();
+  stateReads.shift()(false);
+  positionReads.shift()(55000);
+  monitor.refresh();
+  assert.equal(states.at(-1), false);
+  assert.equal(
+    positions.at(-1),
+    54000,
+    'Callbacks from a removed player are ignored',
+  );
+  assert.equal(stateReads.length, 0, 'Disposed monitors stop querying');
+  console.log(
+    'SoundCloud state: missed play/pause, delayed getters, seek races, timeout and disposal passed.',
+  );
+} finally {
+  if (savedPerformance)
+    Object.defineProperty(globalThis, 'performance', savedPerformance);
+  else delete globalThis.performance;
+}

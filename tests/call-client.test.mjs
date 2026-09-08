@@ -288,7 +288,7 @@ async function connectedCaller(h) {
   h.pc.connection('connected');
 }
 
-test('offer retry preserves exact SDP even when ICE gathering changes localDescription', async () => {
+void test('offer retry preserves exact SDP even when ICE gathering changes localDescription', async () => {
   const h = fixture();
   let attempts = 0;
   h.setSender(async (body) => {
@@ -303,7 +303,7 @@ test('offer retry preserves exact SDP even when ICE gathering changes localDescr
   assert.equal(h.pc.offerCount, 1);
   h.connection.close();
 });
-test('answer retry preserves exact SDP and does not recreate the answer', async () => {
+void test('answer retry preserves exact SDP and does not recreate the answer', async () => {
   const h = fixture(false);
   let attempts = 0;
   h.setSender(async (body) => {
@@ -317,7 +317,7 @@ test('answer retry preserves exact SDP and does not recreate the answer', async 
   assert.equal(h.pc.answerCount, 1);
   h.connection.close();
 });
-test('ICE retry preserves keys and drains acknowledged candidates exactly once', async () => {
+void test('ICE retry preserves keys and drains acknowledged candidates exactly once', async () => {
   const h = fixture();
   await connectedCaller(h);
   h.pc.ice(candidate('local-offer-1'));
@@ -337,7 +337,7 @@ test('ICE retry preserves keys and drains acknowledged candidates exactly once',
   assert.deepEqual(batches[0], batches[1]);
   h.connection.close();
 });
-test('ICE batching keeps candidates gathered during a pending send', async () => {
+void test('ICE batching keeps candidates gathered during a pending send', async () => {
   const h = fixture();
   await connectedCaller(h);
   for (let i = 0; i < 25; i++)
@@ -363,7 +363,7 @@ test('ICE batching keeps candidates gathered during a pending send', async () =>
   assert.equal(new Set(keys).size, 26);
   h.connection.close();
 });
-test('late local ICE with an obsolete usernameFragment is not transmitted', async () => {
+void test('late local ICE with an obsolete usernameFragment is not transmitted', async () => {
   const h = fixture();
   await connectedCaller(h);
   h.pc.ice(candidate('obsolete'));
@@ -373,7 +373,7 @@ test('late local ICE with an obsolete usernameFragment is not transmitted', asyn
   assert.equal(h.sends.find((v) => v.type === 'ice').candidates.length, 1);
   h.connection.close();
 });
-test('remote ICE waits for matching SDP; stale and malformed entries do not block later entries', async () => {
+void test('remote ICE waits for matching SDP; stale and malformed entries do not block later entries', async () => {
   const h = fixture(false);
   const early = signal(1, 1, candidate('offer-1'));
   await h.connection.sync(state(), [early]);
@@ -396,7 +396,7 @@ test('remote ICE waits for matching SDP; stale and malformed entries do not bloc
   assert.equal(h.pc.count('addIceCandidate'), 4);
   h.connection.close();
 });
-test('callee applies each successive offer and answer once, including repeated server snapshots', async () => {
+void test('callee applies each successive offer and answer once, including repeated server snapshots', async () => {
   const h = fixture(false);
   for (let rev = 1; rev <= 3; rev++) {
     await h.connection.sync(state(rev), []);
@@ -413,7 +413,7 @@ test('callee applies each successive offer and answer once, including repeated s
   assert.equal(h.pc.count('setRemoteDescription'), 3);
   h.connection.close();
 });
-test('newer offer supersedes an unacknowledged old answer', async () => {
+void test('newer offer supersedes an unacknowledged old answer', async () => {
   const h = fixture(false);
   let failed = false;
   h.setSender(async (body) => {
@@ -430,7 +430,7 @@ test('newer offer supersedes an unacknowledged old answer', async () => {
   );
   h.connection.close();
 });
-test('short disconnected interval recovers without starting another offer', async () => {
+void test('short disconnected interval recovers without starting another offer', async () => {
   const h = fixture();
   await connectedCaller(h);
   h.clock.advance(10000);
@@ -443,7 +443,7 @@ test('short disconnected interval recovers without starting another offer', asyn
   assert.equal(h.pc.offerCount, 1);
   h.connection.close();
 });
-test('caller restarts after the disconnected grace interval and accepts the new answer', async () => {
+void test('caller restarts after the disconnected grace interval and accepts the new answer', async () => {
   const h = fixture();
   await connectedCaller(h);
   h.clock.advance(10000);
@@ -460,7 +460,7 @@ test('caller restarts after the disconnected grace interval and accepts the new 
   assert.equal(h.pc.remoteDescription.sdp, sdp('answer-2'));
   h.connection.close();
 });
-test('callee requests restart once per revision and never generates an offer', async () => {
+void test('callee requests restart once per revision and never generates an offer', async () => {
   const h = fixture(false);
   await h.connection.sync(state(1), []);
   h.pc.connection('connected');
@@ -477,7 +477,7 @@ test('callee requests restart once per revision and never generates an offer', a
   );
   h.connection.close();
 });
-test('caller honors a callee restart request without duplicate offers from old snapshots', async () => {
+void test('caller honors a callee restart request without duplicate offers from old snapshots', async () => {
   const h = fixture();
   await connectedCaller(h);
   h.clock.advance(10000);
@@ -490,7 +490,7 @@ test('caller honors a callee restart request without duplicate offers from old s
   );
   h.connection.close();
 });
-test('simultaneous recovery keeps the caller as the only offerer', async () => {
+void test('simultaneous recovery keeps the caller as the only offerer', async () => {
   const caller = fixture(),
     callee = fixture(false);
   await connectedCaller(caller);
@@ -510,7 +510,7 @@ test('simultaneous recovery keeps the caller as the only offerer', async () => {
   caller.connection.close();
   callee.connection.close();
 });
-test('reconnect is bounded to four restart offers and expires after its grace budget', async () => {
+void test('reconnect is bounded to four restart offers and expires after its grace budget', async () => {
   const h = fixture();
   await connectedCaller(h);
   h.clock.advance(10000);
@@ -529,7 +529,7 @@ test('reconnect is bounded to four restart offers and expires after its grace bu
   );
   h.connection.close();
 });
-test('initial establishment has a bounded timeout', async () => {
+void test('initial establishment has a bounded timeout', async () => {
   const h = fixture();
   h.clock.advance(60001);
   await assert.rejects(
@@ -539,7 +539,7 @@ test('initial establishment has a bounded timeout', async () => {
   assert.equal(h.sends.length, 0);
   h.connection.close();
 });
-test('sync serializes overlapping calls while an SDP send is pending', async () => {
+void test('sync serializes overlapping calls while an SDP send is pending', async () => {
   const h = fixture(),
     gate = deferred();
   h.setSender(() => gate.promise);
@@ -552,7 +552,7 @@ test('sync serializes overlapping calls while an SDP send is pending', async () 
   assert.equal(h.sends.length, 1);
   h.connection.close();
 });
-test('close during createOffer prevents setLocalDescription and signaling', async () => {
+void test('close during createOffer prevents setLocalDescription and signaling', async () => {
   const h = fixture(),
     gate = deferred();
   h.pc.hook('createOffer', () => gate.promise);
@@ -566,7 +566,7 @@ test('close during createOffer prevents setLocalDescription and signaling', asyn
   assert.equal(h.pc.onicecandidate, null);
   assert.equal(h.pc.onconnectionstatechange, null);
 });
-test('close during setRemoteDescription prevents answer creation', async () => {
+void test('close during setRemoteDescription prevents answer creation', async () => {
   const h = fixture(false),
     gate = deferred();
   h.pc.hook('setRemoteDescription', () => gate.promise);
@@ -578,7 +578,7 @@ test('close during setRemoteDescription prevents answer creation', async () => {
   assert.equal(h.pc.answerCount, 0);
   assert.equal(h.sends.length, 0);
 });
-test('close during SDP publish prevents queued ICE sends and ignores queued sync', async () => {
+void test('close during SDP publish prevents queued ICE sends and ignores queued sync', async () => {
   const h = fixture(),
     gate = deferred();
   h.setSender(() => gate.promise);
@@ -595,7 +595,7 @@ test('close during SDP publish prevents queued ICE sends and ignores queued sync
   );
   assert.equal(h.pc.ontrack, null);
 });
-test('close during addIceCandidate prevents subsequent remote or outgoing processing', async () => {
+void test('close during addIceCandidate prevents subsequent remote or outgoing processing', async () => {
   const h = fixture();
   await connectedCaller(h);
   const gate = deferred();
@@ -613,7 +613,7 @@ test('close during addIceCandidate prevents subsequent remote or outgoing proces
   assert.equal(h.sends.filter((v) => v.type === 'ice').length, 0);
 });
 for (const method of ['createOffer', 'setLocalDescription']) {
-  test(`REGRESSION: transient ${method} error during restart must not wedge the unpublished revision`, async () => {
+  void test(`REGRESSION: transient ${method} error during restart must not wedge the unpublished revision`, async () => {
     const h = fixture();
     await connectedCaller(h);
     h.clock.advance(10000);
@@ -653,7 +653,7 @@ function abortable(signal) {
     }),
   );
 }
-test('HTTP uses same-origin/no-store and sends GET or JSON POST accurately', async () => {
+void test('HTTP uses same-origin/no-store and sends GET or JSON POST accurately', async () => {
   const calls = [],
     h = modules({
       fetch: async (url, options) => {
@@ -674,7 +674,7 @@ test('HTTP uses same-origin/no-store and sends GET or JSON POST accurately', asy
   assert.equal(calls[1].options.cache, 'no-store');
   assert.equal(h.clock.pending(), 0);
 });
-test('HTTP network retry preserves exact call and ICE idempotency payload', async () => {
+void test('HTTP network retry preserves exact call and ICE idempotency payload', async () => {
   const calls = [],
     h = modules({
       fetch: async (url, options) => {
@@ -698,7 +698,7 @@ test('HTTP network retry preserves exact call and ICE idempotency payload', asyn
   assert.equal(h.clock.pending(), 0);
 });
 for (const status of [408, 500, 502, 503, 504]) {
-  test(`HTTP retries temporary ${status} responses with the same operation`, async () => {
+  void test(`HTTP retries temporary ${status} responses with the same operation`, async () => {
     let calls = 0;
     const h = modules({
       fetch: async () =>
@@ -714,7 +714,7 @@ for (const status of [408, 500, 502, 503, 504]) {
   });
 }
 for (const status of [400, 401, 403, 404, 409, 413, 429]) {
-  test(`HTTP does not retry terminal ${status} responses`, async () => {
+  void test(`HTTP does not retry terminal ${status} responses`, async () => {
     let calls = 0;
     const h = modules({
       fetch: async () => {
@@ -730,7 +730,7 @@ for (const status of [400, 401, 403, 404, 409, 413, 429]) {
     assert.equal(h.clock.pending(), 0);
   });
 }
-test('HTTP default attempt count is one and exhausted network errors are normalized', async () => {
+void test('HTTP default attempt count is one and exhausted network errors are normalized', async () => {
   let calls = 0;
   const h = modules({
     fetch: async () => {
@@ -752,7 +752,7 @@ test('HTTP default attempt count is one and exhausted network errors are normali
   assert.equal(calls, 3);
   assert.equal(h.clock.pending(), 0);
 });
-test('HTTP timeout aborts a hung fetch and retries within the bounded attempt count', async () => {
+void test('HTTP timeout aborts a hung fetch and retries within the bounded attempt count', async () => {
   const clock = fakeClock();
   let calls = 0;
   const h = modules({
@@ -774,7 +774,7 @@ test('HTTP timeout aborts a hung fetch and retries within the bounded attempt co
   assert.equal(calls, 2);
   assert.equal(clock.pending(), 0);
 });
-test('HTTP external abort during fetch prevents retries and clears deadline', async () => {
+void test('HTTP external abort during fetch prevents retries and clears deadline', async () => {
   const controller = new AbortController();
   let calls = 0;
   const h = modules({
@@ -797,7 +797,7 @@ test('HTTP external abort during fetch prevents retries and clears deadline', as
   assert.equal(calls, 1);
   assert.equal(h.clock.pending(), 0);
 });
-test('HTTP pre-aborted session never starts a live request', async () => {
+void test('HTTP pre-aborted session never starts a live request', async () => {
   const controller = new AbortController();
   controller.abort();
   let liveRequests = 0;
@@ -818,7 +818,7 @@ test('HTTP pre-aborted session never starts a live request', async () => {
   assert.equal(liveRequests, 0);
   assert.equal(h.clock.pending(), 0);
 });
-test('HTTP retries HTML 502 without exposing server HTML', async () => {
+void test('HTTP retries HTML 502 without exposing server HTML', async () => {
   let calls = 0;
   const h = modules({
     fetch: async () =>
@@ -831,7 +831,7 @@ test('HTTP retries HTML 502 without exposing server HTML', async () => {
   await h.callRequest('', { action: 'callStart' }, { attempts: 2 });
   assert.equal(calls, 2);
 });
-test('REGRESSION: timeout after 200 headers while reading body must remain retryable', async () => {
+void test('REGRESSION: timeout after 200 headers while reading body must remain retryable', async () => {
   const clock = fakeClock();
   let calls = 0;
   const h = modules({
@@ -863,7 +863,7 @@ test('REGRESSION: timeout after 200 headers while reading body must remain retry
   assert.equal(calls, 2);
   assert.equal(clock.pending(), 0);
 });
-test('HTTP external abort while reading body never retries', async () => {
+void test('HTTP external abort while reading body never retries', async () => {
   const controller = new AbortController();
   let calls = 0;
   const h = modules({
@@ -884,7 +884,7 @@ test('HTTP external abort while reading body never retries', async () => {
   assert.equal(calls, 1);
   assert.equal(h.clock.pending(), 0);
 });
-test('HTTP removes the external abort listener after success', async () => {
+void test('HTTP removes the external abort listener after success', async () => {
   const controller = new AbortController(),
     signal = controller.signal;
   let added = 0,

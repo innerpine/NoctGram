@@ -194,6 +194,8 @@ function fixture(t) {
     'lib/turn.ts',
     'lib/account-access.ts',
     'lib/privacy.ts',
+    'lib/chat-files.ts',
+    'lib/chat-access.ts',
     'lib/premium-access.ts',
     'lib/boost-access.ts',
     'lib/boost-rules.ts',
@@ -338,7 +340,7 @@ function fixture(t) {
 }
 const options = { concurrency: false, timeout: 10000 };
 function scenario(name, run) {
-  test(name, options, (t) => run(fixture(t), t));
+  void test(name, options, (t) => run(fixture(t), t));
 }
 const rejectStatus = (fn, status) =>
   assert.rejects(fn, (e) => {

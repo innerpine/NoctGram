@@ -136,7 +136,13 @@ const queue = [
 ];
 assert.equal(adjacentPlayable(queue, 'a').url, 'c');
 assert.equal(adjacentPlayable(queue, 'c', -1).url, 'a');
-assert.equal(adjacentPlayable(queue, 'c'), undefined);
+assert.equal(adjacentPlayable(queue, 'c').url, 'a');
+assert.equal(adjacentPlayable(queue, 'a', -1).url, 'c');
+assert.equal(adjacentPlayable(queue, 'c', 1, true).url, 'a');
+assert.equal(adjacentPlayable(queue, 'b', -1, true).url, 'a');
+assert.equal(adjacentPlayable(queue, 'a', 1, true).playback, 'spotify');
+assert.equal(adjacentPlayable([queue[1], queue[2]], 'c', 1, true).url, 'b');
+assert.equal(adjacentPlayable([queue[0], queue[1]], 'a'), undefined);
 assert.equal(adjacentPlayable([queue[0]], 'a'), undefined);
 assert.equal(adjacentPlayable(queue, 'missing'), undefined);
 console.log(

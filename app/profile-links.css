@@ -1,0 +1,89 @@
+.profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 4px;
+  transition:
+    color 160ms,
+    opacity 160ms;
+}
+.profile-link:hover {
+  color: #d7c1ed;
+}
+.profile-link:hover .display-name-text {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.profile-link:focus-visible {
+  outline: 2px solid #bca2d8;
+  outline-offset: 3px;
+}
+.profile-link .avatar {
+  flex: 0 0 auto;
+}
+.profile-link:has(> .avatar:only-child) {
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+.profile-mention {
+  display: inline;
+  color: #c9b4e1;
+  overflow-wrap: anywhere;
+}
+.profile-mention:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.gift-tile-open {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  border-radius: 12px;
+}
+.gift-tile-open > strong {
+  margin: 6px 0;
+  color: #eee;
+  font-size: 13px;
+}
+.gift-tile-open:focus-visible {
+  outline: 2px solid var(--gift-color);
+  outline-offset: 3px;
+}
+.gift-from .profile-link {
+  display: inline;
+}
+.notification-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+  color: inherit;
+  border-radius: 4px;
+}
+.notification-open:hover {
+  color: #d7c1ed;
+}
+.notification-open:focus-visible {
+  outline: 2px solid #bca2d8;
+  outline-offset: 3px;
+}
+.notification-row > .profile-link {
+  flex-shrink: 0;
+}
+.playlist-listeners > .profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-link {
+    transition: none;
+  }
+}

@@ -28,6 +28,8 @@ const source = (file) => readFileSync(join(root, file), 'utf8');
 const modules = new Map();
 const allowed = new Set([
   'lib/media-access.ts',
+  'lib/chat-access.ts',
+  'lib/chat-files.ts',
   'lib/premium-access.ts',
   'lib/boost-access.ts',
   'lib/boost-rules.ts',
@@ -126,9 +128,9 @@ function compileInsert(declarationText) {
 }
 const insert = compileInsert(declaration.getText(route));
 
-test(
+void test(
   'posting uses real D1 parser limits and atomic access conditions',
-  { timeout: 60000 },
+  { timeout: 120000 },
   async (t) => {
     const mf = new Miniflare({
       modules: true,
@@ -546,6 +548,85 @@ test(
                   : f.actor,
           });
         }
+      },
+    );
+    await t.test(
+      'unsent private chat upload cannot become a personal or owner-channel post',
+      async () => {
+        const f = await fixture(),
+          media = await f.upload(),
+          publicMedia = await f.upload();
+        await run(
+          'INSERT INTO chat_uploads(uploadId,recipient,size,kind) VALUES(?,?,?,?)',
+          media.id,
+          f.owner,
+          12,
+          'image',
+        );
+        await denied(f, { media: [media.id], verified: [media] });
+        await denied(f, {
+          author: f.channel,
+          media: [publicMedia.id, media.id],
+          verified: [publicMedia, media],
+        });
+        assert.equal(
+          (
+            await first(
+              'SELECT COUNT(*) AS count FROM posts WHERE publisherId=?',
+              f.actor,
+            )
+          ).count,
+          0,
+        );
+        await saved(f, { media: [publicMedia.id], verified: [publicMedia] });
+      },
+    );
+    await t.test(
+      'sent chat upload remains private after hide/delete and despite a public reference',
+      async () => {
+        const f = await fixture(),
+          media = await f.upload(),
+          messageId = randomUUID();
+        await run(
+          'INSERT INTO messages(id,sender,recipient,text,media,created) VALUES(?,?,?,?,?,?)',
+          messageId,
+          f.actor,
+          f.owner,
+          'Private attachment',
+          JSON.stringify([media]),
+          f.now,
+        );
+        await run(
+          'INSERT INTO chat_uploads(uploadId,recipient,size,kind,messageId) VALUES(?,?,?,?,?)',
+          media.id,
+          f.owner,
+          12,
+          'image',
+          messageId,
+        );
+        // A pre-existing public reference must not bypass private-file scope.
+        await run(
+          'UPDATE users SET avatar=? WHERE id=?',
+          '/api/media/' + media.id,
+          f.actor,
+        );
+        await denied(f, { media: [media.id], verified: [media] });
+        await run(
+          'INSERT INTO hidden_messages(messageId,userId) VALUES(?,?)',
+          messageId,
+          f.actor,
+        );
+        await denied(f, {
+          author: f.channel,
+          media: [media.id],
+          verified: [media],
+        });
+        await run(
+          'UPDATE messages SET deletedAt=? WHERE id=?',
+          f.now,
+          messageId,
+        );
+        await denied(f, { media: [media.id], verified: [media] });
       },
     );
     assert.deepEqual(

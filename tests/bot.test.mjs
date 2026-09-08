@@ -62,7 +62,7 @@ function command(id, text = '/start') {
     },
   };
 }
-test('Every bot screen is HTML-safe, has bounded buttons and never offers a payment', () => {
+void test('Every bot screen is HTML-safe, has bounded buttons and never offers a payment', () => {
   for (const preferences of [{}, { rich: false }, { customEmoji: true }]) {
     for (const name of [
       'home',
@@ -102,13 +102,13 @@ test('Every bot screen is HTML-safe, has bounded buttons and never offers a paym
     /not enabled/,
   );
 });
-test('Bridge credentials only travel over HTTPS or actual loopback', () => {
+void test('Bridge credentials only travel over HTTPS or actual loopback', () => {
   assert.equal(safeBase('http://localhost:3000'), 'http://localhost:3000');
   assert.throws(() => safeBase('http://example.com'));
   assert.throws(() => safeBase('https://user:pass@example.com'));
   assert.throws(() => safeBase('https://example.com/?secret=x'));
 });
-test('Callback navigation edits one panel and always answers the callback', async () => {
+void test('Callback navigation edits one panel and always answers the callback', async () => {
   const f = fixture(async () => state);
   try {
     await f.bot.handle(command(0));
@@ -127,7 +127,7 @@ test('Callback navigation edits one panel and always answers the callback', asyn
     f.store.close();
   }
 });
-test('Private identity cannot be replaced by a group, forward or mismatched sender', async () => {
+void test('Private identity cannot be replaced by a group, forward or mismatched sender', async () => {
   let siteCalls = 0;
   const f = fixture(async () => {
     siteCalls++;
@@ -145,7 +145,7 @@ test('Private identity cannot be replaced by a group, forward or mismatched send
     f.store.close();
   }
 });
-test('Link proof is stable across retries and only issued to a private Telegram chat', async () => {
+void test('Link proof is stable across retries and only issued to a private Telegram chat', async () => {
   const requests = [],
     f = fixture(async (body) => {
       requests.push(body);
@@ -170,7 +170,7 @@ test('Link proof is stable across retries and only issued to a private Telegram 
     f.store.close();
   }
 });
-test('Lost reply after credit retries the same order without making another quote', async () => {
+void test('Lost reply after credit retries the same order without making another quote', async () => {
   const requests = [],
     f = fixture(async (body) => {
       requests.push(body);
@@ -201,7 +201,7 @@ test('Lost reply after credit retries the same order without making another quot
     f.store.close();
   }
 });
-test('Backend outages stay retryable; business rejections become readable screens', async () => {
+void test('Backend outages stay retryable; business rejections become readable screens', async () => {
   const f = fixture(async () => {
     throw new RemoteError('site', 503, 'down');
   });
@@ -216,7 +216,7 @@ test('Backend outages stay retryable; business rejections become readable screen
     f.store.close();
   }
 });
-test('Preference toggles survive replay without inverting twice', async () => {
+void test('Preference toggles survive replay without inverting twice', async () => {
   const f = fixture(async () => state);
   try {
     await f.bot.handle(event(7, 'toggle:rich'));
@@ -229,7 +229,7 @@ test('Preference toggles survive replay without inverting twice', async () => {
   }
 });
 
-test('Repeated /start and /balance send visible fresh panels after linking', async () => {
+void test('Repeated /start and /balance send visible fresh panels after linking', async () => {
   const f = fixture(async () => state);
   try {
     f.store.set('chat:123', { messageId: 2 });
@@ -256,7 +256,7 @@ test('Repeated /start and /balance send visible fresh panels after linking', asy
   }
 });
 
-test('An older menu edits the clicked panel without hijacking the latest command reply', async () => {
+void test('An older menu edits the clicked panel without hijacking the latest command reply', async () => {
   const f = fixture(async () => state);
   try {
     await f.bot.handle(command(200));
@@ -272,7 +272,7 @@ test('An older menu edits the clicked panel without hijacking the latest command
   }
 });
 
-test('An unchanged callback and an unavailable old panel are handled separately', async () => {
+void test('An unchanged callback and an unavailable old panel are handled separately', async () => {
   const f = fixture(async () => state);
   try {
     const real = f.bot.telegram;
@@ -306,7 +306,7 @@ test('An unchanged callback and an unavailable old panel are handled separately'
   }
 });
 
-test('Premium emoji are on by default, respect opting out and use the requested packs', async () => {
+void test('Premium emoji are on by default, respect opting out and use the requested packs', async () => {
   const f = fixture(async () => state);
   try {
     f.bot.emojiAvailable = true;
@@ -336,7 +336,7 @@ test('Premium emoji are on by default, respect opting out and use the requested 
   }
 });
 
-test('Denied custom emoji fall back to readable replies instead of swallowing /start', async () => {
+void test('Denied custom emoji fall back to readable replies instead of swallowing /start', async () => {
   const f = fixture(async () => state);
   try {
     f.bot.emojiAvailable = true;
@@ -358,7 +358,7 @@ test('Denied custom emoji fall back to readable replies instead of swallowing /s
   }
 });
 
-test('Error screens also fall back when Telegram denies Premium emoji', async () => {
+void test('Error screens also fall back when Telegram denies Premium emoji', async () => {
   let requests = 0;
   const f = fixture(async () => {
     requests++;
@@ -385,7 +385,7 @@ test('Error screens also fall back when Telegram denies Premium emoji', async ()
   }
 });
 
-test('Enabling emoji still refreshes settings when Telegram rejects the icons', async () => {
+void test('Enabling emoji still refreshes settings when Telegram rejects the icons', async () => {
   const f = fixture(async () => state);
   try {
     f.bot.emojiAvailable = true;

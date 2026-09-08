@@ -38,7 +38,7 @@ export function playerArtwork(value?: string, large = false): string {
     const url = new URL(value);
     if (
       url.protocol !== 'https:' ||
-      !/^(?:i\d+\.sndcdn\.com|i\.scdn\.co|image-cdn-[a-z0-9-]+\.spotifycdn\.com)$/.test(
+      !/^(?:i\d+\.sndcdn\.com|i\.scdn\.co|image-cdn-[a-z0-9-]+\.spotifycdn\.com|i\.ytimg\.com)$/.test(
         url.hostname,
       ) ||
       url.username ||

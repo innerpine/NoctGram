@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { observeTopups } from '../lib/stars-topup.ts';
 
-test('existing credits establish a quiet baseline and repeated refreshes stay quiet', () => {
+void test('existing credits establish a quiet baseline and repeated refreshes stay quiet', () => {
   const first = observeTopups(null, { topupCount: 7, topupTotal: 13000 });
   assert.equal(first.amount, 0);
   assert.equal(
@@ -13,7 +13,7 @@ test('existing credits establish a quiet baseline and repeated refreshes stay qu
   );
 });
 
-test('aggregates new top-ups, including credits outside the latest history page', () => {
+void test('aggregates new top-ups, including credits outside the latest history page', () => {
   const credit = observeTopups(
     { count: 7, total: 13000 },
     { topupCount: 67, topupTotal: 43000 },
@@ -25,7 +25,7 @@ test('aggregates new top-ups, including credits outside the latest history page'
   );
 });
 
-test('stored per-account cursor works after reopening; reset totals do not celebrate', () => {
+void test('stored per-account cursor works after reopening; reset totals do not celebrate', () => {
   const stored = JSON.parse(JSON.stringify({ count: 1, total: 100 }));
   assert.equal(
     observeTopups(stored, { topupCount: 2, topupTotal: 600 }).amount,
@@ -41,7 +41,7 @@ test('stored per-account cursor works after reopening; reset totals do not celeb
   );
 });
 
-test('actual wallet totals SQL separates top-ups from grants, spending, and other accounts', () => {
+void test('actual wallet totals SQL separates top-ups from grants, spending, and other accounts', () => {
   const source = readFileSync(
     new URL('../lib/social-features.ts', import.meta.url),
     'utf8',

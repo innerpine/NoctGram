@@ -49,6 +49,14 @@ import {
   failure,
 } from '@/lib/server';
 import { featureGet, featurePost, canPublish } from '@/lib/social-features';
+import { readConversation, pinMessage } from '@/lib/chat-messages';
+import {
+  deleteMessages,
+  editMessage,
+  forwardMessages,
+} from '@/lib/chat-actions';
+import { messageVisible } from '@/lib/chat-access';
+import { readChatTheme, saveChatTheme } from '@/lib/chat-theme-settings';
 export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   try {
@@ -130,8 +138,21 @@ export async function GET(req: Request) {
           .map(([tag, count]) => ({ tag, count })),
       );
     }
-    if (action === 'profile')
-      return Response.json(await profile(s.get('id') || me, me));
+    if (action === 'profile') {
+      let id = s.get('id') || me;
+      if (s.has('handle')) {
+        const handle = (s.get('handle') || '').replace(/^@/, '').toLowerCase();
+        if (!/^[a-z0-9_]{4,24}$/.test(handle))
+          throw new ApiError(404, 'Профиль не найден');
+        const row = await d
+          .prepare('SELECT userId FROM handles WHERE handle=?')
+          .bind(handle)
+          .first<{ userId: string }>();
+        if (!row) throw new ApiError(404, 'Профиль не найден');
+        id = row.userId;
+      }
+      return Response.json(await profile(id, me));
+    }
     if (action === 'feed')
       return Response.json(
         await feed(
@@ -189,9 +210,10 @@ export async function GET(req: Request) {
         (
           await d
             .prepare(
-              `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,(SELECT text FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
+              `WITH visible_messages AS (SELECT m.* FROM messages m WHERE (m.sender=? OR m.recipient=?) AND ${messageVisible('m', '?')})
+              SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,(SELECT CASE WHEN text<>'' THEN text WHEN json_array_length(media)>0 THEN CASE json_extract(media,'$[0].kind') WHEN 'image' THEN 'Фото' WHEN 'video' THEN 'Видео' ELSE 'Файл: '||json_extract(media,'$[0].name') END ELSE text END FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC,id DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM visible_messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
             )
-            .bind(me, me, me, me, me, me, me)
+            .bind(me, me, me, me, me, me, me, me, me, me)
             .all()
         ).results,
       );
@@ -199,19 +221,15 @@ export async function GET(req: Request) {
     if (action === 'messages') {
       const peer = s.get('peer') || '';
       await assertAccountVisible(peer);
-      await d
-        .prepare('UPDATE messages SET read=1 WHERE sender=? AND recipient=?')
-        .bind(peer, me)
-        .run();
+      if (s.get('includeTheme') === '1') {
+        const [messages, theme] = await Promise.all([
+          readConversation(me, peer, s.get('focus') || ''),
+          readChatTheme(me, peer),
+        ]);
+        return Response.json({ messages, theme });
+      }
       return Response.json(
-        (
-          await d
-            .prepare(
-              'SELECT * FROM (SELECT * FROM messages WHERE (sender=? AND recipient=?) OR (sender=? AND recipient=?) ORDER BY created DESC LIMIT 300) ORDER BY created',
-            )
-            .bind(me, peer, peer, me)
-            .all()
-        ).results,
+        await readConversation(me, peer, s.get('focus') || ''),
       );
     }
     throw new ApiError(404, 'Не найдено');
@@ -233,6 +251,8 @@ export async function POST(req: Request) {
     await socialRateLimit(me, action);
     const administration = await administrationPost(action, b, me);
     if (administration) return administration;
+    if (action === 'chatTheme')
+      return Response.json(await saveChatTheme(me, b));
     const telegram = await telegramPost(action, b, me);
     if (telegram) return telegram;
     const call = await callsPost(action, b, me);
@@ -251,6 +271,13 @@ export async function POST(req: Request) {
     if (moderation) return moderation;
     if (action === 'view') await assertReadable(me);
     else await assertWritable(me);
+    if (action === 'messagePin') return Response.json(await pinMessage(me, b));
+    if (action === 'messageDelete')
+      return Response.json(await deleteMessages(me, b));
+    if (action === 'messageEdit')
+      return Response.json(await editMessage(me, b));
+    if (action === 'messageForward')
+      return Response.json(await forwardMessages(me, b));
     if (
       [
         'pin',
@@ -545,8 +572,16 @@ export async function POST(req: Request) {
           .first())
       )
         throw new ApiError(400, 'Выберите участника для личного диалога');
-      await sendPrivateMessage(me, id, clean(b.text, 4000, true));
-      return Response.json({ ok: true });
+      return Response.json(
+        await sendPrivateMessage(
+          me,
+          id,
+          clean(b.text || '', 4000),
+          b.attachments ?? [],
+          b.key,
+          b.replyTo ?? null,
+        ),
+      );
     }
     throw new ApiError(400, 'Неизвестное действие');
   } catch (e) {

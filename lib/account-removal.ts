@@ -69,6 +69,16 @@ export async function deleteAccount(
       .bind(me, ...args),
     d
       .prepare(
+        `UPDATE chat_uploads SET messageId=(
+          SELECT m.id FROM messages m,json_each(m.media) j
+          WHERE m.sender<>? AND m.recipient<>? AND m.deletedAt=0
+            AND json_extract(j.value,'$.id')=chat_uploads.uploadId
+          ORDER BY m.created,m.id LIMIT 1
+        ) WHERE messageId IN(SELECT id FROM messages WHERE sender=? OR recipient=?) AND ${gate}`,
+      )
+      .bind(me, me, me, me, ...args),
+    d
+      .prepare(
         `DELETE FROM messages WHERE (sender=? OR recipient=?) AND ${gate}`,
       )
       .bind(me, me, ...args),
@@ -117,6 +127,8 @@ export async function deleteAccount(
     'story_views',
     'user_privacy',
     'music_audio',
+    'music_activity',
+    'music_playlist_members',
     'music_library',
     'music_preferences',
     'music_sessions',
@@ -153,6 +165,14 @@ export async function deleteAccount(
       .bind(me, me, ...args),
   );
   statements.push(
+    d
+      .prepare(`DELETE FROM music_playlists WHERE ownerId=? AND ${gate}`)
+      .bind(me, ...args),
+    d
+      .prepare(
+        `DELETE FROM chat_themes WHERE (firstId=? OR secondId=?) AND ${gate}`,
+      )
+      .bind(me, me, ...args),
     d
       .prepare(
         `UPDATE users SET name='Удалённый аккаунт',bio='',avatar='',cover='',verified=0,lastSeen=0,onboardingComplete=0,deletedAt=?,sessionsRevokedAt=? WHERE (id=? OR ownerId=?) AND ${gate}`,

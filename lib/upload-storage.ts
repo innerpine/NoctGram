@@ -56,6 +56,7 @@ export const uploadReferenced = (id: string) => `
   OR EXISTS(SELECT 1 FROM profile_appearance WHERE avatarMotion='/api/media/'||${id})
   OR EXISTS(SELECT 1 FROM posts p,json_each(p.media) m WHERE json_extract(m.value,'$.id')=${id})
   OR EXISTS(SELECT 1 FROM stories WHERE mediaId=${id})
+  OR EXISTS(SELECT 1 FROM messages m,json_each(m.media) a WHERE m.deletedAt=0 AND json_extract(a.value,'$.id')=${id})
   OR EXISTS(SELECT 1 FROM moderated_uploads WHERE uploadId=${id})
   OR EXISTS(SELECT 1 FROM content_reports r WHERE json_extract(r.snapshot,'$.mediaId')=${id} OR EXISTS(SELECT 1 FROM json_each(json_extract(r.snapshot,'$.media')) m WHERE json_extract(m.value,'$.id')=${id}))
   OR EXISTS(SELECT 1 FROM content_removals r WHERE json_extract(r.snapshot,'$.mediaId')=${id} OR EXISTS(SELECT 1 FROM json_each(json_extract(r.snapshot,'$.media')) m WHERE json_extract(m.value,'$.id')=${id}))`;

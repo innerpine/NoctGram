@@ -14,26 +14,10 @@ import {
   assertUploadAvailable,
 } from './account-access';
 import { db, clean, ApiError, profile } from '@/lib/server';
+import { ensureWallet, balance } from './star-wallet';
 
 export async function canPublish(id: string, me: string) {
   return allowed(id, me, 'publish');
-}
-async function ensureWallet(me: string) {
-  await db()
-    .prepare(
-      "INSERT OR IGNORE INTO star_transfers(id,recipient,amount,kind,created) VALUES(?,?,10000,'grant',?)",
-    )
-    .bind('grant:' + me, me, Date.now())
-    .run();
-}
-async function balance(me: string) {
-  const row = await db()
-    .prepare(
-      'SELECT COALESCE(SUM(CASE WHEN recipient=? THEN amount ELSE -amount END),0) AS balance FROM star_transfers WHERE recipient=? OR sender=?',
-    )
-    .bind(me, me, me)
-    .first<{ balance: number }>();
-  return row?.balance || 0;
 }
 async function validImage(url: unknown, me: string, existing?: string) {
   const value = clean(url || '', 200);
@@ -123,7 +107,7 @@ export async function featureGet(
     const before = Number(s.get('before')) || Date.now() + 1;
     const rows = await d
       .prepare(
-        `WITH viewer AS(SELECT ? AS id) SELECT t.*,COALESCE(a.name,'Noct Stars') AS name,COALESCE(a.avatar,'') AS avatar,${appearanceColumns('a')} FROM star_transfers t CROSS JOIN viewer v LEFT JOIN users a ON a.id=CASE WHEN t.sender=v.id THEN t.recipient ELSE t.sender END WHERE (t.sender=v.id OR t.recipient=v.id) AND (t.created<? OR(t.created=? AND t.id<?)) ORDER BY t.created DESC,t.id DESC LIMIT 50`,
+        `WITH viewer AS(SELECT ? AS id) SELECT t.*,g.giftId,a.id AS actorId,COALESCE(a.name,'Noct Stars') AS name,COALESCE(a.avatar,'') AS avatar,${appearanceColumns('a')} FROM star_transfers t CROSS JOIN viewer v LEFT JOIN received_gifts g ON g.transferId=t.id LEFT JOIN users a ON a.id=CASE WHEN t.kind='gift' THEN g.recipient WHEN t.sender=v.id THEN t.recipient ELSE t.sender END WHERE (t.sender=v.id OR t.recipient=v.id) AND (t.created<? OR(t.created=? AND t.id<?)) ORDER BY t.created DESC,t.id DESC LIMIT 50`,
       )
       .bind(me, before, before, s.get('beforeId') || '')
       .all();

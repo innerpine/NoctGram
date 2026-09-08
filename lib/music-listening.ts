@@ -22,16 +22,23 @@ export function adjacentPlayable(
   queue: MusicLink[],
   url: string,
   direction = 1,
+  spotifyAvailable = false,
 ) {
   const current = queue.findIndex((item) => item.url === url);
   if (current < 0) return undefined;
-  for (
-    let i = current + direction;
-    i >= 0 && i < queue.length;
-    i += direction
-  ) {
+  for (let step = 1; step < queue.length; step++) {
+    const i =
+      (current + Math.sign(direction) * step + queue.length) % queue.length;
     const item = queue[i] as MusicTrack;
-    if (item.provider === 'soundcloud' || item.audioUrl) return item;
+    if (spotifyAvailable && item.provider === 'spotify')
+      return { ...item, playback: 'spotify' as const };
+    if (
+      item.provider === 'soundcloud' ||
+      item.provider === 'youtube' ||
+      item.audioUrl ||
+      item.playback === 'spotify'
+    )
+      return item;
   }
   return undefined;
 }

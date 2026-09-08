@@ -12,13 +12,26 @@ import './realtime.css';
 import './profile-design.css';
 import './telegram-stars.css';
 import './stars-topup.css';
+import './gifts.css';
+import './dialog-motion.css';
 import './music.css';
 import './music-services.css';
 import './music-player.css';
+import './music-lyrics-dock.css';
+import './music-player-sheet.css';
+import './music-activity.css';
+import './music-playlists.css';
+import './music-workspace.css';
+import './profile-links.css';
+import './chat-themes.css';
+import './chat-attachments.css';
+import './chat-actions.css';
+import './chat-motion.css';
+import './navigation.css';
+import './music-queue.css';
 import './account-management.css';
 import './staff-panel.css';
 import './channel-boosts.css';
-import './dialog-motion.css';
 import { MusicProvider } from './music-provider';
 export const metadata: Metadata = {
   title: 'Noctgram — лента и диалоги',
