@@ -10,6 +10,7 @@ export type ProfileTheme = keyof typeof profileThemes;
 export type Appearance = {
   verified?: number | boolean;
   premium?: number | boolean;
+  boostLevel?: number;
   profileTheme?: string;
   nameGradient?: number | boolean;
   ringText?: string;
@@ -18,6 +19,9 @@ export type Appearance = {
   avatarMotion?: string;
   avatarMotionType?: string;
 };
+export function hasProfileDesign(person: Appearance) {
+  return !!person.premium || (person.boostLevel || 0) > 0;
+}
 export const chromeTempo = { min: 3, max: 26, default: 11 } as const;
 export function themeFor(person: Appearance) {
   return (

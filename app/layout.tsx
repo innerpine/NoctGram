@@ -17,6 +17,7 @@ import './music-services.css';
 import './music-player.css';
 import './account-management.css';
 import './staff-panel.css';
+import './channel-boosts.css';
 import './dialog-motion.css';
 import { MusicProvider } from './music-provider';
 export const metadata: Metadata = {

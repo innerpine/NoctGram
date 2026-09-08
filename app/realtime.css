@@ -130,6 +130,9 @@
   scrollbar-width: thin;
   border-bottom: 1px solid #202024;
 }
+.stories-strip[hidden] {
+  display: none;
+}
 .stories-strip > button {
   display: grid;
   justify-items: center;

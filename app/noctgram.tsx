@@ -1,6 +1,8 @@
 'use client';
 import { AccountPanel } from './account-panel';
 import { VerifiedProfile } from './profile-identity';
+import { ChannelBoosts } from './channel-boosts';
+import { hasProfileDesign } from '@/lib/appearance';
 /* Auth routes require top-level links; private R2 images must keep session cookies.
    Async subscription effects intentionally set loading state; no React compiler is enabled. */
 /* eslint-disable next/no-img-element, next/no-html-link-for-pages, react/react-compiler */
@@ -98,6 +100,12 @@ export default function Noctgram({
 }: {
   initialPage?: 'feed' | 'music' | 'music-services';
 }) {
+  const [boostOpen, setBoostOpen] = useState<{
+    id: string;
+    revision: number;
+    open: boolean;
+  } | null>(null);
+  const pendingBoostOpen = useRef<string | null>(null);
   const [page, setPage] = useState<string>(initialPage),
     [me, setMe] = useState<Profile | null>(null),
     [profile, setProfile] = useState<Profile | null>(null),
@@ -606,6 +614,27 @@ export default function Noctgram({
       clearTimeout(t);
     };
   }, [peopleQuery, modal, me]);
+  useEffect(() => {
+    if (!myId) return;
+    const id = new URLSearchParams(window.location.search).get('boost');
+    if (!id) return;
+    let active = true;
+    void request<Profile>('?action=profile&id=' + encodeURIComponent(id))
+      .then((p) => {
+        if (!active || p.kind !== 'channel' || p.blocked) return;
+        setProfile(p);
+        setProfileTab('posts');
+        setQuery('');
+        setPage('profile');
+        setBoostOpen({ id: p.id, revision: Date.now(), open: true });
+      })
+      .catch((e) => {
+        if (active) notify(e.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [myId]);
   const openProfile = async (id: string) => {
     if (!auth()) return;
     await run(async () => {
@@ -789,6 +818,8 @@ export default function Noctgram({
   const profileOwned =
     !!me && (profile?.id === me.id || profile?.ownerId === me.id);
   const profileEditable = profileOwned || !!profile?.canEditProfile;
+  const editTarget =
+    editId === me?.id ? me : profile?.id === editId ? profile : null;
   const profilePublisher = profileOwned || !!profile?.canPublish;
   const channelRestricted =
     profile?.kind === 'channel' && !!profile.restriction;
@@ -827,11 +858,12 @@ export default function Noctgram({
     setModal('edit');
   }, [me]);
   const applyAppearance = (updated: Profile) => {
-    setMe(updated);
+    setMe((current) => (current?.id === updated.id ? updated : current));
     setProfile((current) => (current?.id === updated.id ? updated : current));
     const appearance = {
       verified: updated.verified,
       premium: updated.premium,
+      boostLevel: updated.boostLevel,
       profileTheme: updated.profileTheme,
       nameGradient: updated.nameGradient,
       ringText: updated.ringText,
@@ -1491,8 +1523,10 @@ export default function Noctgram({
         {page === 'profile' && profile && !profile.blocked && (
           <>
             <section
-              style={profile.premium ? appearanceStyle(profile) : undefined}
-              data-premium={!!profile.premium}
+              style={
+                hasProfileDesign(profile) ? appearanceStyle(profile) : undefined
+              }
+              data-premium={hasProfileDesign(profile)}
               className={
                 'profile-card ' +
                 (profile.kind === 'channel' ? 'channel-profile' : '')
@@ -1544,11 +1578,7 @@ export default function Noctgram({
                       <button
                         className="icon-button cosmetic"
                         aria-label="Оформление профиля"
-                        onClick={() =>
-                          profile.id === me?.id
-                            ? edit('design')
-                            : navigate('premium')
-                        }
+                        onClick={() => edit('design')}
                       >
                         <PremiumIcon size={21} />
                       </button>
@@ -1695,9 +1725,37 @@ export default function Noctgram({
                     <ChevronRight size={17} aria-hidden="true" />
                   </button>
                 )}
+                {profile.kind === 'channel' && me && (
+                  <ChannelBoosts
+                    key={profile.id + ':' + (boostOpen?.revision || 0)}
+                    channel={profile}
+                    me={me}
+                    disabled={readOnly || channelRestricted}
+                    initialOpen={boostOpen?.id === profile.id && boostOpen.open}
+                    onClosed={() =>
+                      setBoostOpen((current) =>
+                        current?.id === profile.id &&
+                        current.revision === boostOpen?.revision
+                          ? { ...current, open: false }
+                          : current,
+                      )
+                    }
+                    onChanged={applyAppearance}
+                    onPremium={() => navigate('premium')}
+                    onProfile={(id) => void openProfile(id)}
+                  />
+                )}
                 <VerifiedProfile person={profile} />
               </div>
             </section>
+            {profile.kind === 'channel' && me && (
+              <StoriesBar
+                key={profile.id}
+                me={me}
+                channel={profile}
+                readOnly={readOnly || channelRestricted}
+              />
+            )}
             <div
               className="feed-tabs profile-tabs"
               data-selected={profileTab === 'media' ? 1 : 0}
@@ -2151,7 +2209,17 @@ export default function Noctgram({
       <Dialog
         open={modalOpen}
         onOpenChangeComplete={(open) => {
-          if (!open && !modalOpen) setModalContent('');
+          if (!open && !modalOpen) {
+            setModalContent('');
+            if (pendingBoostOpen.current) {
+              setBoostOpen({
+                id: pendingBoostOpen.current,
+                revision: Date.now(),
+                open: true,
+              });
+              pendingBoostOpen.current = null;
+            }
+          }
         }}
         onOpenChange={(open) => {
           if (!open && !uploading) setModal('');
@@ -2215,7 +2283,7 @@ export default function Noctgram({
               Войти по почте <ArrowUpRight size={15} />
             </a>
           )}
-          {modal === 'edit' && editId === me?.id && (
+          {modal === 'edit' && editTarget && (
             <div className="edit-tabs" aria-label="Раздел редактирования">
               <button
                 aria-pressed={editTab === 'profile'}
@@ -2231,29 +2299,34 @@ export default function Noctgram({
               >
                 Дизайн
               </button>
-              <button
-                aria-pressed={editTab === 'privacy'}
-                disabled={uploading || busy}
-                onClick={() => setEditTab('privacy')}
-              >
-                Приватность
-              </button>
-              <button
-                aria-pressed={editTab === 'account'}
-                disabled={uploading || busy}
-                onClick={() => setEditTab('account')}
-              >
-                Аккаунт
-              </button>
+              {editId === me?.id && (
+                <>
+                  <button
+                    aria-pressed={editTab === 'privacy'}
+                    disabled={uploading || busy}
+                    onClick={() => setEditTab('privacy')}
+                  >
+                    Приватность
+                  </button>
+                  <button
+                    aria-pressed={editTab === 'account'}
+                    disabled={uploading || busy}
+                    onClick={() => setEditTab('account')}
+                  >
+                    Аккаунт
+                  </button>
+                </>
+              )}
             </div>
           )}
           {modal === 'edit' && editTab === 'account' && editId === me?.id && (
             <AccountPanel />
           )}
-          {modal === 'edit' && me && editId === me.id && (
+          {modal === 'edit' && editTarget && (
             <div hidden={editTab !== 'design'}>
               <ProfileDesign
-                me={me}
+                key={editTarget.id}
+                me={editTarget}
                 disabled={readOnly}
                 onBusy={setUploading}
                 onSaved={(updated) => {
@@ -2264,7 +2337,9 @@ export default function Noctgram({
                 }}
                 onPremium={() => {
                   setModal('');
-                  navigate('premium');
+                  if (editTarget.kind === 'channel')
+                    pendingBoostOpen.current = editTarget.id;
+                  else navigate('premium');
                 }}
               />
             </div>

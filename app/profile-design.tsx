@@ -30,6 +30,9 @@ export function ProfileDesign({
   onPremium: () => void;
   onBusy: (value: boolean) => void;
 }) {
+  const channel = me.kind === 'channel';
+  const level = channel ? me.boostLevel || 0 : 5;
+  const canSave = channel ? level >= 1 : !!me.premium;
   const [theme, setTheme] = useState<ProfileTheme>(
       (me.profileTheme || 'iris') as ProfileTheme,
     ),
@@ -47,9 +50,31 @@ export function ProfileDesign({
     chromeId = useId(),
     tempoId = useId(),
     fileInput = useRef<HTMLInputElement>(null);
+  const [previousLevel, setPreviousLevel] = useState(level);
+  if (previousLevel !== level) {
+    setPreviousLevel(level);
+    if (channel && level > previousLevel) {
+      // Locked fields were masked in the profile response. Restore just the
+      // newly unlocked fields without replacing drafts that stayed editable.
+      if (previousLevel < 1 && level >= 1)
+        setTheme((me.profileTheme || 'iris') as ProfileTheme);
+      if (previousLevel < 2 && level >= 2) setGradient(!!me.nameGradient);
+      if (previousLevel < 3 && level >= 3) {
+        setChrome(!!me.chromeFlow);
+        setTempo(me.chromeTempo || chromeTempo.default);
+      }
+      if (previousLevel < 4 && level >= 4) setRing(me.ringText || '');
+      if (previousLevel < 5 && level >= 5) {
+        setMotion(me.avatarMotion || '');
+        setMotionType(me.avatarMotionType || '');
+        setPoster('');
+      }
+    }
+  }
   const preview = {
     ...me,
-    premium: true,
+    premium: !channel,
+    boostLevel: channel ? Math.max(1, level) : 0,
     profileTheme: theme,
     nameGradient: gradient,
     ringText: ring,
@@ -92,6 +117,7 @@ export function ProfileDesign({
           void perform(async () => {
             const updated = await request<Profile>('', {
               action: 'appearance',
+              id: me.id,
               theme,
               nameGradient: gradient,
               ringText: ring,
@@ -116,6 +142,7 @@ export function ProfileDesign({
                 className="palette-option"
                 type="button"
                 aria-pressed={theme === key}
+                disabled={channel && level < 1}
                 onClick={() => setTheme(key as ProfileTheme)}
               >
                 <span
@@ -131,12 +158,15 @@ export function ProfileDesign({
           </fieldset>
           <label className="appearance-switch" htmlFor={gradientId}>
             <span>
-              <strong>Градиентный ник</strong>
+              <strong>
+                Градиентный ник{' '}
+                {channel && level < 2 && <small>· Уровень 2</small>}
+              </strong>
               <small>Цвет имени и значка — в одной палитре.</small>
             </span>
             <Switch.Root
               id={gradientId}
-              disabled={busy || disabled}
+              disabled={busy || disabled || (channel && level < 2)}
               className="privacy-switch"
               checked={gradient}
               onCheckedChange={setGradient}
@@ -147,7 +177,10 @@ export function ProfileDesign({
           <div className="design-chrome" style={appearanceStyle(preview)}>
             <label className="appearance-switch" htmlFor={chromeId}>
               <span>
-                <strong>Chrome Flow</strong>
+                <strong>
+                  Chrome Flow{' '}
+                  {channel && level < 3 && <small>· Уровень 3</small>}
+                </strong>
                 <small>Металлический блик в цветах профиля.</small>
               </span>
               <Switch.Root
@@ -155,7 +188,7 @@ export function ProfileDesign({
                 className="privacy-switch"
                 checked={chrome}
                 onCheckedChange={setChrome}
-                disabled={busy || disabled}
+                disabled={busy || disabled || (channel && level < 3)}
               >
                 <Switch.Thumb className="privacy-switch-thumb" />
               </Switch.Root>
@@ -180,7 +213,7 @@ export function ProfileDesign({
                   onValueChange={(value) =>
                     setTempo(chromeTempo.max + chromeTempo.min - value)
                   }
-                  disabled={busy || disabled}
+                  disabled={busy || disabled || (channel && level < 3)}
                   thumbAlignment="edge"
                 >
                   <Slider.Control className="chrome-tempo-control">
@@ -208,6 +241,7 @@ export function ProfileDesign({
             </span>
             <input
               value={ring}
+              disabled={channel && level < 4}
               placeholder="В своей орбите"
               maxLength={400}
               onChange={(event) =>
@@ -216,12 +250,19 @@ export function ProfileDesign({
                 )
               }
             />
-            <small className="meta">Оставь пустым, чтобы убрать обводку.</small>
+            <small className="meta">
+              {channel && level < 4
+                ? 'Открывается на 4 уровне канала.'
+                : 'Оставь пустым, чтобы убрать обводку.'}
+            </small>
           </label>
           <div className="design-motion">
             <div className="design-section-heading">
               <Film size={17} />
-              <strong>Анимированный аватар</strong>
+              <strong>
+                Анимированный аватар{' '}
+                {channel && level < 5 && <small>· Уровень 5</small>}
+              </strong>
             </div>
             <p className="meta">
               GIF, MP4 или WebM до 10 МБ. Изображение обрезается по центру в
@@ -231,7 +272,7 @@ export function ProfileDesign({
               <button
                 type="button"
                 className="secondary"
-                disabled={!me.premium || busy || disabled}
+                disabled={!canSave || level < 5 || busy || disabled}
                 onClick={() => fileInput.current?.click()}
               >
                 {busy ? (
@@ -246,7 +287,7 @@ export function ProfileDesign({
                 className="hidden"
                 type="file"
                 accept="image/gif,video/mp4,video/webm"
-                disabled={!me.premium || busy || disabled}
+                disabled={!canSave || level < 5 || busy || disabled}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   event.target.value = '';
@@ -272,6 +313,7 @@ export function ProfileDesign({
                 <button
                   type="button"
                   className="secondary"
+                  disabled={channel && level < 5}
                   onClick={() => {
                     setMotion('');
                     setMotionType('');
@@ -287,7 +329,7 @@ export function ProfileDesign({
               {error}
             </p>
           )}
-          {me.premium ? (
+          {canSave ? (
             <button className="primary design-save" disabled={busy || disabled}>
               {busy ? 'Сохраняем…' : 'Сохранить оформление'}
             </button>
@@ -298,11 +340,12 @@ export function ProfileDesign({
                 className="primary design-save"
                 onClick={onPremium}
               >
-                Открыть Noct Premium
+                {channel ? 'Открыть бусты канала' : 'Открыть Noct Premium'}
               </button>
               <p className="meta">
-                Примеряй оформление. Для сохранения и анимированного аватара
-                нужен Premium.
+                {channel
+                  ? 'Оформление открывается с 1 уровня бустов канала.'
+                  : 'Примеряй оформление. Для сохранения и анимированного аватара нужен Premium.'}
               </p>
             </>
           )}

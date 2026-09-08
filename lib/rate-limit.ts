@@ -52,6 +52,7 @@ const rules: Record<string, [string, number, number]> = {
   like: ['social', 60, 60],
   vote: ['social', 60, 60],
   support: ['support', 20, 60],
+  boost: ['boost', 12, 60],
 };
 export async function socialRateLimit(me: string, action: string) {
   // Heartbeats, read acknowledgments and ICE signaling do not create user content.

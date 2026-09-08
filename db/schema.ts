@@ -5,6 +5,7 @@ import {
   primaryKey,
   index,
   uniqueIndex,
+  check,
   type AnySQLiteColumn,
 } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
@@ -643,6 +644,7 @@ export const stories = sqliteTable(
     userId: text()
       .notNull()
       .references(() => users.id),
+    publisherId: text().references(() => users.id),
     mediaId: text().references(() => uploads.id),
     text: text().notNull().default(''),
     background: text().notNull().default('night'),
@@ -798,6 +800,23 @@ export const premiumEntitlements = sqliteTable('premium_entitlements', {
   source: text().notNull(),
   created: integer().notNull(),
 });
+export const channelBoostSlots = sqliteTable(
+  'channel_boost_slots',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    slot: integer().notNull(),
+    channelId: text().references(() => users.id, { onDelete: 'set null' }),
+    changedAt: integer().notNull(),
+    availableAt: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.slot] }),
+    check('boost_slot_range', sql`${t.slot} IN (1,2,3,4)`),
+    index('boost_slots_channel').on(t.channelId, t.userId),
+  ],
+);
 export const profileAppearance = sqliteTable('profile_appearance', {
   userId: text()
     .primaryKey()

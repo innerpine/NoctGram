@@ -1,0 +1,1 @@
+ALTER TABLE `stories` ADD `publisherId` text REFERENCES users(id);

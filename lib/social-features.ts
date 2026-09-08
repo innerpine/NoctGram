@@ -282,7 +282,7 @@ export async function featurePost(
     statements.unshift(
       d
         .prepare(
-          `${eligibility} UPDATE profile_appearance SET avatarMotion='',avatarMotionType='' WHERE userId=? AND EXISTS(SELECT 1 FROM users u WHERE u.id=profile_appearance.userId AND u.avatar<>? AND u.id IN(SELECT id FROM eligible) AND ${channelPermission('u', 'profile')} AND ${writableTarget('u')})`,
+          `${eligibility} UPDATE profile_appearance SET avatarMotion='',avatarMotionType='' WHERE userId=? AND userId IN(SELECT id FROM eligible) AND EXISTS(SELECT 1 FROM users u WHERE u.id=profile_appearance.userId AND u.avatar<>? AND ${channelPermission('u', 'profile')} AND ${writableTarget('u')})`,
         )
         .bind(...eligibilityArgs, target, avatar, me, me, me, me),
     );

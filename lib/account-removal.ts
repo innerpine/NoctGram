@@ -132,6 +132,7 @@ export async function deleteAccount(
     'account_challenges',
     'recovery_codes',
     'moderators',
+    'channel_boost_slots',
   ])
     statements.push(
       d
@@ -144,6 +145,13 @@ export async function deleteAccount(
         .prepare(`DELETE FROM ${table} WHERE userId IN(${own}) AND ${gate}`)
         .bind(me, me, ...args),
     );
+  statements.push(
+    d
+      .prepare(
+        `UPDATE channel_boost_slots SET channelId=NULL WHERE channelId IN(${own}) AND ${gate}`,
+      )
+      .bind(me, me, ...args),
+  );
   statements.push(
     d
       .prepare(

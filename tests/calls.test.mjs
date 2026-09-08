@@ -195,6 +195,8 @@ function fixture(t) {
     'lib/account-access.ts',
     'lib/privacy.ts',
     'lib/premium-access.ts',
+    'lib/boost-access.ts',
+    'lib/boost-rules.ts',
     'lib/channel-access.ts',
     'lib/rate-limit.ts',
     'lib/api-error.ts',

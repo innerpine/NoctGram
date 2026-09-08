@@ -5,7 +5,12 @@ import {
   assertWritable,
   assertUploadAvailable,
 } from './account-access';
-import { activeActor } from './channel-access';
+import { activeActor, requireChannel } from './channel-access';
+import {
+  channelLevel,
+  channelCanAct,
+  boostChannelActive,
+} from './boost-access';
 import { premiumActive, appearanceColumns } from './premium-access';
 import { assertMediaRead, mediaPermission } from './media-access';
 import { assertStaticAvatar } from './avatar-media';
@@ -61,8 +66,26 @@ export async function premiumPost(
       throw new ApiError(409, 'Тестовый период уже использован');
     return Response.json(await profile(me, me));
   }
-  const theme = clean(b.theme, 20, true),
-    ringText = clean(b.ringText || '', 400).normalize('NFC');
+  const target = b.id ? clean(b.id, 200, true) : me;
+  const isChannel = target !== me;
+  let level = 5;
+  if (isChannel) {
+    await requireChannel(target, me, 'profile');
+    const channel = await d
+      .prepare(
+        `SELECT ${channelLevel('u')} AS level FROM users u WHERE u.id=? AND u.kind='channel'`,
+      )
+      .bind(target)
+      .first<{ level: number }>();
+    if (!channel || channel.level < 1)
+      throw new ApiError(
+        403,
+        'Оформление канала открывается с 1 уровня бустов',
+      );
+    level = channel.level;
+  }
+  const theme = clean(b.theme, 20, true);
+  let ringText = clean(b.ringText || '', 400).normalize('NFC');
   if (
     !Object.hasOwn(profileThemes, theme) ||
     typeof b.nameGradient !== 'boolean' ||
@@ -74,19 +97,21 @@ export async function premiumPost(
     throw new ApiError(400, 'Проверь оформление: текст обводки до 48 символов');
   const current = await d
     .prepare(
-      'SELECT avatarMotion,avatarMotionType,chromeFlow,chromeTempo FROM profile_appearance WHERE userId=?',
+      'SELECT nameGradient,ringText,avatarMotion,avatarMotionType,chromeFlow,chromeTempo FROM profile_appearance WHERE userId=?',
     )
-    .bind(me)
+    .bind(target)
     .first<{
       avatarMotion: string;
       avatarMotionType: string;
       chromeFlow: number;
       chromeTempo: number;
+      nameGradient: number;
+      ringText: string;
     }>();
   // Older clients omit Chrome fields. Keep existing preferences on those saves.
-  const chrome =
+  let chrome =
     b.chromeFlow === undefined ? !!current?.chromeFlow : b.chromeFlow;
-  const tempo =
+  let tempo =
     b.chromeTempo === undefined
       ? (current?.chromeTempo ?? chromeTempo.default)
       : b.chromeTempo;
@@ -98,10 +123,44 @@ export async function premiumPost(
     tempo > chromeTempo.max
   )
     throw new ApiError(400, 'Проверь Chrome Flow: темп от 3 до 26 секунд');
-  const motion = clean(b.avatarMotion || '', 200),
-    poster = clean(b.poster || '', 200);
-  let type = '';
-  if (motion) {
+  let gradient = b.nameGradient;
+  let motion = clean(b.avatarMotion || '', 200);
+  const poster = clean(b.poster || '', 200);
+  if (isChannel) {
+    if (
+      (level < 2 && gradient && !current?.nameGradient) ||
+      (level < 3 && chrome && !current?.chromeFlow) ||
+      (level < 4 && ringText && ringText !== current?.ringText) ||
+      (level < 5 && ((motion && motion !== current?.avatarMotion) || poster))
+    )
+      throw new ApiError(
+        403,
+        'Для этой настройки нужен более высокий уровень канала',
+      );
+    // Locked choices are retained so lost boosts never erase the channel design.
+    if (level < 2) gradient = !!current?.nameGradient;
+    if (level < 3) {
+      chrome = !!current?.chromeFlow;
+      tempo = current?.chromeTempo ?? chromeTempo.default;
+    }
+    if (level < 4) ringText = current?.ringText || '';
+    if (level < 5) motion = current?.avatarMotion || '';
+  }
+  const requiredLevel = Math.max(
+    1,
+    gradient && gradient !== !!current?.nameGradient ? 2 : 1,
+    chrome &&
+      (chrome !== !!current?.chromeFlow || tempo !== current?.chromeTempo)
+      ? 3
+      : 1,
+    ringText && ringText !== current?.ringText ? 4 : 1,
+    (motion && motion !== current?.avatarMotion) || poster ? 5 : 1,
+  );
+  let type =
+    isChannel && motion === current?.avatarMotion
+      ? current.avatarMotionType
+      : '';
+  if (motion && !(isChannel && motion === current?.avatarMotion)) {
     if (!/^\/api\/media\/[a-zA-Z0-9_-]+$/.test(motion))
       throw new ApiError(400, 'Неверный аватар');
     const id = motion.slice(11),
@@ -135,7 +194,11 @@ export async function premiumPost(
     await assertMediaRead(id, me, me);
     await assertStaticAvatar(poster);
   }
-  const input = `WITH input AS(SELECT ? AS actor,? AS motion,? AS poster),eligible AS(SELECT u.id FROM users u,input i WHERE u.id=i.actor AND u.kind='person' AND ${premiumActive('u.id')} AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=u.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000)) AND (i.motion='' OR EXISTS(SELECT 1 FROM uploads up WHERE '/api/media/'||up.id=i.motion AND up.userId=u.id AND ${mediaPermission('up.id', 'u.id')})) AND (i.poster='' OR EXISTS(SELECT 1 FROM uploads up WHERE '/api/media/'||up.id=i.poster AND up.userId=u.id AND ${mediaPermission('up.id', 'u.id')})))`;
+  const input = `WITH input AS(SELECT ? AS actor,? AS target,? AS motion,? AS poster,? AS requiredLevel),eligible AS(SELECT u.id FROM users u,input i WHERE u.id=i.target
+    AND ((u.id=i.actor AND u.kind='person' AND ${premiumActive('u.id')}) OR (${boostChannelActive('u')} AND ${channelCanAct('u', 'i.actor', true)} AND ${channelLevel('u')}>=i.requiredLevel))
+    AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=i.actor AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
+    AND (i.motion='' OR (u.kind='channel' AND i.motion=(SELECT pa.avatarMotion FROM profile_appearance pa WHERE pa.userId=u.id)) OR EXISTS(SELECT 1 FROM uploads up WHERE '/api/media/'||up.id=i.motion AND up.userId=i.actor AND ${mediaPermission('up.id', 'i.actor')}))
+    AND (i.poster='' OR EXISTS(SELECT 1 FROM uploads up WHERE '/api/media/'||up.id=i.poster AND up.userId=i.actor AND ${mediaPermission('up.id', 'i.actor')})))`;
   const result = await d.batch([
     d
       .prepare(
@@ -143,10 +206,12 @@ export async function premiumPost(
       )
       .bind(
         me,
+        target,
         motion,
         poster,
+        requiredLevel,
         theme,
-        b.nameGradient ? 1 : 0,
+        gradient ? 1 : 0,
         ringText,
         chrome ? 1 : 0,
         tempo,
@@ -158,12 +223,14 @@ export async function premiumPost(
       .prepare(
         `${input} UPDATE users SET avatar=? WHERE id IN(SELECT id FROM eligible) AND ?<>''`,
       )
-      .bind(me, motion, poster, poster, poster),
+      .bind(me, target, motion, poster, requiredLevel, poster, poster),
   ]);
   if (!result[0].meta.changes)
     throw new ApiError(
       403,
-      'Для сохранения нужен действующий Noct Premium и доступ к вложениям',
+      isChannel
+        ? 'Уровень или права в канале изменились. Обнови профиль.'
+        : 'Для сохранения нужен действующий Noct Premium и доступ к вложениям',
     );
-  return Response.json(await profile(me, me));
+  return Response.json(await profile(target, me));
 }

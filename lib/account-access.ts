@@ -1,4 +1,4 @@
-import { premiumActive } from './premium-access';
+import { animatedAvatarActive } from './premium-access';
 import { published } from './channel-access';
 import {
   personalVisibility,
@@ -84,7 +84,7 @@ export async function assertUploadAvailable(id: string) {
     SELECT u.id,u.ownerId,u.onboardingComplete,u.deletedAt FROM posts p JOIN users u ON u.id=p.userId
       WHERE EXISTS(SELECT 1 FROM json_each(p.media) m WHERE json_extract(m.value,'$.id')=?)
     UNION SELECT u.id,u.ownerId,u.onboardingComplete,u.deletedAt FROM stories s JOIN users u ON u.id=s.userId WHERE s.mediaId=? AND s.deletedAt=0 AND s.expiresAt>strftime('%s','now')*1000
-    UNION SELECT u.id,u.ownerId,u.onboardingComplete,u.deletedAt FROM profile_appearance pa JOIN users u ON u.id=pa.userId WHERE pa.avatarMotion=? AND ${premiumActive('u.id')}
+    UNION SELECT u.id,u.ownerId,u.onboardingComplete,u.deletedAt FROM profile_appearance pa JOIN users u ON u.id=pa.userId WHERE pa.avatarMotion=? AND ${animatedAvatarActive('u')}
     UNION SELECT u.id,u.ownerId,u.onboardingComplete,u.deletedAt FROM users u WHERE u.avatar=? OR u.cover=?
   ) SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN ${visibleAccount('u')} THEN 1 ELSE 0 END),0) AS visible FROM uses u`)
     .bind(id, id, '/api/media/' + id, '/api/media/' + id, '/api/media/' + id)
