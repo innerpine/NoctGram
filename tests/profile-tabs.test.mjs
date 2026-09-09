@@ -27,6 +27,7 @@ for (const statement of file.statements) {
 }
 const states = new Map();
 const stateSlots = new Map();
+let stateSlot = 0;
 const componentSource = file.statements.find(
   (node) => ts.isFunctionDeclaration(node) && node.name?.text === 'Noctgram',
 );
@@ -38,11 +39,13 @@ for (const statement of componentSource.body.statements) {
       declaration.initializer &&
       ts.isCallExpression(declaration.initializer) &&
       declaration.initializer.expression.getText(file) === 'useState'
-    )
-      stateSlots.set(
-        declaration.name.elements[0].name.getText(file),
-        stateSlots.size,
-      );
+    ) {
+      const binding = declaration.name.elements[0];
+      if (binding && ts.isBindingElement(binding))
+        stateSlots.set(binding.name.getText(file), stateSlot);
+      // A setter-only state still occupies a React hook slot.
+      stateSlot++;
+    }
   }
 }
 let cursor = 0;
@@ -94,7 +97,12 @@ try {
         name: 'profile-boundaries',
         setup(build) {
           build.onResolve({ filter: /.*/ }, ({ path, kind }) =>
-            kind === 'entry-point' || path === '@/lib/feed-snapshots'
+            kind === 'entry-point' ||
+            [
+              '@/lib/feed-snapshots',
+              '@/lib/chat-snapshots',
+              '@/lib/profile-cover-cache',
+            ].includes(path)
               ? undefined
               : { path, namespace: 'boundary' },
           );
