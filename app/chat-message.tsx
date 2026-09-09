@@ -29,6 +29,7 @@ export const ChatMessage = memo(function ChatMessage({
   selecting,
   onJump,
   removing = false,
+  initial = false,
 }: {
   message: Message;
   me: Person | null;
@@ -42,6 +43,7 @@ export const ChatMessage = memo(function ChatMessage({
   selecting: boolean;
   onJump: (id: string) => void;
   removing?: boolean;
+  initial?: boolean;
 }) {
   const own = message.sender === me?.id;
   const menuProps = { message, own, disabled, canSend, selected, onAction };
@@ -52,6 +54,7 @@ export const ChatMessage = memo(function ChatMessage({
         {...menuProps}
         selecting={selecting}
         removing={removing}
+        initial={initial}
       >
         <ChatGift
           message={message}
@@ -68,6 +71,7 @@ export const ChatMessage = memo(function ChatMessage({
       {...menuProps}
       selecting={selecting}
       removing={removing}
+      initial={initial}
     >
       <div
         className={'bubble ' + (own ? 'self' : 'other')}

@@ -148,17 +148,20 @@ export function ChatMessageContext({
   children,
   selecting,
   removing = false,
+  initial = false,
   ...props
 }: ChatActionProps & {
   children: ReactNode;
   selecting: boolean;
   removing?: boolean;
+  initial?: boolean;
 }) {
   const pointer = useRef<{ x: number; y: number } | null>(null);
   return (
     <ContextMenu disabled={removing}>
       <ContextMenuTrigger
         data-chat-message-id={props.message.id}
+        data-chat-initial={initial || undefined}
         data-chat-removing={removing ? '' : undefined}
         inert={removing || undefined}
         aria-hidden={removing || undefined}

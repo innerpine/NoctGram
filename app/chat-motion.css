@@ -1,14 +1,7 @@
 /* Scoped to chat surfaces. Native media controls and the music player keep their behavior. */
-.chat-conversation {
-  animation: chat-conversation-in 180ms ease;
-}
-@keyframes chat-conversation-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Loaded history is visible on its first frame; only newly arriving messages enter. */
+.chat-message-shell[data-chat-initial] :is(.bubble, .chat-gift-event) {
+  animation: none;
 }
 .chat-action-menu,
 .chat-options-menu {

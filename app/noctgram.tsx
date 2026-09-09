@@ -9,6 +9,7 @@ import { hasProfileDesign } from '@/lib/appearance';
 import { StoriesBar } from './stories-bar';
 import { reconcileSnapshot } from '@/lib/reconcile-snapshot';
 import { createFeedSnapshots, feedKey, sameSearch } from '@/lib/feed-snapshots';
+import { createChatSnapshots, type ChatSnapshot } from '@/lib/chat-snapshots';
 import { ChannelTools, localDate } from './channel-tools';
 import { NotificationsBell } from './notifications';
 import { useAudioCalls } from './audio-calls';
@@ -122,6 +123,28 @@ import {
   type Post,
   type Message,
 } from '@/lib/client';
+
+async function requestChatSnapshot(
+  peer: string,
+  focus = '',
+): Promise<ChatSnapshot> {
+  const [conversation, access] = await Promise.all([
+    request<Pick<ChatSnapshot, 'messages' | 'theme'>>(
+      '?' +
+        new URLSearchParams({
+          action: 'messages',
+          includeTheme: '1',
+          peer,
+          focus,
+        }),
+    ),
+    request<ChatSnapshot['access']>(
+      '?action=messageAccess&peer=' + encodeURIComponent(peer),
+    ),
+  ]);
+  return { ...conversation, access };
+}
+
 export default function Noctgram({
   initialPage = 'feed',
 }: {
@@ -241,6 +264,11 @@ export default function Noctgram({
   }, [postsKey, posts, hasMore, loading, loadError]);
   const readOnly = me?.restriction?.mode === 'read_only';
   const accountBlocked = me?.restriction?.mode === 'blocked';
+  const chatSnapshots = useRef(createChatSnapshots());
+  chatSnapshots.current.reset(accountBlocked ? '' : me?.id || '');
+  const [openingChat, setOpeningChat] = useState('');
+  const chatPreparation = useRef(0),
+    preparedMessageLoad = useRef('');
   const audioCalls = useAudioCalls(me?.id, readOnly || accountBlocked);
   const fileRef = useRef<HTMLInputElement>(null),
     searchRef = useRef<HTMLInputElement>(null),
@@ -642,49 +670,40 @@ export default function Noctgram({
       setThreads((previous) => reconcileSnapshot(previous, next));
     }
   }, [myId, accountBlocked]);
-  const loadMessages = useCallback(async () => {
-    if (!peer || activePeer.current !== peer.id) return;
-    const version = ++messageVersion.current;
-    let r: { messages: Message[]; theme: ChatThemeState };
-    let access: { allowed: boolean; blockedByMe: boolean };
-    try {
-      [r, access] = await Promise.all([
-        request<{ messages: Message[]; theme: ChatThemeState }>(
-          '?action=messages&includeTheme=1&peer=' +
-            encodeURIComponent(peer.id) +
-            '&focus=' +
-            encodeURIComponent(messageFocus.current),
-        ),
-        request<{ allowed: boolean; blockedByMe: boolean }>(
-          '?action=messageAccess&peer=' + encodeURIComponent(peer.id),
-        ),
-      ]);
-    } catch (e) {
-      if (version === messageVersion.current) {
-        setMessages([]);
-        setMessageAccess(null);
-      }
-      throw e;
-    }
-    if (version === messageVersion.current && activePeer.current === peer.id) {
-      setMessages((previous) => reconcileSnapshot(previous, r.messages));
+  const applyChatSnapshot = useCallback(
+    (id: string, snapshot: ChatSnapshot) => {
+      setMessages((previous) => reconcileSnapshot(previous, snapshot.messages));
       setChatAppearance((previous) => {
         if (
           previous &&
           previous.viewer === myId &&
-          previous.peer === peer.id &&
-          previous.value.revision > r.theme.revision
+          previous.peer === id &&
+          previous.value.revision > snapshot.theme.revision
         )
           return previous;
         return reconcileSnapshot(previous, {
           viewer: myId || '',
-          peer: peer.id,
-          value: r.theme,
+          peer: id,
+          value: snapshot.theme,
         });
       });
-      setMessageAccess((previous) => reconcileSnapshot(previous, access));
-    }
-  }, [peer, myId]);
+      setMessageAccess((previous) =>
+        reconcileSnapshot(previous, snapshot.access),
+      );
+    },
+    [myId],
+  );
+  const loadMessages = useCallback(async () => {
+    if (!peer || activePeer.current !== peer.id) return;
+    const version = ++messageVersion.current;
+    const ticket = chatSnapshots.current.begin(peer.id);
+    // A failed background refresh must not erase an already loaded conversation.
+    const next = await requestChatSnapshot(peer.id, messageFocus.current);
+    if (version !== messageVersion.current || activePeer.current !== peer.id)
+      return;
+    const saved = chatSnapshots.current.save(next, ticket);
+    if (saved) applyChatSnapshot(peer.id, saved);
+  }, [peer, applyChatSnapshot]);
   useEffect(() => {
     if (!myId) return;
     void loadThreads().catch((e) => notify(e.message));
@@ -713,9 +732,9 @@ export default function Noctgram({
     activePeer.current = peer.id;
     messageFocus.current = '';
     const generationRef = messageVersion;
-    setMessages([]);
-    setMessageAccess(null);
-    void loadMessages().catch((e) => notify(e.message));
+    if (preparedMessageLoad.current !== peer.id)
+      void loadMessages().catch((e) => notify(e.message));
+    preparedMessageLoad.current = '';
     let pending = false;
     const t = setInterval(() => {
       if (!pending && document.visibilityState === 'visible') {
@@ -794,6 +813,8 @@ export default function Noctgram({
     route,
     notify,
     prepare: async (next) => {
+      const preparation = ++chatPreparation.current;
+      setOpeningChat('');
       if (
         !me &&
         ['profile', 'messages', 'saved', 'channels', 'stars'].includes(
@@ -805,6 +826,8 @@ export default function Noctgram({
         throw new Error('Раздел недоступен');
       let person: Profile | null = null,
         conversation: Person | null = null;
+      let conversationSnapshot: ChatSnapshot | undefined;
+      let fetchedConversation = false;
       if (next.page === 'profile') {
         const id = next.profileId || (!next.handle ? myId : '');
         person = id === myId ? me : id ? cache.profiles.get(id) || null : null;
@@ -836,6 +859,22 @@ export default function Noctgram({
           ));
         if (conversation.kind === 'channel' || conversation.id === 'noctgram')
           throw new Error('Выберите личный диалог');
+        conversationSnapshot = chatSnapshots.current.get(conversation.id);
+        if (!conversationSnapshot) {
+          const ticket = chatSnapshots.current.begin(conversation.id);
+          setOpeningChat(conversation.id);
+          try {
+            const snapshot = await requestChatSnapshot(conversation.id);
+            conversationSnapshot =
+              chatSnapshots.current.save(snapshot, ticket) ||
+              chatSnapshots.current.get(conversation.id, ticket.generation);
+            if (!conversationSnapshot)
+              throw new Error('Аккаунт изменился. Откройте диалог снова.');
+            fetchedConversation = true;
+          } finally {
+            if (chatPreparation.current === preparation) setOpeningChat('');
+          }
+        }
       }
       const destination = next;
       return {
@@ -858,8 +897,20 @@ export default function Noctgram({
             messageVersion.current++;
             activePeer.current = conversation?.id || '';
             setPeer(conversation);
-            setMessages([]);
-            setMessageAccess(null);
+            preparedMessageLoad.current = fetchedConversation
+              ? conversation?.id || ''
+              : '';
+            if (conversation && conversationSnapshot)
+              applyChatSnapshot(
+                conversation.id,
+                chatSnapshots.current.get(conversation.id) ||
+                  conversationSnapshot,
+              );
+            else {
+              setMessages([]);
+              setMessageAccess(null);
+              setChatAppearance(null);
+            }
             setMessageText(
               conversation ? cache.drafts.get(conversation.id) || '' : '',
             );
@@ -2397,6 +2448,7 @@ export default function Noctgram({
                     'thread-row ' + (peer?.id === t.id ? 'active' : '')
                   }
                   aria-label={'Открыть диалог с ' + t.name}
+                  aria-busy={openingChat === t.id}
                   onClick={() => openChat(t)}
                 >
                   <Avatar person={t} size={38} />
@@ -2406,6 +2458,13 @@ export default function Noctgram({
                     </strong>
                     <small>{t.lastText || 'Открыть диалог'}</small>
                   </span>
+                  {openingChat === t.id && (
+                    <LoaderCircle
+                      size={16}
+                      className="spin"
+                      aria-hidden="true"
+                    />
+                  )}
                   {!!t.unread && <span className="unread">{t.unread}</span>}
                 </button>
               ))}
@@ -2495,6 +2554,7 @@ export default function Noctgram({
                             id: peer.id,
                             value: !messageAccess?.blockedByMe,
                           });
+                          chatSnapshots.current.remove(peer.id);
                           await loadMessages();
                           setPrivacyVersion((v) => v + 1);
                           notify(
@@ -2524,6 +2584,7 @@ export default function Noctgram({
                           theme,
                         });
                         if (activePeer.current === peer.id) {
+                          chatSnapshots.current.updateTheme(peer.id, saved);
                           setChatAppearance((previous) => {
                             if (
                               previous &&
@@ -2561,9 +2622,10 @@ export default function Noctgram({
                     }
                     text={messageText}
                     onText={setMessageText}
-                    onRefresh={() =>
-                      Promise.all([loadMessages(), loadThreads()])
-                    }
+                    onRefresh={() => {
+                      chatSnapshots.current.remove(peer.id);
+                      return Promise.all([loadMessages(), loadThreads()]);
+                    }}
                     onFocus={async (id) => {
                       if (activePeer.current !== peer.id) return;
                       messageFocus.current = id;
