@@ -19,6 +19,7 @@ assert.equal(prefersNativeHls('Android AppleWebKit Chrome/153 Safari'), false);
 class Audio extends EventTarget {
   src = '';
   readyState = 0;
+  currentTime = 0;
   plays = 0;
   pauses = 0;
   loads = 0;
@@ -33,6 +34,8 @@ class Audio extends EventTarget {
   }
   load() {
     this.loads++;
+    this.readyState = 0;
+    this.currentTime = 0;
   }
   pause() {
     this.pauses++;
@@ -99,6 +102,8 @@ class FakeHls {
   }
   loadSource(url) {
     this.sources.push(url);
+    // Replacing the MediaSource clears old metadata and currentTime.
+    this.element.load();
   }
   destroy() {
     this.destroyed = true;
@@ -122,6 +127,30 @@ hls.events.manifest();
 assert.equal(FakeHls.instances.length, 1);
 assert.equal(hls.element, android);
 assert.equal(android.plays, 1);
+// The new provider effect may attach before the async HLS import settles. A
+// queued timeupdate/metadata callback must neither publish nor resume old audio.
+android.readyState = 4;
+android.currentTime = 1.25;
+assert.equal(hlsPlayer.positionMs, 1250);
+const oldPlays = android.plays;
+hlsPlayer.load('/three', true, true);
+assert.equal(android.currentTime, 1.25, 'Old media remains until HLS loads');
+assert.equal(hlsPlayer.positionMs, 0, 'Pending source cannot leak old time');
+assert.equal(hlsPlayer.hasMetadata, false);
+hlsPlayer.load('/three', true, true);
+hlsPlayer.resume();
+assert.equal(android.plays, oldPlays, 'Cannot resume the previous source');
+await tick();
+assert.equal(hlsPlayer.positionMs, 0, 'Stay at zero while buffering');
+android.readyState = 4;
+android.currentTime = 0.2;
+hls.events.manifest();
+assert.equal(android.plays, oldPlays + 1);
+assert.equal(hlsPlayer.positionMs, 200);
+android.currentTime = 42;
+assert.equal(hlsPlayer.positionMs, 42000, 'Actual forward seeks stay visible');
+android.currentTime = 0;
+assert.equal(hlsPlayer.positionMs, 0, 'Actual backward seeks stay visible');
 let finishImport;
 const delayed = new NativeMusicAudio(
   new Audio(),

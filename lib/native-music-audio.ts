@@ -16,8 +16,17 @@ export class NativeMusicAudio {
   private hls: Hls | null = null;
   private generation = 0;
   private source = '';
+  private sourcePending = false;
   intendsToPlay = false;
   failure = '';
+  get hasMetadata() {
+    return !this.sourcePending && this.element.readyState >= 1;
+  }
+  get positionMs() {
+    return this.hasMetadata && Number.isFinite(this.element.currentTime)
+      ? Math.max(0, this.element.currentTime * 1000)
+      : 0;
+  }
   constructor(
     private element: HTMLAudioElement,
     private loadHls = () => import('hls.js'),
@@ -30,17 +39,21 @@ export class NativeMusicAudio {
   load(source: string, hls: boolean, autoplay: boolean, force = false) {
     this.intendsToPlay = autoplay;
     if (source === this.source && !force) {
-      if (autoplay && this.element.readyState >= 1) this.resume();
+      if (autoplay && this.hasMetadata) this.resume();
       return;
     }
     this.failure = '';
     this.source = source;
+    // HLS imports asynchronously: the element can still expose the previous
+    // track's time/metadata until loadSource replaces its MediaSource.
+    this.sourcePending = true;
     const generation = ++this.generation;
     if (!hls || this.nativeHls()) {
       this.hls?.destroy();
       this.hls = null;
       this.element.src = source;
       this.element.load();
+      this.sourcePending = false;
       if (autoplay) this.resume();
       return;
     }
@@ -70,6 +83,7 @@ export class NativeMusicAudio {
           engine.attachMedia(this.element);
         }
         this.hls.loadSource(source);
+        this.sourcePending = false;
       })
       .catch(() => {
         if (generation === this.generation)
@@ -78,6 +92,7 @@ export class NativeMusicAudio {
   }
   resume() {
     this.intendsToPlay = true;
+    if (this.sourcePending) return;
     const generation = this.generation;
     void this.element.play().catch((error: DOMException) => {
       if (
@@ -101,11 +116,13 @@ export class NativeMusicAudio {
   }
   dispose() {
     ++this.generation;
+    this.sourcePending = true;
     this.pause();
     this.hls?.destroy();
     this.hls = null;
     this.source = '';
     this.element.removeAttribute('src');
     this.element.load();
+    this.sourcePending = false;
   }
 }

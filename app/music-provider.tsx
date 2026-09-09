@@ -661,7 +661,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     window.addEventListener('noctgram:music-preferences', preferenceChanged);
     const attemptPlay = () => engine.resume();
     const loaded = () => {
-      if (!current()) return;
+      if (!current() || !engine.hasMetadata) return;
       if (!Number.isFinite(element.duration) || element.duration <= 0) {
         // HLS initially has an unknown duration; durationchange follows once
         // the manifest is parsed. Do not turn buffering into a playback error.
@@ -680,10 +680,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     };
     const progress = () => {
       if (current()) {
-        setPosition(element.currentTime * 1000);
+        setPosition(engine.positionMs);
         tracker.current?.sample(
-          element.currentTime * 1000,
-          !element.paused && !element.seeking,
+          engine.positionMs,
+          engine.hasMetadata && !element.paused && !element.seeking,
         );
       }
     };
