@@ -1282,6 +1282,7 @@ textarea::placeholder {
 }
 .comments-panel .comment-context {
   display: flex;
+  align-items: flex-start;
   gap: 10px;
   border-left: 0;
   border-bottom: 1px solid var(--border);
@@ -1319,6 +1320,7 @@ textarea::placeholder {
   overscroll-behavior: contain;
 }
 .comment {
+  align-items: flex-start;
   padding: 14px 0;
   gap: 10px;
   animation: line-rise 0.24s var(--motion);

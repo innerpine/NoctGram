@@ -317,9 +317,13 @@ export function CommentsPanel({
           />
           <div className="row">
             <span className="meta">
-              {text.length
-                ? `${text.length} / 2000`
-                : 'Ctrl + Enter · отправить'}
+              {text.length ? (
+                `${text.length} / 2000`
+              ) : (
+                <span className="comment-shortcut-hint">
+                  Ctrl + Enter · отправить
+                </span>
+              )}
             </span>
             <span className="grow" />
             <button

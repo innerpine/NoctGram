@@ -114,6 +114,27 @@ html:has(.app-shell) {
   padding-inline: 5px;
   background: transparent;
 }
+@media (max-width: 500px) {
+  .profile-editor-dialog .edit-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px;
+  }
+  .profile-editor-dialog .edit-tabs::before {
+    display: none;
+  }
+  .profile-editor-dialog .edit-tabs button {
+    min-width: 0;
+    min-height: 42px;
+    padding: 10px 8px;
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
+  }
+  .profile-editor-dialog .edit-tabs button[aria-pressed='true'] {
+    background: #242426;
+  }
+}
 .main-column[data-page='search'] .searchbox {
   transition:
     border-color 180ms ease,
@@ -148,6 +169,7 @@ html:has(.app-shell) {
   }
   .profile-editor-pane,
   .page-loading-indicator,
+  .profile-editor-dialog .edit-tabs button,
   .profile-editor-dialog .edit-tabs::before {
     transition: none;
   }

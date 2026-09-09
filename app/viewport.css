@@ -14,6 +14,16 @@
 .profile-editor-dialog[data-slot='dialog-content'] {
   overflow: hidden;
 }
+/* The catalog alone scrolls, even when the keyboard reduces the visible height. */
+.gift-send-dialog[data-slot='dialog-content']:has(.gift-browser) {
+  display: flex;
+  flex-direction: column;
+  height: min(640px, calc(var(--app-viewport-height, 100dvh) - 32px));
+  overflow: hidden;
+}
+.gift-send-dialog > :not(.gift-browser) {
+  flex-shrink: 0;
+}
 .music-stage[data-slot='dialog-content'] {
   top: calc(var(--app-viewport-top, 0px) + 12px);
   bottom: auto;
@@ -38,6 +48,9 @@
 }
 
 @media (max-width: 760px), (max-width: 1000px) and (pointer: coarse) {
+  .comment-shortcut-hint {
+    display: none;
+  }
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
@@ -133,6 +146,18 @@
   }
 }
 @media (max-width: 500px) {
+  .profile-avatar-line {
+    min-height: 100px;
+  }
+  .profile-avatar-line > .avatar {
+    align-self: flex-start;
+  }
+  .profile-avatar-line > button {
+    margin-bottom: 4px;
+  }
+  .stars-page > .telegram-link {
+    margin-inline: 14px;
+  }
   .app-shell:has(.messages-main) {
     min-height: 0;
     height: var(--app-viewport-height, 100dvh);
@@ -144,5 +169,17 @@
     right: 0;
     padding-inline: max(4px, env(safe-area-inset-left, 0px))
       max(4px, env(safe-area-inset-right, 0px));
+  }
+}
+@media (max-width: 360px) {
+  .profile-avatar-line {
+    gap: 4px;
+  }
+  .profile-avatar-line > .avatar {
+    width: 80px !important;
+    height: 80px !important;
+  }
+  .profile-avatar-line > .secondary {
+    padding-inline: 8px;
   }
 }
