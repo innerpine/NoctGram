@@ -20,9 +20,10 @@ const deferred = () => {
 function fixture() {
   const transitions = [],
     animations = [],
+    contentAnimations = [],
     updates = [];
   const attributes = new Map();
-  const state = { reduced: false, hidden: false };
+  const state = { reduced: false, hidden: false, failedCapture: false };
   const host = {
     matchMedia: () => ({ matches: state.reduced }),
     document: {
@@ -34,6 +35,7 @@ function fixture() {
         removeAttribute: (k) => attributes.delete(k),
       },
       querySelector: () => ({
+        getAnimations: () => contentAnimations,
         animate: (frames, options) => {
           const animation = {
             frames,
@@ -51,7 +53,9 @@ function fixture() {
         const done = deferred(),
           finished = deferred();
         const transition = {
-          ready: Promise.resolve(),
+          ready: state.failedCapture
+            ? Promise.reject(new Error('capture rejected'))
+            : Promise.resolve(),
           updateCallbackDone: done.promise,
           finished: finished.promise,
           skipped: false,
@@ -77,6 +81,7 @@ function fixture() {
     host,
     transitions,
     animations,
+    contentAnimations,
     attributes,
     state,
     updates,
@@ -88,10 +93,11 @@ void test('music transitions snapshot before committing and clean up after the a
   const f = fixture();
   const pending = f.run('feed', 'music');
   assert.deepEqual(f.updates, []);
-  assert.equal(f.attributes.get('data-page-transition'), 'music');
+  assert.equal(f.attributes.get('data-page-transition'), 'out');
   f.transitions[0].apply();
   await pending;
   assert.deepEqual(f.updates, ['music']);
+  assert.equal(f.attributes.get('data-page-transition'), 'in');
   assert.equal(f.attributes.size, 1);
   f.transitions[0].finish();
   await new Promise(setImmediate);
@@ -161,4 +167,36 @@ void test('a snapshot setup failure cannot prevent navigation', async () => {
   assert.deepEqual(f.updates, ['music']);
   assert.equal(f.attributes.size, 0);
   assert.equal(f.animations.length, 1);
+});
+void test('destination cards finish their entrance before capture, while looping media keeps animating', async () => {
+  const f = fixture(),
+    finished = [];
+  for (const endTime of [280, 380, Infinity])
+    f.contentAnimations.push({
+      effect: { getComputedTiming: () => ({ endTime }) },
+      finish: () => finished.push(endTime),
+    });
+  const pending = f.run('music', 'profile');
+  assert.deepEqual(finished, []);
+  f.transitions[0].apply();
+  await pending;
+  assert.deepEqual(finished, [280, 380]);
+  await f.run('profile', 'messages');
+  assert.deepEqual(
+    finished,
+    [280, 380],
+    'ordinary sections keep their existing animations',
+  );
+});
+void test('a browser capture rejection still animates the committed page', async () => {
+  const f = fixture();
+  f.state.failedCapture = true;
+  const pending = f.run('music', 'messages');
+  f.transitions[0].apply();
+  await pending;
+  await new Promise(setImmediate);
+  assert.deepEqual(f.updates, ['messages']);
+  assert.equal(f.animations.length, 1);
+  assert.equal(f.animations[0].options.duration, 360);
+  assert.equal(f.attributes.size, 0);
 });

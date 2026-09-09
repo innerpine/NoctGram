@@ -1963,7 +1963,7 @@ export default function Noctgram({
           <SuspendedProfile profile={profile} onBack={() => navigate('feed')} />
         )}
         <div
-          className="stream-intro feed-intro"
+          className="stream-intro feed-section"
           key={
             'feed:' +
             (me?.id || 'guest') +

@@ -43,31 +43,52 @@ export function createPageTransition(
         if (main?.animate && generation === version) {
           fallback = main.animate(
             [
-              { opacity: 0, translate: '0 8px' },
+              { opacity: 0, translate: '0 10px' },
               { opacity: 1, translate: '0 0' },
             ],
-            { duration: 240, easing: 'cubic-bezier(0.2, 0.75, 0.25, 1)' },
+            { duration: 360, easing: 'cubic-bezier(0.2, 0.75, 0.25, 1)' },
           );
         }
       };
-      if (!document.startViewTransition) {
+      const reveal = () => {
         commit();
+        if (generation !== version) return;
+        // A section has one entrance. A snapshot taken at the start of a nested
+        // card animation would otherwise stay transparent until the snapshot
+        // disappears. Keep looping avatars / skeletons running normally.
+        const main = document.querySelector<HTMLElement>('.main-column');
+        for (const animation of main?.getAnimations?.({ subtree: true }) ||
+          []) {
+          const end = animation.effect?.getComputedTiming().endTime;
+          if (typeof end === 'number' && Number.isFinite(end))
+            animation.finish();
+        }
+        document.documentElement.setAttribute('data-page-transition', 'in');
+      };
+      if (!document.startViewTransition) {
+        reveal();
+        clear();
         enter();
         return;
       }
-      document.documentElement.setAttribute('data-page-transition', 'music');
+      document.documentElement.setAttribute('data-page-transition', 'out');
       try {
-        current = document.startViewTransition(commit);
+        current = document.startViewTransition(reveal);
       } catch {
+        reveal();
         clear();
-        commit();
         enter();
         return;
       }
       const transition = current;
       // Skipping a visual transition still runs its update callback. The version
       // check above prevents a rapid second click from committing the old page.
-      void transition.ready.catch(() => {});
+      void transition.ready.catch(() => {
+        if (generation === version) {
+          clear();
+          enter();
+        }
+      });
       void transition.finished
         .catch(() => {})
         .then(() => {
