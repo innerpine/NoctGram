@@ -298,10 +298,29 @@
   width: min(180px, 70%);
 }
 .gift-dialog-heading {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 10px;
   padding-right: 18px;
+}
+.gift-dialog-close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 32px;
+  height: 32px;
+}
+.gift-catalog-heading {
+  flex-direction: column;
+  gap: 16px;
+  padding-right: 0;
+}
+.gift-catalog-heading > div {
+  padding-right: 24px;
+}
+.gift-catalog-heading .gift-search {
+  width: 100%;
 }
 .gift-dialog-heading > div {
   min-width: 0;

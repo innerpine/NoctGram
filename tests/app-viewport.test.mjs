@@ -37,6 +37,7 @@ function fixture() {
   const frames = new Map();
   const host = Object.assign(new EventTarget(), {
     innerHeight: 844,
+    matchMedia: () => ({ matches: true }),
     visualViewport: viewport,
     document: doc,
     requestAnimationFrame: (fn) => {
@@ -120,5 +121,69 @@ await test('browsers without VisualViewport keep the CSS viewport fallback', () 
   f.host.visualViewport = null;
   const stop = observeAppViewport(f.host);
   assert.equal(f.styles.size, 0);
+  stop();
+});
+
+await test('keyboard inset follows opening and closing frames without a 120px jump', () => {
+  const f = fixture();
+  const stop = observeAppViewport(f.host);
+  f.doc.activeElement = { matches: () => true };
+  f.doc.dispatchEvent(new Event('focusin'));
+  f.flush();
+  assert.equal(f.styles.get('--app-keyboard-inset'), '0px');
+  for (const covered of [20, 60, 119, 121, 250, 400]) {
+    f.viewport.height = 844 - covered;
+    f.viewport.dispatchEvent(new Event('resize'));
+    f.flush();
+    assert.equal(f.styles.get('--app-keyboard-inset'), `${covered}px`);
+    assert.equal(f.root.dataset.keyboardOpen, 'true');
+  }
+  f.doc.activeElement = null;
+  f.doc.dispatchEvent(new Event('focusout'));
+  f.flush();
+  assert.equal(f.styles.get('--app-keyboard-inset'), '400px');
+  for (const covered of [250, 121, 119, 60, 20, 0]) {
+    f.viewport.height = 844 - covered;
+    f.viewport.dispatchEvent(new Event('resize'));
+    f.flush();
+    assert.equal(f.styles.get('--app-keyboard-inset'), `${covered}px`);
+  }
+  assert.equal(f.root.dataset.keyboardOpen, 'false');
+  stop();
+});
+
+await test('Android keeps the pre-keyboard height when both viewports shrink', () => {
+  const f = fixture();
+  const stop = observeAppViewport(f.host);
+  f.doc.activeElement = { matches: () => true };
+  f.doc.dispatchEvent(new Event('focusin'));
+  f.flush();
+  f.host.innerHeight = f.root.clientHeight = f.viewport.height = 444;
+  f.viewport.width = 389.9999;
+  f.viewport.dispatchEvent(new Event('resize'));
+  f.flush();
+  assert.equal(f.styles.get('--app-keyboard-inset'), '400px');
+  f.doc.activeElement = null;
+  f.doc.dispatchEvent(new Event('focusout'));
+  f.flush();
+  assert.equal(f.root.dataset.keyboardOpen, 'true');
+  f.host.innerHeight = f.root.clientHeight = f.viewport.height = 844;
+  f.viewport.dispatchEvent(new Event('resize'));
+  f.flush();
+  assert.equal(f.styles.get('--app-keyboard-inset'), '0px');
+  assert.equal(f.root.dataset.keyboardOpen, 'false');
+  stop();
+});
+
+await test('desktop window resizing does not act like a software keyboard', () => {
+  const f = fixture();
+  f.host.matchMedia = () => ({ matches: false });
+  const stop = observeAppViewport(f.host);
+  f.doc.activeElement = { matches: () => true };
+  f.host.innerHeight = f.root.clientHeight = f.viewport.height = 444;
+  f.viewport.dispatchEvent(new Event('resize'));
+  f.flush();
+  assert.equal(f.styles.get('--app-keyboard-inset'), '0px');
+  assert.equal(f.root.dataset.keyboardOpen, 'false');
   stop();
 });

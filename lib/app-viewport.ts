@@ -5,10 +5,14 @@ export function observeAppViewport(host: Window = window) {
   const root = doc.documentElement;
   const viewport = host.visualViewport;
   let frame = 0;
+  let baselineHeight = Math.max(host.innerHeight, root.clientHeight);
+  let baselineWidth = viewport?.width;
+  let keyboardOpen = false;
   const properties = [
     '--app-viewport-height',
     '--app-viewport-width',
     '--app-viewport-top',
+    '--app-keyboard-inset',
   ];
   const clear = () => {
     for (const property of properties) root.style.removeProperty(property);
@@ -20,16 +24,31 @@ export function observeAppViewport(host: Window = window) {
       clear();
       return;
     }
-    root.style.setProperty(properties[0], `${viewport.height}px`);
-    root.style.setProperty(properties[1], `${viewport.width}px`);
-    root.style.setProperty(properties[2], `${viewport.offsetTop}px`);
     const input = doc.activeElement;
     const editing = input?.matches(
       'textarea, input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="file"]), [contenteditable="true"]',
     );
-    const covered =
-      Math.max(host.innerHeight, root.clientHeight) - viewport.height;
-    root.dataset.keyboardOpen = editing && covered > 120 ? 'true' : 'false';
+    const layoutHeight = Math.max(host.innerHeight, root.clientHeight);
+    // Android can resize both viewports. Keep the pre-keyboard height until it
+    // returns, including the closing animation after the input loses focus.
+    const touch = host.matchMedia('(pointer: coarse)').matches;
+    if (
+      Math.abs((baselineWidth ?? viewport.width) - viewport.width) > 1 ||
+      (!editing && !keyboardOpen) ||
+      !touch
+    )
+      baselineHeight = layoutHeight;
+    baselineWidth = viewport.width;
+    baselineHeight = Math.max(baselineHeight, layoutHeight, viewport.height);
+    const covered = Math.max(0, baselineHeight - viewport.height);
+    const inset = touch && (editing || keyboardOpen) ? covered : 0;
+    keyboardOpen = inset > 1;
+    if (!keyboardOpen) baselineHeight = layoutHeight;
+    root.style.setProperty(properties[0], `${viewport.height}px`);
+    root.style.setProperty(properties[1], `${viewport.width}px`);
+    root.style.setProperty(properties[2], `${viewport.offsetTop}px`);
+    root.style.setProperty(properties[3], `${inset}px`);
+    root.dataset.keyboardOpen = keyboardOpen ? 'true' : 'false';
   };
   const schedule = () => {
     if (!frame) frame = host.requestAnimationFrame(update);
