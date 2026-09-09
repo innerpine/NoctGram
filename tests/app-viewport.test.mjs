@@ -111,6 +111,9 @@ await test('unmount removes listeners, pending updates and viewport overrides', 
   f.viewport.dispatchEvent(new Event('scroll'));
   f.doc.dispatchEvent(new Event('focusin'));
   f.host.dispatchEvent(new Event('resize'));
+  f.host.dispatchEvent(new Event('scroll'));
+  f.host.dispatchEvent(new Event('pageshow'));
+  f.doc.dispatchEvent(new Event('visibilitychange'));
   assert.equal(f.pending, 0);
   assert.equal(f.styles.size, 0);
   assert.equal(f.root.dataset.keyboardOpen, undefined);
@@ -185,5 +188,40 @@ await test('desktop window resizing does not act like a software keyboard', () =
   f.flush();
   assert.equal(f.styles.get('--app-keyboard-inset'), '0px');
   assert.equal(f.root.dataset.keyboardOpen, 'false');
+  stop();
+});
+
+await test('Safari toolbar scrolling follows the visible area while layout height stays stale', () => {
+  const f = fixture();
+  f.host.innerHeight = f.root.clientHeight = f.viewport.height = 659;
+  const stop = observeAppViewport(f.host);
+  for (const height of [690, 730, 790, 730, 659]) {
+    f.viewport.height = height;
+    f.host.dispatchEvent(new Event('scroll'));
+    f.host.dispatchEvent(new Event('scroll'));
+    assert.equal(f.pending, 1, 'Scroll updates are coalesced into one frame');
+    f.flush();
+    assert.equal(f.styles.get('--app-viewport-height'), `${height}px`);
+    assert.equal(f.styles.get('--app-keyboard-inset'), '0px');
+    assert.equal(f.root.dataset.keyboardOpen, 'false');
+  }
+  f.viewport.offsetTop = 26;
+  f.host.dispatchEvent(new Event('scroll'));
+  f.flush();
+  assert.equal(f.styles.get('--app-viewport-top'), '26px');
+  stop();
+});
+
+await test('returning to a cached or background Safari page refreshes viewport controls', () => {
+  const f = fixture();
+  const stop = observeAppViewport(f.host);
+  f.viewport.height = 700;
+  f.host.dispatchEvent(new Event('pageshow'));
+  f.flush();
+  assert.equal(f.styles.get('--app-viewport-height'), '700px');
+  f.viewport.height = 844;
+  f.doc.dispatchEvent(new Event('visibilitychange'));
+  f.flush();
+  assert.equal(f.styles.get('--app-viewport-height'), '844px');
   stop();
 });

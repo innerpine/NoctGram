@@ -412,6 +412,22 @@
   }
 }
 @media (max-width: 500px) {
+  /* iOS Safari can retain an old fixed-bottom boundary while its toolbar
+     collapses. Anchor controls to the visible viewport's top + height instead. */
+  .sidebar {
+    top: calc(
+      var(--app-viewport-top, 0px) + var(--app-viewport-height, 100dvh) -
+        var(--app-nav-inset)
+    );
+    bottom: auto;
+  }
+  .music-player.music-sheet {
+    top: calc(
+      var(--app-viewport-top, 0px) + var(--app-viewport-height, 100dvh) -
+        var(--app-nav-inset) - 10px - var(--music-player-height, 100px)
+    );
+    bottom: auto;
+  }
   .profile-avatar-line {
     min-height: 100px;
   }

@@ -56,6 +56,11 @@ export function observeAppViewport(host: Window = window) {
   viewport?.addEventListener('resize', schedule);
   viewport?.addEventListener('scroll', schedule);
   host.addEventListener('resize', schedule);
+  // Safari's collapsing toolbar can change the visible area during a document
+  // scroll without delivering a VisualViewport resize in the same frame.
+  host.addEventListener('scroll', schedule, { passive: true });
+  host.addEventListener('pageshow', schedule);
+  doc.addEventListener('visibilitychange', schedule);
   doc.addEventListener('focusin', schedule);
   doc.addEventListener('focusout', schedule);
   update();
@@ -64,6 +69,9 @@ export function observeAppViewport(host: Window = window) {
     viewport?.removeEventListener('resize', schedule);
     viewport?.removeEventListener('scroll', schedule);
     host.removeEventListener('resize', schedule);
+    host.removeEventListener('scroll', schedule);
+    host.removeEventListener('pageshow', schedule);
+    doc.removeEventListener('visibilitychange', schedule);
     doc.removeEventListener('focusin', schedule);
     doc.removeEventListener('focusout', schedule);
     clear();
