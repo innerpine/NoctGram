@@ -60,6 +60,10 @@ export default defineConfig(async () => {
   const { cloudflare } = await import('@cloudflare/vite-plugin');
 
   return {
+    // Lightning CSS merges independent translate/scale with transform across
+    // popup rules. That doubles Tailwind's centering in the production player
+    // and changes the properties used by our open/close transitions.
+    build: { cssMinify: 'esbuild' as const },
     css: { postcss: { plugins: [tailwindcss()] } },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }

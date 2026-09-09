@@ -1,7 +1,7 @@
 'use client';
 /* File transfers are scoped to this mounted conversation. */
 /* eslint-disable react/react-compiler, next/no-img-element */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   File as FileIcon,
   LoaderCircle,
@@ -58,6 +58,12 @@ export function ChatComposer({
   const [sending, setSending] = useState(false),
     [uncertain, setUncertain] = useState(false),
     [error, setError] = useState('');
+  useLayoutEffect(() => {
+    const field = textarea.current;
+    if (!field || !window.matchMedia('(pointer: coarse)').matches) return;
+    field.style.height = '44px';
+    field.style.height = `${Math.min(120, Math.max(44, field.scrollHeight))}px`;
+  }, [text]);
   const attempt = useRef<{
     action: string;
     id: string;
@@ -218,7 +224,7 @@ export function ChatComposer({
     onLockedChange?.(sending || uncertain);
   }, [sending, uncertain, onLockedChange]);
   useEffect(() => {
-    if (reply?.id) textarea.current?.focus();
+    if (reply?.id) textarea.current?.focus({ preventScroll: true });
   }, [reply?.id]);
   return (
     <div
@@ -356,7 +362,10 @@ export function ChatComposer({
             if (
               e.key === 'Enter' &&
               !e.shiftKey &&
-              !e.nativeEvent.isComposing
+              !e.nativeEvent.isComposing &&
+              (!window.matchMedia('(pointer: coarse)').matches ||
+                e.ctrlKey ||
+                e.metaKey)
             ) {
               e.preventDefault();
               e.currentTarget.form?.requestSubmit();

@@ -67,6 +67,8 @@ textarea {
   font: inherit;
 }
 button {
+  -webkit-appearance: none;
+  appearance: none;
   cursor: pointer;
   color: inherit;
   border: 0;

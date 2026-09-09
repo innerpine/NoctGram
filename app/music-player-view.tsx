@@ -835,6 +835,7 @@ export function MusicPlayerView(p: Props) {
           }}
         >
           <DialogContent
+            layout="fullscreen"
             showCloseButton={false}
             finalFocus={miniCollapsed ? sheetHandle : coverButton}
             className="music-stage"

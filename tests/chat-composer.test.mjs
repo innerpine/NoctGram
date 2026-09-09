@@ -44,7 +44,7 @@ const { outputFiles } = await build({
         build.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({
           contents:
             path === 'react'
-              ? 'export const {useState,useRef,useEffect}=globalThis.__composerHooks;'
+              ? 'export const {useState,useRef,useEffect}=globalThis.__composerHooks; export const useLayoutEffect=useEffect;'
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx;'
                 : 'export const File="File", LoaderCircle="LoaderCircle", Paperclip="Paperclip", RotateCcw="RotateCcw", Send="Send", Video="Video", X="X", Reply="Reply";',
@@ -183,6 +183,36 @@ const photo = (name) =>
     { type: 'image/png' },
   );
 try {
+  const keyboard = mount();
+  let coarse = true,
+    submissions = 0,
+    prevented = 0;
+  window.matchMedia = () => ({ matches: coarse });
+  const enter = (extra = {}) =>
+    keyboard.textarea().onKeyDown({
+      key: 'Enter',
+      shiftKey: false,
+      nativeEvent: { isComposing: false },
+      preventDefault: () => prevented++,
+      currentTarget: { form: { requestSubmit: () => submissions++ } },
+      ...extra,
+    });
+  enter();
+  assert.equal(submissions, 0, 'Mobile Return keeps native newline insertion');
+  assert.equal(prevented, 0);
+  enter({ ctrlKey: true });
+  assert.equal(
+    submissions,
+    1,
+    'An external mobile keyboard can explicitly submit',
+  );
+  coarse = false;
+  enter();
+  assert.equal(submissions, 2, 'Desktop Enter still submits');
+  enter({ shiftKey: true });
+  enter({ nativeEvent: { isComposing: true } });
+  assert.equal(submissions, 2, 'Shift+Enter and IME composition are preserved');
+  keyboard.dispose();
   const compose = mount();
   compose.pick([photo('one.png'), photo('two.png')]);
   assert.equal(uploads.length, 1, 'A selection uploads sequentially');

@@ -60,18 +60,25 @@ function DialogContent({
   children,
   showCloseButton = true,
   overlayClassName,
+  layout = 'centered',
+  initialFocus = (type) => type !== 'touch',
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean;
   overlayClassName?: string;
+  layout?: 'centered' | 'fullscreen';
 }) {
   return (
     <DialogPortal>
       <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
+        data-layout={layout}
+        initialFocus={initialFocus}
         className={cn(
-          'fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm ',
+          'fixed z-50 grid gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none',
+          layout === 'centered' &&
+            'top-1/2 left-1/2 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 sm:max-w-sm',
           className,
         )}
         {...props}

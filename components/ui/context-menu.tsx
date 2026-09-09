@@ -44,6 +44,7 @@ function ContextMenuContent({
   return (
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Positioner
+        collisionPadding={12}
         className="isolate z-50 outline-none"
         align={align}
         alignOffset={alignOffset}

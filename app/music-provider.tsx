@@ -1,4 +1,5 @@
 'use client';
+import { observeAppViewport } from '@/lib/app-viewport';
 /* Provider subscriptions update state from real SoundCloud events. */
 /* eslint-disable react/react-compiler, next/no-img-element */
 import {
@@ -56,6 +57,7 @@ export function MusicAccountGuard({ blocked }: { blocked: boolean }) {
   return null;
 }
 export function MusicProvider({ children }: { children: ReactNode }) {
+  useEffect(() => observeAppViewport(), []);
   const [link, setLink] = useState<MusicLink | null>(null);
   const [sound, setSound] = useState<SoundCloudSound | null>(null);
   const [localTrack, setLocalTrack] = useState<MusicTrack | null>(null);

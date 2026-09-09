@@ -1,6 +1,6 @@
 /* Fonts are loaded in the shared App Router root, not a pages route. */
 /* eslint-disable next/no-page-custom-font */
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import './redesign.css';
 import './features.css';
@@ -32,7 +32,13 @@ import './music-queue.css';
 import './account-management.css';
 import './staff-panel.css';
 import './channel-boosts.css';
+import './viewport.css';
 import { MusicProvider } from './music-provider';
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 export const metadata: Metadata = {
   title: 'Noctgram — лента и диалоги',
   manifest: '/manifest.webmanifest',
