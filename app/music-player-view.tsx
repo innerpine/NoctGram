@@ -24,6 +24,7 @@ import {
   Play,
   SkipBack,
   SkipForward,
+  SlidersHorizontal,
   Volume2,
   VolumeX,
   X,
@@ -142,16 +143,61 @@ function Lyrics({
   const [follow, setFollow] = useState(true);
   const container = useRef<HTMLDivElement>(null);
   const activeLine = useRef<HTMLButtonElement>(null);
-  const latestSeek = useRef({ onSeek, offset });
-  latestSeek.current = { onSeek, offset };
-  const chooseLine = useCallback((time: number) => {
-    latestSeek.current.onSeek(Math.max(0, time - latestSeek.current.offset));
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchOrigin = useRef<{ x: number; y: number } | null>(null);
+  const [size, setSize] = useState(0);
+  const resumeFollow = useCallback(() => {
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
     setFollow(true);
   }, []);
+  const browseLyrics = () => {
+    setFollow(false);
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(resumeFollow, 4000);
+  };
+  const latestSeek = useRef({ onSeek, offset });
+  latestSeek.current = { onSeek, offset };
+  const chooseLine = useCallback(
+    (time: number) => {
+      latestSeek.current.onSeek(Math.max(0, time - latestSeek.current.offset));
+      resumeFollow();
+    },
+    [resumeFollow],
+  );
   const active = currentLyric(lyrics?.lines || [], position + offset);
   useEffect(() => {
-    setFollow(true);
-  }, [key, enabled]);
+    resumeFollow();
+    return () => {
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    };
+  }, [key, enabled, resumeFollow]);
+  useEffect(() => {
+    const element = container.current;
+    const pane = element?.parentElement;
+    if (!element || !pane || !enabled) return;
+    let frame = 0,
+      height = -1,
+      width = -1;
+    const observer = new ResizeObserver(() => {
+      const available = Math.max(
+        0,
+        pane.clientHeight - (pane.lastElementChild as HTMLElement).offsetHeight,
+      );
+      if (height === available && width === pane.clientWidth) return;
+      height = available;
+      width = pane.clientWidth;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        element.style.setProperty('--lyrics-center-space', `${height / 2}px`);
+        setSize((value) => value + 1);
+      });
+    });
+    observer.observe(pane, { box: 'border-box' });
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [enabled, lyrics]);
   useEffect(() => {
     if (!enabled || !follow || !container.current || !activeLine.current)
       return;
@@ -160,12 +206,23 @@ function Lyrics({
     ).matches;
     container.current.scrollTo({
       top:
-        activeLine.current.offsetTop -
+        container.current.scrollTop +
+        activeLine.current.getBoundingClientRect().top -
+        container.current.getBoundingClientRect().top -
         container.current.clientHeight / 2 +
-        activeLine.current.clientHeight / 2,
+        activeLine.current.getBoundingClientRect().height / 2,
       behavior: appearance.motion && !reduced ? 'smooth' : 'instant',
     });
-  }, [active, follow, enabled, key, appearance.textSize, appearance.motion]);
+  }, [
+    active,
+    follow,
+    enabled,
+    key,
+    lyrics,
+    size,
+    appearance.textSize,
+    appearance.motion,
+  ]);
 
   if (lookup.loading)
     return (
@@ -207,8 +264,23 @@ function Lyrics({
         className={
           'music-lyrics-scroll' + (appearance.softLyrics ? ' soft-lines' : '')
         }
-        onWheel={() => setFollow(false)}
-        onTouchStart={() => setFollow(false)}
+        onWheel={browseLyrics}
+        onTouchStart={(event) => {
+          const touch = event.touches[0];
+          touchOrigin.current = { x: touch.clientX, y: touch.clientY };
+        }}
+        onTouchMove={(event) => {
+          const touch = event.touches[0],
+            origin = touchOrigin.current;
+          if (
+            origin &&
+            Math.hypot(touch.clientX - origin.x, touch.clientY - origin.y) > 8
+          )
+            browseLyrics();
+        }}
+        onScroll={() => {
+          if (!follow) browseLyrics();
+        }}
         onKeyDown={(e) => {
           if (
             [
@@ -221,7 +293,7 @@ function Lyrics({
               'Tab',
             ].includes(e.key)
           )
-            setFollow(false);
+            browseLyrics();
         }}
         tabIndex={0}
         aria-label="Текст песни"
@@ -240,7 +312,7 @@ function Lyrics({
       <div className="music-lyrics-footer">
         <span>Текст · LRCLIB</span>
         {!follow && lyrics.lines.length > 0 ? (
-          <button onClick={() => setFollow(true)}>К текущей строке</button>
+          <button onClick={resumeFollow}>К текущей строке</button>
         ) : (
           <span>
             {lyrics.lines.length ? 'По строкам' : 'Без синхронизации'}
@@ -897,7 +969,18 @@ export function MusicPlayerView(p: Props) {
               >
                 <PanelRightOpen size={22} />
               </button>
-              <span className="music-dock-mobile-spacer" aria-hidden="true" />
+              <button
+                className="music-stage-icon music-settings-button"
+                aria-label="Настройки плеера"
+                aria-haspopup="dialog"
+                aria-expanded={settingsOpen}
+                onClick={(event) => {
+                  const box = event.currentTarget.getBoundingClientRect();
+                  showSettings(box.left, box.bottom);
+                }}
+              >
+                <SlidersHorizontal size={21} />
+              </button>
             </header>
             <DialogDescription className="sr-only">
               Плеер Noctgram. Настройки открываются правой кнопкой мыши или
@@ -905,34 +988,37 @@ export function MusicPlayerView(p: Props) {
               сворачивает окно, музыка продолжает играть.
             </DialogDescription>
             <div
+              data-pane={pane}
               className={
                 'music-stage-body' + (pane === 'cover' ? ' cover-only' : '')
               }
             >
               <div className="music-stage-main">
-                <div className="music-stage-artwork">
-                  {artwork ? (
-                    <img
-                      key={artwork}
-                      src={artwork}
-                      alt={`Обложка ${p.track.title}`}
-                      onError={(event) => {
-                        if (event.currentTarget.src !== p.track.artwork)
-                          event.currentTarget.src = p.track.artwork;
-                      }}
-                    />
-                  ) : (
-                    <Headphones size={88} strokeWidth={0.8} />
-                  )}
-                </div>
-                <div className="music-stage-track">
-                  <DialogTitle>{p.track.title}</DialogTitle>
-                  <p>
-                    {p.track.artist || 'Музыка'}
-                    <span> · </span>
-                    {source}
-                  </p>
-                  <MusicFavorite track={p.track} />
+                <div className="music-stage-identity">
+                  <div className="music-stage-artwork">
+                    {artwork ? (
+                      <img
+                        key={artwork}
+                        src={artwork}
+                        alt={`Обложка ${p.track.title}`}
+                        onError={(event) => {
+                          if (event.currentTarget.src !== p.track.artwork)
+                            event.currentTarget.src = p.track.artwork;
+                        }}
+                      />
+                    ) : (
+                      <Headphones size={88} strokeWidth={0.8} />
+                    )}
+                  </div>
+                  <div className="music-stage-track">
+                    <DialogTitle>{p.track.title}</DialogTitle>
+                    <p>
+                      {p.track.artist || 'Музыка'}
+                      <span> · </span>
+                      {source}
+                    </p>
+                    <MusicFavorite track={p.track} />
+                  </div>
                 </div>
                 {progress('full')}
                 <div className="music-stage-controls">

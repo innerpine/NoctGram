@@ -206,6 +206,9 @@
   align-items: center;
   transition: max-width 480ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+.music-stage-identity {
+  display: contents;
+}
 .music-stage-artwork {
   width: min(100%, calc(100dvh - 410px));
   max-width: 480px;
@@ -362,6 +365,8 @@
   flex-direction: column;
   justify-content: center;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   opacity: 0;
   visibility: hidden;
   transform: translateY(16px);
@@ -468,10 +473,12 @@
 .music-lyrics-scroll {
   position: relative;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
-  padding: 35% 8px 40%;
+  padding: var(--lyrics-center-space, 35%) 8px var(--lyrics-center-space, 40%);
+  touch-action: pan-y pinch-zoom;
   mask-image: linear-gradient(transparent, #000 12%, #000 85%, transparent);
 }
 .music-lyrics-scroll::-webkit-scrollbar {
@@ -489,8 +496,8 @@
   margin: 0;
   padding: 18px 0;
   transition:
-    color 0.3s,
-    filter 0.3s,
+    color 0.15s,
+    filter 0.15s,
     transform 0.3s;
   transform-origin: left center;
 }
@@ -517,6 +524,7 @@
   letter-spacing: -0.025em;
 }
 .music-lyrics-footer {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -550,6 +558,8 @@
   font-size: 14px;
 }
 .music-queue-scroll {
+  min-height: 0;
+  touch-action: pan-y pinch-zoom;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;

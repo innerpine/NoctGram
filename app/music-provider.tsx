@@ -81,6 +81,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const nativeOrder = useRef<MusicLink[] | null>(null);
   const frame = useRef<HTMLIFrameElement>(null),
     widget = useRef<Widget | null>(null);
+  const [soundCloudSource, setSoundCloudSource] = useState('');
+  const loadedFrame = useRef<HTMLIFrameElement | null>(null);
+  const loadedSounds = useRef<SoundCloudSound[]>([]);
   const soundCloudState = useRef<SoundCloudStateMonitor | null>(null);
   const playerElement = useRef<HTMLElement>(null);
   const hasPlayer = !!link;
@@ -108,6 +111,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     volumeRef = useRef(volume);
   const tracker = useRef<MusicListenTracker | null>(null);
   const roomRef = useRef<MusicRoom | null>(null);
+  useEffect(
+    () => () => {
+      generation.current++;
+      audio.current?.pause();
+      youtube.current?.dispose();
+      spotify.current?.dispose();
+    },
+    [],
+  );
   const [listening, setListening] = useState<ListenState>({
     status: 'idle',
     seconds: 0,
@@ -144,6 +156,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     isPlaying.current = false;
     setPlaying(false);
     setLink(null);
+    setSoundCloudSource('');
+    loadedSounds.current = [];
     setExpanded(false);
     setSound(null);
     setLocalTrack(null);
@@ -169,6 +183,21 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     } else if (!queueRef.current.some((item) => item.url === valid.url)) {
       queueRef.current = [valid];
       setQueue([valid]);
+    }
+    if (
+      valid.provider === 'soundcloud' &&
+      desired.current?.kind === 'playlist' &&
+      widget.current
+    ) {
+      const index = loadedSounds.current.findIndex(
+        (sound) => sound.permalink_url === valid.url,
+      );
+      if (index >= 0) {
+        soundCloudState.current?.invalidate();
+        widget.current.skip(index);
+        widget.current.play();
+        return;
+      }
     }
     if (
       desired.current?.url === valid.url &&
@@ -211,13 +240,22 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         );
       return;
     }
+    // Keep the iframe browsing context when advancing the queue. Replacing it
+    // on every URL discards the user's media activation on mobile browsers.
+    if (valid.provider === 'soundcloud') {
+      setSoundCloudSource((source) => source || valid.url);
+    } else {
+      setSoundCloudSource('');
+    }
     generation.current++;
     widget.current?.pause();
     audio.current?.pause();
     spotify.current?.dispose();
     spotify.current = null;
-    youtube.current?.dispose();
-    youtube.current = null;
+    if (valid.provider !== 'youtube') {
+      youtube.current?.dispose();
+      youtube.current = null;
+    }
     clearStats();
     soundUrl.current = '';
     nativeOrder.current = null;
@@ -235,6 +273,22 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setPlaylistLength(0);
     setPlaylistSounds([]);
     setLink(valid);
+    const knownAudio = (next as MusicTrack).audioUrl;
+    if (
+      valid.playback === 'file' &&
+      audio.current &&
+      knownAudio &&
+      /^\/api\/music\/audio\/[a-f0-9-]{36}$/.test(knownAudio) &&
+      roomRef.current?.detail?.playback.playing !== 0
+    ) {
+      // Start on the existing element while a Next/queue tap is still active.
+      // The effect attaches tracking and validates metadata without resetting it.
+      audio.current.src = knownAudio;
+      audio.current.load();
+      void audio.current.play().catch(() => {
+        /* The effect reports playback errors. */
+      });
+    }
   }, []);
   useEffect(() => {
     const disconnected = (event: Event) => {
@@ -371,6 +425,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       .then((sc) => {
         if (!isCurrent() || !frame.current) return;
         const w = sc.Widget(frame.current);
+        if (loadedFrame.current === frame.current) {
+          // load must precede READY binding: an already-ready widget invokes
+          // newly bound READY listeners immediately, with the previous sound.
+          w.load(link.url, {
+            auto_play: roomRef.current?.detail?.playback.playing !== 0,
+            show_artwork: false,
+          });
+        }
+        loadedFrame.current = frame.current;
         bound = w;
         widget.current = w;
         monitor = new SoundCloudStateMonitor(
@@ -414,13 +477,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           if (!isCurrent()) return;
           clearTimeout(timeout);
           widgetReady = true;
-          if (!stateTimer) stateTimer = setInterval(confirmState, 1000);
+          if (!stateTimer) stateTimer = setInterval(confirmState, 250);
           setReady(true);
           setError('');
           w.setVolume(musicGain(volumeRef.current) * 100);
           w.getSounds((sounds) => {
             if (isCurrent()) {
               nativeLength = sounds.length;
+              loadedSounds.current = sounds;
               setPlaylistLength(sounds.length);
               setPlaylistSounds(sounds);
             }
@@ -564,18 +628,25 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener('noctgram:music-preferences', preferenceChanged);
     const attemptPlay = () => {
-      void element.play().catch((error: DOMException) => {
-        if (current() && error.name === 'NotAllowedError')
-          setNeedsGesture(true);
-        if (
-          current() &&
-          error.name !== 'NotAllowedError' &&
-          error.name !== 'AbortError'
-        )
-          setError(
-            'Не удалось воспроизвести файл. Попробуйте другой аудиофайл.',
-          );
-      });
+      void element
+        .play()
+        .then(() => {
+          // A queue tap can start the persistent audio element before this
+          // track's listeners are attached; confirm the real state as well.
+          if (current() && !element.paused) started();
+        })
+        .catch((error: DOMException) => {
+          if (current() && error.name === 'NotAllowedError')
+            setNeedsGesture(true);
+          if (
+            current() &&
+            error.name !== 'NotAllowedError' &&
+            error.name !== 'AbortError'
+          )
+            setError(
+              'Не удалось воспроизвести файл. Попробуйте другой аудиофайл.',
+            );
+        });
     };
     const loaded = () => {
       if (!current()) return;
@@ -586,7 +657,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       setDuration(Math.round(element.duration * 1000));
       setReady(true);
       setError('');
-      attemptPlay();
+      if (roomRef.current?.detail?.playback.playing !== 0) attemptPlay();
+      else setNeedsGesture(false);
     };
     const progress = () => {
       if (current()) {
@@ -663,8 +735,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             'Добавьте аудиофайл к этому треку в «Моей музыке». Ссылка Spotify содержит сведения о песне, но не само аудио.',
           );
         beginSession();
-        element.src = data.audioUrl;
-        element.load();
+        if (element.getAttribute('src') !== data.audioUrl) {
+          element.src = data.audioUrl;
+          element.load();
+        }
+        if (roomRef.current?.detail?.playback.playing !== 0) attemptPlay();
+        if (element.readyState >= 1) loaded();
       })
       .catch((error: Error) => {
         if (current() && error.name !== 'AbortError') setError(error.message);
@@ -684,9 +760,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       element.removeEventListener('pause', paused);
       element.removeEventListener('error', failed);
       element.removeEventListener('ended', ended);
-      element.pause();
-      element.removeAttribute('src');
-      element.load();
+      if (desired.current?.playback !== 'file') {
+        element.pause();
+        element.removeAttribute('src');
+        element.load();
+      }
     };
   }, [link, retry, play]);
   useEffect(() => {
@@ -710,68 +788,74 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     void loadYouTubeSDK()
       .then((sdk) => {
         if (!current() || !youtubeHost.current) return;
-        engine = new YouTubePlayback(
-          sdk,
-          youtubeHost.current,
-          new URL(link.url).searchParams.get('v')!,
-          youtubeVolume(volumeRef.current),
-          {
-            ready: () => {
-              if (!current()) return;
-              engine?.volume(youtubeVolume(volumeRef.current));
-              setReady(true);
-              setError('');
-              if (roomRef.current?.detail?.playback.playing === 0)
-                setNeedsGesture(false);
-            },
-            state: (state) => {
-              if (!current()) return;
-              setPlaying(state.playing);
-              setPosition(state.position);
-              setDuration(state.duration);
-              const nextVolume = volumeFromYouTube(
-                state.volume,
-                volumeRef.current,
-              );
-              volumeRef.current = nextVolume;
-              setVolume(nextVolume);
-              if (state.playing) {
-                setNeedsGesture(false);
-                setError('');
-              }
-            },
-            blocked: () => {
-              if (current()) {
-                setNeedsGesture(true);
-                setPlaying(false);
-              }
-            },
-            error: (message) => {
-              if (current()) {
-                setError(message);
-                setPlaying(false);
-              }
-            },
-            shouldPlay: () => roomRef.current?.detail?.playback.playing !== 0,
-            control: (command, extra) => {
-              if (current() && roomRef.current?.detail)
-                void roomRef.current.command(command, extra);
-            },
-            ended: () => {
-              if (!current()) return;
-              if (roomRef.current?.detail) {
-                void roomRef.current.command('advance');
-                return;
-              }
-              const next = adjacentPlayable(queueRef.current, link.url);
-              if (next) play(next);
-              else {
-                engine?.seek(0);
-                engine?.resume();
-              }
-            },
+        const hooks: ConstructorParameters<typeof YouTubePlayback>[4] = {
+          ready: () => {
+            if (!current()) return;
+            engine?.volume(youtubeVolume(volumeRef.current));
+            setReady(true);
+            setError('');
+            if (roomRef.current?.detail?.playback.playing === 0)
+              setNeedsGesture(false);
           },
-        );
+          state: (state) => {
+            if (!current()) return;
+            setPlaying(state.playing);
+            setPosition(state.position);
+            setDuration(state.duration);
+            const nextVolume = volumeFromYouTube(
+              state.volume,
+              volumeRef.current,
+            );
+            volumeRef.current = nextVolume;
+            setVolume(nextVolume);
+            if (state.playing) {
+              setNeedsGesture(false);
+              setError('');
+            }
+          },
+          blocked: () => {
+            if (current()) {
+              setNeedsGesture(true);
+              setPlaying(false);
+            }
+          },
+          error: (message) => {
+            if (current()) {
+              setError(message);
+              setPlaying(false);
+            }
+          },
+          shouldPlay: () => roomRef.current?.detail?.playback.playing !== 0,
+          control: (command, extra) => {
+            if (current() && roomRef.current?.detail)
+              void roomRef.current.command(command, extra);
+          },
+          ended: () => {
+            if (!current()) return;
+            if (roomRef.current?.detail) {
+              void roomRef.current.command('advance');
+              return;
+            }
+            const next = adjacentPlayable(queueRef.current, link.url);
+            if (next) play(next);
+            else {
+              engine?.seek(0);
+              engine?.resume();
+            }
+          },
+        };
+        const id = new URL(link.url).searchParams.get('v')!;
+        engine = youtube.current;
+        if (!engine?.load(id, hooks)) {
+          engine?.dispose();
+          engine = new YouTubePlayback(
+            sdk,
+            youtubeHost.current,
+            id,
+            youtubeVolume(volumeRef.current),
+            hooks,
+          );
+        }
         youtube.current = engine;
       })
       .catch((e) => {
@@ -779,8 +863,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       });
     return () => {
       active = false;
-      engine?.dispose();
-      if (youtube.current === engine) youtube.current = null;
+      if (desired.current?.provider !== 'youtube') {
+        engine?.dispose();
+        if (youtube.current === engine) youtube.current = null;
+      }
     };
   }, [link, retry, play]);
   const queueIndex = queue.findIndex(
@@ -1123,7 +1209,6 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           {/* Keep one engine mounted outside the dialog: collapsing never restarts audio. */}
           {link.provider === 'youtube' ? (
             <div
-              key={link.url + ':' + retry}
               ref={youtubeHost}
               className="music-audio-engine"
               aria-hidden="true"
@@ -1137,7 +1222,6 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             ) : null
           ) : link.provider === 'soundcloud' ? (
             <iframe
-              key={link.url + ':' + retry}
               ref={frame}
               className="music-audio-engine"
               title="Аудиодвижок SoundCloud"
@@ -1147,7 +1231,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
               src={
                 'https://w.soundcloud.com/player/?' +
                 new URLSearchParams({
-                  url: link.url,
+                  url: soundCloudSource,
                   auto_play: 'false',
                   color: '#eeeeee',
                   show_artwork: 'false',
