@@ -1585,7 +1585,8 @@ export default function Noctgram({
     <div
       className={
         'app-shell' +
-        (['music', 'music-services'].includes(page) ? ' music-shell' : '')
+        (['music', 'music-services'].includes(page) ? ' music-shell' : '') +
+        (page === 'messages' ? ' messages-shell' : '')
       }
     >
       {audioCalls.panel}

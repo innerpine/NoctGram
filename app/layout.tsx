@@ -23,6 +23,7 @@ import './music-player-sheet.css';
 import './music-activity.css';
 import './music-playlists.css';
 import './music-workspace.css';
+import './messages-workspace.css';
 import './profile-links.css';
 import './chat-themes.css';
 import './chat-attachments.css';
