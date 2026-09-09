@@ -103,6 +103,48 @@ globalThis.fetch = async (input, options) => {
     'Never send authorization to a CDN or arbitrary redirect',
   );
   assert.match(options.headers.Authorization, /^OAuth access-/);
+  if (u.pathname === '/tracks') {
+    assert.equal(u.searchParams.get('q'), 'FACE антидепрессант');
+    assert.equal(u.searchParams.get('access'), 'playable');
+    assert.equal(u.searchParams.get('limit'), '20');
+    assert.ok(['0', '20'].includes(u.searchParams.get('offset')));
+    const track = {
+      kind: 'track',
+      sharing: 'public',
+      access: 'playable',
+      streamable: true,
+      urn: 'soundcloud:tracks:42',
+      title: 'Антидепрессант',
+      permalink_url: 'https://soundcloud.com/face/song?utm_source=test',
+      duration: 123000,
+      artwork_url: 'https://i1.sndcdn.com/cover.jpg',
+      user: {
+        username: 'FACE',
+        permalink_url: 'https://soundcloud.com/face?utm_source=test',
+      },
+    };
+    return Response.json({
+      collection: [
+        track,
+        {
+          ...track,
+          urn: 'soundcloud:tracks:43',
+          permalink_url: 'https://soundcloud.com/face/private',
+          sharing: 'private',
+        },
+        { id: 4 },
+        { ...track, access: 'preview' },
+        { ...track, access: 'blocked' },
+        { ...track, streamable: false },
+        { ...track, permalink_url: 'https://evil.test/song' },
+        track,
+      ],
+      next_href:
+        u.searchParams.get('offset') === '0'
+          ? 'https://api.soundcloud.com/tracks?cursor=next'
+          : null,
+    });
+  }
   if (u.pathname === '/resolve' && (resolveRedirect || maliciousRedirect))
     return new Response(null, {
       status: 302,
@@ -148,6 +190,28 @@ const tracks = await Promise.all(
   ),
 );
 assert.equal(tokens, 1, 'Concurrent requests share one app token');
+const searched = await api.searchSoundCloud(' FACE антидепрессант ');
+assert.equal(searched.items.length, 1);
+assert.equal(searched.items[0].url, 'https://soundcloud.com/face/song');
+assert.equal(searched.items[0].authorUrl, 'https://soundcloud.com/face');
+assert.equal(searched.items[0].durationMs, 123000);
+assert.equal(searched.items[0].playback, 'soundcloud');
+assert.equal(searched.nextPage, '2');
+assert.equal(
+  (await api.searchSoundCloud('FACE антидепрессант', '2')).nextPage,
+  null,
+);
+assert.equal(
+  tokens,
+  1,
+  'Search shares the existing app token without a connected personal account',
+);
+for (const q of ['', '   ', 'x'.repeat(151), null])
+  await assert.rejects(api.searchSoundCloud(q), { status: 400 });
+for (const page of ['0', '-1', '1.5', '21', 'https://evil.test'])
+  await assert.rejects(api.searchSoundCloud('FACE антидепрессант', page), {
+    status: 400,
+  });
 assert.equal(tracks[0].playback, 'soundcloud');
 assert.equal(tracks[0].durationMs, 42000);
 assert.equal(await api.soundcloudStream(url('parallel-0')), streamRedirect);

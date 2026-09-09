@@ -29,6 +29,7 @@ import {
 } from '@/lib/music-links';
 import { useMusic } from '@/lib/music-context';
 import { MusicPlaylists } from './music-playlists';
+import { MusicSearch } from './music-search';
 import { MusicAudioUpload } from './music-audio-upload';
 import { MusicLeaderboard, type ListenerScore } from './music-leaderboard';
 import type { Person } from '@/lib/client';
@@ -274,12 +275,13 @@ export function MusicPanel({
         className="music-tabs"
       >
         <TabsList>
+          <TabsTrigger value="search">Поиск</TabsTrigger>
           <TabsTrigger value="playlists">Плейлисты</TabsTrigger>
           <TabsTrigger value="charts">Чарты</TabsTrigger>
           <TabsTrigger value="library">Моя музыка</TabsTrigger>
         </TabsList>
       </Tabs>
-      {tab !== 'playlists' && (
+      {tab !== 'playlists' && tab !== 'search' && (
         <form
           className="music-link-search"
           onSubmit={(e) => {
@@ -336,6 +338,15 @@ export function MusicPanel({
           <>
             {tab === 'playlists' ? (
               <MusicPlaylists readOnly={readOnly} library={data.library} />
+            ) : tab === 'search' ? (
+              <MusicSearch
+                disabled={readOnly}
+                savedUrls={data.library.map((t) => t.url)}
+                onAdd={async (track) => {
+                  await musicRequest('save', { url: track.url });
+                  window.dispatchEvent(new Event('noctgram:music-refresh'));
+                }}
+              />
             ) : tab === 'charts' ? (
               <section
                 className="music-chart music-content-enter card"

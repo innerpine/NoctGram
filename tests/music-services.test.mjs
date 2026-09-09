@@ -603,6 +603,10 @@ try {
   assert.equal((await service.yandexPlaylists('bob')).length, 0);
   playlistStatus = 451;
   await assert.rejects(
+    service.checkYandexAccess('alice'),
+    (e) => e.code === 'YANDEX_ACCESS_RESTRICTED',
+  );
+  await assert.rejects(
     service.syncYandex('alice'),
     (e) => e.code === 'YANDEX_ACCESS_RESTRICTED',
   );
@@ -622,6 +626,11 @@ try {
     (e) => e.code === 'YANDEX_HTTP_503',
   );
   playlistStatus = 200;
+  assert.deepEqual(await service.checkYandexAccess('alice'), {
+    ok: true,
+    scope: 'playlists',
+    count: 1,
+  });
   assert.equal(
     (await service.yandexTracks('alice', '3')).items[0].title,
     'Recording',

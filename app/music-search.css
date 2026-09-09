@@ -1,0 +1,71 @@
+.music-search {
+  min-width: 0;
+}
+.music-search .music-link-search {
+  margin-top: 0;
+}
+.music-search-submit {
+  flex-shrink: 0;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: #ffffff12;
+  font-size: 13px;
+}
+.music-search-caption {
+  font-size: 12px;
+  color: #89928e;
+  margin: 8px 0 18px;
+}
+.music-search .music-track {
+  min-width: 0;
+}
+.music-search-add {
+  flex: 0 0 36px;
+}
+.music-search-duration {
+  color: #89928e;
+  font-size: 12px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.music-search-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 8px;
+  color: #a9b1ac;
+  font-size: 14px;
+}
+.music-search-empty {
+  padding: 22px 4px;
+  color: #89928e;
+  font-size: 14px;
+}
+.music-search-more {
+  display: block;
+  margin: 18px auto;
+}
+.playlist-picker .music-search {
+  margin: 16px 0 22px;
+}
+.playlist-picker .music-search-results {
+  max-height: 40dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 500px) {
+  .music-search .music-link-search input {
+    font-size: 16px;
+    min-width: 0;
+  }
+  .music-search .music-track {
+    gap: 9px;
+  }
+  .music-search-duration {
+    display: none;
+  }
+  .music-search-submit {
+    padding-inline: 10px;
+  }
+}

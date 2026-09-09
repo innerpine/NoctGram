@@ -78,7 +78,7 @@ export function MusicServices({
 }: {
   signedIn: boolean;
   readOnly: boolean;
-  onMusic?: (tab?: 'playlists') => void;
+  onMusic?: (tab?: 'playlists' | 'search') => void;
 }) {
   const [provider, setProvider] = useState<MusicServiceId>('soundcloud');
   const [statuses, setStatuses] = useState<ServiceStatus[]>([]),
@@ -123,7 +123,7 @@ export function MusicServices({
   useEffect(() => {
     const params = new URLSearchParams(window.location.search),
       choice = params.get('provider');
-    if (MUSIC_SERVICES.includes(choice as MusicServiceId))
+    if (MUSIC_SERVICES.some((service) => service === choice))
       setProvider(choice as MusicServiceId);
     const result = params.get('result');
     if (result) {
@@ -321,6 +321,25 @@ export function MusicServices({
           ))}
         </TabsList>
       </Tabs>
+      {provider === 'soundcloud' && signedIn && (
+        <Link
+          className="music-services-link"
+          href="/music?tab=search"
+          onNavigate={(event) => {
+            if (onMusic) {
+              event.preventDefault();
+              onMusic('search');
+            }
+          }}
+        >
+          <Search size={21} />
+          <span>
+            <strong>Найти музыку</strong>
+            <small>По названию песни или исполнителю</small>
+          </span>
+          <ArrowUpRight size={19} />
+        </Link>
+      )}
       {error && (
         <div className="music-error" role="alert">
           {error}

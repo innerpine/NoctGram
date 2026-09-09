@@ -1,12 +1,10 @@
-export const MUSIC_SERVICES = [
-  'soundcloud',
-  'spotify',
-  'yandex',
-  'youtube',
-  'vk',
-  'deezer',
-] as const;
-export type MusicServiceId = (typeof MUSIC_SERVICES)[number];
+export const MUSIC_SERVICES = ['soundcloud', 'yandex', 'youtube'] as const;
+// Retain stored legacy tracks and connections; only these three services are offered in the UI.
+export type MusicServiceId =
+  | (typeof MUSIC_SERVICES)[number]
+  | 'spotify'
+  | 'vk'
+  | 'deezer';
 export type OAuthMusicService = 'soundcloud' | 'spotify';
 export const SERVICE_NAMES: Record<MusicServiceId, string> = {
   soundcloud: 'SoundCloud',

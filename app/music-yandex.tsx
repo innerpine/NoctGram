@@ -138,10 +138,16 @@ export function MusicYandex({
     setError('');
     setNotice('');
     try {
-      await request<{ ok: true }>(undefined, '?action=check', abort.signal);
+      const result = await request<{ ok: true; scope: string }>(
+        undefined,
+        '?action=check',
+        abort.signal,
+      );
       if (!abort.signal.aborted)
         setNotice(
-          'Сервер Noctgram может соединиться с Яндексом. Теперь можно подключить аккаунт. Эта проверка не использует токен.',
+          result.scope === 'playlists'
+            ? 'Доступ к вашим плейлистам подтверждён. Можно запустить синхронизацию.'
+            : 'API Яндекса отвечает. Доступ к плейлистам проверим после подключения аккаунта.',
         );
     } catch (error) {
       if (!abort.signal.aborted) setError((error as Error).message);
@@ -249,12 +255,14 @@ export function MusicYandex({
                 disabled={busy}
                 onClick={() => void checkConnection()}
               >
-                Проверить соединение с Яндексом
+                {connected
+                  ? 'Проверить доступ к плейлистам'
+                  : 'Проверить соединение с Яндексом'}
               </button>
               <p>
-                Запросы отправляет сервер Noctgram. Если доступ к Яндексу
-                ограничен, VPN должен работать на компьютере с сервером.
-                Расширения в браузере недостаточно.
+                Общая версия обращается к Яндексу из облака. VPN на вашем
+                устройстве не влияет на доступ облачного сервера. Проверяем
+                именно загрузку плейлистов подключённого аккаунта.
               </p>
             </>
           )}

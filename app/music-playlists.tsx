@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { MusicPlaylistCreate } from './music-playlist-create';
 import { MusicReorderList } from './music-reorder-list';
+import { MusicSearch } from './music-search';
 import { ProfileLink } from './profile-link';
 import { useMusic } from '@/lib/music-context';
 import {
@@ -108,7 +109,7 @@ export function MusicPlaylists({
     };
   }, [refresh]);
   async function mutate(action: string, extra: Record<string, unknown> = {}) {
-    if (locked.current || readOnly) return;
+    if (locked.current || readOnly) return false;
     locked.current = true;
     setBusy(true);
     setError('');
@@ -133,8 +134,10 @@ export function MusicPlaylists({
       }
       setUrl('');
       setHandle('');
+      return true;
     } catch (e) {
       setError((e as Error).message);
+      return false;
     } finally {
       locked.current = false;
       setBusy(false);
@@ -613,10 +616,20 @@ export function MusicPlaylists({
       </Dialog>
       <Dialog open={picker} onOpenChange={setPicker}>
         <DialogContent className="noct-dialog playlist-picker">
-          <DialogTitle>Добавить из моей музыки</DialogTitle>
+          <DialogTitle>Добавить песни</DialogTitle>
           <DialogDescription>
-            Выберите песни для общего плейлиста.
+            Найдите песню или выберите её из своей музыки.
           </DialogDescription>
+          <MusicSearch
+            playlist
+            disabled={controlsDisabled}
+            savedUrls={shown?.tracks.map((t) => t.url)}
+            onAdd={async (track) => {
+              if (!(await mutate('add', { url: track.url })))
+                throw new Error('Песня не добавлена. Попробуйте ещё раз.');
+              setPicker(false);
+            }}
+          />
           {error && (
             <p className="music-error" role="alert">
               {error}
@@ -643,8 +656,8 @@ export function MusicPlaylists({
               })}
             {!library.some((t) => t.kind === 'track') && (
               <p>
-                Пока нет сохранённых песен. В плейлист можно добавить трек по
-                ссылке.
+                Пока нет сохранённых песен. Найдите музыку выше или добавьте
+                песню по ссылке.
               </p>
             )}
           </div>

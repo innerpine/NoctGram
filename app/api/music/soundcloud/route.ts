@@ -5,6 +5,7 @@ import {
   soundcloudStreamingConfigured,
   soundcloudTrack,
   soundcloudStream,
+  searchSoundCloud,
 } from '@/lib/soundcloud-stream';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,13 @@ export async function GET(req: Request) {
         { headers },
       );
     const action = params.get('action');
+    if (action === 'search') {
+      await rateLimit('soundcloud-search', me, 30, 60);
+      return Response.json(
+        await searchSoundCloud(params.get('q'), params.get('page') || '1'),
+        { headers },
+      );
+    }
     if (action !== 'track' && action !== 'stream')
       throw new ApiError(400, 'Неизвестное действие.');
     await rateLimit('soundcloud-playback', me, 120, 60);

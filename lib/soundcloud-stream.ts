@@ -234,12 +234,18 @@ async function resource(value: unknown) {
 }
 export async function soundcloudTrack(value: unknown): Promise<MusicTrack> {
   const link = publicTrack(value),
-    track = await resource(value),
-    user = track.user as Data | undefined;
+    track = await resource(value);
+  return trackMetadata(track, link);
+}
+function trackMetadata(
+  track: Data,
+  link: ReturnType<typeof publicTrack>,
+): MusicTrack {
+  const user = track.user as Data | undefined;
   const string = (v: unknown) =>
     typeof v === 'string' ? v.slice(0, 1500) : '';
   const art = string(track.artwork_url),
-    author = string(user?.permalink_url);
+    author = string(user?.permalink_url).split(/[?#]/, 1)[0];
   return {
     ...link,
     playback: 'soundcloud',
@@ -254,6 +260,58 @@ export async function soundcloudTrack(value: unknown): Promise<MusicTrack> {
       typeof track.duration === 'number' && Number.isFinite(track.duration)
         ? Math.max(0, track.duration)
         : 0,
+  };
+}
+
+export async function searchSoundCloud(query: unknown, page: unknown = '1') {
+  if (typeof query !== 'string' || !query.trim() || query.length > 150)
+    throw new ApiError(
+      400,
+      'Введите название песни или исполнителя — до 150 символов.',
+    );
+  if (typeof page !== 'string' || !/^(?:[1-9]|1\d|20)$/.test(page))
+    throw new ApiError(400, 'Некорректная страница поиска.');
+  const response = await request(
+    '/tracks?' +
+      new URLSearchParams({
+        q: query.trim(),
+        access: 'playable',
+        limit: '20',
+        offset: String((Number(page) - 1) * 20),
+        linked_partitioning: 'true',
+      }),
+  );
+  const data = (await response.json()) as Data;
+  const collection = Array.isArray(data) ? data : data.collection;
+  if (!Array.isArray(collection)) throw unavailable();
+  const seen = new Set<string>();
+  const items = collection.flatMap((value: unknown) => {
+    if (!value || typeof value !== 'object') return [];
+    const track = value as Data,
+      link = parseMusicLink(track.permalink_url);
+    if (
+      track.sharing !== 'public' ||
+      track.access !== 'playable' ||
+      track.streamable !== true ||
+      typeof track.urn !== 'string' ||
+      !/^soundcloud:tracks:\d+$/.test(track.urn) ||
+      typeof track.title !== 'string' ||
+      !track.title.trim() ||
+      link?.provider !== 'soundcloud' ||
+      link.kind !== 'track' ||
+      seen.has(link.url)
+    )
+      return [];
+    seen.add(link.url);
+    return [trackMetadata(track, link)];
+  });
+  return {
+    items,
+    nextPage:
+      Number(page) < 20 &&
+      (Array.isArray(data) ? collection.length === 20 : !!data.next_href)
+        ? String(Number(page) + 1)
+        : null,
   };
 }
 export async function soundcloudStream(value: unknown) {

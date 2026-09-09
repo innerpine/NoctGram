@@ -45,7 +45,7 @@ export function normalizeAppRoute(input: AppRoute): AppRoute {
   if (page === 'music')
     return {
       page,
-      musicTab: ['charts', 'library'].includes(input.musicTab || '')
+      musicTab: ['search', 'charts', 'library'].includes(input.musicTab || '')
         ? input.musicTab
         : 'playlists',
     };
