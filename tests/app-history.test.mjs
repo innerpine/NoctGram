@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { build } from 'esbuild';
+import { runInNewContext } from 'node:vm';
 
 const compiled = await build({
   entryPoints: ['lib/app-history.ts'],
@@ -24,7 +25,19 @@ const deferred = () => {
   return { promise, resolve, reject };
 };
 
-// A session history with capture/bubble ordering, including an earlier account
+const bootstrap = await build({
+  entryPoints: ['lib/app-history-bootstrap.ts'],
+  bundle: true,
+  write: false,
+  platform: 'node',
+  format: 'esm',
+});
+const { APP_HISTORY_BOOTSTRAP } = await import(
+  'data:text/javascript;base64,' +
+  Buffer.from(bootstrap.outputFiles[0].text).toString('base64')
+);
+
+// A session history with native Window listener order, including an earlier account
 // picker entry. No browser, network requests or test-account mutations needed.
 function fixture(href = '/', prepare, render) {
   const entries = [
@@ -75,6 +88,8 @@ function fixture(href = '/', prepare, render) {
       if (at >= 0) listeners.splice(at, 1);
     },
   };
+  runInNewContext(APP_HISTORY_BOOTSTRAP, { window: host });
+  runInNewContext(APP_HISTORY_BOOTSTRAP, { window: host }); // Hydration must not double it.
   host.addEventListener('popstate', () => nativePops++);
   const observe = (route) => {
     ui = route;
@@ -123,9 +138,7 @@ function fixture(href = '/', prepare, render) {
           stopped = true;
         },
       };
-      for (const { fn } of [...listeners].sort(
-        (a, b) => Number(b.capture) - Number(a.capture),
-      )) {
+      for (const { fn } of listeners) {
         if (stopped) break;
         fn(event);
       }

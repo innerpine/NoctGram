@@ -36,6 +36,7 @@ import './staff-panel.css';
 import './channel-boosts.css';
 import './viewport.css';
 import { MusicProvider } from './music-provider';
+import { APP_HISTORY_BOOTSTRAP } from '@/lib/app-history-bootstrap';
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -61,6 +62,10 @@ export default function RootLayout({
   return (
     <html lang="ru" className="dark">
       <head>
+        <script
+          id="noctgram-history"
+          dangerouslySetInnerHTML={{ __html: APP_HISTORY_BOOTSTRAP }}
+        />
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap"

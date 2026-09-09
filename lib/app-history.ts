@@ -1,3 +1,5 @@
+import type { AppHistoryHost } from './app-history-bootstrap';
+
 const STATE_KEY = '__noctgramNavigation';
 const pages = new Set([
   'feed',
@@ -122,7 +124,7 @@ export function appRouteHref(input: AppRoute) {
 
 /** Own only Noctgram view entries. Browser Back beyond the first view stays native. */
 export function createAppHistory(
-  host: Window,
+  host: AppHistoryHost,
   options: {
     owner: string;
     initial: AppRoute;
@@ -230,7 +232,7 @@ export function createAppHistory(
       // profile request from rewriting the destination URL in the meantime.
       disposed = true;
       generation++;
-      host.removeEventListener('popstate', pop, true);
+      detach();
       return;
     }
     // These entries describe client views in the mounted app. Letting the
@@ -238,7 +240,13 @@ export function createAppHistory(
     event.stopImmediatePropagation();
     void transition(route, 'replace');
   };
-  host.addEventListener('popstate', pop, true);
+  const bridge = host.__noctgramHistory;
+  const detach = () => {
+    if (bridge?.listener === pop) bridge.listener = null;
+    host.removeEventListener('popstate', pop, true);
+  };
+  if (bridge) bridge.listener = pop;
+  else host.addEventListener('popstate', pop, true);
   const initialRoute = appRouteFromURL(host.location.href, options.owner);
   const state = {
     ...host.history.state,
@@ -277,7 +285,7 @@ export function createAppHistory(
     dispose() {
       disposed = true;
       generation++;
-      host.removeEventListener('popstate', pop, true);
+      detach();
     },
   };
 }

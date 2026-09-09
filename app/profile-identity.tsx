@@ -154,9 +154,11 @@ export function VerifiedProfile({ person }: { person: Appearance }) {
 export function Avatar({
   person,
   size = 40,
+  eager = false,
 }: {
   person: Identity;
   size?: number;
+  eager?: boolean;
 }) {
   const enabled = useMotion();
   const root = useRef<HTMLSpanElement>(null);
@@ -209,7 +211,12 @@ export function Avatar({
         onError={() => setFailed(person.avatarMotion!)}
       />
     ) : person.avatar ? (
-      <img src={person.avatar} alt="" loading="lazy" decoding="async" />
+      <img
+        src={person.avatar}
+        alt=""
+        loading={eager ? 'eager' : 'lazy'}
+        decoding={eager ? 'sync' : 'async'}
+      />
     ) : person.name === 'Noctgram' ? (
       <NoctLogo size={size * 1.08} />
     ) : (

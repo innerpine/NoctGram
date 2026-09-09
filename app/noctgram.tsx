@@ -11,6 +11,7 @@ import { reconcileSnapshot } from '@/lib/reconcile-snapshot';
 import { createFeedSnapshots, feedKey, sameSearch } from '@/lib/feed-snapshots';
 import { createChatSnapshots, type ChatSnapshot } from '@/lib/chat-snapshots';
 import { createPageTransition } from '@/lib/page-transition';
+import { createProfileCoverCache } from '@/lib/profile-cover-cache';
 import { flushSync } from 'react-dom';
 import { ChannelTools, localDate } from './channel-tools';
 import { NotificationsBell } from './notifications';
@@ -266,6 +267,26 @@ export default function Noctgram({
   }, [postsKey, posts, hasMore, loading, loadError]);
   const readOnly = me?.restriction?.mode === 'read_only';
   const accountBlocked = me?.restriction?.mode === 'blocked';
+  const coverImages = useRef(createProfileCoverCache());
+  const [, setCoverRevision] = useState(0);
+  const [openingProfile, setOpeningProfile] = useState('');
+  coverImages.current.reset(
+    accountBlocked || !me ? '' : me.id + ':' + privacyVersion,
+  );
+  useEffect(() => {
+    if (!me?.cover || accountBlocked) return;
+    let active = true;
+    void coverImages.current.prepare(me.cover).then((src) => {
+      if (src && active) setCoverRevision((value) => value + 1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [me?.id, me?.cover, accountBlocked, privacyVersion]);
+  useEffect(() => {
+    const cache = coverImages.current;
+    return () => cache.clear();
+  }, []);
   const chatSnapshots = useRef(createChatSnapshots());
   chatSnapshots.current.reset(accountBlocked ? '' : me?.id || '');
   const [openingChat, setOpeningChat] = useState('');
@@ -656,6 +677,10 @@ export default function Noctgram({
     if (v === 'moderation' && !me?.canModerate) return;
     if (v === 'premium' && page !== 'premium') premiumReturn.current = page;
     if (v === 'stars' && page !== 'stars') starsReturn.current = page;
+    if (v === 'profile' && appHistory.current) {
+      void appHistory.current.navigate({ page: 'profile', profileId: me!.id });
+      return;
+    }
     setQuery('');
     setPage(v);
     if (v === 'profile') {
@@ -826,6 +851,7 @@ export default function Noctgram({
     prepare: async (next) => {
       const preparation = ++chatPreparation.current;
       setOpeningChat('');
+      setOpeningProfile('');
       if (
         !me &&
         ['profile', 'messages', 'saved', 'channels', 'stars'].includes(
@@ -849,6 +875,18 @@ export default function Noctgram({
               ...(id ? { id } : { handle: next.handle || '' }),
             }),
         );
+        if (
+          person.cover &&
+          !person.blocked &&
+          !coverImages.current.get(person.cover)
+        ) {
+          setOpeningProfile(person.id);
+          try {
+            await coverImages.current.prepare(person.cover);
+          } finally {
+            if (chatPreparation.current === preparation) setOpeningProfile('');
+          }
+        }
         next = {
           page: 'profile',
           profileId: person.id,
@@ -1685,6 +1723,7 @@ export default function Noctgram({
                 className={selected ? 'active' : ''}
                 aria-current={selected ? 'page' : undefined}
                 aria-label={String(label)}
+                aria-busy={(id === 'profile' && !!openingProfile) || undefined}
                 onClick={() => navigate(String(id))}
               >
                 <NavIcon size={21} />
@@ -1840,7 +1879,7 @@ export default function Noctgram({
             {page !== 'premium' && (
               <span
                 className="page-loading-indicator"
-                data-loading={loading}
+                data-loading={loading || !!openingProfile}
                 aria-hidden="true"
               >
                 <LoaderCircle
@@ -1923,86 +1962,95 @@ export default function Noctgram({
         {page === 'profile' && profile?.blocked && (
           <SuspendedProfile profile={profile} onBack={() => navigate('feed')} />
         )}
-        {['feed', 'search'].includes(page) && (
-          <div className="stream-intro" key={page}>
-            {page === 'feed' && (
-              <>
-                <div
-                  className="feed-tabs"
-                  data-selected={mode === 'following' ? 1 : 0}
-                >
-                  <Tabs
-                    value={mode}
-                    onValueChange={(v) => {
-                      if (v !== 'all' && !auth()) return;
+        <div
+          className="stream-intro feed-intro"
+          key={
+            'feed:' +
+            (me?.id || 'guest') +
+            ':' +
+            privacyVersion +
+            ':' +
+            accountBlocked
+          }
+          hidden={page !== 'feed'}
+        >
+          <div
+            className="feed-tabs"
+            data-selected={mode === 'following' ? 1 : 0}
+          >
+            <Tabs
+              value={mode}
+              onValueChange={(v) => {
+                if (v !== 'all' && !auth()) return;
+                appHistory.current?.cancelPending();
+                setMode(String(v));
+              }}
+            >
+              <TabsList>
+                <TabsTrigger value="all">Для вас</TabsTrigger>
+                <TabsTrigger value="following">Подписки</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          {guest && (
+            <div className="welcome-banner">
+              <div>
+                <strong>Свои люди. Твои мысли.</strong>
+                <span>Войди, чтобы стать частью Noctgram.</span>
+              </div>
+              <a href="/login" target="_top" className="primary">
+                Войти <ArrowUpRight size={14} />
+              </a>
+            </div>
+          )}
+          {me && !accountBlocked && (
+            <StoriesBar me={me} readOnly={readOnly} active={page === 'feed'} />
+          )}
+          {page === 'feed' && composer}
+          {page === 'feed' && me && !readOnly && (
+            <ChannelTools profile={me} revision={scheduleVersion} />
+          )}
+        </div>
+        {page === 'search' && (
+          <div className="stream-intro search-intro">
+            <div className="search-panel">
+              <div className="searchbox">
+                <Search size={18} />
+                <input
+                  ref={searchRef}
+                  value={query}
+                  onChange={(e) => {
+                    appHistory.current?.cancelPending();
+                    setQuery(e.target.value);
+                  }}
+                  aria-label="Поиск в ленте"
+                  placeholder="Публикации, темы, люди"
+                />
+                {query && (
+                  <button
+                    aria-label="Очистить поиск"
+                    onClick={() => {
                       appHistory.current?.cancelPending();
-                      setMode(String(v));
+                      setQuery('');
                     }}
                   >
-                    <TabsList>
-                      <TabsTrigger value="all">Для вас</TabsTrigger>
-                      <TabsTrigger value="following">Подписки</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-                {guest && (
-                  <div className="welcome-banner">
-                    <div>
-                      <strong>Свои люди. Твои мысли.</strong>
-                      <span>Войди, чтобы стать частью Noctgram.</span>
-                    </div>
-                    <a href="/login" target="_top" className="primary">
-                      Войти <ArrowUpRight size={14} />
-                    </a>
-                  </div>
+                    <X size={16} />
+                  </button>
                 )}
-                {me && <StoriesBar me={me} readOnly={readOnly} />}
-                {composer}
-                {me && !readOnly && (
-                  <ChannelTools profile={me} revision={scheduleVersion} />
-                )}
-              </>
-            )}
-            {page === 'search' && (
-              <div className="search-panel">
-                <div className="searchbox">
-                  <Search size={18} />
-                  <input
-                    ref={searchRef}
-                    value={query}
-                    onChange={(e) => {
-                      appHistory.current?.cancelPending();
-                      setQuery(e.target.value);
-                    }}
-                    aria-label="Поиск в ленте"
-                    placeholder="Публикации, темы, люди"
-                  />
-                  {query && (
-                    <button
-                      aria-label="Очистить поиск"
-                      onClick={() => {
-                        appHistory.current?.cancelPending();
-                        setQuery('');
-                      }}
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-                <button
-                  className="text-button"
-                  onClick={() => {
-                    if (auth()) {
-                      setPeopleQuery(query);
-                      setModal('people');
-                    }
-                  }}
-                >
-                  <UserRound size={16} /> Найти человека по юзернейму{' '}
-                  <ArrowUpRight size={14} />
-                </button>
               </div>
-            )}
+              <button
+                className="text-button"
+                onClick={() => {
+                  if (auth()) {
+                    setPeopleQuery(query);
+                    setModal('people');
+                  }
+                }}
+              >
+                <UserRound size={16} /> Найти человека по юзернейму{' '}
+                <ArrowUpRight size={14} />
+              </button>
+            </div>
           </div>
         )}
         {page === 'profile' && profile && !profile.blocked && (
@@ -2022,7 +2070,9 @@ export default function Noctgram({
                 className="profile-cover"
                 style={
                   profile.cover
-                    ? { backgroundImage: `url(${profile.cover})` }
+                    ? {
+                        backgroundImage: `url(${coverImages.current.get(profile.cover) || profile.cover})`,
+                      }
                     : undefined
                 }
               >

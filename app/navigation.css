@@ -81,6 +81,9 @@ html[data-page-transition]::view-transition-new(noct-page) {
 .stream-results .post-skeleton {
   animation: none;
 }
+.feed-intro[hidden] {
+  display: none;
+}
 @keyframes stream-enter {
   from {
     opacity: 0;

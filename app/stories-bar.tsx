@@ -1,6 +1,7 @@
 'use client';
 import { DisplayName } from './profile-identity';
 import { ProfileLink } from './profile-link';
+import { reconcileSnapshot } from '@/lib/reconcile-snapshot';
 /* eslint-disable next/no-img-element, react/react-compiler, jsx-a11y/media-has-caption */
 /* Uploaded videos have no caption track supplied by their author. */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -52,12 +53,15 @@ export function StoriesBar({
   me,
   readOnly,
   channel,
+  active = true,
 }: {
   me: Person;
   readOnly: boolean;
   channel?: Profile;
+  active?: boolean;
 }) {
   const [rows, setRows] = useState<Story[]>([]),
+    [loaded, setLoaded] = useState(false),
     [revision, setRevision] = useState(0),
     [creating, setCreating] = useState(false),
     [open, setOpen] = useState(false),
@@ -76,6 +80,10 @@ export function StoriesBar({
     [mediaReady, setMediaReady] = useState(false);
   const activeStory = useRef<string | null>(null),
     picture = useRef<HTMLImageElement>(null);
+  const visible = useRef(active),
+    lastLoaded = useRef(0),
+    reloadStories = useRef<() => void>(() => {});
+  visible.current = active;
   const video = useRef<HTMLVideoElement>(null),
     file = useRef<HTMLInputElement>(null),
     duration = useRef(5000),
@@ -84,6 +92,14 @@ export function StoriesBar({
   const current = playlist[index];
   const channelId = channel?.id;
   activeStory.current = open ? current?.id || null : null;
+  useEffect(() => {
+    if (!active) {
+      setOpen(false);
+      setCreating(false);
+      setViewers(null);
+      setPlaylist([]);
+    }
+  }, [active]);
   useEffect(() => {
     if (open && current && !rows.some((s) => s.id === current.id)) {
       setOpen(false);
@@ -98,27 +114,47 @@ export function StoriesBar({
     else setOpen(false);
   }, [index, playlist.length]);
   useEffect(() => {
-    let live = true;
-    const load = () =>
-      request<Story[]>(
+    let live = true,
+      pending = false;
+    const load = async () => {
+      if (pending) return;
+      pending = true;
+      await request<Story[]>(
         '?action=stories' +
           (channelId ? '&id=' + encodeURIComponent(channelId) : ''),
       )
         .then((v) => {
-          if (live) setRows(v);
+          if (live) {
+            lastLoaded.current = Date.now();
+            setRows((current) => reconcileSnapshot(current, v));
+            setLoaded(true);
+            setError('');
+          }
         })
         .catch((e) => {
           if (live) setError(e.message);
+        })
+        .finally(() => {
+          pending = false;
         });
+    };
+    reloadStories.current = () => {
+      void load();
+    };
     void load();
     const t = setInterval(() => {
-      if (!document.hidden) void load();
+      if (visible.current && !document.hidden) void load();
     }, 30000);
     return () => {
       live = false;
       clearInterval(t);
+      reloadStories.current = () => {};
     };
   }, [revision, me.id, channelId]);
+  useEffect(() => {
+    if (active && Date.now() - lastLoaded.current >= 30000)
+      reloadStories.current();
+  }, [active]);
   useEffect(() => {
     if (!open || !current) return;
     setViewers(null);
@@ -205,7 +241,8 @@ export function StoriesBar({
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [open, index, playlist.length, next, busy]);
-  const groups = [...new Map(rows.map((s) => [s.userId, s])).values()];
+  const available = rows.filter((s) => s.expiresAt > Date.now());
+  const groups = [...new Map(available.map((s) => [s.userId, s])).values()];
   async function action(work: () => Promise<void>) {
     if (lock.current) return;
     lock.current = true;
@@ -225,6 +262,7 @@ export function StoriesBar({
       <div
         className="stories-strip"
         aria-label="Истории"
+        aria-busy={!loaded}
         hidden={!!channel && !(channel.boostLevel || groups.length)}
       >
         {(!channel || !!channel.canPublish) && (
@@ -247,13 +285,13 @@ export function StoriesBar({
             key={g.userId}
             className={
               'story-person ' +
-              (rows.some((s) => s.userId === g.userId && !s.viewed)
+              (available.some((s) => s.userId === g.userId && !s.viewed)
                 ? 'unseen'
                 : '')
             }
             onClick={() => {
               setPlaylist(
-                rows
+                available
                   .filter((s) => s.userId === g.userId)
                   .sort((a, b) => a.created - b.created),
               );
@@ -265,12 +303,12 @@ export function StoriesBar({
             }}
           >
             <span>
-              <Avatar person={g} size={48} />
+              <Avatar person={g} size={48} eager />
             </span>
             <small>{g.userId === me.id ? 'Вы' : g.name}</small>
           </button>
         ))}
-        {!groups.length && (
+        {loaded && !groups.length && (
           <p className="meta">Моменты, которые останутся на 24 часа.</p>
         )}
       </div>
