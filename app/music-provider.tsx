@@ -116,13 +116,23 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasPlayer || !playerElement.current) return;
     const element = playerElement.current;
-    const reserveSpace = () =>
+    let previousHeight = -1;
+    const reserveSpace = (height: number) => {
+      const next = Math.ceil(height);
+      if (next === previousHeight) return;
+      previousHeight = next;
       document.documentElement.style.setProperty(
         '--music-player-height',
-        `${element.getBoundingClientRect().height}px`,
+        `${next}px`,
       );
-    reserveSpace();
-    const observer = new ResizeObserver(reserveSpace);
+    };
+    reserveSpace(element.offsetHeight);
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry)
+        reserveSpace(
+          entry.borderBoxSize?.[0]?.blockSize ?? element.offsetHeight,
+        );
+    });
     observer.observe(element);
     return () => {
       observer.disconnect();

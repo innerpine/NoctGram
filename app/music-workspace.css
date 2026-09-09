@@ -7,7 +7,7 @@
 .playlist-detail {
   min-width: 0;
 }
-body:has(.music-shell) .music-player.music-sheet:not([data-collapsed='true']) {
+body:has(.music-shell) .music-player.music-sheet {
   --music-sheet-width: 760px;
 }
 @media (min-width: 1001px) {

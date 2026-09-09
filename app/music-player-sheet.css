@@ -1,23 +1,52 @@
 .music-player.music-sheet {
   --music-sheet-width: 680px;
   width: min(var(--music-sheet-width), calc(100vw - 32px));
-  padding: 0 16px 9px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  pointer-events: none;
   translate: 0 var(--music-sheet-drag, 0px);
-  transition:
-    width 420ms cubic-bezier(0.22, 1, 0.36, 1),
-    left 440ms,
-    padding 420ms,
-    border-radius 420ms,
-    translate 350ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: translate 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .music-player.music-sheet[data-collapsed='true'] {
-  --music-sheet-width: 240px;
-  padding: 2px 12px;
-  border-radius: 24px;
-  background: #171719ed;
+  height: 56px;
 }
 .music-player.music-sheet[data-dragging='true'] {
   transition: none;
+}
+.music-sheet-panel {
+  position: relative;
+  width: 100%;
+  padding: 0 16px 9px;
+  border: 1px solid #ffffff24;
+  border-radius: 18px;
+  background: #161616;
+  box-shadow: 0 10px 36px #0008;
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  transform-origin: center bottom;
+  will-change: transform, opacity;
+  transition:
+    opacity 220ms ease,
+    transform 340ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s;
+}
+.music-sheet[data-collapsed='true'] .music-sheet-panel {
+  /* Keep the full controls at their natural width throughout the fade. */
+  position: absolute;
+  bottom: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(14px) scale(0.98);
+  transition:
+    opacity 180ms ease,
+    transform 340ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s 340ms;
 }
 .music-sheet-handle {
   display: flex;
@@ -44,12 +73,12 @@
   border-radius: 8px;
   background: #ffffff40;
   transition:
-    width 250ms,
+    transform 250ms,
     background 250ms;
 }
 .music-sheet-handle:hover .music-sheet-grip,
 .music-sheet-handle:focus-visible .music-sheet-grip {
-  width: 48px;
+  transform: scaleX(1.2);
   background: #ffffff9c;
 }
 .music-sheet-peek {
@@ -57,17 +86,11 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 0;
-  max-height: 0;
   overflow: hidden;
-  opacity: 0;
   font-size: 11px;
   line-height: 1.5;
   padding-inline: 3px;
-  transition:
-    max-height 350ms,
-    opacity 250ms,
-    margin-top 350ms;
+  margin-top: 5px;
 }
 .music-sheet-peek > span {
   flex: 1;
@@ -80,29 +103,36 @@
 .music-sheet-peek > svg {
   flex-shrink: 0;
 }
-.music-sheet[data-collapsed='true'] .music-sheet-peek {
-  margin-top: 5px;
-  max-height: 22px;
-  opacity: 1;
-}
-.music-sheet-content {
-  display: grid;
-  grid-template-rows: 1fr;
-  opacity: 1;
-  visibility: visible;
-  transition:
-    grid-template-rows 420ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 240ms,
-    visibility 0s;
-}
-.music-sheet[data-collapsed='true'] .music-sheet-content {
-  grid-template-rows: 0fr;
+.music-sheet-handle.music-sheet-compact {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: min(240px, 100%);
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid #ffffff24;
+  border-radius: 24px;
+  background: #171719;
+  box-shadow: 0 8px 24px #0006;
   opacity: 0;
   visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, 10px) scale(0.96);
+  will-change: transform, opacity;
   transition:
-    grid-template-rows 420ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 180ms,
-    visibility 0s 420ms;
+    opacity 180ms ease,
+    transform 340ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s 340ms;
+}
+.music-sheet[data-collapsed='true'] .music-sheet-compact {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(-50%, 0) scale(1);
+  transition:
+    opacity 220ms ease 60ms,
+    transform 340ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s;
 }
 .music-sheet-inner {
   min-height: 0;
@@ -119,11 +149,30 @@
 .music-lyrics-dock .music-dock-volume [data-slot='slider'] {
   padding-block: 12px;
 }
+@media (min-width: 1100px) {
+  .music-player.music-sheet {
+    /* Reserve the available width so opening lyrics never squeezes the controls. */
+    width: min(
+      var(--music-sheet-width),
+      calc(100vw - var(--music-dock-space) - 32px)
+    );
+    transition:
+      translate 300ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 440ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  body:has(.music-lyrics-dock[data-open='true']) .music-player.music-sheet {
+    left: 50%;
+    transform: translateX(calc(-50% - var(--music-dock-space) / 2));
+  }
+}
 @media (max-width: 500px) {
   .music-player.music-sheet {
     width: min(var(--music-sheet-width), calc(100vw - 16px));
-    padding-inline: 10px;
     bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  }
+  .music-sheet-panel {
+    padding-inline: 10px;
+    border-radius: 14px;
   }
   .music-sheet-handle {
     min-height: 32px;

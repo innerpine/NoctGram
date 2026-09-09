@@ -424,9 +424,11 @@
   .music-player.music-sheet {
     top: calc(
       var(--app-viewport-top, 0px) + var(--app-viewport-height, 100dvh) -
-        var(--app-nav-inset) - 10px - var(--music-player-height, 100px)
+        var(--app-nav-inset) - 10px
     );
     bottom: auto;
+    /* Anchor the bottom directly, without waiting for ResizeObserver after a toggle. */
+    transform: translate(-50%, -100%);
   }
   .profile-avatar-line {
     min-height: 100px;
