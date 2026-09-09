@@ -1,4 +1,5 @@
 'use client';
+import { observeAppViewport } from '@/lib/app-viewport';
 /* Provider subscriptions update state from real SoundCloud events. */
 /* eslint-disable react/react-compiler, next/no-img-element */
 import {
@@ -38,6 +39,15 @@ import {
 } from '@/lib/music-volume';
 import { moveMusicItem } from '@/lib/music-queue';
 import {
+  soundCloudQueue,
+  type SoundCloudQueueEntry,
+} from '@/lib/soundcloud-queue';
+import {
+  NativeMusicAudio,
+  nativeMusicPlayback,
+  soundcloudAudioURL,
+} from '@/lib/native-music-audio';
+import {
   MusicContext,
   MusicPlaybackContext,
   useMusic,
@@ -56,10 +66,26 @@ export function MusicAccountGuard({ blocked }: { blocked: boolean }) {
   return null;
 }
 export function MusicProvider({ children }: { children: ReactNode }) {
+  useEffect(() => observeAppViewport(), []);
   const [link, setLink] = useState<MusicLink | null>(null);
   const [sound, setSound] = useState<SoundCloudSound | null>(null);
   const [localTrack, setLocalTrack] = useState<MusicTrack | null>(null);
   const audio = useRef<HTMLAudioElement>(null);
+  const nativeAudio = useRef<NativeMusicAudio | null>(null);
+  const soundCloudNative = useRef<boolean | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/music/soundcloud?action=status', {
+      signal: controller.signal,
+    })
+      .then(async (r) => {
+        if (r.ok)
+          soundCloudNative.current =
+            ((await r.json()) as { configured?: boolean }).configured === true;
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
   const spotify = useRef<SpotifyPlayback | null>(null);
   const youtube = useRef<YouTubePlayback | null>(null);
   const youtubeHost = useRef<HTMLDivElement>(null);
@@ -74,24 +100,39 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [retry, setRetry] = useState(0);
   const [playlistIndex, setPlaylistIndex] = useState(0),
     [playlistLength, setPlaylistLength] = useState(0);
-  const [playlistSounds, setPlaylistSounds] = useState<SoundCloudSound[]>([]);
+  const [playlistSounds, setPlaylistSounds] = useState<SoundCloudQueueEntry[]>(
+    [],
+  );
   const [queue, setQueue] = useState<MusicLink[]>([]);
   const nativeOrder = useRef<MusicLink[] | null>(null);
   const frame = useRef<HTMLIFrameElement>(null),
     widget = useRef<Widget | null>(null);
+  const [soundCloudSource, setSoundCloudSource] = useState('');
+  const loadedFrame = useRef<HTMLIFrameElement | null>(null);
+  const loadedSounds = useRef<SoundCloudQueueEntry[]>([]);
   const soundCloudState = useRef<SoundCloudStateMonitor | null>(null);
   const playerElement = useRef<HTMLElement>(null);
   const hasPlayer = !!link;
   useEffect(() => {
     if (!hasPlayer || !playerElement.current) return;
     const element = playerElement.current;
-    const reserveSpace = () =>
+    let previousHeight = -1;
+    const reserveSpace = (height: number) => {
+      const next = Math.ceil(height);
+      if (next === previousHeight) return;
+      previousHeight = next;
       document.documentElement.style.setProperty(
         '--music-player-height',
-        `${element.getBoundingClientRect().height}px`,
+        `${next}px`,
       );
-    reserveSpace();
-    const observer = new ResizeObserver(reserveSpace);
+    };
+    reserveSpace(element.offsetHeight);
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry)
+        reserveSpace(
+          entry.borderBoxSize?.[0]?.blockSize ?? element.offsetHeight,
+        );
+    });
     observer.observe(element);
     return () => {
       observer.disconnect();
@@ -106,6 +147,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     volumeRef = useRef(volume);
   const tracker = useRef<MusicListenTracker | null>(null);
   const roomRef = useRef<MusicRoom | null>(null);
+  useEffect(
+    () => () => {
+      generation.current++;
+      nativeAudio.current?.dispose();
+      youtube.current?.dispose();
+      spotify.current?.dispose();
+    },
+    [],
+  );
   const [listening, setListening] = useState<ListenState>({
     status: 'idle',
     seconds: 0,
@@ -131,7 +181,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     nativeOrder.current = null;
     generation.current++;
     widget.current?.pause();
-    audio.current?.pause();
+    nativeAudio.current?.dispose();
     spotify.current?.dispose();
     spotify.current = null;
     youtube.current?.dispose();
@@ -142,6 +192,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     isPlaying.current = false;
     setPlaying(false);
     setLink(null);
+    setSoundCloudSource('');
+    loadedSounds.current = [];
     setExpanded(false);
     setSound(null);
     setLocalTrack(null);
@@ -159,7 +211,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         parsed.provider === 'spotify'
           ? next.playback ||
             ((next as MusicTrack).audioUrl ? 'file' : 'spotify')
-          : undefined,
+          : parsed.provider === 'soundcloud' &&
+              parsed.kind === 'track' &&
+              soundCloudNative.current !== false
+            ? 'soundcloud'
+            : undefined,
     } as MusicLink;
     if (nextQueue) {
       queueRef.current = nextQueue;
@@ -167,6 +223,21 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     } else if (!queueRef.current.some((item) => item.url === valid.url)) {
       queueRef.current = [valid];
       setQueue([valid]);
+    }
+    if (
+      valid.provider === 'soundcloud' &&
+      desired.current?.kind === 'playlist' &&
+      widget.current
+    ) {
+      const entry = loadedSounds.current.find(
+        (sound) => sound.track.url === valid.url,
+      );
+      if (entry) {
+        soundCloudState.current?.invalidate();
+        widget.current.skip(entry.nativeIndex);
+        widget.current.play();
+        return;
+      }
     }
     if (
       desired.current?.url === valid.url &&
@@ -197,25 +268,30 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
     if (
       desired.current?.url === valid.url &&
-      valid.provider === 'spotify' &&
-      valid.playback === 'file' &&
-      desired.current.playback === 'file' &&
+      nativeMusicPlayback(valid.playback) &&
+      desired.current.playback === valid.playback &&
       audio.current?.currentSrc
     ) {
-      void audio.current
-        .play()
-        .catch(() =>
-          setError('Не удалось запустить аудио. Нажмите «Повторить».'),
-        );
+      nativeAudio.current?.resume();
       return;
+    }
+    // The widget remains a fallback for deployments without API credentials and
+    // for native SoundCloud playlists. Track queues use the persistent audio.
+    if (valid.provider === 'soundcloud' && valid.playback !== 'soundcloud') {
+      setSoundCloudSource((source) => source || valid.url);
+    } else {
+      setSoundCloudSource('');
     }
     generation.current++;
     widget.current?.pause();
-    audio.current?.pause();
+    if (nativeMusicPlayback(valid.playback)) nativeAudio.current?.pause();
+    else nativeAudio.current?.dispose();
     spotify.current?.dispose();
     spotify.current = null;
-    youtube.current?.dispose();
-    youtube.current = null;
+    if (valid.provider !== 'youtube') {
+      youtube.current?.dispose();
+      youtube.current = null;
+    }
     clearStats();
     soundUrl.current = '';
     nativeOrder.current = null;
@@ -233,6 +309,31 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setPlaylistLength(0);
     setPlaylistSounds([]);
     setLink(valid);
+    if (nativeMusicPlayback(valid.playback) && audio.current) {
+      nativeAudio.current ??= new NativeMusicAudio(audio.current);
+      nativeAudio.current.intendsToPlay =
+        roomRef.current?.detail?.playback.playing !== 0;
+    }
+    const knownAudio =
+      valid.playback === 'soundcloud'
+        ? soundcloudAudioURL(valid.url)
+        : (next as MusicTrack).audioUrl;
+    if (
+      nativeMusicPlayback(valid.playback) &&
+      audio.current &&
+      knownAudio &&
+      (valid.playback === 'soundcloud' ||
+        /^\/api\/music\/audio\/[a-f0-9-]{36}$/.test(knownAudio))
+    ) {
+      // Start on the existing element while a Next/queue tap is still active.
+      // The effect attaches tracking and validates metadata without resetting it.
+      nativeAudio.current ??= new NativeMusicAudio(audio.current);
+      nativeAudio.current.load(
+        knownAudio,
+        valid.playback === 'soundcloud',
+        roomRef.current?.detail?.playback.playing !== 0,
+      );
+    }
   }, []);
   useEffect(() => {
     const disconnected = (event: Event) => {
@@ -323,7 +424,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     };
   }, [link, retry, play]);
   useEffect(() => {
-    if (link?.provider !== 'soundcloud' || !frame.current) return;
+    if (
+      link?.provider !== 'soundcloud' ||
+      link.playback === 'soundcloud' ||
+      !frame.current
+    )
+      return;
     soundUrl.current = '';
     clearStats();
     let active = true;
@@ -369,6 +475,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       .then((sc) => {
         if (!isCurrent() || !frame.current) return;
         const w = sc.Widget(frame.current);
+        if (loadedFrame.current === frame.current) {
+          // load must precede READY binding: an already-ready widget invokes
+          // newly bound READY listeners immediately, with the previous sound.
+          w.load(link.url, {
+            auto_play: roomRef.current?.detail?.playback.playing !== 0,
+            show_artwork: false,
+          });
+        }
+        loadedFrame.current = frame.current;
         bound = w;
         widget.current = w;
         monitor = new SoundCloudStateMonitor(
@@ -412,15 +527,17 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           if (!isCurrent()) return;
           clearTimeout(timeout);
           widgetReady = true;
-          if (!stateTimer) stateTimer = setInterval(confirmState, 1000);
+          if (!stateTimer) stateTimer = setInterval(confirmState, 250);
           setReady(true);
           setError('');
           w.setVolume(musicGain(volumeRef.current) * 100);
           w.getSounds((sounds) => {
             if (isCurrent()) {
-              nativeLength = sounds.length;
-              setPlaylistLength(sounds.length);
-              setPlaylistSounds(sounds);
+              nativeLength = Array.isArray(sounds) ? sounds.length : 0;
+              const entries = soundCloudQueue(sounds);
+              loadedSounds.current = entries;
+              setPlaylistLength(nativeLength);
+              setPlaylistSounds(entries);
             }
           });
           w.getDuration((ms) => {
@@ -535,13 +652,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     };
   }, [link, retry, play]);
   useEffect(() => {
-    if (
-      link?.provider !== 'spotify' ||
-      link.playback !== 'file' ||
-      !audio.current
-    )
-      return;
+    if (!link || !nativeMusicPlayback(link.playback) || !audio.current) return;
     const element = audio.current;
+    nativeAudio.current ??= new NativeMusicAudio(element);
+    const engine = nativeAudio.current;
+    const stream = link.playback === 'soundcloud';
     const token = ++generation.current;
     const controller = new AbortController();
     let active = true;
@@ -561,37 +676,31 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (element.currentSrc) beginSession();
     };
     window.addEventListener('noctgram:music-preferences', preferenceChanged);
-    const attemptPlay = () => {
-      void element.play().catch((error: DOMException) => {
-        if (current() && error.name === 'NotAllowedError')
-          setNeedsGesture(true);
-        if (
-          current() &&
-          error.name !== 'NotAllowedError' &&
-          error.name !== 'AbortError'
-        )
-          setError(
-            'Не удалось воспроизвести файл. Попробуйте другой аудиофайл.',
-          );
-      });
-    };
+    const attemptPlay = () => engine.resume();
     const loaded = () => {
-      if (!current()) return;
+      if (!current() || !engine.hasMetadata) return;
       if (!Number.isFinite(element.duration) || element.duration <= 0) {
-        setError('Не удалось прочитать длительность аудио.');
+        // HLS initially has an unknown duration; durationchange follows once
+        // the manifest is parsed. Do not turn buffering into a playback error.
         return;
       }
       setDuration(Math.round(element.duration * 1000));
       setReady(true);
+      if (engine.failure) {
+        failed();
+        return;
+      }
       setError('');
-      attemptPlay();
+      if (engine.intendsToPlay) attemptPlay();
+      else setNeedsGesture(false);
+      if (!element.paused) started();
     };
     const progress = () => {
       if (current()) {
-        setPosition(element.currentTime * 1000);
+        setPosition(engine.positionMs);
         tracker.current?.sample(
-          element.currentTime * 1000,
-          !element.paused && !element.seeking,
+          engine.positionMs,
+          engine.hasMetadata && !element.paused && !element.seeking,
         );
       }
     };
@@ -599,6 +708,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (current()) {
         tracker.current?.resetPosition();
         setPlaying(true);
+        isPlaying.current = true;
         setNeedsGesture(false);
         setError('');
       }
@@ -607,6 +717,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (current()) {
         tracker.current?.resetPosition();
         setPlaying(false);
+        isPlaying.current = false;
       }
     };
     const failed = () => {
@@ -614,7 +725,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         setPlaying(false);
         clearStats();
         setError(
-          'Аудиофайл недоступен или браузер не поддерживает его формат.',
+          engine.failure ||
+            (stream
+              ? 'Не удалось загрузить трек SoundCloud. Нажмите «Повторить».'
+              : 'Аудиофайл недоступен или браузер не поддерживает его формат.'),
         );
       }
     };
@@ -634,35 +748,61 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       }
     };
     const seeking = () => tracker.current?.resetPosition();
+    const blocked = () => {
+      if (current()) {
+        setPlaying(false);
+        setNeedsGesture(true);
+      }
+    };
+    element.addEventListener('noctgram:audio-blocked', blocked);
+    element.addEventListener('noctgram:audio-error', failed);
     element.addEventListener('seeking', seeking);
     element.addEventListener('loadedmetadata', loaded);
+    element.addEventListener('durationchange', loaded);
     element.addEventListener('timeupdate', progress);
     element.addEventListener('play', started);
     element.addEventListener('pause', paused);
     element.addEventListener('error', failed);
     element.addEventListener('ended', ended);
     element.volume = musicGain(volumeRef.current);
-    void fetch('/api/music?action=track&url=' + encodeURIComponent(link.url), {
-      signal: controller.signal,
-      cache: 'no-store',
-    })
+    if (stream)
+      engine.load(soundcloudAudioURL(link.url), true, engine.intendsToPlay);
+    void fetch(
+      (stream ? '/api/music/soundcloud' : '/api/music') +
+        '?action=track&url=' +
+        encodeURIComponent(link.url),
+      {
+        signal: controller.signal,
+        cache: 'no-store',
+      },
+    )
       .then(async (response) => {
-        const data = (await response.json()) as MusicTrack & { error?: string };
+        const data = (await response.json()) as MusicTrack & {
+          error?: string;
+          code?: string;
+        };
+        if (!current()) return;
+        if (!response.ok && stream && data.code === 'MUSIC_SETUP_REQUIRED') {
+          soundCloudNative.current = false;
+          play(link);
+          return;
+        }
         if (!response.ok)
           throw new Error(data.error || 'Не удалось загрузить трек.');
         if (!current()) return;
         setLocalTrack(data);
         setDuration(data.durationMs || 0);
         if (
-          !data.audioUrl ||
-          !/^\/api\/music\/audio\/[a-f0-9-]{36}$/.test(data.audioUrl)
+          !stream &&
+          (!data.audioUrl ||
+            !/^\/api\/music\/audio\/[a-f0-9-]{36}$/.test(data.audioUrl))
         )
           throw new Error(
             'Добавьте аудиофайл к этому треку в «Моей музыке». Ссылка Spotify содержит сведения о песне, но не само аудио.',
           );
         beginSession();
-        element.src = data.audioUrl;
-        element.load();
+        if (!stream) engine.load(data.audioUrl!, false, engine.intendsToPlay);
+        if (element.readyState >= 1) loaded();
       })
       .catch((error: Error) => {
         if (current() && error.name !== 'AbortError') setError(error.message);
@@ -675,16 +815,17 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         preferenceChanged,
       );
       element.removeEventListener('seeking', seeking);
+      element.removeEventListener('noctgram:audio-blocked', blocked);
+      element.removeEventListener('noctgram:audio-error', failed);
       controller.abort();
       element.removeEventListener('loadedmetadata', loaded);
+      element.removeEventListener('durationchange', loaded);
       element.removeEventListener('timeupdate', progress);
       element.removeEventListener('play', started);
       element.removeEventListener('pause', paused);
       element.removeEventListener('error', failed);
       element.removeEventListener('ended', ended);
-      element.pause();
-      element.removeAttribute('src');
-      element.load();
+      if (!nativeMusicPlayback(desired.current?.playback)) engine.dispose();
     };
   }, [link, retry, play]);
   useEffect(() => {
@@ -708,68 +849,74 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     void loadYouTubeSDK()
       .then((sdk) => {
         if (!current() || !youtubeHost.current) return;
-        engine = new YouTubePlayback(
-          sdk,
-          youtubeHost.current,
-          new URL(link.url).searchParams.get('v')!,
-          youtubeVolume(volumeRef.current),
-          {
-            ready: () => {
-              if (!current()) return;
-              engine?.volume(youtubeVolume(volumeRef.current));
-              setReady(true);
-              setError('');
-              if (roomRef.current?.detail?.playback.playing === 0)
-                setNeedsGesture(false);
-            },
-            state: (state) => {
-              if (!current()) return;
-              setPlaying(state.playing);
-              setPosition(state.position);
-              setDuration(state.duration);
-              const nextVolume = volumeFromYouTube(
-                state.volume,
-                volumeRef.current,
-              );
-              volumeRef.current = nextVolume;
-              setVolume(nextVolume);
-              if (state.playing) {
-                setNeedsGesture(false);
-                setError('');
-              }
-            },
-            blocked: () => {
-              if (current()) {
-                setNeedsGesture(true);
-                setPlaying(false);
-              }
-            },
-            error: (message) => {
-              if (current()) {
-                setError(message);
-                setPlaying(false);
-              }
-            },
-            shouldPlay: () => roomRef.current?.detail?.playback.playing !== 0,
-            control: (command, extra) => {
-              if (current() && roomRef.current?.detail)
-                void roomRef.current.command(command, extra);
-            },
-            ended: () => {
-              if (!current()) return;
-              if (roomRef.current?.detail) {
-                void roomRef.current.command('advance');
-                return;
-              }
-              const next = adjacentPlayable(queueRef.current, link.url);
-              if (next) play(next);
-              else {
-                engine?.seek(0);
-                engine?.resume();
-              }
-            },
+        const hooks: ConstructorParameters<typeof YouTubePlayback>[4] = {
+          ready: () => {
+            if (!current()) return;
+            engine?.volume(youtubeVolume(volumeRef.current));
+            setReady(true);
+            setError('');
+            if (roomRef.current?.detail?.playback.playing === 0)
+              setNeedsGesture(false);
           },
-        );
+          state: (state) => {
+            if (!current()) return;
+            setPlaying(state.playing);
+            setPosition(state.position);
+            setDuration(state.duration);
+            const nextVolume = volumeFromYouTube(
+              state.volume,
+              volumeRef.current,
+            );
+            volumeRef.current = nextVolume;
+            setVolume(nextVolume);
+            if (state.playing) {
+              setNeedsGesture(false);
+              setError('');
+            }
+          },
+          blocked: () => {
+            if (current()) {
+              setNeedsGesture(true);
+              setPlaying(false);
+            }
+          },
+          error: (message) => {
+            if (current()) {
+              setError(message);
+              setPlaying(false);
+            }
+          },
+          shouldPlay: () => roomRef.current?.detail?.playback.playing !== 0,
+          control: (command, extra) => {
+            if (current() && roomRef.current?.detail)
+              void roomRef.current.command(command, extra);
+          },
+          ended: () => {
+            if (!current()) return;
+            if (roomRef.current?.detail) {
+              void roomRef.current.command('advance');
+              return;
+            }
+            const next = adjacentPlayable(queueRef.current, link.url);
+            if (next) play(next);
+            else {
+              engine?.seek(0);
+              engine?.resume();
+            }
+          },
+        };
+        const id = new URL(link.url).searchParams.get('v')!;
+        engine = youtube.current;
+        if (!engine?.load(id, hooks)) {
+          engine?.dispose();
+          engine = new YouTubePlayback(
+            sdk,
+            youtubeHost.current,
+            id,
+            youtubeVolume(volumeRef.current),
+            hooks,
+          );
+        }
         youtube.current = engine;
       })
       .catch((e) => {
@@ -777,8 +924,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       });
     return () => {
       active = false;
-      engine?.dispose();
-      if (youtube.current === engine) youtube.current = null;
+      if (desired.current?.provider !== 'youtube') {
+        engine?.dispose();
+        if (youtube.current === engine) youtube.current = null;
+      }
     };
   }, [link, retry, play]);
   const queueIndex = queue.findIndex(
@@ -871,14 +1020,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       } else if (link?.playback === 'spotify') {
         if (active) spotify.current?.resume();
         else spotify.current?.pause();
-      } else if (link?.provider === 'spotify' && audio.current) {
-        if (active)
-          void audio.current
-            .play()
-            .catch(() =>
-              setError('Нажмите воспроизведение, чтобы разрешить звук'),
-            );
-        else audio.current.pause();
+      } else if (nativeMusicPlayback(link?.playback)) {
+        if (active) nativeAudio.current?.resume();
+        else nativeAudio.current?.pause();
       } else if (active) widget.current?.play();
       else widget.current?.pause();
     },
@@ -889,7 +1033,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       setPosition(value);
       if (link?.provider === 'youtube') youtube.current?.seek(value);
       else if (link?.playback === 'spotify') spotify.current?.seek(value);
-      else if (link?.provider === 'spotify' && audio.current)
+      else if (nativeMusicPlayback(link?.playback) && audio.current)
         audio.current.currentTime = value / 1000;
       else widget.current?.seekTo(value);
     },
@@ -935,12 +1079,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const displayQueue = room.detail
     ? room.detail.tracks.map(metadata)
     : link?.kind === 'playlist' && !nativeOrder.current
-      ? playlistSounds.map((item) => ({
-          url: item.permalink_url,
-          title: item.title,
-          artist: item.user?.username || '',
-          artwork: item.artwork_url || '',
-        }))
+      ? playlistSounds.map((item) => item.track)
       : queue.map((item) => (item.url === currentUrl ? track : metadata(item)));
   const select = (index: number) => {
     if (room.detail) {
@@ -950,7 +1089,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
     if (link?.kind === 'playlist' && !nativeOrder.current) {
       if (index >= 0 && index < playlistSounds.length) {
-        widget.current?.skip(index);
+        widget.current?.skip(playlistSounds[index].nativeIndex);
         widget.current?.play();
       }
     } else if (queue[index]) play(queue[index]);
@@ -965,14 +1104,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
     const current =
       link?.kind === 'playlist' && !nativeOrder.current
-        ? playlistSounds.map((item) => ({
-            url: item.permalink_url,
-            kind: 'track' as const,
-            provider: 'soundcloud' as const,
-            title: item.title,
-            artist: item.user?.username || '',
-            artwork: item.artwork_url || '',
-          }))
+        ? playlistSounds.map((item) => item.track)
         : queueRef.current;
     const reordered = moveMusicItem(
       current,
@@ -991,8 +1123,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         void room.command('resume');
       if (link.provider === 'youtube') youtube.current?.resume();
       else if (link.playback === 'spotify') spotify.current?.resume();
-      else if (link.playback === 'file')
-        void audio.current?.play().catch(() => setNeedsGesture(true));
+      else if (nativeMusicPlayback(link.playback))
+        nativeAudio.current?.resume();
       else widget.current?.play();
       return;
     }
@@ -1004,14 +1136,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (playing) youtube.current?.pause();
       else youtube.current?.resume();
     } else if (link.playback === 'spotify') spotify.current?.toggle();
-    else if (link.provider === 'spotify' && audio.current) {
-      if (playing) audio.current.pause();
-      else
-        void audio.current
-          .play()
-          .catch(() =>
-            setError('Не удалось запустить файл. Попробуйте ещё раз.'),
-          );
+    else if (nativeMusicPlayback(link.playback)) {
+      if (playing) nativeAudio.current?.pause();
+      else nativeAudio.current?.resume();
     } else if (playing) widget.current?.pause();
     else widget.current?.play();
   };
@@ -1027,7 +1154,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setPosition(value);
     if (link.provider === 'youtube') youtube.current?.seek(value);
     else if (link.playback === 'spotify') spotify.current?.seek(value);
-    else if (link.provider === 'spotify' && audio.current)
+    else if (nativeMusicPlayback(link.playback) && audio.current)
       audio.current.currentTime = value / 1000;
     else widget.current?.seekTo(value);
   };
@@ -1045,7 +1172,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       youtube.current?.volume(youtubeVolume(value));
     else if (link.playback === 'spotify')
       spotify.current?.volume(musicGain(value));
-    else if (link.provider === 'spotify' && audio.current)
+    else if (nativeMusicPlayback(link.playback) && audio.current)
       audio.current.volume = musicGain(value);
     else widget.current?.setVolume(musicGain(value) * 100);
   };
@@ -1054,6 +1181,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       <MusicPlaybackContext.Provider value={playback}>
         {children}
       </MusicPlaybackContext.Provider>
+      {/* This element also survives changes between music providers. */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <audio ref={audio} preload="metadata" />
       {link && (
         <MusicActivityPublisher
           track={track}
@@ -1075,7 +1205,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
               room.detail
                 ? room.detail.tracks.findIndex((t) => t.url === currentUrl)
                 : link.kind === 'playlist' && !nativeOrder.current
-                  ? playlistIndex
+                  ? playlistSounds.findIndex(
+                      (item) => item.nativeIndex === playlistIndex,
+                    )
                   : queueIndex
             }
             expanded={expanded}
@@ -1112,6 +1244,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             onVolume={changeVolume}
             onStop={stopPersonal}
             onRetry={() => {
+              if (nativeMusicPlayback(link.playback)) {
+                nativeAudio.current?.dispose();
+                nativeAudio.current!.intendsToPlay =
+                  roomRef.current?.detail?.playback.playing !== 0;
+              }
               setError('');
               setReady(false);
               setNeedsGesture(true);
@@ -1121,21 +1258,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           {/* Keep one engine mounted outside the dialog: collapsing never restarts audio. */}
           {link.provider === 'youtube' ? (
             <div
-              key={link.url + ':' + retry}
               ref={youtubeHost}
               className="music-audio-engine"
               aria-hidden="true"
               inert
             />
-          ) : link.provider === 'spotify' ? (
-            link.playback === 'file' ? (
-              // Lyrics, when available, are rendered in the accessible Text pane.
-              // eslint-disable-next-line jsx-a11y/media-has-caption
-              <audio ref={audio} preload="metadata" />
-            ) : null
-          ) : link.provider === 'soundcloud' ? (
+          ) : link.provider === 'soundcloud' &&
+            link.playback !== 'soundcloud' ? (
             <iframe
-              key={link.url + ':' + retry}
               ref={frame}
               className="music-audio-engine"
               title="Аудиодвижок SoundCloud"
@@ -1145,7 +1275,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
               src={
                 'https://w.soundcloud.com/player/?' +
                 new URLSearchParams({
-                  url: link.url,
+                  url: soundCloudSource,
                   auto_play: 'false',
                   color: '#eeeeee',
                   show_artwork: 'false',

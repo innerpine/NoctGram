@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogTitle,
@@ -98,6 +99,7 @@ export function SendGiftButton({
 }) {
   const [open, setOpen] = useState(false),
     [session, setSession] = useState(0);
+  const popup = useRef<HTMLDivElement>(null);
   return (
     <>
       <button
@@ -114,6 +116,9 @@ export function SendGiftButton({
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
+          ref={popup}
+          initialFocus={popup}
+          showCloseButton={false}
           className="noct-dialog gift-dialog gift-send-dialog"
           overlayClassName="gift-backdrop"
         >
@@ -214,7 +219,17 @@ function SendGiftForm({
   }
   return (
     <>
-      <div className="gift-dialog-heading">
+      <div
+        className={
+          'gift-dialog-heading' + (!selected ? ' gift-catalog-heading' : '')
+        }
+      >
+        <DialogClose
+          className="icon-button gift-dialog-close"
+          aria-label="Закрыть подарки"
+        >
+          <X size={18} />
+        </DialogClose>
         {selected && !sent && !attempt.current && (
           <button
             className="icon-button"
@@ -241,6 +256,28 @@ function SendGiftForm({
               : `Подарок для ${recipient.name}`}
           </DialogDescription>
         </div>
+        {!selected && (
+          <label className="gift-search">
+            <Search size={17} aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Найти подарок"
+              placeholder="Найти подарок"
+              value={query}
+              maxLength={80}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            {query && (
+              <button
+                type="button"
+                aria-label="Очистить поиск"
+                onClick={() => setQuery('')}
+              >
+                <X size={16} />
+              </button>
+            )}
+          </label>
+        )}
       </div>
       {selected ? (
         <div
@@ -280,26 +317,6 @@ function SendGiftForm({
         </div>
       ) : (
         <div className="gift-browser">
-          <label className="gift-search">
-            <Search size={17} aria-hidden="true" />
-            <input
-              type="search"
-              aria-label="Найти подарок"
-              placeholder="Найти подарок"
-              value={query}
-              maxLength={80}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            {query && (
-              <button
-                type="button"
-                aria-label="Очистить поиск"
-                onClick={() => setQuery('')}
-              >
-                <X size={16} />
-              </button>
-            )}
-          </label>
           <div className="gift-catalog-scroll">
             <div className="gift-catalog">
               {matches.map((gift) => (

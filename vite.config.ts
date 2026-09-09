@@ -4,6 +4,7 @@ import vinext from 'vinext';
 import { defineConfig } from 'vite';
 import hostingConfig from './.openai/hosting.json';
 import { localTestAccounts } from './scripts/local-test-accounts';
+import { readFileSync } from 'node:fs';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
@@ -36,6 +37,19 @@ const localBindingConfig = {
 };
 
 export default defineConfig(async () => {
+  const previewConfigPath = process.env.NOCT_PREVIEW_CONFIG;
+  const previewConfig = previewConfigPath
+    ? JSON.parse(readFileSync(previewConfigPath, 'utf8'))
+    : null;
+  if (
+    previewConfig &&
+    (previewConfig.vars?.NOCT_AUTH_MODE !== 'access' ||
+      !previewConfig.d1_databases?.[0]?.database_id ||
+      !previewConfig.r2_buckets?.[0]?.bucket_name)
+  )
+    throw new Error(
+      'Private preview requires Access authentication, D1 and R2 configuration',
+    );
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= 'false';
@@ -46,6 +60,10 @@ export default defineConfig(async () => {
   const { cloudflare } = await import('@cloudflare/vite-plugin');
 
   return {
+    // Lightning CSS merges independent translate/scale with transform across
+    // popup rules. That doubles Tailwind's centering in the production player
+    // and changes the properties used by our open/close transitions.
+    build: { cssMinify: 'esbuild' as const },
     css: { postcss: { plugins: [tailwindcss()] } },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
@@ -55,7 +73,14 @@ export default defineConfig(async () => {
       ...localTestAccounts(sites()),
       cloudflare({
         viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
-        config: localBindingConfig,
+        config: previewConfig
+          ? {
+              ...previewConfig,
+              main: './worker/shared-preview.ts',
+              compatibility_flags: ['nodejs_compat'],
+              assets: { binding: 'ASSETS', run_worker_first: true },
+            }
+          : localBindingConfig,
       }),
     ],
   };

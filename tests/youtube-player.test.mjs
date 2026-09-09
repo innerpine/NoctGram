@@ -95,6 +95,16 @@ class Device {
     this.calls.push('play');
     this.emit(1);
   }
+  loadVideoById(id) {
+    this.calls.push(['load', id]);
+    this.time = 0;
+    this.emit(1);
+  }
+  cueVideoById(id) {
+    this.calls.push(['cue', id]);
+    this.time = 0;
+    this.emit(5);
+  }
   pauseVideo() {
     this.calls.push('pause');
     this.emit(2);
@@ -253,8 +263,47 @@ try {
   assert.equal(states.at(-1).volume, 36);
   device.events.onAutoplayBlocked();
   assert.equal(events.at(-1), 'blocked');
+  const nextEvents = [];
+  const nextHooks = {
+    ...hooks,
+    ready: () => nextEvents.push('ready'),
+    ended: () => nextEvents.push('ended'),
+  };
+  const frameBefore = device.frame;
+  assert.equal(player.load('nextVideo01', nextHooks), true);
+  assert.equal(
+    host.children.length,
+    1,
+    'Queue changes reuse the activated iframe',
+  );
+  assert.equal(device.frame, frameBefore);
+  assert.equal(
+    device.state,
+    1,
+    'The next video starts without a second play tap',
+  );
+  device.emit(0);
+  assert.deepEqual(
+    nextEvents,
+    ['ready', 'ended'],
+    'End events belong to the new track',
+  );
+  assert.equal(
+    player.load('pausedVideo', { ...nextHooks, shouldPlay: () => false }),
+    true,
+  );
+  assert.equal(
+    device.state,
+    5,
+    'Changing a paused room track only cues the next video',
+  );
   device.events.onError({ data: 150 });
   assert.match(events.at(-1), /Автор запретил/);
+  assert.equal(
+    player.load('retryVideo', nextHooks),
+    false,
+    'A failed engine must be recreated by Retry',
+  );
   player.dispose();
   player.dispose();
   assert.equal(device.calls.filter((call) => call === 'destroy').length, 1);

@@ -115,8 +115,18 @@ export async function notificationsGet(
       enabled: !!current,
     });
   }
-  if (action !== 'notifications') return null;
+  if (action !== 'notifications' && action !== 'notificationCount') return null;
   await fanoutPosts();
+  if (action === 'notificationCount') {
+    const row = await db()
+      .prepare(`SELECT COUNT(*) AS unread FROM (
+        SELECT 1 FROM notifications n JOIN users u ON u.id=n.actorId
+        WHERE n.userId=? AND n.read=0 AND ${notificationVisible()} LIMIT 10
+      )`)
+      .bind(me)
+      .first<{ unread: number }>();
+    return Response.json({ unread: row?.unread || 0 });
+  }
   const rows = await db()
     .prepare(
       `SELECT n.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM notifications n JOIN users u ON u.id=n.actorId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE n.userId=? AND ${notificationVisible()} ORDER BY n.created DESC,n.id DESC LIMIT 50`,

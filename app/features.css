@@ -25,9 +25,6 @@
   height: 110%;
   object-fit: contain;
 }
-.stars-nav-shell .premium-nav-beam {
-  background: linear-gradient(to left, #ffda55, #ffa844, transparent);
-}
 .stars-hero .premium-star-main {
   filter: drop-shadow(0 8px 24px #ffd15218);
 }

@@ -169,8 +169,12 @@ export async function POST(req: Request) {
       if (!link)
         throw new ApiError(
           400,
-          'Нужна ссылка SoundCloud, Spotify, YouTube или YouTube Music',
+          body.action === 'save'
+            ? 'Нужна ссылка на трек или плейлист SoundCloud.'
+            : 'Нужна корректная ссылка на музыку.',
         );
+      if (body.action === 'save' && link.provider !== 'soundcloud')
+        throw new ApiError(400, 'Добавлять музыку можно только из SoundCloud.');
       if (body.action === 'resolve' && link.provider !== 'youtube')
         throw new ApiError(400, 'Неизвестный источник видео.');
       if (body.action === 'start') {

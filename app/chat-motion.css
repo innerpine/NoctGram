@@ -1,14 +1,8 @@
 /* Scoped to chat surfaces. Native media controls and the music player keep their behavior. */
-.chat-conversation {
-  animation: chat-conversation-in 180ms ease;
-}
-@keyframes chat-conversation-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Loaded history is visible on its first frame; only newly arriving messages enter. */
+.chat-message-shell[data-chat-initial]
+  :is(.chat-message-row, .bubble, .chat-gift-event) {
+  animation: none;
 }
 .chat-action-menu,
 .chat-options-menu {
@@ -75,7 +69,7 @@
     background-color 160ms ease,
     outline-color 160ms ease;
 }
-.chat-message-shell > .bubble.other {
+.chat-message-shell > .chat-message-row.other {
   transition:
     margin-left 200ms ease,
     background-color 240ms ease;

@@ -1,6 +1,12 @@
 'use client';
 /* eslint-disable react/react-compiler */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Forward, Trash2, X } from 'lucide-react';
 import type { Message, Person } from '@/lib/client';
 import { chatRequest } from '@/lib/chat-client';
@@ -50,6 +56,9 @@ export function ChatConversation({
   onReport: (message: Message) => void;
   notify: (text: string) => void;
 }) {
+  const [initialMessages] = useState(
+    () => new Set(messages.map((message) => message.id)),
+  );
   const [reply, setReply] = useState<Message | null>(null),
     [selected, setSelected] = useState<string[]>([]),
     [composerLocked, setComposerLocked] = useState(false),
@@ -74,7 +83,7 @@ export function ChatConversation({
     alive = useRef(true);
   const selectionRef = useRef(selected);
   selectionRef.current = selected;
-  useEffect(() => {
+  useLayoutEffect(() => {
     alive.current = true;
     if (list.current)
       removal.current = createChatRemoval(list.current, () =>
@@ -171,7 +180,7 @@ export function ChatConversation({
       });
   }, []);
   const last = messages.at(-1);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previous = previousNewest.current;
     if (last?.id === previous?.id) return;
     previousNewest.current = last;
@@ -355,12 +364,12 @@ export function ChatConversation({
           <ChatMessage
             key={message.id}
             message={message}
+            initial={initialMessages.has(message.id)}
             me={me}
             peer={peer}
             disabled={readonly}
             canSend={canSend}
             onProfile={onProfile}
-            onReport={onReport}
             onAction={onAction}
             onJump={onJump}
             selected={selected.includes(message.id)}

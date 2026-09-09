@@ -400,15 +400,3 @@
   color: #999;
   flex-shrink: 0;
 }
-.message-report {
-  padding: 4px;
-  margin-left: 6px;
-  border-radius: 5px;
-  color: inherit;
-  opacity: 0.65;
-}
-.message-report:hover,
-.message-report:focus-visible {
-  opacity: 1;
-  background: #ffffff14;
-}

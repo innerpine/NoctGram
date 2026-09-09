@@ -46,7 +46,9 @@ export function MusicPlaylistCreate({
     [error, setError] = useState('');
   const locked = useRef(false),
     nameInput = useRef<HTMLInputElement>(null);
-  const tracks = library.filter((track) => track.kind === 'track');
+  const tracks = library.filter(
+    (track) => track.kind === 'track' && track.provider === 'soundcloud',
+  );
   const selectedTracks = selected.flatMap(
     (id) => tracks.find((t) => t.id === id) || [],
   );

@@ -153,6 +153,25 @@ const scPlaylist = {
   permalink_url: 'https://soundcloud.com/qa-owner/sets/private',
   track_count: 3,
 };
+let importPageMode = 'normal';
+const importTrack = (id, sharing = 'public') => ({
+  id,
+  sharing,
+  kind: 'track',
+  streamable: true,
+  access: 'playable',
+  title: 'Imported song ' + id,
+  duration: 120000,
+  permalink_url:
+    'https://soundcloud.com/qa-owner/imported-' +
+    id +
+    '?utm_medium=api&utm_source=id_fixture',
+  user: {
+    username: 'QA Owner',
+    permalink_url:
+      'https://soundcloud.com/qa-owner?utm_medium=api&utm_source=id_fixture',
+  },
+});
 globalThis.fetch = async (input, init) => {
   const target =
     typeof input === 'string'
@@ -224,6 +243,27 @@ globalThis.fetch = async (input, init) => {
     });
   if (target.startsWith('https://api.soundcloud.com/me/playlists'))
     return Response.json({ collection: [scPlaylist], next_href: nextHref });
+  if (
+    target.startsWith(
+      'https://api.soundcloud.com/playlists/soundcloud%3Aplaylists%3A1/tracks',
+    )
+  ) {
+    if (target.includes('cursor=next')) {
+      if (importPageMode === 'fail')
+        return Response.json({ error: 'temporary' }, { status: 503 });
+      return Response.json({
+        collection: [importTrack(13), importTrack(14, 'private')],
+        next_href: null,
+      });
+    }
+    return Response.json({
+      collection: [importTrack(12)],
+      next_href:
+        importPageMode === 'foreign'
+          ? 'https://evil.example/steal'
+          : 'https://api.soundcloud.com/playlists/soundcloud%3Aplaylists%3A1/tracks?cursor=next',
+    });
+  }
   if (target.startsWith('https://api.soundcloud.com/playlists/1'))
     return Response.json(scPlaylist);
   const spPlaylist = {
@@ -329,7 +369,74 @@ try {
     (await service.servicePlaylists('alice', provider, '')).next,
     null,
   );
-  await service.importServicePlaylist('alice', provider, '1');
+  const copied = await service.importServicePlaylist('alice', provider, '1');
+  assert.ok(copied.localPlaylistId);
+  assert.equal(copied.importedTrackCount, 2);
+  assert.equal(
+    sqlite
+      .prepare(
+        "SELECT authorUrl FROM music_tracks WHERE url='https://soundcloud.com/qa-owner/imported-12'",
+      )
+      .get().authorUrl,
+    'https://soundcloud.com/qa-owner',
+  );
+  assert.equal(
+    sqlite
+      .prepare('SELECT ownerId FROM music_playlists WHERE id=?')
+      .get(copied.localPlaylistId).ownerId,
+    'alice',
+  );
+  assert.deepEqual(
+    sqlite
+      .prepare(
+        'SELECT t.title FROM music_playlist_tracks pt JOIN music_tracks t ON t.id=pt.trackId WHERE pt.playlistId=? ORDER BY pt.sortOrder',
+      )
+      .all(copied.localPlaylistId)
+      .map((t) => t.title),
+    ['Imported song 12', 'Imported song 13'],
+  );
+  sqlite
+    .prepare(
+      'UPDATE music_playlist_tracks SET sortOrder=1-sortOrder WHERE playlistId=?',
+    )
+    .run(copied.localPlaylistId);
+  assert.equal(
+    (await service.importServicePlaylist('alice', provider, '1'))
+      .localPlaylistId,
+    copied.localPlaylistId,
+  );
+  assert.deepEqual(
+    sqlite
+      .prepare(
+        'SELECT t.title FROM music_playlist_tracks pt JOIN music_tracks t ON t.id=pt.trackId WHERE pt.playlistId=? ORDER BY pt.sortOrder',
+      )
+      .all(copied.localPlaylistId)
+      .map((t) => t.title),
+    ['Imported song 13', 'Imported song 12'],
+    'Reimport preserves local edits',
+  );
+  sqlite
+    .prepare('DELETE FROM music_playlists WHERE id=?')
+    .run(copied.localPlaylistId);
+  assert.equal(
+    (await service.importedPlaylists('alice', provider))[0].localPlaylistId,
+    null,
+  );
+  for (const mode of ['fail', 'foreign']) {
+    importPageMode = mode;
+    await assert.rejects(service.importServicePlaylist('alice', provider, '1'));
+    assert.equal(
+      sqlite.prepare('SELECT COUNT(*) AS n FROM music_playlists').get().n,
+      0,
+      'A failed page never produces a partial playlist',
+    );
+  }
+  importPageMode = 'normal';
+  assert.equal(
+    (await service.importServicePlaylist('alice', provider, '1'))
+      .importedTrackCount,
+    2,
+  );
   assert.equal((await service.importedPlaylists('alice', provider)).length, 1);
   assert.equal((await service.importedPlaylists('bob', provider)).length, 0);
   assert.equal(
@@ -478,11 +585,9 @@ try {
   );
   await service.connectYandex('alice', 'own-yandex-token-test');
   assert.equal((await service.yandexStatus('alice')).status, 'connected');
-  assert.equal(
-    (await service.musicServiceStatus('alice')).find(
-      (x) => x.provider === 'yandex',
-    ).status,
-    'connected',
+  assert.deepEqual(
+    (await service.musicServiceStatus('alice')).map((x) => x.provider),
+    ['soundcloud'],
   );
   assert.ok(
     !JSON.stringify(
@@ -495,6 +600,10 @@ try {
   assert.equal((await service.yandexPlaylists('alice')).length, 1);
   assert.equal((await service.yandexPlaylists('bob')).length, 0);
   playlistStatus = 451;
+  await assert.rejects(
+    service.checkYandexAccess('alice'),
+    (e) => e.code === 'YANDEX_ACCESS_RESTRICTED',
+  );
   await assert.rejects(
     service.syncYandex('alice'),
     (e) => e.code === 'YANDEX_ACCESS_RESTRICTED',
@@ -515,6 +624,11 @@ try {
     (e) => e.code === 'YANDEX_HTTP_503',
   );
   playlistStatus = 200;
+  assert.deepEqual(await service.checkYandexAccess('alice'), {
+    ok: true,
+    scope: 'playlists',
+    count: 1,
+  });
   assert.equal(
     (await service.yandexTracks('alice', '3')).items[0].title,
     'Recording',

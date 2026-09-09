@@ -6,11 +6,13 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
   type RefObject,
+  type ButtonHTMLAttributes,
 } from 'react';
 import {
   ChevronDown,
@@ -24,6 +26,7 @@ import {
   Play,
   SkipBack,
   SkipForward,
+  SlidersHorizontal,
   Volume2,
   VolumeX,
   X,
@@ -142,16 +145,61 @@ function Lyrics({
   const [follow, setFollow] = useState(true);
   const container = useRef<HTMLDivElement>(null);
   const activeLine = useRef<HTMLButtonElement>(null);
-  const latestSeek = useRef({ onSeek, offset });
-  latestSeek.current = { onSeek, offset };
-  const chooseLine = useCallback((time: number) => {
-    latestSeek.current.onSeek(Math.max(0, time - latestSeek.current.offset));
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchOrigin = useRef<{ x: number; y: number } | null>(null);
+  const [size, setSize] = useState(0);
+  const resumeFollow = useCallback(() => {
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
     setFollow(true);
   }, []);
+  const browseLyrics = () => {
+    setFollow(false);
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(resumeFollow, 4000);
+  };
+  const latestSeek = useRef({ onSeek, offset });
+  latestSeek.current = { onSeek, offset };
+  const chooseLine = useCallback(
+    (time: number) => {
+      latestSeek.current.onSeek(Math.max(0, time - latestSeek.current.offset));
+      resumeFollow();
+    },
+    [resumeFollow],
+  );
   const active = currentLyric(lyrics?.lines || [], position + offset);
   useEffect(() => {
-    setFollow(true);
-  }, [key, enabled]);
+    resumeFollow();
+    return () => {
+      if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    };
+  }, [key, enabled, resumeFollow]);
+  useEffect(() => {
+    const element = container.current;
+    const pane = element?.parentElement;
+    if (!element || !pane || !enabled) return;
+    let frame = 0,
+      height = -1,
+      width = -1;
+    const observer = new ResizeObserver(() => {
+      const available = Math.max(
+        0,
+        pane.clientHeight - (pane.lastElementChild as HTMLElement).offsetHeight,
+      );
+      if (height === available && width === pane.clientWidth) return;
+      height = available;
+      width = pane.clientWidth;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        element.style.setProperty('--lyrics-center-space', `${height / 2}px`);
+        setSize((value) => value + 1);
+      });
+    });
+    observer.observe(pane, { box: 'border-box' });
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [enabled, lyrics]);
   useEffect(() => {
     if (!enabled || !follow || !container.current || !activeLine.current)
       return;
@@ -160,12 +208,23 @@ function Lyrics({
     ).matches;
     container.current.scrollTo({
       top:
-        activeLine.current.offsetTop -
+        container.current.scrollTop +
+        activeLine.current.getBoundingClientRect().top -
+        container.current.getBoundingClientRect().top -
         container.current.clientHeight / 2 +
-        activeLine.current.clientHeight / 2,
+        activeLine.current.getBoundingClientRect().height / 2,
       behavior: appearance.motion && !reduced ? 'smooth' : 'instant',
     });
-  }, [active, follow, enabled, key, appearance.textSize, appearance.motion]);
+  }, [
+    active,
+    follow,
+    enabled,
+    key,
+    lyrics,
+    size,
+    appearance.textSize,
+    appearance.motion,
+  ]);
 
   if (lookup.loading)
     return (
@@ -207,8 +266,23 @@ function Lyrics({
         className={
           'music-lyrics-scroll' + (appearance.softLyrics ? ' soft-lines' : '')
         }
-        onWheel={() => setFollow(false)}
-        onTouchStart={() => setFollow(false)}
+        onWheel={browseLyrics}
+        onTouchStart={(event) => {
+          const touch = event.touches[0];
+          touchOrigin.current = { x: touch.clientX, y: touch.clientY };
+        }}
+        onTouchMove={(event) => {
+          const touch = event.touches[0],
+            origin = touchOrigin.current;
+          if (
+            origin &&
+            Math.hypot(touch.clientX - origin.x, touch.clientY - origin.y) > 8
+          )
+            browseLyrics();
+        }}
+        onScroll={() => {
+          if (!follow) browseLyrics();
+        }}
         onKeyDown={(e) => {
           if (
             [
@@ -221,7 +295,7 @@ function Lyrics({
               'Tab',
             ].includes(e.key)
           )
-            setFollow(false);
+            browseLyrics();
         }}
         tabIndex={0}
         aria-label="Текст песни"
@@ -240,7 +314,7 @@ function Lyrics({
       <div className="music-lyrics-footer">
         <span>Текст · LRCLIB</span>
         {!follow && lyrics.lines.length > 0 ? (
-          <button onClick={() => setFollow(true)}>К текущей строке</button>
+          <button onClick={resumeFollow}>К текущей строке</button>
         ) : (
           <span>
             {lyrics.lines.length ? 'По строкам' : 'Без синхронизации'}
@@ -300,11 +374,15 @@ export function MusicPlayerView(p: Props) {
   const [miniCollapsed, setMiniCollapsed] = useState(false);
   const [sheetDragging, setSheetDragging] = useState(false);
   const sheetHandle = useRef<HTMLButtonElement>(null);
+  const compactHandle = useRef<HTMLButtonElement>(null);
   const sheetDrag = useRef<{ id: number; y: number } | null>(null);
+  const dragFrame = useRef<number | null>(null);
+  const dragOffset = useRef(0);
+  const focusSheet = useRef(false);
   const suppressSheetClickUntil = useRef(0);
   const changeMini = (collapsed: boolean) => {
+    focusSheet.current = collapsed !== miniCollapsed;
     setMiniCollapsed(collapsed);
-    sheetHandle.current?.focus({ preventScroll: true });
     try {
       localStorage.setItem('noctgram:player-collapsed', String(collapsed));
     } catch {
@@ -312,9 +390,70 @@ export function MusicPlayerView(p: Props) {
     }
   };
   const resetSheetDrag = () => {
+    if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
+    dragFrame.current = null;
     sheetDrag.current = null;
     setSheetDragging(false);
     p.playerRef.current?.style.removeProperty('--music-sheet-drag');
+  };
+  useLayoutEffect(() => {
+    if (!focusSheet.current) return;
+    focusSheet.current = false;
+    (miniCollapsed ? compactHandle : sheetHandle).current?.focus({
+      preventScroll: true,
+    });
+  }, [miniCollapsed]);
+  useEffect(
+    () => () => {
+      if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
+    },
+    [],
+  );
+  const sheetGesture: ButtonHTMLAttributes<HTMLButtonElement> = {
+    onClick(event) {
+      if (event.detail > 0 && Date.now() < suppressSheetClickUntil.current)
+        return;
+      changeMini(!miniCollapsed);
+    },
+    onKeyDown(event) {
+      if (['ArrowUp', 'ArrowDown', 'Escape'].includes(event.key)) {
+        event.preventDefault();
+        changeMini(event.key !== 'ArrowUp');
+      }
+    },
+    onPointerDown(event) {
+      if (!event.isPrimary || event.button !== 0) return;
+      sheetDrag.current = { id: event.pointerId, y: event.clientY };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    onPointerMove(event) {
+      if (sheetDrag.current?.id !== event.pointerId) return;
+      const delta = event.clientY - sheetDrag.current.y;
+      if (Math.abs(delta) < 3) return;
+      if (!sheetDragging) setSheetDragging(true);
+      dragOffset.current = Math.max(-14, Math.min(24, delta * 0.3));
+      if (dragFrame.current !== null) return;
+      dragFrame.current = requestAnimationFrame(() => {
+        dragFrame.current = null;
+        p.playerRef.current?.style.setProperty(
+          '--music-sheet-drag',
+          `${dragOffset.current}px`,
+        );
+      });
+    },
+    onPointerUp(event) {
+      if (sheetDrag.current?.id !== event.pointerId) return;
+      const delta = event.clientY - sheetDrag.current.y;
+      if (Math.abs(delta) >= 24) {
+        suppressSheetClickUntil.current = Date.now() + 400;
+        changeMini(delta > 0);
+      }
+      resetSheetDrag();
+      if (event.currentTarget.hasPointerCapture(event.pointerId))
+        event.currentTarget.releasePointerCapture(event.pointerId);
+    },
+    onPointerCancel: resetSheetDrag,
+    onLostPointerCapture: resetSheetDrag,
   };
   useEffect(() => {
     const query = window.matchMedia('(min-width: 1100px)');
@@ -342,7 +481,7 @@ export function MusicPlayerView(p: Props) {
   };
   const closeDock = () => {
     changeDock(false);
-    (miniCollapsed ? sheetHandle : dockButton).current?.focus({
+    (miniCollapsed ? compactHandle : dockButton).current?.focus({
       preventScroll: true,
     });
   };
@@ -542,60 +681,148 @@ export function MusicPlayerView(p: Props) {
         data-dragging={sheetDragging}
         data-motion={appearance.motion ? 'on' : 'off'}
       >
+        <div
+          className="music-sheet-panel"
+          aria-hidden={miniCollapsed}
+          inert={miniCollapsed}
+        >
+          <button
+            ref={sheetHandle}
+            className="music-sheet-handle"
+            aria-label={
+              miniCollapsed ? 'Раскрыть нижний плеер' : 'Свернуть нижний плеер'
+            }
+            aria-expanded={!miniCollapsed}
+            aria-controls="music-sheet-controls"
+            title={
+              miniCollapsed
+                ? 'Раскрыть плеер — нажми или потяни вверх'
+                : 'Свернуть плеер — нажми или потяни вниз'
+            }
+            {...sheetGesture}
+          >
+            <span className="music-sheet-grip" aria-hidden="true" />
+          </button>
+          <div
+            id="music-sheet-controls"
+            className="music-sheet-content"
+            aria-hidden={miniCollapsed}
+            inert={miniCollapsed}
+          >
+            <div className="music-sheet-inner">
+              {p.roomName && (
+                <div className="music-room-strip">
+                  <Headphones size={14} />
+                  <span>Вместе · {p.roomName}</span>
+                  <button onClick={p.onLeaveRoom}>Выйти</button>
+                </div>
+              )}
+              {p.roomError && (
+                <p className="music-error" role="alert">
+                  {p.roomError}
+                </p>
+              )}
+              <div className="music-player-row">
+                <button
+                  ref={coverButton}
+                  className="music-cover"
+                  aria-label="Развернуть плеер"
+                  aria-haspopup="dialog"
+                  aria-expanded={p.expanded}
+                  onClick={() => p.onExpanded(true)}
+                >
+                  {p.track.artwork ? (
+                    <img src={playerArtwork(p.track.artwork)} alt="" />
+                  ) : (
+                    <Headphones size={21} />
+                  )}
+                  <span>
+                    <ChevronUp size={20} />
+                  </span>
+                </button>
+                <div className="music-player-title">
+                  <button
+                    onClick={() => p.onExpanded(true)}
+                    title={p.track.title}
+                  >
+                    {p.track.title}
+                  </button>
+                  <div>
+                    <span>{p.track.artist || 'Музыка'}</span>
+                    <span aria-hidden="true"> · </span>
+                    {source}
+                  </div>
+                </div>
+                <MusicFavorite track={p.track} />
+                {transport()}
+                <button
+                  ref={dockButton}
+                  className="icon-button music-dock-toggle"
+                  aria-label="Текст справа"
+                  title={
+                    dockOpen
+                      ? 'Скрыть текст справа'
+                      : 'Текст справа — слушай и общайся'
+                  }
+                  aria-pressed={dockOpen}
+                  aria-expanded={dockVisible}
+                  aria-controls="music-lyrics-dock"
+                  onClick={() => changeDock(!dockOpen)}
+                >
+                  <PanelRightOpen size={19} />
+                  <span>Текст</span>
+                </button>
+                <button
+                  className="icon-button music-expand-button"
+                  aria-label="Развернуть плеер"
+                  aria-haspopup="dialog"
+                  onClick={() => p.onExpanded(true)}
+                >
+                  <ChevronUp size={18} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label="Остановить и закрыть плеер"
+                  onClick={p.onStop}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              {progress()}
+              <div className="music-mini-footer">
+                <Link
+                  className="music-listen-status"
+                  href="/music?tab=charts"
+                  title="Открыть чарт прослушиваний"
+                >
+                  {p.listening.status === 'counted'
+                    ? 'Учтено в чарте сегодня'
+                    : p.listening.status === 'tracking'
+                      ? `В чарт · ${p.listening.seconds} / 30 с`
+                      : p.listening.status === 'error'
+                        ? 'Учёт недоступен'
+                        : p.listening.status === 'checking'
+                          ? 'Проверяем учёт…'
+                          : p.listening.status === 'excluded'
+                            ? `${sourceName} · без учёта в чарте`
+                            : 'Чарт прослушиваний'}
+                </Link>
+                {volumeControl('mini')}
+              </div>
+              {!p.expanded && error}
+            </div>
+          </div>
+        </div>
         <button
-          ref={sheetHandle}
-          className="music-sheet-handle"
-          aria-label={
-            miniCollapsed ? 'Раскрыть нижний плеер' : 'Свернуть нижний плеер'
-          }
-          aria-expanded={!miniCollapsed}
+          ref={compactHandle}
+          className="music-sheet-handle music-sheet-compact"
+          aria-label="Раскрыть нижний плеер"
+          aria-expanded={false}
           aria-controls="music-sheet-controls"
-          title={
-            miniCollapsed
-              ? 'Раскрыть плеер — нажми или потяни вверх'
-              : 'Свернуть плеер — нажми или потяни вниз'
-          }
-          onClick={(event) => {
-            if (
-              event.detail > 0 &&
-              Date.now() < suppressSheetClickUntil.current
-            )
-              return;
-            changeMini(!miniCollapsed);
-          }}
-          onKeyDown={(event) => {
-            if (['ArrowUp', 'ArrowDown', 'Escape'].includes(event.key)) {
-              event.preventDefault();
-              changeMini(event.key !== 'ArrowUp');
-            }
-          }}
-          onPointerDown={(event) => {
-            if (!event.isPrimary || event.button !== 0) return;
-            sheetDrag.current = { id: event.pointerId, y: event.clientY };
-            event.currentTarget.setPointerCapture(event.pointerId);
-            setSheetDragging(true);
-          }}
-          onPointerMove={(event) => {
-            if (sheetDrag.current?.id !== event.pointerId) return;
-            const delta = event.clientY - sheetDrag.current.y;
-            p.playerRef.current?.style.setProperty(
-              '--music-sheet-drag',
-              `${Math.max(-14, Math.min(24, delta * 0.3))}px`,
-            );
-          }}
-          onPointerUp={(event) => {
-            if (sheetDrag.current?.id !== event.pointerId) return;
-            const delta = event.clientY - sheetDrag.current.y;
-            if (Math.abs(delta) >= 24) {
-              suppressSheetClickUntil.current = Date.now() + 400;
-              changeMini(delta > 0);
-            }
-            resetSheetDrag();
-            if (event.currentTarget.hasPointerCapture(event.pointerId))
-              event.currentTarget.releasePointerCapture(event.pointerId);
-          }}
-          onPointerCancel={resetSheetDrag}
-          onLostPointerCapture={resetSheetDrag}
+          aria-hidden={!miniCollapsed}
+          inert={!miniCollapsed}
+          title="Раскрыть плеер — нажми или потяни вверх"
+          {...sheetGesture}
         >
           <span className="music-sheet-grip" aria-hidden="true" />
           <span className="music-sheet-peek" aria-hidden="true">
@@ -603,115 +830,6 @@ export function MusicPlayerView(p: Props) {
             <ChevronUp size={15} />
           </span>
         </button>
-        <div
-          id="music-sheet-controls"
-          className="music-sheet-content"
-          aria-hidden={miniCollapsed}
-          inert={miniCollapsed}
-        >
-          <div className="music-sheet-inner">
-            {p.roomName && (
-              <div className="music-room-strip">
-                <Headphones size={14} />
-                <span>Вместе · {p.roomName}</span>
-                <button onClick={p.onLeaveRoom}>Выйти</button>
-              </div>
-            )}
-            {p.roomError && (
-              <p className="music-error" role="alert">
-                {p.roomError}
-              </p>
-            )}
-            <div className="music-player-row">
-              <button
-                ref={coverButton}
-                className="music-cover"
-                aria-label="Развернуть плеер"
-                aria-haspopup="dialog"
-                aria-expanded={p.expanded}
-                onClick={() => p.onExpanded(true)}
-              >
-                {p.track.artwork ? (
-                  <img src={playerArtwork(p.track.artwork)} alt="" />
-                ) : (
-                  <Headphones size={21} />
-                )}
-                <span>
-                  <ChevronUp size={20} />
-                </span>
-              </button>
-              <div className="music-player-title">
-                <button
-                  onClick={() => p.onExpanded(true)}
-                  title={p.track.title}
-                >
-                  {p.track.title}
-                </button>
-                <div>
-                  <span>{p.track.artist || 'Музыка'}</span>
-                  <span aria-hidden="true"> · </span>
-                  {source}
-                </div>
-              </div>
-              <MusicFavorite track={p.track} />
-              {transport()}
-              <button
-                ref={dockButton}
-                className="icon-button music-dock-toggle"
-                aria-label="Текст справа"
-                title={
-                  dockOpen
-                    ? 'Скрыть текст справа'
-                    : 'Текст справа — слушай и общайся'
-                }
-                aria-pressed={dockOpen}
-                aria-expanded={dockVisible}
-                aria-controls="music-lyrics-dock"
-                onClick={() => changeDock(!dockOpen)}
-              >
-                <PanelRightOpen size={19} />
-                <span>Текст</span>
-              </button>
-              <button
-                className="icon-button music-expand-button"
-                aria-label="Развернуть плеер"
-                aria-haspopup="dialog"
-                onClick={() => p.onExpanded(true)}
-              >
-                <ChevronUp size={18} />
-              </button>
-              <button
-                className="icon-button"
-                aria-label="Остановить и закрыть плеер"
-                onClick={p.onStop}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            {progress()}
-            <div className="music-mini-footer">
-              <Link
-                className="music-listen-status"
-                href="/music?tab=charts"
-                title="Открыть чарт прослушиваний"
-              >
-                {p.listening.status === 'counted'
-                  ? 'Учтено в чарте сегодня'
-                  : p.listening.status === 'tracking'
-                    ? `В чарт · ${p.listening.seconds} / 30 с`
-                    : p.listening.status === 'error'
-                      ? 'Учёт недоступен'
-                      : p.listening.status === 'checking'
-                        ? 'Проверяем учёт…'
-                        : p.listening.status === 'excluded'
-                          ? `${sourceName} · без учёта в чарте`
-                          : 'Чарт прослушиваний'}
-              </Link>
-              {volumeControl('mini')}
-            </div>
-            {!p.expanded && error}
-          </div>
-        </div>
       </section>
 
       {/* Escape bubbles from the panel's controls; the panel never traps focus. */}
@@ -835,8 +953,9 @@ export function MusicPlayerView(p: Props) {
           }}
         >
           <DialogContent
+            layout="fullscreen"
             showCloseButton={false}
-            finalFocus={miniCollapsed ? sheetHandle : coverButton}
+            finalFocus={miniCollapsed ? compactHandle : coverButton}
             className="music-stage"
             onContextMenu={(event) => {
               event.preventDefault();
@@ -896,7 +1015,18 @@ export function MusicPlayerView(p: Props) {
               >
                 <PanelRightOpen size={22} />
               </button>
-              <span className="music-dock-mobile-spacer" aria-hidden="true" />
+              <button
+                className="music-stage-icon music-settings-button"
+                aria-label="Настройки плеера"
+                aria-haspopup="dialog"
+                aria-expanded={settingsOpen}
+                onClick={(event) => {
+                  const box = event.currentTarget.getBoundingClientRect();
+                  showSettings(box.left, box.bottom);
+                }}
+              >
+                <SlidersHorizontal size={21} />
+              </button>
             </header>
             <DialogDescription className="sr-only">
               Плеер Noctgram. Настройки открываются правой кнопкой мыши или
@@ -904,34 +1034,37 @@ export function MusicPlayerView(p: Props) {
               сворачивает окно, музыка продолжает играть.
             </DialogDescription>
             <div
+              data-pane={pane}
               className={
                 'music-stage-body' + (pane === 'cover' ? ' cover-only' : '')
               }
             >
               <div className="music-stage-main">
-                <div className="music-stage-artwork">
-                  {artwork ? (
-                    <img
-                      key={artwork}
-                      src={artwork}
-                      alt={`Обложка ${p.track.title}`}
-                      onError={(event) => {
-                        if (event.currentTarget.src !== p.track.artwork)
-                          event.currentTarget.src = p.track.artwork;
-                      }}
-                    />
-                  ) : (
-                    <Headphones size={88} strokeWidth={0.8} />
-                  )}
-                </div>
-                <div className="music-stage-track">
-                  <DialogTitle>{p.track.title}</DialogTitle>
-                  <p>
-                    {p.track.artist || 'Музыка'}
-                    <span> · </span>
-                    {source}
-                  </p>
-                  <MusicFavorite track={p.track} />
+                <div className="music-stage-identity">
+                  <div className="music-stage-artwork">
+                    {artwork ? (
+                      <img
+                        key={artwork}
+                        src={artwork}
+                        alt={`Обложка ${p.track.title}`}
+                        onError={(event) => {
+                          if (event.currentTarget.src !== p.track.artwork)
+                            event.currentTarget.src = p.track.artwork;
+                        }}
+                      />
+                    ) : (
+                      <Headphones size={88} strokeWidth={0.8} />
+                    )}
+                  </div>
+                  <div className="music-stage-track">
+                    <DialogTitle>{p.track.title}</DialogTitle>
+                    <p>
+                      {p.track.artist || 'Музыка'}
+                      <span> · </span>
+                      {source}
+                    </p>
+                    <MusicFavorite track={p.track} />
+                  </div>
                 </div>
                 {progress('full')}
                 <div className="music-stage-controls">

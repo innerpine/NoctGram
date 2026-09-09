@@ -29,6 +29,7 @@ import {
 } from '@/lib/music-links';
 import { useMusic } from '@/lib/music-context';
 import { MusicPlaylists } from './music-playlists';
+import { MusicSearch } from './music-search';
 import { MusicAudioUpload } from './music-audio-upload';
 import { MusicLeaderboard, type ListenerScore } from './music-leaderboard';
 import type { Person } from '@/lib/client';
@@ -84,7 +85,7 @@ export function MusicPanel({
     try {
       const result = await musicRequest<MusicData>('home', undefined, {
         charts: tab === 'charts' ? '1' : '0',
-        leaders: '1',
+        leaders: tab === 'charts' ? '1' : '0',
         period,
       });
       if (version === requestVersion.current) setData(result);
@@ -118,10 +119,8 @@ export function MusicPanel({
   }, [refresh]);
   async function save() {
     const link = parseMusicLink(url);
-    if (!link) {
-      setError(
-        'Вставьте ссылку SoundCloud, Spotify, YouTube или YouTube Music.',
-      );
+    if (!link || link.provider !== 'soundcloud') {
+      setError('Вставьте ссылку на трек или плейлист SoundCloud.');
       return;
     }
     setBusy(true);
@@ -253,6 +252,7 @@ export function MusicPanel({
       </div>
       <Link
         href="/music/services"
+        prefetch={false}
         className="music-services-link"
         onNavigate={(event) => {
           if (onServices) {
@@ -263,8 +263,8 @@ export function MusicPanel({
       >
         <Headphones size={21} />
         <span>
-          <strong>Подключить музыкальные сервисы</strong>
-          <small>Ваши аккаунты и плейлисты</small>
+          <strong>Подключить SoundCloud</strong>
+          <small>Ваш аккаунт и плейлисты</small>
         </span>
         <ArrowUpRight size={19} />
       </Link>
@@ -274,12 +274,13 @@ export function MusicPanel({
         className="music-tabs"
       >
         <TabsList>
+          <TabsTrigger value="search">Поиск</TabsTrigger>
           <TabsTrigger value="playlists">Плейлисты</TabsTrigger>
           <TabsTrigger value="charts">Чарты</TabsTrigger>
           <TabsTrigger value="library">Моя музыка</TabsTrigger>
         </TabsList>
       </Tabs>
-      {tab !== 'playlists' && (
+      {tab === 'library' && (
         <form
           className="music-link-search"
           onSubmit={(e) => {
@@ -294,7 +295,7 @@ export function MusicPanel({
             aria-label="Добавить музыку по ссылке"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="Вставьте ссылку на музыку"
+            placeholder="Ссылка на трек или плейлист SoundCloud"
             disabled={busy || readOnly || !signedIn}
             autoComplete="off"
           />
@@ -336,6 +337,15 @@ export function MusicPanel({
           <>
             {tab === 'playlists' ? (
               <MusicPlaylists readOnly={readOnly} library={data.library} />
+            ) : tab === 'search' ? (
+              <MusicSearch
+                disabled={readOnly}
+                savedUrls={data.library.map((t) => t.url)}
+                onAdd={async (track) => {
+                  await musicRequest('save', { url: track.url });
+                  window.dispatchEvent(new Event('noctgram:music-refresh'));
+                }}
+              />
             ) : tab === 'charts' ? (
               <section
                 className="music-chart music-content-enter card"
@@ -442,17 +452,6 @@ export function MusicPanel({
                   </div>
                 )}
               </section>
-            )}
-            {tab === 'playlists' && (
-              <div className="music-content-enter card">
-                <MusicLeaderboard
-                  listeners={data.listeners}
-                  profile={data.profile}
-                  mine={data.mine}
-                  period={data.period}
-                  onProfile={onProfile}
-                />
-              </div>
             )}
           </>
         )

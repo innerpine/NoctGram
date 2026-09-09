@@ -1,3 +1,5 @@
+import type { AppHistoryHost } from './app-history-bootstrap';
+
 const STATE_KEY = '__noctgramNavigation';
 const pages = new Set([
   'feed',
@@ -45,7 +47,7 @@ export function normalizeAppRoute(input: AppRoute): AppRoute {
   if (page === 'music')
     return {
       page,
-      musicTab: ['charts', 'library'].includes(input.musicTab || '')
+      musicTab: ['search', 'charts', 'library'].includes(input.musicTab || '')
         ? input.musicTab
         : 'playlists',
     };
@@ -122,11 +124,17 @@ export function appRouteHref(input: AppRoute) {
 
 /** Own only Noctgram view entries. Browser Back beyond the first view stays native. */
 export function createAppHistory(
-  host: Window,
+  host: AppHistoryHost,
   options: {
     owner: string;
     initial: AppRoute;
     prepare: (route: AppRoute) => Promise<PreparedRoute>;
+    render?: (
+      from: AppRoute,
+      to: AppRoute,
+      update: () => void,
+      initial: boolean,
+    ) => Promise<void>;
     error: (message: string) => void;
   },
 ) {
@@ -192,13 +200,20 @@ export function createAppHistory(
       if (disposed || generation !== version) return false;
       const next = normalizeAppRoute(prepared.route);
       const changed = appRouteKey(next) !== appRouteKey(active);
-      active = next;
-      settling =
-        appRouteKey(observed) === appRouteKey(next) ? '' : appRouteKey(next);
-      pending = false;
-      write(mode === 'push' && changed ? 'push' : 'replace', next, initial);
-      prepared.commit();
-      return true;
+      let committed = false;
+      const commit = () => {
+        if (disposed || generation !== version) return;
+        active = next;
+        settling =
+          appRouteKey(observed) === appRouteKey(next) ? '' : appRouteKey(next);
+        pending = false;
+        write(mode === 'push' && changed ? 'push' : 'replace', next, initial);
+        prepared.commit();
+        committed = true;
+      };
+      if (options.render) await options.render(active, next, commit, initial);
+      else commit();
+      return committed;
     } catch (error) {
       if (disposed || generation !== version) return false;
       pending = false;
@@ -217,7 +232,7 @@ export function createAppHistory(
       // profile request from rewriting the destination URL in the meantime.
       disposed = true;
       generation++;
-      host.removeEventListener('popstate', pop, true);
+      detach();
       return;
     }
     // These entries describe client views in the mounted app. Letting the
@@ -225,7 +240,13 @@ export function createAppHistory(
     event.stopImmediatePropagation();
     void transition(route, 'replace');
   };
-  host.addEventListener('popstate', pop, true);
+  const bridge = host.__noctgramHistory;
+  const detach = () => {
+    if (bridge?.listener === pop) bridge.listener = null;
+    host.removeEventListener('popstate', pop, true);
+  };
+  if (bridge) bridge.listener = pop;
+  else host.addEventListener('popstate', pop, true);
   const initialRoute = appRouteFromURL(host.location.href, options.owner);
   const state = {
     ...host.history.state,
@@ -264,7 +285,7 @@ export function createAppHistory(
     dispose() {
       disposed = true;
       generation++;
-      host.removeEventListener('popstate', pop, true);
+      detach();
     },
   };
 }

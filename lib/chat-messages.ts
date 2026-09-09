@@ -5,6 +5,22 @@ import { messageAllowed } from './privacy';
 import { visibleAccount } from './account-access';
 import { messageVisible, messagePair } from './chat-access';
 
+export async function readUnreadMessageCount(me: string): Promise<number> {
+  // The navigation badge only displays up to 99+, without loading every peer's
+  // appearance, last message and conversation history on every background poll.
+  const row = await db()
+    .prepare(`SELECT COUNT(*) AS unread FROM (
+      SELECT 1 FROM messages m JOIN users u ON u.id=m.sender
+      WHERE m.recipient=? AND m.read=0 AND ${messageVisible('m', 'm.recipient')}
+        AND ${visibleAccount('u')}
+        AND EXISTS(SELECT 1 FROM handles h WHERE h.userId=u.id AND h.main=1)
+      LIMIT 100
+    )`)
+    .bind(me)
+    .first<{ unread: number }>();
+  return row?.unread || 0;
+}
+
 export async function readConversation(
   me: string,
   peer: string,

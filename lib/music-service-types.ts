@@ -1,12 +1,12 @@
-export const MUSIC_SERVICES = [
-  'soundcloud',
-  'spotify',
-  'yandex',
-  'youtube',
-  'vk',
-  'deezer',
-] as const;
-export type MusicServiceId = (typeof MUSIC_SERVICES)[number];
+export const MUSIC_SERVICES = ['soundcloud'] as const;
+// Keep legacy data compatible while offering only the enabled services in the UI.
+export type MusicServiceId =
+  | (typeof MUSIC_SERVICES)[number]
+  | 'youtube'
+  | 'yandex'
+  | 'spotify'
+  | 'vk'
+  | 'deezer';
 export type OAuthMusicService = 'soundcloud' | 'spotify';
 export const SERVICE_NAMES: Record<MusicServiceId, string> = {
   soundcloud: 'SoundCloud',
@@ -43,5 +43,7 @@ export type ServicePlaylist = {
   trackCount: number;
   playable: boolean;
   imported?: boolean;
+  localPlaylistId?: string | null;
+  importedTrackCount?: number;
 };
 export type ServicePage = { items: ServicePlaylist[]; next: string | null };

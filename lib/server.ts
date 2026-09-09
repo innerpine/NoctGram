@@ -18,7 +18,9 @@ export async function viewer(allowIncomplete = false) {
   if (!user) throw new ApiError(401, 'Войдите, чтобы продолжить');
   const d = db();
   const existing = await d
-    .prepare('SELECT id,onboardingComplete,lastSeen,deletedAt FROM users WHERE id=?')
+    .prepare(
+      'SELECT id,onboardingComplete,lastSeen,deletedAt FROM users WHERE id=?',
+    )
     .bind(user.userId)
     .first();
   if (!existing && user.source === 'email')
@@ -34,14 +36,27 @@ export async function viewer(allowIncomplete = false) {
     const suffix = crypto.randomUUID().replaceAll('-', '').slice(0, 16);
     await d.batch([
       d
-        .prepare('INSERT OR IGNORE INTO users (id,name,created) VALUES (?,?,?)')
-        .bind(user.userId, user.fullName || 'Ночной житель', Date.now()),
+        .prepare(
+          'INSERT OR IGNORE INTO users (id,name,created,onboardingComplete) VALUES (?,?,?,?)',
+        )
+        .bind(
+          user.userId,
+          user.fullName || 'Ночной житель',
+          Date.now(),
+          user.source === 'access' ? 0 : 1,
+        ),
       d
         .prepare(
           'INSERT OR IGNORE INTO handles (handle,userId,main) SELECT ?,?,1 WHERE NOT EXISTS (SELECT 1 FROM handles WHERE userId=?)',
         )
         .bind('user_' + suffix, user.userId, user.userId),
     ]);
+    if (user.source === 'access' && !allowIncomplete)
+      throw new ApiError(
+        428,
+        'Завершите настройку профиля',
+        'ONBOARDING_REQUIRED',
+      );
   }
   const now = Date.now();
   if (!existing || Number(existing.lastSeen) < now - 60000)

@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { MusicPlaylistCreate } from './music-playlist-create';
 import { MusicReorderList } from './music-reorder-list';
+import { MusicSearch } from './music-search';
 import { ProfileLink } from './profile-link';
 import { useMusic } from '@/lib/music-context';
 import {
@@ -108,7 +109,7 @@ export function MusicPlaylists({
     };
   }, [refresh]);
   async function mutate(action: string, extra: Record<string, unknown> = {}) {
-    if (locked.current || readOnly) return;
+    if (locked.current || readOnly) return false;
     locked.current = true;
     setBusy(true);
     setError('');
@@ -133,8 +134,10 @@ export function MusicPlaylists({
       }
       setUrl('');
       setHandle('');
+      return true;
     } catch (e) {
       setError((e as Error).message);
+      return false;
     } finally {
       locked.current = false;
       setBusy(false);
@@ -176,14 +179,14 @@ export function MusicPlaylists({
     else void room?.join(shown, trackId);
   };
   return (
-    <div className="music-playlists music-content-enter">
+    <div className="music-playlists">
       {(error || room?.error) && (
         <p className="music-error" role="alert">
           {error || room?.error}
         </p>
       )}
-      {!selected ? (
-        <>
+      {!selected || !shown ? (
+        <section className="playlist-overview" key="overview">
           <div className="playlist-section-heading">
             <div>
               <ListMusic size={20} />
@@ -248,32 +251,59 @@ export function MusicPlaylists({
                 <button
                   className="playlist-tile card"
                   key={p.id}
+                  aria-busy={selected === p.id && !error}
+                  data-opening={selected === p.id && !error}
                   onClick={() => {
+                    setError('');
                     setDetail(null);
-                    setSelected(p.id);
+                    if (selected === p.id) void refresh();
+                    else setSelected(p.id);
                   }}
                 >
                   <span className="playlist-cover">
                     {p.artwork ? (
-                      <img src={p.artwork} alt="" />
+                      <img
+                        src={p.artwork}
+                        alt=""
+                        width={72}
+                        height={72}
+                        loading="lazy"
+                        decoding="async"
+                      />
                     ) : (
                       <ListMusic size={35} />
                     )}
-                    <span className="playlist-cover-mark">
-                      <Users size={16} />
-                      {p.memberCount}
-                    </span>
+                    {selected === p.id && !error && (
+                      <output className="playlist-opening">
+                        <LoaderCircle
+                          size={22}
+                          className="spin"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">Открываем плейлист…</span>
+                      </output>
+                    )}
                   </span>
-                  <strong>{p.name}</strong>
-                  <small>
-                    {p.trackCount} треков · {p.ownerName}
-                  </small>
-                  {room?.detail?.id === p.id && (
-                    <span className="playlist-live">
-                      <i />
-                      Слушаем вместе
+                  <span className="playlist-copy">
+                    <strong title={p.name}>{p.name}</strong>
+                    <span className="playlist-meta">
+                      <span>{p.trackCount} треков</span>
+                      <span
+                        className="playlist-member-count"
+                        title={'Участников: ' + p.memberCount}
+                      >
+                        <Users size={13} aria-hidden="true" />
+                        {p.memberCount}
+                      </span>
                     </span>
-                  )}
+                    <small title={p.ownerName}>{p.ownerName}</small>
+                    {room?.detail?.id === p.id && (
+                      <span className="playlist-live">
+                        <i />
+                        Слушаем вместе
+                      </span>
+                    )}
+                  </span>
                 </button>
               ))}
             </div>
@@ -284,9 +314,9 @@ export function MusicPlaylists({
               <p>Создайте плейлист, добавьте песни и пригласите друга.</p>
             </div>
           )}
-        </>
-      ) : shown ? (
-        <section className="playlist-detail card">
+        </section>
+      ) : (
+        <section className="playlist-detail card" key={shown.id}>
           <div className="playlist-detail-top">
             <button
               className="icon-button"
@@ -392,7 +422,7 @@ export function MusicPlaylists({
             <Link2 size={18} />
             <input
               aria-label="Ссылка на песню для общего плейлиста"
-              placeholder="Добавить песню по ссылке"
+              placeholder="Ссылка на песню SoundCloud"
               type="url"
               required
               value={url}
@@ -471,14 +501,6 @@ export function MusicPlaylists({
             </div>
           )}
         </section>
-      ) : (
-        <output className="music-empty">
-          <LoaderCircle size={24} className="spin" />
-          Открываем плейлист…
-          <button className="secondary" onClick={() => setSelected('')}>
-            Назад
-          </button>
-        </output>
       )}
       <MusicPlaylistCreate
         key={createVersion}
@@ -613,10 +635,20 @@ export function MusicPlaylists({
       </Dialog>
       <Dialog open={picker} onOpenChange={setPicker}>
         <DialogContent className="noct-dialog playlist-picker">
-          <DialogTitle>Добавить из моей музыки</DialogTitle>
+          <DialogTitle>Добавить песни</DialogTitle>
           <DialogDescription>
-            Выберите песни для общего плейлиста.
+            Найдите песню или выберите её из своей музыки.
           </DialogDescription>
+          <MusicSearch
+            playlist
+            disabled={controlsDisabled}
+            savedUrls={shown?.tracks.map((t) => t.url)}
+            onAdd={async (track) => {
+              if (!(await mutate('add', { url: track.url })))
+                throw new Error('Песня не добавлена. Попробуйте ещё раз.');
+              setPicker(false);
+            }}
+          />
           {error && (
             <p className="music-error" role="alert">
               {error}
@@ -624,7 +656,7 @@ export function MusicPlaylists({
           )}
           <div className="playlist-picker-list">
             {library
-              .filter((t) => t.kind === 'track')
+              .filter((t) => t.kind === 'track' && t.provider === 'soundcloud')
               .map((t) => {
                 const added = shown?.tracks.some((x) => x.id === t.id);
                 return (
@@ -641,10 +673,12 @@ export function MusicPlaylists({
                   </button>
                 );
               })}
-            {!library.some((t) => t.kind === 'track') && (
+            {!library.some(
+              (t) => t.kind === 'track' && t.provider === 'soundcloud',
+            ) && (
               <p>
-                Пока нет сохранённых песен. В плейлист можно добавить трек по
-                ссылке.
+                Пока нет сохранённых песен. Найдите музыку выше или добавьте
+                песню по ссылке.
               </p>
             )}
           </div>

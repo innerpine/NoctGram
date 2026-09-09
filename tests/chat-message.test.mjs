@@ -14,13 +14,13 @@ const compiled = await build({
         build.onResolve(
           {
             filter:
-              /^\.\/(chat-gift|profile-link|music-link-card|chat-message-files|chat-message-menu)$/,
+              /^\.\/(chat-gift|profile-link|profile-identity|music-link-card|chat-message-files|chat-message-menu)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
         build.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
           contents:
-            'export const ChatGift="ChatGift", MentionText="MentionText", ProfileLink="ProfileLink", MusicLinkCard="MusicLinkCard", ChatMessageFiles="ChatMessageFiles", ChatMessageMenu="ChatMessageMenu", ChatMessageContext="ChatMessageContext";',
+            'export const Avatar="Avatar", ChatGift="ChatGift", MentionText="MentionText", ProfileLink="ProfileLink", MusicLinkCard="MusicLinkCard", ChatMessageFiles="ChatMessageFiles", ChatMessageContext="ChatMessageContext";',
         }));
       },
     },
@@ -42,13 +42,11 @@ const { ChatMessage } = await import(
 );
 const me = { id: 'alice', name: 'Alice' },
   peer = { id: 'bob', name: 'Bob' };
-const reported = [],
-  profiles = [],
+const profiles = [],
   pinned = [];
 const props = {
   me,
   peer,
-  onReport: (message) => reported.push(message.id),
   onProfile: (id) => profiles.push(id),
   onAction: (action, message) => {
     if (action === 'pin') pinned.push(message.id);
@@ -69,7 +67,11 @@ const message = {
 };
 const context = ChatMessage.type({ ...props, message });
 assert.equal(context.type, 'ChatMessageContext');
-const rendered = context.props.children;
+const row = context.props.children;
+const [avatar, rendered] = row.props.children;
+assert.equal(avatar.type, 'ProfileLink');
+assert.deepEqual(avatar.props.target, { id: peer.id });
+assert.equal(avatar.props.children.props.person, peer);
 assert.equal(rendered.props.className, 'bubble other');
 const content = rendered.props.children;
 const caption = content.find((child) => child?.type === 'p');
@@ -86,19 +88,26 @@ assert.equal(
   message.text,
   'Music link handling stays attached to the original text',
 );
-footer.props.children[0].props.onClick();
-assert.deepEqual(reported, ['m1']);
+assert.equal(footer.props.children[0].type, 'time');
+assert.equal(
+  footer.props.children[0].props.dateTime,
+  new Date(message.created).toISOString(),
+);
+assert.equal(
+  footer.props.children.some((child) => child?.type === 'button'),
+  false,
+);
 const outgoing = ChatMessage.type({
   ...props,
   message: { ...message, sender: 'alice', read: 1 },
-}).props.children;
+}).props.children.props.children[1];
 assert.equal(outgoing.props.className, 'bubble self');
 assert.equal(
-  outgoing.props.children.find(
-    (child) => child?.props?.className === 'message-time',
-  ).props.children[0],
-  false,
-  'Own messages do not get a report button',
+  outgoing.props.children
+    .find((child) => child?.props?.className === 'message-time')
+    .props.children.at(-1).props['aria-label'],
+  'Прочитано',
+  'Own messages retain their read status',
 );
 const gift = ChatMessage.type({
   ...props,
@@ -110,16 +119,16 @@ const gift = ChatMessage.type({
 assert.equal(gift.type, 'ChatGift');
 assert.equal(gift.props.peer, peer);
 gift.props.onProfile('bob');
-gift.props.onReport();
 assert.deepEqual(profiles, ['bob']);
-assert.deepEqual(reported, ['m1', 'm1']);
+assert.equal(gift.props.actions, undefined);
+assert.equal(gift.props.onReport, undefined);
 const files = [
   { id: 'photo', kind: 'image', name: 'Фото.png', type: 'image/png', size: 50 },
 ];
 const fileMessage = ChatMessage.type({
   ...props,
   message: { ...message, text: '', attachments: files },
-}).props.children;
+}).props.children.props.children[1];
 assert.equal(fileMessage.props.id, 'chat-message-m1');
 assert.equal(
   fileMessage.props.children.find((child) => child?.type === 'ChatMessageFiles')
@@ -130,12 +139,8 @@ assert.equal(
   fileMessage.props.children.some((child) => child?.type === 'p'),
   false,
 );
-const menu = footer.props.children.find(
-  (child) => child?.type === 'ChatMessageMenu',
-);
-menu.props.onAction('pin', menu.props.message);
+context.props.onAction('pin', context.props.message);
 assert.deepEqual(pinned, ['m1']);
-assert.equal(gift.props.actions.type, 'ChatMessageMenu');
 const quoted = ChatMessage.type({
   ...props,
   message: {
@@ -149,7 +154,7 @@ const quoted = ChatMessage.type({
       unavailable: false,
     },
   },
-}).props.children;
+}).props.children.props.children[1];
 const quote = quoted.props.children.find(
   (child) => child?.props?.className === 'chat-reply-quote',
 );
@@ -162,13 +167,13 @@ assert.equal(
   'Автор',
 );
 console.log(
-  'Chat rendering: own/incoming messages, read indicators, mentions/music, gift routing and report/profile callbacks preserved.',
+  'Chat rendering: sender avatars, compact timestamps, read indicators, mentions/music, gift routing and context actions preserved.',
 );
 
 const attributed = ChatMessage.type({
   ...props,
   message: { ...message, forwardedName: 'Alice', forwardedSender: 'alice' },
-}).props.children;
+}).props.children.props.children[1];
 const author = attributed.props.children.find(
   (child) => child?.props?.className === 'chat-forwarded',
 ).props.children[1].props.children;

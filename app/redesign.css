@@ -803,15 +803,9 @@ textarea::placeholder {
 }
 .premium-nav-beam {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 64px;
-  aspect-ratio: 1;
-  offset-path: rect(0 auto auto 0 round 14px);
-  offset-anchor: center;
-  offset-rotate: 0deg;
-  background: linear-gradient(to left, #a78bfa, #38bdf8, transparent);
-  animation: premium-border-beam 8s linear infinite;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 0;
   pointer-events: none;
 }
@@ -860,33 +854,6 @@ textarea::placeholder {
   padding: 1px 5px;
   margin-left: auto;
   animation: badge-in 0.42s var(--motion);
-}
-@keyframes premium-border-beam {
-  from {
-    offset-distance: 0%;
-  }
-  to {
-    offset-distance: 100%;
-  }
-}
-@supports not (offset-path: rect(0 auto auto 0 round 14px)) {
-  .premium-nav-shell {
-    background: linear-gradient(110deg, #ffffff24, #a78bfa, #38bdf8, #ffffff24);
-    background-size: 300% 100%;
-    animation: premium-border-shift 5s ease-in-out infinite;
-  }
-  .premium-nav-beam {
-    display: none;
-  }
-}
-@keyframes premium-border-shift {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
 }
 .premium-main {
   padding-top: 24px;
@@ -1282,6 +1249,7 @@ textarea::placeholder {
 }
 .comments-panel .comment-context {
   display: flex;
+  align-items: flex-start;
   gap: 10px;
   border-left: 0;
   border-bottom: 1px solid var(--border);
@@ -1319,6 +1287,7 @@ textarea::placeholder {
   overscroll-behavior: contain;
 }
 .comment {
+  align-items: flex-start;
   padding: 14px 0;
   gap: 10px;
   animation: line-rise 0.24s var(--motion);
@@ -1996,9 +1965,6 @@ textarea::placeholder {
   .premium-nav-shell {
     width: 44px;
     flex-shrink: 0;
-  }
-  .premium-nav-beam {
-    width: 40px;
   }
   .premium-nav-shell .premium-nav {
     width: 42px;

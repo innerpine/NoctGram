@@ -1,4 +1,6 @@
 type YouTubeDevice = {
+  loadVideoById(id: string): void;
+  cueVideoById(id: string): void;
   playVideo(): void;
   pauseVideo(): void;
   seekTo(seconds: number, allowSeekAhead: boolean): void;
@@ -139,9 +141,9 @@ export class YouTubePlayback {
           clearTimeout(this.timeout);
           this.ready = true;
           this.device.setVolume(volume);
-          hooks.ready();
+          this.hooks.ready();
           this.timer = setInterval(() => this.publish(), 250);
-          if (hooks.shouldPlay()) this.resume();
+          if (this.hooks.shouldPlay()) this.resume();
           else this.publish();
         },
         onStateChange: ({ data }) => {
@@ -151,15 +153,15 @@ export class YouTubePlayback {
           const commanded = this.expected === data;
           if (commanded) this.expected = null;
           if (!commanded && data === 2 && (previous === 1 || previous === 3))
-            hooks.control('pause');
+            this.hooks.control('pause');
           if (
             !commanded &&
             data === 1 &&
             (previous === 2 || previous === 5 || previous === -1)
           )
-            hooks.control('resume');
+            this.hooks.control('resume');
           this.publish();
-          if (data === 0) hooks.ended();
+          if (data === 0) this.hooks.ended();
         },
         onError: ({ data }) =>
           this.fail(
@@ -174,14 +176,27 @@ export class YouTubePlayback {
         onAutoplayBlocked: () => {
           if (!this.disposed) {
             this.expected = null;
-            hooks.blocked();
+            this.hooks.blocked();
           }
         },
       },
     });
   }
+  load(id: string, hooks: Hooks) {
+    if (this.disposed || !this.ready) return false;
+    this.hooks = hooks;
+    this.state = -1;
+    this.sample = null;
+    this.ignoreSeekUntil = this.now() + 3000;
+    this.expected = hooks.shouldPlay() ? 1 : 5;
+    if (hooks.shouldPlay()) this.device.loadVideoById(id);
+    else this.device.cueVideoById(id);
+    hooks.ready();
+    return true;
+  }
   private fail(message: string) {
     if (this.disposed) return;
+    this.ready = false;
     clearTimeout(this.timeout);
     clearInterval(this.timer);
     this.hooks.error(message);

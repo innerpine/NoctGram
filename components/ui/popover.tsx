@@ -29,6 +29,7 @@ function PopoverContent({
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Positioner
+        collisionPadding={12}
         align={align}
         alignOffset={alignOffset}
         side={side}

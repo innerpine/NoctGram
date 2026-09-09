@@ -3,7 +3,7 @@ import { setting, randomToken } from './auth-session';
 import { ApiError } from './api-error';
 import { openMusicToken, sealMusicToken } from './music-token-crypto';
 import type { ServiceStatus } from './music-service-types';
-import { fetchYandex } from './yandex-transport';
+import { fetchYandex, checkYandexConnection } from './yandex-transport';
 
 // Experimental metadata connector. Protocol reference: MarshalX/yandex-music-api.
 // It never requests downloads, streams, passwords or another application's credentials.
@@ -84,7 +84,7 @@ async function api(token: string, path: string): Promise<unknown> {
   if (response.status === 451)
     throw new ApiError(
       502,
-      'Доступ к плейлистам Яндекс Музыки ограничен (HTTP 451). Проверьте регион и подключение сервера Noctgram: VPN только в браузере не меняет этот запрос. Подключённый аккаунт и сохранённые плейлисты не удалены.',
+      'Яндекс отклонил запрос плейлистов с сервера Noctgram (HTTP 451). Доступ к аккаунту может работать отдельно. VPN на вашем устройстве не меняет маршрут облачного сервера. Подключение и сохранённые плейлисты сохранены.',
       'YANDEX_ACCESS_RESTRICTED',
     );
   if (!response.ok)
@@ -166,6 +166,22 @@ export async function yandexStatus(user: string): Promise<ServiceStatus> {
           : 'expired',
     ...(row ? { displayName: row.displayName } : {}),
   };
+}
+export async function checkYandexAccess(user: string) {
+  const status = await yandexStatus(user);
+  if (status.status === 'disconnected' || status.status === 'setup_required') {
+    await checkYandexConnection();
+    return { ok: true, scope: 'network' };
+  }
+  const row = await connection(user);
+  const result = await request(
+    user,
+    row,
+    '/users/' + row.accountId + '/playlists/list',
+  );
+  if (!Array.isArray(result))
+    throw new ApiError(502, 'Яндекс не вернул список плейлистов.');
+  return { ok: true, scope: 'playlists', count: result.length };
 }
 export async function connectYandex(user: string, value: unknown) {
   const secret = key();

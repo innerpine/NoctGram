@@ -1,9 +1,12 @@
 'use client';
-import { useRef, type ReactNode, type MouseEvent } from 'react';
+import {
+  useRef,
+  type ReactNode,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import {
   CheckSquare,
   Copy,
-  Ellipsis,
   Flag,
   Forward,
   Pencil,
@@ -20,13 +23,6 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
 
 export type ChatAction =
   | 'reply'
@@ -59,17 +55,14 @@ export function preserveContextTarget(
 }
 // Gaps between message rows are part of the chat too. Preserve native/player
 // menus on their own surfaces and never consume events from a React portal.
-export function chatHistoryContextMenu(event: MouseEvent<HTMLElement>) {
+export function chatHistoryContextMenu(event: ReactMouseEvent<HTMLElement>) {
   if (preserveContextTarget(event.target, event.currentTarget)) return;
   event.preventDefault();
   event.stopPropagation();
 }
-function Items({
-  context = false,
-  ...props
-}: ChatActionProps & { context?: boolean }) {
-  const Item = context ? ContextMenuItem : DropdownMenuItem;
-  const Separator = context ? ContextMenuSeparator : DropdownMenuSeparator;
+function Items(props: ChatActionProps) {
+  const Item = ContextMenuItem;
+  const Separator = ContextMenuSeparator;
   const { message, own, disabled, canSend, selected, onAction } = props;
   return (
     <>
@@ -128,37 +121,27 @@ function Items({
     </>
   );
 }
-export function ChatMessageMenu(props: ChatActionProps) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        className="chat-message-more"
-        aria-label="Действия с сообщением"
-        title="Действия с сообщением"
-      >
-        <Ellipsis size={16} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="chat-action-menu">
-        <Items {...props} />
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 export function ChatMessageContext({
   children,
   selecting,
   removing = false,
+  initial = false,
   ...props
 }: ChatActionProps & {
   children: ReactNode;
   selecting: boolean;
   removing?: boolean;
+  initial?: boolean;
 }) {
   const pointer = useRef<{ x: number; y: number } | null>(null);
   return (
     <ContextMenu disabled={removing}>
       <ContextMenuTrigger
+        tabIndex={0}
+        aria-haspopup="menu"
+        aria-keyshortcuts="Shift+F10"
         data-chat-message-id={props.message.id}
+        data-chat-initial={initial || undefined}
         data-chat-removing={removing ? '' : undefined}
         inert={removing || undefined}
         aria-hidden={removing || undefined}
@@ -166,6 +149,27 @@ export function ChatMessageContext({
           'chat-message-shell select-text' +
           (props.selected ? ' is-selected' : '')
         }
+        onKeyDown={(event) => {
+          if (
+            (event.key !== 'ContextMenu' &&
+              !(event.shiftKey && event.key === 'F10')) ||
+            preserveContextTarget(event.target, event.currentTarget)
+          )
+            return;
+          event.preventDefault();
+          const surface =
+            event.currentTarget.querySelector('.bubble, .chat-gift-card') ||
+            event.currentTarget;
+          const rect = surface.getBoundingClientRect();
+          surface.dispatchEvent(
+            new MouseEvent('contextmenu', {
+              bubbles: true,
+              cancelable: true,
+              clientX: rect.left + rect.width / 2,
+              clientY: rect.top + rect.height / 2,
+            }),
+          );
+        }}
         onContextMenu={(event) => {
           if (preserveContextTarget(event.target, event.currentTarget)) {
             event.preventBaseUIHandler();
@@ -210,12 +214,7 @@ export function ChatMessageContext({
             !target.closest('.chat-message-select')
           )
             return;
-          if (
-            target.closest(
-              '.chat-message-more,[data-slot="dropdown-menu-content"],[data-slot="context-menu-content"]',
-            )
-          )
-            return;
+          if (target.closest('[data-slot="context-menu-content"]')) return;
           event.preventDefault();
           event.stopPropagation();
           props.onAction('select', props.message);
@@ -238,7 +237,7 @@ export function ChatMessageContext({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent className="chat-action-menu">
-        <Items context {...props} />
+        <Items {...props} />
       </ContextMenuContent>
     </ContextMenu>
   );

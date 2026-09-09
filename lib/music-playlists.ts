@@ -157,7 +157,7 @@ export async function changePlaylist(
         'Не удалось пригласить друга. Проверьте @ник и настройки приватности',
       );
     const trackGuard = trackIds.length
-      ? `AND (SELECT COUNT(*) FROM music_library l JOIN music_tracks t ON t.id=l.trackId WHERE l.userId=? AND t.kind='track' AND l.trackId IN (${trackIds.map(() => '?').join(',')}))=?`
+      ? `AND (SELECT COUNT(*) FROM music_library l JOIN music_tracks t ON t.id=l.trackId WHERE l.userId=? AND t.kind='track' AND t.provider='soundcloud' AND l.trackId IN (${trackIds.map(() => '?').join(',')}))=?`
       : '';
     const friendGuard = friend
       ? `AND EXISTS(SELECT 1 FROM users u WHERE u.id=? AND ${inviteAllowed})`
@@ -306,6 +306,8 @@ export async function changePlaylist(
     const link = parseMusicLink(body.url);
     if (!link || link.kind !== 'track')
       throw new ApiError(400, 'Добавьте ссылку на отдельную песню');
+    if (link.provider !== 'soundcloud')
+      throw new ApiError(400, 'Добавьте ссылку на песню SoundCloud.');
     const limit = await db()
       .prepare(
         `INSERT INTO auth_limits(key,count,expiresAt) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1 WHERE count<30 RETURNING count`,

@@ -1,3 +1,98 @@
+/* Each section keeps its own snapshot bounds: a wide chat never stretches the
+   outgoing feed/music bitmap. Persistent controls move with the shared layout. */
+html[data-page-transition='out'] .app-shell > .main-column {
+  view-transition-name: noct-page-out;
+}
+html[data-page-transition='in'] .app-shell > .main-column {
+  view-transition-name: noct-page-in;
+}
+html[data-page-transition] .app-shell > .sidebar {
+  view-transition-name: noct-navigation;
+}
+html[data-page-transition] .music-player.music-sheet {
+  view-transition-name: noct-player;
+}
+html[data-page-transition] .music-lyrics-dock[data-open='true'] {
+  view-transition-name: noct-lyrics;
+}
+html[data-page-transition]::view-transition {
+  pointer-events: none;
+}
+/* Capture the destination layout, not a halfway CSS width/margin transition.
+   The browser animates the persistent surfaces together over the same interval. */
+html[data-page-transition]
+  :is(.app-shell, .music-player.music-sheet, .music-lyrics-dock) {
+  transition: none !important;
+}
+html[data-page-transition]::view-transition-group(*) {
+  animation-duration: 380ms;
+  animation-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+html[data-page-transition]::view-transition-group(root),
+html[data-page-transition]::view-transition-group(noct-page-out),
+html[data-page-transition]::view-transition-group(noct-page-in) {
+  animation: none;
+}
+html[data-page-transition]::view-transition-group(noct-page-out) {
+  z-index: 1;
+}
+html[data-page-transition]::view-transition-group(noct-page-in) {
+  z-index: 2;
+}
+html[data-page-transition]::view-transition-group(noct-navigation),
+html[data-page-transition]::view-transition-group(noct-player),
+html[data-page-transition]::view-transition-group(noct-lyrics) {
+  z-index: 3;
+}
+html[data-page-transition]::view-transition-old(root),
+html[data-page-transition]::view-transition-old(noct-navigation),
+html[data-page-transition]::view-transition-old(noct-player),
+html[data-page-transition]::view-transition-old(noct-lyrics) {
+  display: none;
+}
+html[data-page-transition]::view-transition-new(root),
+html[data-page-transition]::view-transition-new(noct-navigation),
+html[data-page-transition]::view-transition-new(noct-player),
+html[data-page-transition]::view-transition-new(noct-lyrics) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html[data-page-transition]::view-transition-new(noct-player),
+html[data-page-transition]::view-transition-new(noct-lyrics) {
+  object-fit: none;
+  object-position: center;
+}
+html[data-page-transition]::view-transition-old(noct-page-out) {
+  animation: section-leave 180ms ease both;
+  mix-blend-mode: normal;
+}
+html[data-page-transition]::view-transition-new(noct-page-in) {
+  animation: section-enter 360ms cubic-bezier(0.2, 0.75, 0.25, 1) 20ms both;
+  mix-blend-mode: normal;
+}
+@keyframes section-leave {
+  to {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+@keyframes section-enter {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-page-transition]::view-transition-group(*),
+  html[data-page-transition]::view-transition-old(*),
+  html[data-page-transition]::view-transition-new(*) {
+    animation: none !important;
+  }
+}
 .main-column[data-page='profile'] .profile-card {
   animation: profile-enter 280ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
@@ -14,6 +109,9 @@
 }
 .stream-results .post-skeleton {
   animation: none;
+}
+.feed-section[hidden] {
+  display: none;
 }
 @keyframes stream-enter {
   from {
@@ -114,6 +212,27 @@ html:has(.app-shell) {
   padding-inline: 5px;
   background: transparent;
 }
+@media (max-width: 500px) {
+  .profile-editor-dialog .edit-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px;
+  }
+  .profile-editor-dialog .edit-tabs::before {
+    display: none;
+  }
+  .profile-editor-dialog .edit-tabs button {
+    min-width: 0;
+    min-height: 42px;
+    padding: 10px 8px;
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
+  }
+  .profile-editor-dialog .edit-tabs button[aria-pressed='true'] {
+    background: #242426;
+  }
+}
 .main-column[data-page='search'] .searchbox {
   transition:
     border-color 180ms ease,
@@ -148,6 +267,7 @@ html:has(.app-shell) {
   }
   .profile-editor-pane,
   .page-loading-indicator,
+  .profile-editor-dialog .edit-tabs button,
   .profile-editor-dialog .edit-tabs::before {
     transition: none;
   }

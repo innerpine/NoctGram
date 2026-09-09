@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { headers } from 'next/headers';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { db } from './storage';
+import { accessIdentity, type AccessSettings } from './access-auth';
 
 export const SESSION_COOKIE = 'noct_session';
 export const CHALLENGE_COOKIE = 'noct_email_challenge';
@@ -12,7 +13,7 @@ export function setting(name: string) {
 }
 // Keep migration access through Sites until the owner explicitly selects email-only.
 export function sitesAuthEnabled() {
-  return setting('NOCT_AUTH_MODE') !== 'email';
+  return !['email', 'access'].includes(setting('NOCT_AUTH_MODE'));
 }
 export function cookieValue(cookie: string | null, name: string) {
   return (
@@ -48,10 +49,21 @@ export function authCookie(
 export type Identity = {
   userId: string;
   fullName: string | null;
-  source: 'email' | 'sites';
+  source: 'email' | 'sites' | 'access';
 };
 export async function identity(): Promise<Identity | null> {
   const h = await headers();
+  // Private preview identities come only from a verified Access application JWT.
+  // Old email cookies and development identity headers cannot switch this user.
+  if (setting('NOCT_AUTH_MODE') === 'access') {
+    const member = await accessIdentity(h, env as unknown as AccessSettings);
+    if (!member) return null;
+    const deleted = await db()
+      .prepare('SELECT 1 FROM users WHERE id=? AND deletedAt>0')
+      .bind(member.userId)
+      .first();
+    return deleted ? null : member;
+  }
   const cookie = h.get('cookie');
   const token = cookieValue(cookie, SESSION_COOKIE);
   // An expired/invalid email session must never silently become a different Sites account.

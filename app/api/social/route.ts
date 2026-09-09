@@ -49,7 +49,11 @@ import {
   failure,
 } from '@/lib/server';
 import { featureGet, featurePost, canPublish } from '@/lib/social-features';
-import { readConversation, pinMessage } from '@/lib/chat-messages';
+import {
+  readConversation,
+  readUnreadMessageCount,
+  pinMessage,
+} from '@/lib/chat-messages';
 import {
   deleteMessages,
   editMessage,
@@ -205,6 +209,8 @@ export async function GET(req: Request) {
         ).results,
       );
     }
+    if (action === 'threadsUnread')
+      return Response.json({ unread: await readUnreadMessageCount(me) });
     if (action === 'threads') {
       return Response.json(
         (

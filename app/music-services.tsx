@@ -31,8 +31,6 @@ import {
 } from '@/lib/music-service-types';
 import { parseMusicLink, type MusicTrack } from '@/lib/music-links';
 import { useMusic } from '@/lib/music-context';
-import { MusicYandex } from './music-yandex';
-import { MusicYouTubeService } from './music-youtube-service';
 
 async function serviceRequest<T>(
   path: string,
@@ -78,7 +76,7 @@ export function MusicServices({
 }: {
   signedIn: boolean;
   readOnly: boolean;
-  onMusic?: () => void;
+  onMusic?: (tab?: 'playlists' | 'search') => void;
 }) {
   const [provider, setProvider] = useState<MusicServiceId>('soundcloud');
   const [statuses, setStatuses] = useState<ServiceStatus[]>([]),
@@ -123,7 +121,7 @@ export function MusicServices({
   useEffect(() => {
     const params = new URLSearchParams(window.location.search),
       choice = params.get('provider');
-    if (MUSIC_SERVICES.includes(choice as MusicServiceId))
+    if (MUSIC_SERVICES.some((service) => service === choice))
       setProvider(choice as MusicServiceId);
     const result = params.get('result');
     if (result) {
@@ -153,7 +151,7 @@ export function MusicServices({
     setNext(null);
     setQuery('');
     setView('playlists');
-    if (!connected || provider === 'yandex') return;
+    if (!connected) return;
     setBusy(true);
     Promise.all([
       serviceRequest<ServicePage>(`/${provider}/playlists`),
@@ -242,9 +240,20 @@ export function MusicServices({
       if (version === selection.current) {
         setImports((old) => [saved, ...old.filter((v) => v.id !== saved.id)]);
         setPlaylists((old) =>
-          old.map((v) => (v.id === p.id ? { ...v, imported: true } : v)),
+          old.map((v) =>
+            v.id === p.id ? { ...v, ...saved, imported: true } : v,
+          ),
         );
-        setNotice('Плейлист добавлен. Он виден только вам.');
+        const skipped = Math.max(
+          0,
+          saved.trackCount - (saved.importedTrackCount ?? saved.trackCount),
+        );
+        setNotice(
+          saved.localPlaylistId
+            ? `Плейлист добавлен в «Плейлисты»: ${saved.importedTrackCount} треков.${skipped ? ` Не добавлено недоступных или повторяющихся песен: ${skipped}.` : ''}`
+            : 'Плейлист добавлен. Он виден только вам.',
+        );
+        window.dispatchEvent(new Event('noctgram:music-refresh'));
       }
     } catch (e) {
       if (version === selection.current) setError((e as Error).message);
@@ -274,11 +283,12 @@ export function MusicServices({
     <div className="music-services">
       <div className="services-heading">
         <div>
-          <h2>Ваши музыкальные сервисы</h2>
-          <p>Подключите аккаунт — любимая музыка будет рядом.</p>
+          <h2>Ваш SoundCloud</h2>
+          <p>Подключите аккаунт, чтобы перенести свои плейлисты.</p>
         </div>
         <Link
           href="/music"
+          prefetch={false}
           className="icon-button"
           aria-label="Вернуться к музыке"
           onNavigate={(event) => {
@@ -291,25 +301,26 @@ export function MusicServices({
           <ArrowLeft size={18} />
         </Link>
       </div>
-      <Tabs
-        value={provider}
-        onValueChange={(v) => {
-          setProvider(v as MusicServiceId);
-          setError('');
-          setNotice('');
-          setBusy(false);
-        }}
-        className="service-picker"
-      >
-        <TabsList>
-          {MUSIC_SERVICES.map((id) => (
-            <TabsTrigger value={id} key={id} disabled={busy}>
-              <ServiceMark provider={id} />
-              {SERVICE_NAMES[id]}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      {provider === 'soundcloud' && signedIn && (
+        <Link
+          className="music-services-link"
+          href="/music?tab=search"
+          prefetch={false}
+          onNavigate={(event) => {
+            if (onMusic) {
+              event.preventDefault();
+              onMusic('search');
+            }
+          }}
+        >
+          <Search size={21} />
+          <span>
+            <strong>Найти музыку</strong>
+            <small>По названию песни или исполнителю</small>
+          </span>
+          <ArrowUpRight size={19} />
+        </Link>
+      )}
       {error && (
         <div className="music-error" role="alert">
           {error}
@@ -321,11 +332,7 @@ export function MusicServices({
           {notice}
         </output>
       )}
-      {provider === 'yandex' ? (
-        <MusicYandex signedIn={signedIn} readOnly={readOnly} />
-      ) : provider === 'youtube' ? (
-        <MusicYouTubeService signedIn={signedIn} readOnly={readOnly} />
-      ) : (
+      {supported && (
         <>
           <section className="service-connection-card">
             <div className="service-card-top">
@@ -607,19 +614,34 @@ export function MusicServices({
                           <ArrowUpRight size={18} />
                         </a>
                       )}
-                      {view === 'playlists' && (
-                        <button
+                      {p.localPlaylistId ? (
+                        <Link
                           className="secondary service-import-button"
-                          disabled={busy || readOnly || p.imported}
-                          onClick={() => void importPlaylist(p)}
+                          href="/music?tab=playlists"
+                          onNavigate={(event) => {
+                            if (onMusic) {
+                              event.preventDefault();
+                              onMusic('playlists');
+                            }
+                          }}
                         >
-                          {p.imported ? (
-                            <Check size={16} />
-                          ) : (
-                            <Library size={16} />
-                          )}
-                          {p.imported ? 'Добавлен' : 'Импорт'}
-                        </button>
+                          <Library size={16} />В плейлисты
+                        </Link>
+                      ) : (
+                        (view === 'playlists' || provider === 'soundcloud') && (
+                          <button
+                            className="secondary service-import-button"
+                            disabled={busy || readOnly || p.imported}
+                            onClick={() => void importPlaylist(p)}
+                          >
+                            {p.imported ? (
+                              <Check size={16} />
+                            ) : (
+                              <Library size={16} />
+                            )}
+                            {p.imported ? 'Добавлен' : 'Импорт'}
+                          </button>
+                        )
                       )}
                     </div>
                   ))}
@@ -651,8 +673,9 @@ export function MusicServices({
                 </output>
               )}
               <p className="service-library-note">
-                Импорт сохраняет плейлист в личной коллекции Noctgram. Состав и
-                аудио остаются в {name}.
+                {provider === 'soundcloud'
+                  ? 'Импорт добавляет песни в «Плейлисты». Их порядок можно менять в Noctgram; музыка воспроизводится из SoundCloud.'
+                  : `Импорт сохраняет плейлист в личной коллекции Noctgram. Состав и аудио остаются в ${name}.`}
                 {provider === 'spotify' &&
                   ' Отдельные треки можно добавить по ссылке и слушать в плеере Noctgram с Premium.'}
               </p>
