@@ -123,9 +123,6 @@
 .chat-gift-time > span {
   display: inline-flex;
 }
-.chat-gift-time .message-report {
-  padding: 0 3px;
-}
 .chat-gift-dialog.noct-dialog {
   max-width: 400px;
 }

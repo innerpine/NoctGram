@@ -125,10 +125,6 @@
   .chat-compose-area .message-composer {
     margin: 6px 8px 8px;
   }
-  .chat-message-more {
-    min-width: 32px;
-    min-height: 28px;
-  }
   .music-stage[data-slot='dialog-content'] {
     top: var(--app-viewport-top, 0px);
     height: var(--app-viewport-height, 100dvh);

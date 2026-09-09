@@ -35,15 +35,11 @@ const compiled = await build({
     },
   ],
 });
-const {
-  ChatMessageContext,
-  ChatMessageMenu,
-  preserveContextTarget,
-  chatHistoryContextMenu,
-} = await import(
-  'data:text/javascript;base64,' +
-    Buffer.from(compiled.outputFiles[0].text).toString('base64')
-);
+const { ChatMessageContext, preserveContextTarget, chatHistoryContextMenu } =
+  await import(
+    'data:text/javascript;base64,' +
+      Buffer.from(compiled.outputFiles[0].text).toString('base64')
+  );
 function nodes(node) {
   if (!node || typeof node !== 'object') return [];
   if (typeof node.type === 'function') return nodes(node.type(node.props));
@@ -102,14 +98,6 @@ for (const kind of [
   item.props.onClick();
   assert.deepEqual(actions.at(-1), [kind, 'm1']);
 }
-const fallback = nodes(ChatMessageMenu(props)).filter(
-  (node) => node.type === 'DropdownMenuItem',
-);
-assert.equal(
-  fallback.length,
-  items.length,
-  'Ellipsis and right click expose the same actions',
-);
 const incoming = nodes(
   ChatMessageContext({ ...props, own: false, selecting: false }),
 ).filter((node) => node.type === 'ContextMenuItem');
@@ -274,5 +262,5 @@ try {
   else delete globalThis.Element;
 }
 console.log(
-  'Chat menus: complete actions, own-message editing, shared ellipsis, selection, player/portal boundaries and untouched native events passed.',
+  'Chat menus: complete actions, own-message editing, selection, player/portal boundaries and untouched native events passed.',
 );

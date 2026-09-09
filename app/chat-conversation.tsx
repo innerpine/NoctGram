@@ -370,7 +370,6 @@ export function ChatConversation({
             disabled={readonly}
             canSend={canSend}
             onProfile={onProfile}
-            onReport={onReport}
             onAction={onAction}
             onJump={onJump}
             selected={selected.includes(message.id)}

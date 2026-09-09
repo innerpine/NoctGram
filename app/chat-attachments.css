@@ -195,19 +195,6 @@
   font-size: 13px;
   color: #dbd1e5;
 }
-.chat-message-more {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 22px;
-  border-radius: 6px;
-  color: #ada7b8;
-}
-.chat-message-more:hover {
-  background: #ffffff10;
-  color: #fff;
-}
 .chat-pinned-bar {
   display: flex;
   flex-shrink: 0;

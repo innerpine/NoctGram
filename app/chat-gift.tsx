@@ -1,6 +1,6 @@
 'use client';
-import { useState, type CSSProperties, type ReactNode } from 'react';
-import { Check, CheckCheck, Flag, Gift } from 'lucide-react';
+import { useState, type CSSProperties } from 'react';
+import { Check, CheckCheck, Gift } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -19,15 +19,11 @@ export function ChatGift({
   me,
   peer,
   onProfile,
-  onReport,
-  actions,
 }: {
   message: Message;
   me: Person;
   peer: Person;
   onProfile: (id: string) => void;
-  onReport: () => void;
-  actions?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const gift = message.gift && giftDefinition(message.gift.giftId);
@@ -80,23 +76,12 @@ export function ChatGift({
           Просмотр
         </button>
         <div className="chat-gift-time">
-          {!outgoing && (
-            <button
-              className="message-report"
-              aria-label="Пожаловаться на подарок"
-              title="Пожаловаться на подарок"
-              onClick={onReport}
-            >
-              <Flag size={12} />
-            </button>
-          )}
           <time dateTime={new Date(message.created).toISOString()}>{time}</time>
           {outgoing && (
             <span aria-label={message.read ? 'Прочитано' : 'Отправлено'}>
               {message.read ? <CheckCheck size={12} /> : <Check size={12} />}
             </span>
           )}
-          {actions}
         </div>
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
