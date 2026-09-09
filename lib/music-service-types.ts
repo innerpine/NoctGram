@@ -43,5 +43,7 @@ export type ServicePlaylist = {
   trackCount: number;
   playable: boolean;
   imported?: boolean;
+  localPlaylistId?: string | null;
+  importedTrackCount?: number;
 };
 export type ServicePage = { items: ServicePlaylist[]; next: string | null };

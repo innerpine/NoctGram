@@ -21,7 +21,7 @@ export type Widget = {
   prev(): void;
   skip(index: number): void;
   getCurrentSound(callback: (sound: SoundCloudSound | null) => void): void;
-  getSounds(callback: (sounds: SoundCloudSound[]) => void): void;
+  getSounds(callback: (sounds: unknown[]) => void): void;
   getCurrentSoundIndex(callback: (index: number) => void): void;
   getDuration(callback: (ms: number) => void): void;
   getPosition(callback: (ms: number) => void): void;

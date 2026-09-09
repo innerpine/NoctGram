@@ -39,6 +39,10 @@ import {
 } from '@/lib/music-volume';
 import { moveMusicItem } from '@/lib/music-queue';
 import {
+  soundCloudQueue,
+  type SoundCloudQueueEntry,
+} from '@/lib/soundcloud-queue';
+import {
   NativeMusicAudio,
   nativeMusicPlayback,
   soundcloudAudioURL,
@@ -96,14 +100,16 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [retry, setRetry] = useState(0);
   const [playlistIndex, setPlaylistIndex] = useState(0),
     [playlistLength, setPlaylistLength] = useState(0);
-  const [playlistSounds, setPlaylistSounds] = useState<SoundCloudSound[]>([]);
+  const [playlistSounds, setPlaylistSounds] = useState<SoundCloudQueueEntry[]>(
+    [],
+  );
   const [queue, setQueue] = useState<MusicLink[]>([]);
   const nativeOrder = useRef<MusicLink[] | null>(null);
   const frame = useRef<HTMLIFrameElement>(null),
     widget = useRef<Widget | null>(null);
   const [soundCloudSource, setSoundCloudSource] = useState('');
   const loadedFrame = useRef<HTMLIFrameElement | null>(null);
-  const loadedSounds = useRef<SoundCloudSound[]>([]);
+  const loadedSounds = useRef<SoundCloudQueueEntry[]>([]);
   const soundCloudState = useRef<SoundCloudStateMonitor | null>(null);
   const playerElement = useRef<HTMLElement>(null);
   const hasPlayer = !!link;
@@ -213,12 +219,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       desired.current?.kind === 'playlist' &&
       widget.current
     ) {
-      const index = loadedSounds.current.findIndex(
-        (sound) => sound.permalink_url === valid.url,
+      const entry = loadedSounds.current.find(
+        (sound) => sound.track.url === valid.url,
       );
-      if (index >= 0) {
+      if (entry) {
         soundCloudState.current?.invalidate();
-        widget.current.skip(index);
+        widget.current.skip(entry.nativeIndex);
         widget.current.play();
         return;
       }
@@ -517,10 +523,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           w.setVolume(musicGain(volumeRef.current) * 100);
           w.getSounds((sounds) => {
             if (isCurrent()) {
-              nativeLength = sounds.length;
-              loadedSounds.current = sounds;
-              setPlaylistLength(sounds.length);
-              setPlaylistSounds(sounds);
+              nativeLength = Array.isArray(sounds) ? sounds.length : 0;
+              const entries = soundCloudQueue(sounds);
+              loadedSounds.current = entries;
+              setPlaylistLength(nativeLength);
+              setPlaylistSounds(entries);
             }
           });
           w.getDuration((ms) => {
@@ -1062,12 +1069,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const displayQueue = room.detail
     ? room.detail.tracks.map(metadata)
     : link?.kind === 'playlist' && !nativeOrder.current
-      ? playlistSounds.map((item) => ({
-          url: item.permalink_url,
-          title: item.title,
-          artist: item.user?.username || '',
-          artwork: item.artwork_url || '',
-        }))
+      ? playlistSounds.map((item) => item.track)
       : queue.map((item) => (item.url === currentUrl ? track : metadata(item)));
   const select = (index: number) => {
     if (room.detail) {
@@ -1077,7 +1079,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
     if (link?.kind === 'playlist' && !nativeOrder.current) {
       if (index >= 0 && index < playlistSounds.length) {
-        widget.current?.skip(index);
+        widget.current?.skip(playlistSounds[index].nativeIndex);
         widget.current?.play();
       }
     } else if (queue[index]) play(queue[index]);
@@ -1092,14 +1094,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
     const current =
       link?.kind === 'playlist' && !nativeOrder.current
-        ? playlistSounds.map((item) => ({
-            url: item.permalink_url,
-            kind: 'track' as const,
-            provider: 'soundcloud' as const,
-            title: item.title,
-            artist: item.user?.username || '',
-            artwork: item.artwork_url || '',
-          }))
+        ? playlistSounds.map((item) => item.track)
         : queueRef.current;
     const reordered = moveMusicItem(
       current,
@@ -1200,7 +1195,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
               room.detail
                 ? room.detail.tracks.findIndex((t) => t.url === currentUrl)
                 : link.kind === 'playlist' && !nativeOrder.current
-                  ? playlistIndex
+                  ? playlistSounds.findIndex(
+                      (item) => item.nativeIndex === playlistIndex,
+                    )
                   : queueIndex
             }
             expanded={expanded}

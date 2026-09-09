@@ -790,6 +790,9 @@ export const musicImports = sqliteTable(
     provider: text().notNull(),
     playlistId: text().notNull(),
     connectionId: text().notNull(),
+    localPlaylistId: text().references(() => musicPlaylists.id, {
+      onDelete: 'set null',
+    }),
     title: text().notNull(),
     url: text().notNull(),
     artwork: text().notNull().default(''),

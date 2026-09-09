@@ -78,7 +78,7 @@ export function MusicServices({
 }: {
   signedIn: boolean;
   readOnly: boolean;
-  onMusic?: () => void;
+  onMusic?: (tab?: 'playlists') => void;
 }) {
   const [provider, setProvider] = useState<MusicServiceId>('soundcloud');
   const [statuses, setStatuses] = useState<ServiceStatus[]>([]),
@@ -242,9 +242,20 @@ export function MusicServices({
       if (version === selection.current) {
         setImports((old) => [saved, ...old.filter((v) => v.id !== saved.id)]);
         setPlaylists((old) =>
-          old.map((v) => (v.id === p.id ? { ...v, imported: true } : v)),
+          old.map((v) =>
+            v.id === p.id ? { ...v, ...saved, imported: true } : v,
+          ),
         );
-        setNotice('Плейлист добавлен. Он виден только вам.');
+        const skipped = Math.max(
+          0,
+          saved.trackCount - (saved.importedTrackCount ?? saved.trackCount),
+        );
+        setNotice(
+          saved.localPlaylistId
+            ? `Плейлист добавлен в «Плейлисты»: ${saved.importedTrackCount} треков.${skipped ? ` Не добавлено недоступных или повторяющихся песен: ${skipped}.` : ''}`
+            : 'Плейлист добавлен. Он виден только вам.',
+        );
+        window.dispatchEvent(new Event('noctgram:music-refresh'));
       }
     } catch (e) {
       if (version === selection.current) setError((e as Error).message);
@@ -607,19 +618,34 @@ export function MusicServices({
                           <ArrowUpRight size={18} />
                         </a>
                       )}
-                      {view === 'playlists' && (
-                        <button
+                      {p.localPlaylistId ? (
+                        <Link
                           className="secondary service-import-button"
-                          disabled={busy || readOnly || p.imported}
-                          onClick={() => void importPlaylist(p)}
+                          href="/music?tab=playlists"
+                          onNavigate={(event) => {
+                            if (onMusic) {
+                              event.preventDefault();
+                              onMusic('playlists');
+                            }
+                          }}
                         >
-                          {p.imported ? (
-                            <Check size={16} />
-                          ) : (
-                            <Library size={16} />
-                          )}
-                          {p.imported ? 'Добавлен' : 'Импорт'}
-                        </button>
+                          <Library size={16} />В плейлисты
+                        </Link>
+                      ) : (
+                        (view === 'playlists' || provider === 'soundcloud') && (
+                          <button
+                            className="secondary service-import-button"
+                            disabled={busy || readOnly || p.imported}
+                            onClick={() => void importPlaylist(p)}
+                          >
+                            {p.imported ? (
+                              <Check size={16} />
+                            ) : (
+                              <Library size={16} />
+                            )}
+                            {p.imported ? 'Добавлен' : 'Импорт'}
+                          </button>
+                        )
                       )}
                     </div>
                   ))}
@@ -651,8 +677,9 @@ export function MusicServices({
                 </output>
               )}
               <p className="service-library-note">
-                Импорт сохраняет плейлист в личной коллекции Noctgram. Состав и
-                аудио остаются в {name}.
+                {provider === 'soundcloud'
+                  ? 'Импорт добавляет песни в «Плейлисты». Их порядок можно менять в Noctgram; музыка воспроизводится из SoundCloud.'
+                  : `Импорт сохраняет плейлист в личной коллекции Noctgram. Состав и аудио остаются в ${name}.`}
                 {provider === 'spotify' &&
                   ' Отдельные треки можно добавить по ссылке и слушать в плеере Noctgram с Premium.'}
               </p>

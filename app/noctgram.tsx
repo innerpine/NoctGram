@@ -2262,7 +2262,10 @@ export default function Noctgram({
           <MusicServices
             signedIn={!!me}
             readOnly={!!readOnly}
-            onMusic={() => navigate('music')}
+            onMusic={(tab) => {
+              if (tab) setMusicTab(tab);
+              navigate('music');
+            }}
           />
         )}
         {page === 'music' && (

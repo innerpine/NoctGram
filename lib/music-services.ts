@@ -11,6 +11,10 @@ import { assertWritable } from './account-access';
 import { yandexStatus } from './yandex-music';
 import { parseMusicLink } from './music-links';
 import {
+  copySoundCloudPlaylist,
+  MAX_IMPORTED_TRACKS,
+} from './music-playlist-import';
+import {
   MUSIC_SERVICES,
   type OAuthMusicService,
   type ServicePlaylist,
@@ -631,10 +635,10 @@ export async function servicePlaylists(
     .filter((v): v is ServicePlaylist => !!v);
   const imports = await db()
     .prepare(
-      'SELECT playlistId FROM music_imports WHERE userId=? AND provider=?',
+      'SELECT playlistId,localPlaylistId FROM music_imports WHERE userId=? AND provider=?',
     )
     .bind(user, provider)
-    .all<{ playlistId: string }>();
+    .all<{ playlistId: string; localPlaylistId: string | null }>();
   let next: string | null = null;
   const href = text(
     provider === 'soundcloud' ? data.next_href : data.next,
@@ -661,7 +665,13 @@ export async function servicePlaylists(
   return {
     items: items.map((p) => ({
       ...p,
-      imported: imports.results.some((i) => i.playlistId === p.id),
+      imported: imports.results.some(
+        (i) =>
+          i.playlistId === p.id &&
+          (provider !== 'soundcloud' || !!i.localPlaylistId),
+      ),
+      localPlaylistId: imports.results.find((i) => i.playlistId === p.id)
+        ?.localPlaylistId,
     })),
     next,
   };
@@ -673,6 +683,12 @@ export async function importServicePlaylist(
 ) {
   if (typeof id !== 'string' || !/^[a-zA-Z0-9:_-]{1,160}$/.test(id))
     throw new ApiError(400, 'Некорректный плейлист.');
+  if (provider === 'soundcloud') {
+    const saved = (await importedPlaylists(user, provider)).find(
+      (p) => p.id === id && p.localPlaylistId,
+    );
+    if (saved) return saved;
+  }
   const { data, connectionId } = await serviceRequest(
     user,
     provider,
@@ -683,6 +699,78 @@ export async function importServicePlaylist(
   const value = playlist(provider, data);
   if (!value || value.id !== id)
     throw new ApiError(422, 'Этот плейлист не поддерживается.');
+  if (provider === 'soundcloud') {
+    const urn =
+      typeof data.urn === 'string' &&
+      /^soundcloud:playlists:\d+$/.test(data.urn)
+        ? data.urn
+        : /^\d+$/.test(id)
+          ? 'soundcloud:playlists:' + id
+          : id;
+    const endpoint = '/playlists/' + encodeURIComponent(urn) + '/tracks';
+    let path = endpoint + '?linked_partitioning=true&limit=200';
+    const tracks: Data[] = [],
+      seen = new Set<string>();
+    while (path) {
+      if (seen.has(path) || seen.size >= 20)
+        throw new ApiError(
+          502,
+          'SoundCloud не завершил загрузку списка песен. Повторите импорт.',
+        );
+      seen.add(path);
+      const page = await serviceRequest(user, provider, path);
+      if (page.connectionId !== connectionId)
+        throw new ApiError(409, 'Подключение изменилось. Повторите импорт.');
+      const collection = Array.isArray(page.data)
+        ? page.data
+        : page.data.collection;
+      if (!Array.isArray(collection))
+        throw new ApiError(502, 'SoundCloud не вернул песни плейлиста.');
+      tracks.push(
+        ...collection.filter(
+          (track): track is Data => !!track && typeof track === 'object',
+        ),
+      );
+      if (tracks.length > MAX_IMPORTED_TRACKS)
+        throw new ApiError(
+          422,
+          `Можно импортировать до ${MAX_IMPORTED_TRACKS} песен в один плейлист.`,
+        );
+      path = '';
+      if (page.data.next_href) {
+        let next: URL;
+        let nextPath: string;
+        try {
+          if (typeof page.data.next_href !== 'string')
+            throw new Error('Invalid next page');
+          next = new URL(page.data.next_href);
+          nextPath = decodeURIComponent(next.pathname);
+        } catch {
+          throw new ApiError(
+            502,
+            'SoundCloud вернул некорректную страницу песен.',
+          );
+        }
+        if (
+          next.origin !== endpoints.soundcloud.api ||
+          next.username ||
+          next.password ||
+          ![
+            decodeURIComponent(endpoint),
+            '/playlists/' + id + '/tracks',
+          ].includes(nextPath) ||
+          next.searchParams.has('access_token') ||
+          next.searchParams.has('secret_token')
+        )
+          throw new ApiError(
+            502,
+            'SoundCloud вернул некорректную страницу песен.',
+          );
+        path = next.pathname + next.search;
+      }
+    }
+    return copySoundCloudPlaylist(user, connectionId, value, tracks);
+  }
   const row = await db()
     .prepare(`INSERT INTO music_imports(userId,provider,playlistId,connectionId,title,url,artwork,trackCount,playable,imported)
     SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM music_connections WHERE userId=? AND provider=? AND id=?) AND ${writableSQL}
@@ -723,14 +811,14 @@ export async function importedPlaylists(
 ) {
   const rows = await db()
     .prepare(
-      'SELECT playlistId AS id,provider,title,url,artwork,trackCount,playable FROM music_imports WHERE userId=? AND provider=? ORDER BY imported DESC LIMIT 100',
+      'SELECT playlistId AS id,provider,title,url,artwork,trackCount,playable,localPlaylistId,(SELECT COUNT(*) FROM music_playlist_tracks pt WHERE pt.playlistId=music_imports.localPlaylistId) AS importedTrackCount FROM music_imports WHERE userId=? AND provider=? ORDER BY imported DESC LIMIT 100',
     )
     .bind(user, provider)
     .all<ServicePlaylist>();
   return rows.results.map((row) => ({
     ...row,
     playable: !!row.playable,
-    imported: true,
+    imported: provider !== 'soundcloud' || !!row.localPlaylistId,
   }));
 }
 export async function searchServiceTracks(
