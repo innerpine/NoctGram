@@ -585,11 +585,9 @@ try {
   );
   await service.connectYandex('alice', 'own-yandex-token-test');
   assert.equal((await service.yandexStatus('alice')).status, 'connected');
-  assert.equal(
-    (await service.musicServiceStatus('alice')).find(
-      (x) => x.provider === 'yandex',
-    ).status,
-    'connected',
+  assert.deepEqual(
+    (await service.musicServiceStatus('alice')).map((x) => x.provider),
+    ['soundcloud', 'youtube'],
   );
   assert.ok(
     !JSON.stringify(

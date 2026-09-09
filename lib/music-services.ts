@@ -8,7 +8,6 @@ import {
   authCookie,
 } from './auth-session';
 import { assertWritable } from './account-access';
-import { yandexStatus } from './yandex-music';
 import { parseMusicLink } from './music-links';
 import {
   copySoundCloudPlaylist,
@@ -220,7 +219,6 @@ async function connection(user: string, provider: OAuthMusicService) {
 export async function musicServiceStatus(
   user: string,
 ): Promise<ServiceStatus[]> {
-  const yandex = await yandexStatus(user);
   const rows = await db()
     .prepare(
       'SELECT provider,displayName,profileUrl,status FROM music_connections WHERE userId=?',
@@ -230,9 +228,6 @@ export async function musicServiceStatus(
   return MUSIC_SERVICES.map((provider) => {
     if (provider === 'youtube')
       return { provider, configured: true, status: 'link_only' };
-    if (provider === 'yandex') return yandex;
-    if (provider !== 'soundcloud' && provider !== 'spotify')
-      return { provider, configured: false, status: 'unavailable' };
     const row = rows.results.find((r) => r.provider === provider),
       configured = !!configuration(provider);
     return {

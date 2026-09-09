@@ -1,7 +1,8 @@
-export const MUSIC_SERVICES = ['soundcloud', 'yandex', 'youtube'] as const;
-// Retain stored legacy tracks and connections; only these three services are offered in the UI.
+export const MUSIC_SERVICES = ['soundcloud', 'youtube'] as const;
+// Keep legacy data compatible while offering only the enabled services in the UI.
 export type MusicServiceId =
   | (typeof MUSIC_SERVICES)[number]
+  | 'yandex'
   | 'spotify'
   | 'vk'
   | 'deezer';

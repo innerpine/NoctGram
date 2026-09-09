@@ -31,7 +31,6 @@ import {
 } from '@/lib/music-service-types';
 import { parseMusicLink, type MusicTrack } from '@/lib/music-links';
 import { useMusic } from '@/lib/music-context';
-import { MusicYandex } from './music-yandex';
 import { MusicYouTubeService } from './music-youtube-service';
 
 async function serviceRequest<T>(
@@ -153,7 +152,7 @@ export function MusicServices({
     setNext(null);
     setQuery('');
     setView('playlists');
-    if (!connected || provider === 'yandex') return;
+    if (!connected) return;
     setBusy(true);
     Promise.all([
       serviceRequest<ServicePage>(`/${provider}/playlists`),
@@ -351,9 +350,7 @@ export function MusicServices({
           {notice}
         </output>
       )}
-      {provider === 'yandex' ? (
-        <MusicYandex signedIn={signedIn} readOnly={readOnly} />
-      ) : provider === 'youtube' ? (
+      {provider === 'youtube' ? (
         <MusicYouTubeService signedIn={signedIn} readOnly={readOnly} />
       ) : (
         <>
