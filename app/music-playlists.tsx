@@ -258,25 +258,38 @@ export function MusicPlaylists({
                 >
                   <span className="playlist-cover">
                     {p.artwork ? (
-                      <img src={p.artwork} alt="" />
+                      <img
+                        src={p.artwork}
+                        alt=""
+                        width={72}
+                        height={72}
+                        loading="lazy"
+                        decoding="async"
+                      />
                     ) : (
                       <ListMusic size={35} />
                     )}
-                    <span className="playlist-cover-mark">
-                      <Users size={16} />
-                      {p.memberCount}
-                    </span>
                   </span>
-                  <strong>{p.name}</strong>
-                  <small>
-                    {p.trackCount} треков · {p.ownerName}
-                  </small>
-                  {room?.detail?.id === p.id && (
-                    <span className="playlist-live">
-                      <i />
-                      Слушаем вместе
+                  <span className="playlist-copy">
+                    <strong title={p.name}>{p.name}</strong>
+                    <span className="playlist-meta">
+                      <span>{p.trackCount} треков</span>
+                      <span
+                        className="playlist-member-count"
+                        title={'Участников: ' + p.memberCount}
+                      >
+                        <Users size={13} aria-hidden="true" />
+                        {p.memberCount}
+                      </span>
                     </span>
-                  )}
+                    <small title={p.ownerName}>{p.ownerName}</small>
+                    {room?.detail?.id === p.id && (
+                      <span className="playlist-live">
+                        <i />
+                        Слушаем вместе
+                      </span>
+                    )}
+                  </span>
                 </button>
               ))}
             </div>
@@ -395,7 +408,7 @@ export function MusicPlaylists({
             <Link2 size={18} />
             <input
               aria-label="Ссылка на песню для общего плейлиста"
-              placeholder="Добавить песню по ссылке"
+              placeholder="Ссылка на песню SoundCloud"
               type="url"
               required
               value={url}
@@ -637,7 +650,7 @@ export function MusicPlaylists({
           )}
           <div className="playlist-picker-list">
             {library
-              .filter((t) => t.kind === 'track')
+              .filter((t) => t.kind === 'track' && t.provider === 'soundcloud')
               .map((t) => {
                 const added = shown?.tracks.some((x) => x.id === t.id);
                 return (
@@ -654,7 +667,9 @@ export function MusicPlaylists({
                   </button>
                 );
               })}
-            {!library.some((t) => t.kind === 'track') && (
+            {!library.some(
+              (t) => t.kind === 'track' && t.provider === 'soundcloud',
+            ) && (
               <p>
                 Пока нет сохранённых песен. Найдите музыку выше или добавьте
                 песню по ссылке.

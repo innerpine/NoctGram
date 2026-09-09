@@ -31,7 +31,6 @@ import {
 } from '@/lib/music-service-types';
 import { parseMusicLink, type MusicTrack } from '@/lib/music-links';
 import { useMusic } from '@/lib/music-context';
-import { MusicYouTubeService } from './music-youtube-service';
 
 async function serviceRequest<T>(
   path: string,
@@ -284,8 +283,8 @@ export function MusicServices({
     <div className="music-services">
       <div className="services-heading">
         <div>
-          <h2>Ваши музыкальные сервисы</h2>
-          <p>Подключите аккаунт — любимая музыка будет рядом.</p>
+          <h2>Ваш SoundCloud</h2>
+          <p>Подключите аккаунт, чтобы перенести свои плейлисты.</p>
         </div>
         <Link
           href="/music"
@@ -301,25 +300,6 @@ export function MusicServices({
           <ArrowLeft size={18} />
         </Link>
       </div>
-      <Tabs
-        value={provider}
-        onValueChange={(v) => {
-          setProvider(v as MusicServiceId);
-          setError('');
-          setNotice('');
-          setBusy(false);
-        }}
-        className="service-picker"
-      >
-        <TabsList>
-          {MUSIC_SERVICES.map((id) => (
-            <TabsTrigger value={id} key={id} disabled={busy}>
-              <ServiceMark provider={id} />
-              {SERVICE_NAMES[id]}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
       {provider === 'soundcloud' && signedIn && (
         <Link
           className="music-services-link"
@@ -350,9 +330,7 @@ export function MusicServices({
           {notice}
         </output>
       )}
-      {provider === 'youtube' ? (
-        <MusicYouTubeService signedIn={signedIn} readOnly={readOnly} />
-      ) : (
+      {supported && (
         <>
           <section className="service-connection-card">
             <div className="service-card-top">

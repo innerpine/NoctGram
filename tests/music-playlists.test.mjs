@@ -417,15 +417,24 @@ const videoPlaylist = await api.changePlaylist(
   now + 300000,
 );
 const videoId = videoPlaylist.id;
-await api.changePlaylist(
-  'alice',
-  {
-    action: 'add',
-    id: videoId,
-    url: 'https://music.youtube.com/watch?v=M7lc1UVf-VE&si=tracking',
-  },
-  now + 300001,
+await assert.rejects(
+  api.changePlaylist(
+    'alice',
+    {
+      action: 'add',
+      id: videoId,
+      url: 'https://music.youtube.com/watch?v=M7lc1UVf-VE&si=tracking',
+    },
+    now + 300001,
+  ),
+  (error) => error.status === 400,
 );
+// A previously saved playlist still opens and plays after its service is retired.
+sqlite
+  .prepare(
+    'INSERT INTO music_playlist_tracks(playlistId,trackId,addedBy,created,sortOrder) VALUES(?,?,?,?,?)',
+  )
+  .run(videoId, 'youtube', 'alice', now + 300001, 0);
 const videoSession = 'youtube-room-session-123';
 await api.changePlaylist(
   'alice',
@@ -485,6 +494,22 @@ for (const [index, trackId] of trackIds.entries()) {
   const url = sqlite
     .prepare('SELECT url FROM music_tracks WHERE id=?')
     .get(trackId).url;
+  if (trackId === 'youtube' || trackId === 'spotify') {
+    await assert.rejects(
+      api.changePlaylist(
+        'alice',
+        { action: 'add', id: orderedId, url },
+        now + 400001 + index,
+      ),
+      (error) => error.status === 400,
+    );
+    sqlite
+      .prepare(
+        'INSERT INTO music_playlist_tracks(playlistId,trackId,addedBy,created,sortOrder) VALUES(?,?,?,?,?)',
+      )
+      .run(orderedId, trackId, 'alice', now + 400001 + index, index);
+    continue;
+  }
   await api.changePlaylist(
     'alice',
     { action: 'add', id: orderedId, url },

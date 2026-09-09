@@ -226,8 +226,6 @@ export async function musicServiceStatus(
     .bind(user)
     .all<Connection>();
   return MUSIC_SERVICES.map((provider) => {
-    if (provider === 'youtube')
-      return { provider, configured: true, status: 'link_only' };
     const row = rows.results.find((r) => r.provider === provider),
       configured = !!configuration(provider);
     return {

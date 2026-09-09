@@ -587,7 +587,7 @@ try {
   assert.equal((await service.yandexStatus('alice')).status, 'connected');
   assert.deepEqual(
     (await service.musicServiceStatus('alice')).map((x) => x.provider),
-    ['soundcloud', 'youtube'],
+    ['soundcloud'],
   );
   assert.ok(
     !JSON.stringify(

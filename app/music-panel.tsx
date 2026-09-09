@@ -119,10 +119,8 @@ export function MusicPanel({
   }, [refresh]);
   async function save() {
     const link = parseMusicLink(url);
-    if (!link) {
-      setError(
-        'Вставьте ссылку SoundCloud, Spotify, YouTube или YouTube Music.',
-      );
+    if (!link || link.provider !== 'soundcloud') {
+      setError('Вставьте ссылку на трек или плейлист SoundCloud.');
       return;
     }
     setBusy(true);
@@ -264,8 +262,8 @@ export function MusicPanel({
       >
         <Headphones size={21} />
         <span>
-          <strong>Подключить музыкальные сервисы</strong>
-          <small>Ваши аккаунты и плейлисты</small>
+          <strong>Подключить SoundCloud</strong>
+          <small>Ваш аккаунт и плейлисты</small>
         </span>
         <ArrowUpRight size={19} />
       </Link>
@@ -296,7 +294,7 @@ export function MusicPanel({
             aria-label="Добавить музыку по ссылке"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="Вставьте ссылку на музыку"
+            placeholder="Ссылка на трек или плейлист SoundCloud"
             disabled={busy || readOnly || !signedIn}
             autoComplete="off"
           />
