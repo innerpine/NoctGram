@@ -179,14 +179,14 @@ export function MusicPlaylists({
     else void room?.join(shown, trackId);
   };
   return (
-    <div className="music-playlists music-content-enter">
+    <div className="music-playlists">
       {(error || room?.error) && (
         <p className="music-error" role="alert">
           {error || room?.error}
         </p>
       )}
-      {!selected ? (
-        <>
+      {!selected || !shown ? (
+        <section className="playlist-overview" key="overview">
           <div className="playlist-section-heading">
             <div>
               <ListMusic size={20} />
@@ -251,9 +251,13 @@ export function MusicPlaylists({
                 <button
                   className="playlist-tile card"
                   key={p.id}
+                  aria-busy={selected === p.id && !error}
+                  data-opening={selected === p.id && !error}
                   onClick={() => {
+                    setError('');
                     setDetail(null);
-                    setSelected(p.id);
+                    if (selected === p.id) void refresh();
+                    else setSelected(p.id);
                   }}
                 >
                   <span className="playlist-cover">
@@ -268,6 +272,16 @@ export function MusicPlaylists({
                       />
                     ) : (
                       <ListMusic size={35} />
+                    )}
+                    {selected === p.id && !error && (
+                      <output className="playlist-opening">
+                        <LoaderCircle
+                          size={22}
+                          className="spin"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">Открываем плейлист…</span>
+                      </output>
                     )}
                   </span>
                   <span className="playlist-copy">
@@ -300,9 +314,9 @@ export function MusicPlaylists({
               <p>Создайте плейлист, добавьте песни и пригласите друга.</p>
             </div>
           )}
-        </>
-      ) : shown ? (
-        <section className="playlist-detail card">
+        </section>
+      ) : (
+        <section className="playlist-detail card" key={shown.id}>
           <div className="playlist-detail-top">
             <button
               className="icon-button"
@@ -487,14 +501,6 @@ export function MusicPlaylists({
             </div>
           )}
         </section>
-      ) : (
-        <output className="music-empty">
-          <LoaderCircle size={24} className="spin" />
-          Открываем плейлист…
-          <button className="secondary" onClick={() => setSelected('')}>
-            Назад
-          </button>
-        </output>
       )}
       <MusicPlaylistCreate
         key={createVersion}

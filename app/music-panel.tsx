@@ -279,7 +279,7 @@ export function MusicPanel({
           <TabsTrigger value="library">Моя музыка</TabsTrigger>
         </TabsList>
       </Tabs>
-      {tab !== 'playlists' && tab !== 'search' && (
+      {tab === 'library' && (
         <form
           className="music-link-search"
           onSubmit={(e) => {
