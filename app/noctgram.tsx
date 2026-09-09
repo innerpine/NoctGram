@@ -10,6 +10,8 @@ import { StoriesBar } from './stories-bar';
 import { reconcileSnapshot } from '@/lib/reconcile-snapshot';
 import { createFeedSnapshots, feedKey, sameSearch } from '@/lib/feed-snapshots';
 import { createChatSnapshots, type ChatSnapshot } from '@/lib/chat-snapshots';
+import { createPageTransition } from '@/lib/page-transition';
+import { flushSync } from 'react-dom';
 import { ChannelTools, localDate } from './channel-tools';
 import { NotificationsBell } from './notifications';
 import { useAudioCalls } from './audio-calls';
@@ -281,6 +283,11 @@ export default function Noctgram({
     starsReturn = useRef('feed'),
     actionLock = useRef(false);
   const appHistory = useRef<ReturnType<typeof createAppHistory> | null>(null);
+  const pageTransition = useRef<ReturnType<typeof createPageTransition> | null>(
+    null,
+  );
+  const currentPage = useRef(page);
+  currentPage.current = page;
   const navigationCache = useRef({
     owner: '',
     profiles: new Map<string, Profile>(),
@@ -289,7 +296,11 @@ export default function Noctgram({
   });
   const setPage = useCallback((value: string) => {
     appHistory.current?.cancelPending();
-    setPageState(value);
+    if (pageTransition.current)
+      void pageTransition.current.run(currentPage.current, value, () =>
+        setPageState(value),
+      );
+    else setPageState(value);
   }, []);
   const setModal = (next: string) => {
     if (next) setModalContent(next);
@@ -928,15 +939,21 @@ export default function Noctgram({
   };
   useEffect(() => {
     if (!myId && !guest) return;
+    const motion = createPageTransition(window, flushSync);
+    pageTransition.current = motion;
     const history = createAppHistory(window, {
       owner: myId || 'guest',
       initial: navigationLatest.current!.route,
       prepare: (next) => navigationLatest.current!.prepare(next),
+      render: (from, to, update, initial) =>
+        motion.run(from.page, to.page, update, !initial),
       error: (message) => navigationLatest.current!.notify(message),
     });
     appHistory.current = history;
     return () => {
       history.dispose();
+      motion.cancel();
+      pageTransition.current = null;
       appHistory.current = null;
     };
   }, [myId, guest]);

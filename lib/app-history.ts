@@ -127,6 +127,12 @@ export function createAppHistory(
     owner: string;
     initial: AppRoute;
     prepare: (route: AppRoute) => Promise<PreparedRoute>;
+    render?: (
+      from: AppRoute,
+      to: AppRoute,
+      update: () => void,
+      initial: boolean,
+    ) => Promise<void>;
     error: (message: string) => void;
   },
 ) {
@@ -192,13 +198,20 @@ export function createAppHistory(
       if (disposed || generation !== version) return false;
       const next = normalizeAppRoute(prepared.route);
       const changed = appRouteKey(next) !== appRouteKey(active);
-      active = next;
-      settling =
-        appRouteKey(observed) === appRouteKey(next) ? '' : appRouteKey(next);
-      pending = false;
-      write(mode === 'push' && changed ? 'push' : 'replace', next, initial);
-      prepared.commit();
-      return true;
+      let committed = false;
+      const commit = () => {
+        if (disposed || generation !== version) return;
+        active = next;
+        settling =
+          appRouteKey(observed) === appRouteKey(next) ? '' : appRouteKey(next);
+        pending = false;
+        write(mode === 'push' && changed ? 'push' : 'replace', next, initial);
+        prepared.commit();
+        committed = true;
+      };
+      if (options.render) await options.render(active, next, commit, initial);
+      else commit();
+      return committed;
     } catch (error) {
       if (disposed || generation !== version) return false;
       pending = false;

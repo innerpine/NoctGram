@@ -1,3 +1,69 @@
+/* Keep the old section visible until the new one is committed. Named live
+   surfaces keep playback controls and navigation visible during the fade. */
+html[data-page-transition] .app-shell > .main-column {
+  view-transition-name: noct-page;
+}
+html[data-page-transition] .app-shell > .sidebar {
+  view-transition-name: noct-navigation;
+}
+html[data-page-transition] .music-player.music-sheet {
+  view-transition-name: noct-player;
+}
+html[data-page-transition] .music-lyrics-dock[data-open='true'] {
+  view-transition-name: noct-lyrics;
+}
+html[data-page-transition]::view-transition {
+  pointer-events: none;
+}
+/* A feed can be much taller than a music page. Crossfade its content without
+   scaling a whole document-height snapshot (which stretches text mid-flight). */
+html[data-page-transition]::view-transition-group(*) {
+  animation: none;
+}
+html[data-page-transition]::view-transition-old(root),
+html[data-page-transition]::view-transition-old(noct-navigation),
+html[data-page-transition]::view-transition-old(noct-player),
+html[data-page-transition]::view-transition-old(noct-lyrics) {
+  display: none;
+}
+html[data-page-transition]::view-transition-new(root),
+html[data-page-transition]::view-transition-new(noct-navigation),
+html[data-page-transition]::view-transition-new(noct-player),
+html[data-page-transition]::view-transition-new(noct-lyrics) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html[data-page-transition]::view-transition-old(noct-page) {
+  animation: section-leave 160ms ease both;
+  mix-blend-mode: normal;
+}
+html[data-page-transition]::view-transition-new(noct-page) {
+  animation: section-enter 240ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  mix-blend-mode: normal;
+}
+@keyframes section-leave {
+  to {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+@keyframes section-enter {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-page-transition]::view-transition-group(*),
+  html[data-page-transition]::view-transition-old(*),
+  html[data-page-transition]::view-transition-new(*) {
+    animation: none !important;
+  }
+}
 .main-column[data-page='profile'] .profile-card {
   animation: profile-enter 280ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }

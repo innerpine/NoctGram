@@ -26,7 +26,7 @@ const deferred = () => {
 
 // A session history with capture/bubble ordering, including an earlier account
 // picker entry. No browser, network requests or test-account mutations needed.
-function fixture(href = '/', prepare) {
+function fixture(href = '/', prepare, render) {
   const entries = [
     { url: new URL('/__dev/accounts', 'http://localhost:3000'), state: null },
     {
@@ -83,6 +83,7 @@ function fixture(href = '/', prepare) {
   const controller = createAppHistory(host, {
     owner: 'me',
     initial: { page: 'feed' },
+    render,
     error: (error) => errors.push(error),
     prepare: async (route) => {
       preparations.push(route);
@@ -257,6 +258,62 @@ void test('same-view clicks preserve the current chat and do not prepare or remo
   assert.equal(f.commits.length, count);
   assert.equal(f.preparations.length, 1);
   assert.equal(f.entries.length, 2);
+});
+
+void test('delayed visual commits keep URL and content together and reject obsolete callbacks', async () => {
+  const queued = [];
+  const f = fixture('/', undefined, async (from, to, update, initial) => {
+    if (initial) return update();
+    const wait = deferred();
+    queued.push({
+      from,
+      to,
+      apply: () => {
+        update();
+        wait.resolve();
+      },
+    });
+    await wait.promise;
+  });
+  await f.controller.ready;
+  const first = f.controller.navigate({ page: 'music' });
+  await tick();
+  assert.equal(f.ui.page, 'feed');
+  assert.equal(f.host.location.pathname, '/');
+  const second = f.controller.navigate({
+    page: 'profile',
+    profileId: 'friend',
+  });
+  await tick();
+  queued[0].apply();
+  assert.equal(await first, false);
+  assert.equal(f.ui.page, 'feed');
+  assert.equal(f.host.location.pathname, '/');
+  queued[1].apply();
+  assert.equal(await second, true);
+  assert.equal(f.ui.profileId, 'friend');
+  assert.equal(f.host.location.search, '?profile=friend');
+  assert.equal(f.entries.length, 3);
+});
+
+void test('a sidebar cancellation also invalidates a queued animation commit', async () => {
+  let apply;
+  const wait = deferred();
+  const f = fixture('/', undefined, async (from, to, update, initial) => {
+    if (initial) return update();
+    apply = update;
+    await wait.promise;
+  });
+  await f.controller.ready;
+  const pending = f.controller.navigate({ page: 'music' });
+  await tick();
+  f.controller.cancelPending();
+  f.observe({ page: 'messages' });
+  apply();
+  wait.resolve();
+  assert.equal(await pending, false);
+  assert.equal(f.ui.page, 'messages');
+  assert.equal(f.host.location.search, '?page=messages');
 });
 
 void test('music chart links and library/service transitions remain in app history', async () => {
