@@ -85,7 +85,7 @@ export function MusicPanel({
     try {
       const result = await musicRequest<MusicData>('home', undefined, {
         charts: tab === 'charts' ? '1' : '0',
-        leaders: '1',
+        leaders: tab === 'charts' ? '1' : '0',
         period,
       });
       if (version === requestVersion.current) setData(result);
@@ -451,17 +451,6 @@ export function MusicPanel({
                   </div>
                 )}
               </section>
-            )}
-            {tab === 'playlists' && (
-              <div className="music-content-enter card">
-                <MusicLeaderboard
-                  listeners={data.listeners}
-                  profile={data.profile}
-                  mine={data.mine}
-                  period={data.period}
-                  onProfile={onProfile}
-                />
-              </div>
             )}
           </>
         )
