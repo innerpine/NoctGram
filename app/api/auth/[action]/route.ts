@@ -1,4 +1,5 @@
 import { readJsonBody } from '@/lib/request-body';
+import { setting } from '@/lib/auth-session';
 import { ApiError, failure } from '@/lib/api-error';
 import { accountAction, accountStatus } from '@/lib/account-management';
 import {
@@ -49,6 +50,14 @@ export async function POST(
   try {
     const data = await body(req),
       action = (await params).action;
+    if (
+      setting('NOCT_AUTH_MODE') === 'access' &&
+      !['onboarding', 'logout'].includes(action)
+    )
+      throw new ApiError(
+        403,
+        'В тестовой версии вход настроен через Cloudflare Access.',
+      );
     let response: Response;
     if (action === 'start') response = await startEmail(req, data);
     else if (action === 'verify') response = await finishEmail(req, data);

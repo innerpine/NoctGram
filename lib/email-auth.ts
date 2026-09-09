@@ -16,6 +16,7 @@ import {
   SESSION_COOKIE,
   SESSION_SECONDS,
   sitesAuthEnabled,
+  setting,
   tokenHash,
 } from './auth-session';
 import {
@@ -451,9 +452,12 @@ export async function signOut(req: Request) {
   ]);
   const platform = sitesAuthEnabled() && (await getChatGPTUser());
   const response = Response.json({
-    redirectTo: platform
-      ? '/signout-with-chatgpt?return_to=%2Flogin'
-      : '/login',
+    redirectTo:
+      setting('NOCT_AUTH_MODE') === 'access'
+        ? '/cdn-cgi/access/logout'
+        : platform
+          ? '/signout-with-chatgpt?return_to=%2Flogin'
+          : '/login',
   });
   response.headers.append('Set-Cookie', authCookie(req, SESSION_COOKIE, '', 0));
   response.headers.append(
