@@ -288,6 +288,7 @@ export function MusicServices({
         </div>
         <Link
           href="/music"
+          prefetch={false}
           className="icon-button"
           aria-label="Вернуться к музыке"
           onNavigate={(event) => {
@@ -304,6 +305,7 @@ export function MusicServices({
         <Link
           className="music-services-link"
           href="/music?tab=search"
+          prefetch={false}
           onNavigate={(event) => {
             if (onMusic) {
               event.preventDefault();

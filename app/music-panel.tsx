@@ -252,6 +252,7 @@ export function MusicPanel({
       </div>
       <Link
         href="/music/services"
+        prefetch={false}
         className="music-services-link"
         onNavigate={(event) => {
           if (onServices) {
