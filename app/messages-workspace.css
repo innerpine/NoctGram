@@ -14,6 +14,10 @@
         var(--messages-thread-reserve) - var(--messages-dock-reserve)
     );
   }
+  body:has(.messages-shell):has(.music-player.music-sheet) {
+    /* Match the player's 4px bottom inset and leave 8px below the chat. */
+    --app-player-space: calc(var(--music-player-height, 100px) + 12px);
+  }
   body:has(.messages-shell) .app-shell.messages-shell {
     grid-template-columns: var(--messages-nav-width) minmax(0, 1fr);
     width: calc(100% - var(--messages-dock-reserve));
@@ -34,6 +38,7 @@
   }
   body:has(.app-shell.messages-shell) .music-player.music-sheet {
     width: min(var(--music-sheet-width), var(--messages-chat-width));
+    bottom: 4px;
     left: 50%;
     transform: translateX(
       calc(
