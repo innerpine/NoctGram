@@ -204,6 +204,13 @@
       "when": 1788882205013,
       "tag": "0028_chat_storage_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1788945793979,
+      "tag": "0029_music_app_tokens",
+      "breakpoints": true
     }
   ]
 }

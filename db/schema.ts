@@ -9,6 +9,15 @@ import {
   type AnySQLiteColumn,
 } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
+// Application playback tokens are separate from users' OAuth connections.
+export const musicAppTokens = sqliteTable('music_app_tokens', {
+  id: text().primaryKey(),
+  sealedTokens: text().notNull().default(''),
+  expiresAt: integer().notNull().default(0),
+  lease: text().notNull().default(''),
+  leaseUntil: integer().notNull().default(0),
+  retryAt: integer().notNull().default(0),
+});
 export const users = sqliteTable('users', {
   id: text().primaryKey(),
   name: text().notNull(),

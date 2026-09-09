@@ -39,6 +39,11 @@ import {
 } from '@/lib/music-volume';
 import { moveMusicItem } from '@/lib/music-queue';
 import {
+  NativeMusicAudio,
+  nativeMusicPlayback,
+  soundcloudAudioURL,
+} from '@/lib/native-music-audio';
+import {
   MusicContext,
   MusicPlaybackContext,
   useMusic,
@@ -62,6 +67,21 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [sound, setSound] = useState<SoundCloudSound | null>(null);
   const [localTrack, setLocalTrack] = useState<MusicTrack | null>(null);
   const audio = useRef<HTMLAudioElement>(null);
+  const nativeAudio = useRef<NativeMusicAudio | null>(null);
+  const soundCloudNative = useRef<boolean | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/music/soundcloud?action=status', {
+      signal: controller.signal,
+    })
+      .then(async (r) => {
+        if (r.ok)
+          soundCloudNative.current =
+            ((await r.json()) as { configured?: boolean }).configured === true;
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
   const spotify = useRef<SpotifyPlayback | null>(null);
   const youtube = useRef<YouTubePlayback | null>(null);
   const youtubeHost = useRef<HTMLDivElement>(null);
@@ -114,7 +134,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   useEffect(
     () => () => {
       generation.current++;
-      audio.current?.pause();
+      nativeAudio.current?.dispose();
       youtube.current?.dispose();
       spotify.current?.dispose();
     },
@@ -145,7 +165,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     nativeOrder.current = null;
     generation.current++;
     widget.current?.pause();
-    audio.current?.pause();
+    nativeAudio.current?.dispose();
     spotify.current?.dispose();
     spotify.current = null;
     youtube.current?.dispose();
@@ -175,7 +195,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         parsed.provider === 'spotify'
           ? next.playback ||
             ((next as MusicTrack).audioUrl ? 'file' : 'spotify')
-          : undefined,
+          : parsed.provider === 'soundcloud' &&
+              parsed.kind === 'track' &&
+              soundCloudNative.current !== false
+            ? 'soundcloud'
+            : undefined,
     } as MusicLink;
     if (nextQueue) {
       queueRef.current = nextQueue;
@@ -228,28 +252,24 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
     if (
       desired.current?.url === valid.url &&
-      valid.provider === 'spotify' &&
-      valid.playback === 'file' &&
-      desired.current.playback === 'file' &&
+      nativeMusicPlayback(valid.playback) &&
+      desired.current.playback === valid.playback &&
       audio.current?.currentSrc
     ) {
-      void audio.current
-        .play()
-        .catch(() =>
-          setError('Не удалось запустить аудио. Нажмите «Повторить».'),
-        );
+      nativeAudio.current?.resume();
       return;
     }
-    // Keep the iframe browsing context when advancing the queue. Replacing it
-    // on every URL discards the user's media activation on mobile browsers.
-    if (valid.provider === 'soundcloud') {
+    // The widget remains a fallback for deployments without API credentials and
+    // for native SoundCloud playlists. Track queues use the persistent audio.
+    if (valid.provider === 'soundcloud' && valid.playback !== 'soundcloud') {
       setSoundCloudSource((source) => source || valid.url);
     } else {
       setSoundCloudSource('');
     }
     generation.current++;
     widget.current?.pause();
-    audio.current?.pause();
+    if (nativeMusicPlayback(valid.playback)) nativeAudio.current?.pause();
+    else nativeAudio.current?.dispose();
     spotify.current?.dispose();
     spotify.current = null;
     if (valid.provider !== 'youtube') {
@@ -273,21 +293,30 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setPlaylistLength(0);
     setPlaylistSounds([]);
     setLink(valid);
-    const knownAudio = (next as MusicTrack).audioUrl;
+    if (nativeMusicPlayback(valid.playback) && audio.current) {
+      nativeAudio.current ??= new NativeMusicAudio(audio.current);
+      nativeAudio.current.intendsToPlay =
+        roomRef.current?.detail?.playback.playing !== 0;
+    }
+    const knownAudio =
+      valid.playback === 'soundcloud'
+        ? soundcloudAudioURL(valid.url)
+        : (next as MusicTrack).audioUrl;
     if (
-      valid.playback === 'file' &&
+      nativeMusicPlayback(valid.playback) &&
       audio.current &&
       knownAudio &&
-      /^\/api\/music\/audio\/[a-f0-9-]{36}$/.test(knownAudio) &&
-      roomRef.current?.detail?.playback.playing !== 0
+      (valid.playback === 'soundcloud' ||
+        /^\/api\/music\/audio\/[a-f0-9-]{36}$/.test(knownAudio))
     ) {
       // Start on the existing element while a Next/queue tap is still active.
       // The effect attaches tracking and validates metadata without resetting it.
-      audio.current.src = knownAudio;
-      audio.current.load();
-      void audio.current.play().catch(() => {
-        /* The effect reports playback errors. */
-      });
+      nativeAudio.current ??= new NativeMusicAudio(audio.current);
+      nativeAudio.current.load(
+        knownAudio,
+        valid.playback === 'soundcloud',
+        roomRef.current?.detail?.playback.playing !== 0,
+      );
     }
   }, []);
   useEffect(() => {
@@ -379,7 +408,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     };
   }, [link, retry, play]);
   useEffect(() => {
-    if (link?.provider !== 'soundcloud' || !frame.current) return;
+    if (
+      link?.provider !== 'soundcloud' ||
+      link.playback === 'soundcloud' ||
+      !frame.current
+    )
+      return;
     soundUrl.current = '';
     clearStats();
     let active = true;
@@ -601,13 +635,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     };
   }, [link, retry, play]);
   useEffect(() => {
-    if (
-      link?.provider !== 'spotify' ||
-      link.playback !== 'file' ||
-      !audio.current
-    )
-      return;
+    if (!link || !nativeMusicPlayback(link.playback) || !audio.current) return;
     const element = audio.current;
+    nativeAudio.current ??= new NativeMusicAudio(element);
+    const engine = nativeAudio.current;
+    const stream = link.playback === 'soundcloud';
     const token = ++generation.current;
     const controller = new AbortController();
     let active = true;
@@ -627,38 +659,24 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (element.currentSrc) beginSession();
     };
     window.addEventListener('noctgram:music-preferences', preferenceChanged);
-    const attemptPlay = () => {
-      void element
-        .play()
-        .then(() => {
-          // A queue tap can start the persistent audio element before this
-          // track's listeners are attached; confirm the real state as well.
-          if (current() && !element.paused) started();
-        })
-        .catch((error: DOMException) => {
-          if (current() && error.name === 'NotAllowedError')
-            setNeedsGesture(true);
-          if (
-            current() &&
-            error.name !== 'NotAllowedError' &&
-            error.name !== 'AbortError'
-          )
-            setError(
-              'Не удалось воспроизвести файл. Попробуйте другой аудиофайл.',
-            );
-        });
-    };
+    const attemptPlay = () => engine.resume();
     const loaded = () => {
       if (!current()) return;
       if (!Number.isFinite(element.duration) || element.duration <= 0) {
-        setError('Не удалось прочитать длительность аудио.');
+        // HLS initially has an unknown duration; durationchange follows once
+        // the manifest is parsed. Do not turn buffering into a playback error.
         return;
       }
       setDuration(Math.round(element.duration * 1000));
       setReady(true);
+      if (engine.failure) {
+        failed();
+        return;
+      }
       setError('');
-      if (roomRef.current?.detail?.playback.playing !== 0) attemptPlay();
+      if (engine.intendsToPlay) attemptPlay();
       else setNeedsGesture(false);
+      if (!element.paused) started();
     };
     const progress = () => {
       if (current()) {
@@ -673,6 +691,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (current()) {
         tracker.current?.resetPosition();
         setPlaying(true);
+        isPlaying.current = true;
         setNeedsGesture(false);
         setError('');
       }
@@ -681,6 +700,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (current()) {
         tracker.current?.resetPosition();
         setPlaying(false);
+        isPlaying.current = false;
       }
     };
     const failed = () => {
@@ -688,7 +708,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         setPlaying(false);
         clearStats();
         setError(
-          'Аудиофайл недоступен или браузер не поддерживает его формат.',
+          engine.failure ||
+            (stream
+              ? 'Не удалось загрузить трек SoundCloud. Нажмите «Повторить».'
+              : 'Аудиофайл недоступен или браузер не поддерживает его формат.'),
         );
       }
     };
@@ -708,38 +731,60 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       }
     };
     const seeking = () => tracker.current?.resetPosition();
+    const blocked = () => {
+      if (current()) {
+        setPlaying(false);
+        setNeedsGesture(true);
+      }
+    };
+    element.addEventListener('noctgram:audio-blocked', blocked);
+    element.addEventListener('noctgram:audio-error', failed);
     element.addEventListener('seeking', seeking);
     element.addEventListener('loadedmetadata', loaded);
+    element.addEventListener('durationchange', loaded);
     element.addEventListener('timeupdate', progress);
     element.addEventListener('play', started);
     element.addEventListener('pause', paused);
     element.addEventListener('error', failed);
     element.addEventListener('ended', ended);
     element.volume = musicGain(volumeRef.current);
-    void fetch('/api/music?action=track&url=' + encodeURIComponent(link.url), {
-      signal: controller.signal,
-      cache: 'no-store',
-    })
+    if (stream)
+      engine.load(soundcloudAudioURL(link.url), true, engine.intendsToPlay);
+    void fetch(
+      (stream ? '/api/music/soundcloud' : '/api/music') +
+        '?action=track&url=' +
+        encodeURIComponent(link.url),
+      {
+        signal: controller.signal,
+        cache: 'no-store',
+      },
+    )
       .then(async (response) => {
-        const data = (await response.json()) as MusicTrack & { error?: string };
+        const data = (await response.json()) as MusicTrack & {
+          error?: string;
+          code?: string;
+        };
+        if (!current()) return;
+        if (!response.ok && stream && data.code === 'MUSIC_SETUP_REQUIRED') {
+          soundCloudNative.current = false;
+          play(link);
+          return;
+        }
         if (!response.ok)
           throw new Error(data.error || 'Не удалось загрузить трек.');
         if (!current()) return;
         setLocalTrack(data);
         setDuration(data.durationMs || 0);
         if (
-          !data.audioUrl ||
-          !/^\/api\/music\/audio\/[a-f0-9-]{36}$/.test(data.audioUrl)
+          !stream &&
+          (!data.audioUrl ||
+            !/^\/api\/music\/audio\/[a-f0-9-]{36}$/.test(data.audioUrl))
         )
           throw new Error(
             'Добавьте аудиофайл к этому треку в «Моей музыке». Ссылка Spotify содержит сведения о песне, но не само аудио.',
           );
         beginSession();
-        if (element.getAttribute('src') !== data.audioUrl) {
-          element.src = data.audioUrl;
-          element.load();
-        }
-        if (roomRef.current?.detail?.playback.playing !== 0) attemptPlay();
+        if (!stream) engine.load(data.audioUrl!, false, engine.intendsToPlay);
         if (element.readyState >= 1) loaded();
       })
       .catch((error: Error) => {
@@ -753,18 +798,17 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         preferenceChanged,
       );
       element.removeEventListener('seeking', seeking);
+      element.removeEventListener('noctgram:audio-blocked', blocked);
+      element.removeEventListener('noctgram:audio-error', failed);
       controller.abort();
       element.removeEventListener('loadedmetadata', loaded);
+      element.removeEventListener('durationchange', loaded);
       element.removeEventListener('timeupdate', progress);
       element.removeEventListener('play', started);
       element.removeEventListener('pause', paused);
       element.removeEventListener('error', failed);
       element.removeEventListener('ended', ended);
-      if (desired.current?.playback !== 'file') {
-        element.pause();
-        element.removeAttribute('src');
-        element.load();
-      }
+      if (!nativeMusicPlayback(desired.current?.playback)) engine.dispose();
     };
   }, [link, retry, play]);
   useEffect(() => {
@@ -959,14 +1003,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       } else if (link?.playback === 'spotify') {
         if (active) spotify.current?.resume();
         else spotify.current?.pause();
-      } else if (link?.provider === 'spotify' && audio.current) {
-        if (active)
-          void audio.current
-            .play()
-            .catch(() =>
-              setError('Нажмите воспроизведение, чтобы разрешить звук'),
-            );
-        else audio.current.pause();
+      } else if (nativeMusicPlayback(link?.playback)) {
+        if (active) nativeAudio.current?.resume();
+        else nativeAudio.current?.pause();
       } else if (active) widget.current?.play();
       else widget.current?.pause();
     },
@@ -977,7 +1016,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       setPosition(value);
       if (link?.provider === 'youtube') youtube.current?.seek(value);
       else if (link?.playback === 'spotify') spotify.current?.seek(value);
-      else if (link?.provider === 'spotify' && audio.current)
+      else if (nativeMusicPlayback(link?.playback) && audio.current)
         audio.current.currentTime = value / 1000;
       else widget.current?.seekTo(value);
     },
@@ -1079,8 +1118,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         void room.command('resume');
       if (link.provider === 'youtube') youtube.current?.resume();
       else if (link.playback === 'spotify') spotify.current?.resume();
-      else if (link.playback === 'file')
-        void audio.current?.play().catch(() => setNeedsGesture(true));
+      else if (nativeMusicPlayback(link.playback))
+        nativeAudio.current?.resume();
       else widget.current?.play();
       return;
     }
@@ -1092,14 +1131,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (playing) youtube.current?.pause();
       else youtube.current?.resume();
     } else if (link.playback === 'spotify') spotify.current?.toggle();
-    else if (link.provider === 'spotify' && audio.current) {
-      if (playing) audio.current.pause();
-      else
-        void audio.current
-          .play()
-          .catch(() =>
-            setError('Не удалось запустить файл. Попробуйте ещё раз.'),
-          );
+    else if (nativeMusicPlayback(link.playback)) {
+      if (playing) nativeAudio.current?.pause();
+      else nativeAudio.current?.resume();
     } else if (playing) widget.current?.pause();
     else widget.current?.play();
   };
@@ -1115,7 +1149,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setPosition(value);
     if (link.provider === 'youtube') youtube.current?.seek(value);
     else if (link.playback === 'spotify') spotify.current?.seek(value);
-    else if (link.provider === 'spotify' && audio.current)
+    else if (nativeMusicPlayback(link.playback) && audio.current)
       audio.current.currentTime = value / 1000;
     else widget.current?.seekTo(value);
   };
@@ -1133,7 +1167,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       youtube.current?.volume(youtubeVolume(value));
     else if (link.playback === 'spotify')
       spotify.current?.volume(musicGain(value));
-    else if (link.provider === 'spotify' && audio.current)
+    else if (nativeMusicPlayback(link.playback) && audio.current)
       audio.current.volume = musicGain(value);
     else widget.current?.setVolume(musicGain(value) * 100);
   };
@@ -1142,6 +1176,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       <MusicPlaybackContext.Provider value={playback}>
         {children}
       </MusicPlaybackContext.Provider>
+      {/* This element also survives changes between music providers. */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <audio ref={audio} preload="metadata" />
       {link && (
         <MusicActivityPublisher
           track={track}
@@ -1200,6 +1237,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             onVolume={changeVolume}
             onStop={stopPersonal}
             onRetry={() => {
+              if (nativeMusicPlayback(link.playback)) {
+                nativeAudio.current?.dispose();
+                nativeAudio.current!.intendsToPlay =
+                  roomRef.current?.detail?.playback.playing !== 0;
+              }
               setError('');
               setReady(false);
               setNeedsGesture(true);
@@ -1214,13 +1256,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
               aria-hidden="true"
               inert
             />
-          ) : link.provider === 'spotify' ? (
-            link.playback === 'file' ? (
-              // Lyrics, when available, are rendered in the accessible Text pane.
-              // eslint-disable-next-line jsx-a11y/media-has-caption
-              <audio ref={audio} preload="metadata" />
-            ) : null
-          ) : link.provider === 'soundcloud' ? (
+          ) : link.provider === 'soundcloud' &&
+            link.playback !== 'soundcloud' ? (
             <iframe
               ref={frame}
               className="music-audio-engine"
