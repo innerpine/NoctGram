@@ -5,11 +5,29 @@
   margin-top: 0;
 }
 .music-search-submit {
-  flex-shrink: 0;
-  padding: 9px 14px;
-  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
   background: #ffffff12;
-  font-size: 13px;
+  color: #eee;
+  transition:
+    background 180ms,
+    transform 180ms,
+    opacity 180ms;
+}
+.music-search-submit:not(:disabled):hover {
+  background: #ffffff24;
+}
+.music-search-submit:not(:disabled):active {
+  transform: scale(0.94);
+}
+.music-search-submit:focus-visible {
+  outline: 2px solid #b1d9c6;
+  outline-offset: 2px;
 }
 .music-search-caption {
   font-size: 12px;
@@ -64,8 +82,5 @@
   }
   .music-search-duration {
     display: none;
-  }
-  .music-search-submit {
-    padding-inline: 10px;
   }
 }

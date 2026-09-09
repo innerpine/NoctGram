@@ -127,7 +127,6 @@ export function MusicSearch({
           void search();
         }}
       >
-        <Search size={19} aria-hidden="true" />
         <input
           type="search"
           aria-label="Название песни или исполнитель"
@@ -143,8 +142,13 @@ export function MusicSearch({
           className="music-search-submit"
           disabled={!query.trim() || loading}
           aria-label="Найти музыку"
+          title="Найти музыку"
         >
-          Найти
+          {loading ? (
+            <LoaderCircle size={19} className="spin" aria-hidden="true" />
+          ) : (
+            <Search size={19} aria-hidden="true" />
+          )}
         </button>
       </form>
       <p className="music-search-caption">
