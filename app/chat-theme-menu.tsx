@@ -1,6 +1,12 @@
 'use client';
 import { useState } from 'react';
-import { Check, EllipsisVertical, Palette, RotateCcw } from 'lucide-react';
+import {
+  Check,
+  EllipsisVertical,
+  Palette,
+  RefreshCw,
+  RotateCcw,
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,10 +29,12 @@ import {
 export function ChatThemeMenu({
   value,
   canShare,
+  onRefresh,
   onSave,
 }: {
   value: ChatThemeState;
   canShare: boolean;
+  onRefresh: () => void;
   onSave: (
     scope: 'personal' | 'shared',
     theme: ChatThemeId | null,
@@ -74,6 +82,9 @@ export function ChatThemeMenu({
             }}
           >
             <Palette size={17} /> Оформление чата
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onRefresh}>
+            <RefreshCw size={17} /> Обновить сообщения
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

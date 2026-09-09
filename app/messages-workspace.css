@@ -1,3 +1,7 @@
+.messages-main {
+  padding-top: 20px;
+}
+
 /* Conversations use the available desktop width, including space outside the feed. */
 @media (min-width: 1001px) {
   body:has(.messages-shell) {

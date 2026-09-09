@@ -1702,20 +1702,21 @@ export default function Noctgram({
               : '')
         }
       >
-        <header className="page-header">
-          <h1>
-            {['music', 'music-services'].includes(page)
-              ? 'Музыка'
-              : page === 'moderation'
-                ? 'Модерация'
-                : page === 'profile'
-                  ? profile?.name || 'Профиль'
-                  : page === 'channels'
-                    ? 'Каналы'
-                    : page === 'stars'
-                      ? 'Noct Stars'
-                      : page === 'messages'
-                        ? 'Сообщения'
+        {page === 'messages' ? (
+          <h1 className="sr-only">Сообщения</h1>
+        ) : (
+          <header className="page-header">
+            <h1>
+              {['music', 'music-services'].includes(page)
+                ? 'Музыка'
+                : page === 'moderation'
+                  ? 'Модерация'
+                  : page === 'profile'
+                    ? profile?.name || 'Профиль'
+                    : page === 'channels'
+                      ? 'Каналы'
+                      : page === 'stars'
+                        ? 'Noct Stars'
                         : page === 'search'
                           ? 'Поиск'
                           : page === 'premium'
@@ -1723,84 +1724,84 @@ export default function Noctgram({
                             : page === 'saved'
                               ? 'Сохранённое'
                               : 'Noctgram'}
-          </h1>
-          <span className="grow" />
-          {me?.canModerate && (
+            </h1>
+            <span className="grow" />
+            {me?.canModerate && (
+              <button
+                className="icon-button"
+                title="Модерация"
+                aria-label="Открыть модерацию"
+                onClick={() => navigate('moderation')}
+              >
+                <ShieldCheck size={20} />
+              </button>
+            )}
+            <button
+              className="icon-button header-stars"
+              onClick={() => navigate('stars')}
+              aria-label="Открыть Noct Stars"
+            >
+              <StarsIcon size={25} />
+            </button>
+            {me && (
+              <NotificationsBell
+                me={me.id}
+                onGift={() => {
+                  navigate('profile');
+                  setProfileTab('gifts');
+                }}
+                onPost={(id) => {
+                  void request<Post>(
+                    '?action=post&id=' + encodeURIComponent(id),
+                  )
+                    .then((p) => {
+                      setCommentPost(p);
+                      setModal('comments');
+                    })
+                    .catch((e) => notify(e.message));
+                }}
+                onChat={(id) => {
+                  void request<Profile>(
+                    '?action=profile&id=' + encodeURIComponent(id),
+                  )
+                    .then(openChat)
+                    .catch((e) => notify(e.message));
+                }}
+              />
+            )}
+            {page !== 'premium' && (
+              <span
+                className="page-loading-indicator"
+                data-loading={loading}
+                aria-hidden="true"
+              >
+                <LoaderCircle
+                  className={loading ? 'spin' : undefined}
+                  size={15}
+                />
+              </span>
+            )}
             <button
               className="icon-button"
-              title="Модерация"
-              aria-label="Открыть модерацию"
-              onClick={() => navigate('moderation')}
+              aria-label="Найти в Noctgram"
+              onClick={() => navigate('search')}
             >
-              <ShieldCheck size={20} />
+              <Search size={20} />
             </button>
-          )}
-          <button
-            className="icon-button header-stars"
-            onClick={() => navigate('stars')}
-            aria-label="Открыть Noct Stars"
-          >
-            <StarsIcon size={25} />
-          </button>
-          {me && (
-            <NotificationsBell
-              me={me.id}
-              onGift={() => {
-                navigate('profile');
-                setProfileTab('gifts');
+            <button
+              className="icon-button"
+              aria-label="Обновить"
+              onClick={() => {
+                if (['music', 'music-services'].includes(page)) {
+                  window.dispatchEvent(new Event('noctgram:music-refresh'));
+                } else if (me) void refresh();
+                else void bootstrap();
               }}
-              onPost={(id) => {
-                void request<Post>('?action=post&id=' + encodeURIComponent(id))
-                  .then((p) => {
-                    setCommentPost(p);
-                    setModal('comments');
-                  })
-                  .catch((e) => notify(e.message));
-              }}
-              onChat={(id) => {
-                void request<Profile>(
-                  '?action=profile&id=' + encodeURIComponent(id),
-                )
-                  .then(openChat)
-                  .catch((e) => notify(e.message));
-              }}
-            />
-          )}
-          {page !== 'premium' && page !== 'messages' && (
-            <span
-              className="page-loading-indicator"
-              data-loading={loading}
-              aria-hidden="true"
             >
-              <LoaderCircle
-                className={loading ? 'spin' : undefined}
-                size={15}
-              />
-            </span>
-          )}
-          <button
-            className="icon-button"
-            aria-label="Найти в Noctgram"
-            onClick={() => navigate('search')}
-          >
-            <Search size={20} />
-          </button>
-          <button
-            className="icon-button"
-            aria-label="Обновить"
-            onClick={() => {
-              if (['music', 'music-services'].includes(page)) {
-                window.dispatchEvent(new Event('noctgram:music-refresh'));
-              } else if (me && page === 'messages') {
-                void loadThreads().catch((e) => notify(e.message));
-                void loadMessages().catch((e) => notify(e.message));
-              } else if (me) void refresh();
-              else void bootstrap();
-            }}
-          >
-            <RefreshCw size={18} />
-          </button>
-        </header>
+              <RefreshCw size={18} />
+            </button>
+          </header>
+        )}
         {page === 'saved' && (
           <button
             type="button"
@@ -2510,6 +2511,11 @@ export default function Noctgram({
                       key={'chat-theme:' + myId + ':' + peer.id}
                       value={currentChatTheme}
                       canShare={!readOnly && !!messageAccess?.allowed}
+                      onRefresh={() => {
+                        void Promise.all([loadThreads(), loadMessages()]).catch(
+                          (e) => notify(e.message),
+                        );
+                      }}
                       onSave={async (scope, theme) => {
                         const saved = await request<ChatThemeState>('', {
                           action: 'chatTheme',
