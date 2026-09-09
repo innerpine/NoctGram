@@ -89,7 +89,6 @@ import {
 } from './profile-identity';
 import { PremiumPanel } from './premium-panel';
 import { PremiumIcon } from './premium-icon';
-import { NavBorderBeam } from './nav-border-beam';
 import { StarsIcon, NoctLogo } from './stars-icon';
 import { StarsPanel, SupportPanel } from './stars-panel';
 import { SendGiftButton, ProfileGifts } from './gifts';
@@ -1632,7 +1631,7 @@ export default function Noctgram({
         </nav>
         <div className="sidebar-bottom">
           <div className="premium-nav-shell">
-            <NavBorderBeam />
+            <span className="premium-nav-beam" aria-hidden="true" />
             <button
               className="premium-nav"
               onClick={() => navigate('premium')}
@@ -1645,7 +1644,7 @@ export default function Noctgram({
             </button>
           </div>
           <div className="premium-nav-shell stars-nav-shell">
-            <NavBorderBeam />
+            <span className="premium-nav-beam" aria-hidden="true" />
             <button
               className="premium-nav"
               aria-label="Открыть Noct Stars"

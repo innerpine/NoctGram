@@ -26,8 +26,7 @@
   object-fit: contain;
 }
 .stars-nav-shell .premium-nav-beam {
-  --beam-color: #ffda55;
-  --beam-tail-color: #ffa844;
+  background: linear-gradient(to left, #ffda55, #ffa844, transparent);
 }
 .stars-hero .premium-star-main {
   filter: drop-shadow(0 8px 24px #ffd15218);
