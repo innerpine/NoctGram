@@ -10,6 +10,23 @@ export class ApiError extends Error {
 export function failure(e: unknown) {
   if (!(e instanceof ApiError)) {
     const text = String(e);
+    if (/D1_ERROR:.*free tier daily row (?:read|write) limit/i.test(text)) {
+      const now = Date.now();
+      const reset = (Math.floor(now / 86400000) + 1) * 86400000;
+      return Response.json(
+        {
+          error:
+            'База временно недоступна: исчерпан суточный лимит хостинга. Он обновится в 00:00 UTC. Данные аккаунта не удалены.',
+          code: 'DATABASE_DAILY_LIMIT',
+        },
+        {
+          status: 503,
+          headers: {
+            'Retry-After': String(Math.max(1, Math.ceil((reset - now) / 1000))),
+          },
+        },
+      );
+    }
     if (text.includes('MEDIA_NOT_READY'))
       e = new ApiError(
         409,

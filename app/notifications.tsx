@@ -177,6 +177,7 @@ export function NotificationsBell({
   onGift: () => void;
 }) {
   const [rows, setRows] = useState<NotificationRow[]>([]),
+    [unread, setUnread] = useState(0),
     [open, setOpen] = useState(false),
     [error, setError] = useState('');
   useEffect(() => {
@@ -185,21 +186,35 @@ export function NotificationsBell({
     const tick = async () => {
       try {
         if (document.hidden) return;
+        if (!open) {
+          const data = await request<{ unread: number }>(
+            '?action=notificationCount',
+          );
+          if (live) {
+            setUnread(data.unread);
+            setError('');
+          }
+          return;
+        }
         const data = await request<NotificationRow[]>('?action=notifications');
         if (!live) return;
         setRows((previous) => reconcileSnapshot(previous, data));
+        setUnread(data.filter((n) => !n.read).length);
         setError('');
         if (open && data.some((n) => !n.read)) {
           await request('', {
             action: 'readNotifications',
             before: Math.max(...data.map((n) => n.created)),
           });
-          if (live) setRows(data.map((n) => ({ ...n, read: 1 })));
+          if (live) {
+            setRows(data.map((n) => ({ ...n, read: 1 })));
+            setUnread(0);
+          }
         }
       } catch (e) {
         if (live) setError((e as Error).message);
       } finally {
-        if (live) t = setTimeout(tick, 8000);
+        if (live) t = setTimeout(tick, open ? 8000 : 15000);
       }
     };
     void tick();
@@ -208,7 +223,6 @@ export function NotificationsBell({
       clearTimeout(t);
     };
   }, [me, open]);
-  const unread = rows.filter((n) => !n.read).length;
   return (
     <>
       <button

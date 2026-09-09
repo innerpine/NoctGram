@@ -165,7 +165,7 @@ export default function Noctgram({
     [loading, setLoading] = useState(true),
     [notice, setNotice] = useState(''),
     [noticeVersion, setNoticeVersion] = useState(0),
-    [loadError, setLoadError] = useState(false),
+    [loadError, setLoadError] = useState(''),
     [guest, setGuest] = useState(false),
     [modal, setModalContent] = useState(''),
     [modalOpen, setModalOpen] = useState(false),
@@ -217,6 +217,7 @@ export default function Noctgram({
     [editHandle, setEditHandle] = useState(''),
     [editAliases, setEditAliases] = useState<string[]>([]);
   const [threads, setThreads] = useState<Person[]>([]),
+    [threadUnread, setThreadUnread] = useState(0),
     [peer, setPeer] = useState<Person | null>(null),
     [messages, setMessages] = useState<Message[]>([]),
     [messageText, setMessageText] = useState(''),
@@ -365,7 +366,7 @@ export default function Noctgram({
   };
   const bootstrap = useCallback(async () => {
     setLoading(true);
-    setLoadError(false);
+    setLoadError('');
     try {
       const r = await request<{ me: Profile; people: Person[]; posts: Post[] }>(
         '?action=bootstrap',
@@ -380,7 +381,7 @@ export default function Noctgram({
       if ((e as Error).message.startsWith('Войдите')) setGuest(true);
       else {
         notify((e as Error).message);
-        setLoadError(true);
+        setLoadError((e as Error).message);
       }
     } finally {
       setLoading(false);
@@ -410,6 +411,7 @@ export default function Noctgram({
     if (next.restriction?.mode === 'blocked') {
       setPosts([]);
       setThreads([]);
+      setThreadUnread(0);
       setMessages([]);
       setModalOpen(false);
     }
@@ -530,12 +532,12 @@ export default function Noctgram({
               : reconcileSnapshot(p, r),
           );
           setHasMore(count === 30);
-          setLoadError(false);
+          setLoadError('');
         }
       } catch (e) {
         if (version === requestVersion.current) {
           notify((e as Error).message);
-          setLoadError(true);
+          setLoadError((e as Error).message);
           return false;
         }
       } finally {
@@ -586,7 +588,7 @@ export default function Noctgram({
       setHasMore(cached?.hasMore || false);
       setPostsKey(publicationKey);
     }
-    setLoadError(false);
+    setLoadError('');
     if (page === 'profile' && profileTab === 'gifts') {
       setLoading(false);
       return;
@@ -704,6 +706,9 @@ export default function Noctgram({
     if (myId && !accountBlocked) {
       const next = await request<Person[]>('?action=threads');
       setThreads((previous) => reconcileSnapshot(previous, next));
+      setThreadUnread(
+        next.reduce((sum, thread) => sum + (thread.unread || 0), 0),
+      );
     }
   }, [myId, accountBlocked]);
   const applyChatSnapshot = useCallback(
@@ -741,28 +746,44 @@ export default function Noctgram({
     if (saved) applyChatSnapshot(peer.id, saved);
   }, [peer, applyChatSnapshot]);
   useEffect(() => {
-    if (!myId) return;
-    void loadThreads().catch((e) => notify(e.message));
-    let pending = false;
-    const t = setInterval(() => {
-      if (!pending && document.visibilityState === 'visible') {
-        pending = true;
-        void loadThreads()
-          .catch(() => {})
-          .finally(() => {
-            pending = false;
-          });
+    if (!myId || accountBlocked) return;
+    let live = true,
+      pending = false,
+      timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      if (!live || pending) return;
+      pending = true;
+      clearTimeout(timer);
+      try {
+        if (document.hidden) return;
+        if (page === 'messages') await loadThreads();
+        else {
+          const data = await request<{ unread: number }>(
+            '?action=threadsUnread',
+          );
+          if (live) setThreadUnread(data.unread);
+        }
+      } catch {
+        // Keep the last successful badge/list while the server is unavailable.
+      } finally {
+        pending = false;
+        if (live) timer = setTimeout(tick, page === 'messages' ? 5000 : 15000);
       }
-    }, 5000);
-    const giftsChanged = () => {
-      void loadThreads().catch(() => {});
+    };
+    void tick();
+    const giftsChanged = () => void tick();
+    const visible = () => {
+      if (!document.hidden) void tick();
     };
     window.addEventListener('noctgram:gifts-changed', giftsChanged);
+    document.addEventListener('visibilitychange', visible);
     return () => {
-      clearInterval(t);
+      live = false;
+      clearTimeout(timer);
       window.removeEventListener('noctgram:gifts-changed', giftsChanged);
+      document.removeEventListener('visibilitychange', visible);
     };
-  }, [myId, loadThreads, notify]);
+  }, [myId, accountBlocked, page, loadThreads]);
   useEffect(() => {
     if (page !== 'messages' || !peer || accountBlocked) return;
     activePeer.current = peer.id;
@@ -1668,7 +1689,7 @@ export default function Noctgram({
         : page === 'saved'
           ? displayPosts.filter((p) => p.saved)
           : displayPosts;
-  const unread = threads.reduce((sum, t) => sum + (t.unread || 0), 0);
+  const unread = threadUnread;
   const online = !!profile?.lastSeen && Date.now() - profile.lastSeen < 120000;
   if (accountBlocked && me)
     return (
@@ -1920,7 +1941,7 @@ export default function Noctgram({
         )}
         {loadError && (
           <div className="error-banner" role="alert">
-            Не удалось загрузить данные.{' '}
+            {loadError}{' '}
             <button onClick={() => void (me ? refresh() : bootstrap())}>
               Повторить
             </button>
