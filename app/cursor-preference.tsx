@@ -25,10 +25,10 @@ export function CursorPreference() {
     <label className="appearance-switch cursor-preference" htmlFor={id}>
       <span className="cursor-preference-art" aria-hidden="true">
         <img
-          src="/assets/cursors/noct-arrow-dark.svg"
+          src="/assets/cursors/noct-arrow-dark.svg?v=24"
           alt=""
-          width={32}
-          height={32}
+          width={24}
+          height={24}
         />
       </span>
       <span>
