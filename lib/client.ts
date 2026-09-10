@@ -35,6 +35,7 @@ export type AccountAppeal = {
   created: number;
 };
 export type Profile = Person & {
+  profileBackground?: string;
   channelRole?: 'owner' | 'admin' | 'editor' | null;
   canPublish?: boolean;
   canEditProfile?: boolean;

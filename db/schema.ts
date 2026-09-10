@@ -1034,6 +1034,7 @@ export const profileAppearance = sqliteTable('profile_appearance', {
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
   theme: text().notNull().default('iris'),
+  background: text().notNull().default(''),
   nameGradient: integer().notNull().default(0),
   ringText: text().notNull().default(''),
   chromeFlow: integer().notNull().default(0),

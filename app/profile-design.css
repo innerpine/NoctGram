@@ -309,6 +309,132 @@
   margin: 12px 0 0;
   overflow-wrap: anywhere;
 }
+.profile-card[data-profile-background='true'],
+.design-preview[data-profile-background='true'] {
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--surface-first) var(--surface-intensity), #0b0b10),
+    color-mix(in srgb, var(--surface-second) var(--surface-intensity), #0b0b10)
+  );
+  border-color: color-mix(in srgb, var(--surface-first) 25%, #ffffff14);
+}
+.profile-card[data-profile-background='true'] .profile-info {
+  background: transparent;
+}
+.profile-card[data-profile-background='true']
+  :is(.bio, .profile-details, .profile-stats, .profile-aliases) {
+  color: #ffffffb8;
+}
+.profile-card[data-profile-background='true'] .profile-saved-link {
+  background: #00000020;
+}
+.design-preview[data-profile-background='true'] :is(.meta, p) {
+  color: #ffffffb8;
+}
+.design-background {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #ffffff14;
+  border-radius: 16px;
+  background: #ffffff03;
+}
+.design-background p {
+  margin: 0;
+  color: #a9a3b1;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.design-premium-label {
+  margin-left: auto;
+  font-size: 10px;
+  color: #c8acec;
+}
+.background-modes {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.background-modes button {
+  min-height: 40px;
+  padding: 9px 10px;
+  font-size: 12px;
+  border: 1px solid #ffffff12;
+  border-radius: 10px;
+  background: #ffffff04;
+  color: #c0bac8;
+  transition:
+    background 180ms,
+    border-color 180ms;
+}
+.background-modes button[aria-pressed='true'] {
+  border-color: #bd9de878;
+  background: #bd9de81a;
+  color: #f3e8ff;
+}
+.background-modes button:focus-visible {
+  outline: 2px solid #c7a9ef;
+  outline-offset: 2px;
+}
+.background-colors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.background-colors label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+  min-width: 0;
+}
+.background-colors input {
+  width: 36px;
+  height: 38px;
+  flex: 0 0 36px;
+  border: 0;
+  padding: 0;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+}
+.background-colors small {
+  display: block;
+  margin-top: 4px;
+  color: #9c94a5;
+  font-size: 10px;
+}
+.background-intensity {
+  display: grid;
+  gap: 12px;
+  font-size: 12px;
+}
+.background-intensity > span {
+  display: flex;
+  justify-content: space-between;
+}
+.background-intensity output {
+  color: #cbb2ea;
+  font-variant-numeric: tabular-nums;
+}
+.background-intensity input {
+  width: 100%;
+  accent-color: #b898df;
+}
+@media (max-width: 380px) {
+  .design-background {
+    padding: 12px;
+  }
+  .background-colors {
+    gap: 6px;
+  }
+  .background-colors label {
+    gap: 6px;
+  }
+}
 .design-fields {
   display: grid;
   gap: 20px;

@@ -232,6 +232,13 @@
       "when": 1789035711294,
       "tag": "0032_presence_privacy",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1789057584071,
+      "tag": "0033_profile_background",
+      "breakpoints": true
     }
   ]
 }

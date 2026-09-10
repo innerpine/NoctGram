@@ -15,6 +15,10 @@ import { premiumActive, appearanceColumns } from './premium-access';
 import { assertMediaRead, mediaPermission } from './media-access';
 import { assertStaticAvatar } from './avatar-media';
 import { profileThemes, ringCharacters, chromeTempo } from './appearance';
+import {
+  parseProfileBackground,
+  readProfileBackground,
+} from './profile-background';
 export async function premiumGet(
   action: string,
   me: string,
@@ -97,7 +101,7 @@ export async function premiumPost(
     throw new ApiError(400, 'Проверь оформление: текст обводки до 48 символов');
   const current = await d
     .prepare(
-      'SELECT nameGradient,ringText,avatarMotion,avatarMotionType,chromeFlow,chromeTempo FROM profile_appearance WHERE userId=?',
+      'SELECT nameGradient,ringText,avatarMotion,avatarMotionType,chromeFlow,chromeTempo,background FROM profile_appearance WHERE userId=?',
     )
     .bind(target)
     .first<{
@@ -107,7 +111,16 @@ export async function premiumPost(
       chromeTempo: number;
       nameGradient: number;
       ringText: string;
+      background: string;
     }>();
+  const background =
+    b.background === undefined
+      ? readProfileBackground(current?.background)
+      : parseProfileBackground(b.background);
+  if (!background)
+    throw new ApiError(400, 'Проверь цвета и интенсивность фона профиля');
+  if (isChannel && background.mode !== 'none')
+    throw new ApiError(403, 'Фон доступен личному профилю с Noct Premium');
   // Older clients omit Chrome fields. Keep existing preferences on those saves.
   let chrome =
     b.chromeFlow === undefined ? !!current?.chromeFlow : b.chromeFlow;
@@ -202,7 +215,7 @@ export async function premiumPost(
   const result = await d.batch([
     d
       .prepare(
-        `${input} INSERT INTO profile_appearance(userId,theme,nameGradient,ringText,chromeFlow,chromeTempo,avatarMotion,avatarMotionType,updated) SELECT id,?,?,?,?,?,?,?,? FROM eligible WHERE 1 ON CONFLICT(userId) DO UPDATE SET theme=excluded.theme,nameGradient=excluded.nameGradient,ringText=excluded.ringText,chromeFlow=excluded.chromeFlow,chromeTempo=excluded.chromeTempo,avatarMotion=excluded.avatarMotion,avatarMotionType=excluded.avatarMotionType,updated=excluded.updated`,
+        `${input} INSERT INTO profile_appearance(userId,theme,nameGradient,ringText,chromeFlow,chromeTempo,avatarMotion,avatarMotionType,background,updated) SELECT id,?,?,?,?,?,?,?,?,? FROM eligible WHERE 1 ON CONFLICT(userId) DO UPDATE SET theme=excluded.theme,nameGradient=excluded.nameGradient,ringText=excluded.ringText,chromeFlow=excluded.chromeFlow,chromeTempo=excluded.chromeTempo,avatarMotion=excluded.avatarMotion,avatarMotionType=excluded.avatarMotionType,background=excluded.background,updated=excluded.updated`,
       )
       .bind(
         me,
@@ -217,6 +230,7 @@ export async function premiumPost(
         tempo,
         motion,
         type,
+        JSON.stringify(background),
         now,
       ),
     d
