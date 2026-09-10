@@ -726,6 +726,7 @@ export const musicSessions = sqliteTable('music_sessions', {
   created: integer().notNull(),
   updated: integer().notNull(),
   totalMs: integer().notNull().default(0),
+  counted: integer().notNull().default(0),
 });
 export const musicListens = sqliteTable(
   'music_listens',
@@ -738,6 +739,7 @@ export const musicListens = sqliteTable(
       .references(() => musicTracks.id, { onDelete: 'cascade' }),
     day: integer().notNull(),
     created: integer().notNull(),
+    plays: integer().notNull().default(1),
   },
   (t) => [
     primaryKey({ columns: [t.userId, t.trackId, t.day] }),
