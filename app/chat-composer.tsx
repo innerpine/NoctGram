@@ -36,6 +36,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { insertComposerEmoji } from '@/lib/chat-composer-text';
+import type { ChatDraft } from '@/lib/chat-outbox';
 
 const ChatEmojiPicker = lazy(() => import('./chat-emoji-picker'));
 
@@ -57,19 +58,17 @@ export function ChatComposer({
   text,
   onText,
   disabled,
-  onSent,
+  onSend,
   reply,
   onCancelReply,
-  onLockedChange,
 }: {
   peerId: string;
   text: string;
   onText: (text: string) => void;
   disabled: boolean;
-  onSent: () => void;
-  reply?: { id: string; name: string; text: string } | null;
+  onSend: (draft: ChatDraft) => void;
+  reply?: NonNullable<ChatDraft['reply']> | null;
   onCancelReply?: () => void;
-  onLockedChange?: (locked: boolean) => void;
 }) {
   const [files, setFiles] = useState<DraftFile[]>([]);
   const current = useRef(files);
@@ -81,9 +80,7 @@ export function ChatComposer({
   const alive = useRef(true);
   const controllers = useRef(new Map<string, AbortController>());
   const locked = useRef(false);
-  const [sending, setSending] = useState(false),
-    [uncertain, setUncertain] = useState(false),
-    [error, setError] = useState('');
+  const [error, setError] = useState('');
   useLayoutEffect(() => {
     const field = textarea.current;
     fitMessageField(field);
@@ -109,14 +106,6 @@ export function ChatComposer({
       cancelAnimationFrame(frame);
     };
   }, []);
-  const attempt = useRef<{
-    action: string;
-    id: string;
-    text: string;
-    attachments: string[];
-    key: string;
-    replyTo: string | null;
-  } | null>(null);
   const changeFiles = (next: DraftFile[]) => {
     current.current = next;
     setFiles(next);
@@ -182,7 +171,7 @@ export function ChatComposer({
     }
   };
   const add = async (incoming: File[]) => {
-    if (disabled || locked.current || uncertain || !incoming.length) return;
+    if (disabled || locked.current || !incoming.length) return;
     if (incoming.length + current.current.length > CHAT_ATTACHMENT_LIMIT) {
       setError('Можно прикрепить до 10 файлов');
       return;
@@ -211,7 +200,7 @@ export function ChatComposer({
     if (item.attachment) void discardChatFile(item.attachment.id);
     changeFiles(current.current.filter((file) => file.id !== item.id));
   };
-  const submit = async () => {
+  const submit = () => {
     if (
       disabled ||
       locked.current ||
@@ -220,51 +209,26 @@ export function ChatComposer({
     )
       return;
     locked.current = true;
-    setSending(true);
     setError('');
-    attempt.current ??= {
-      action: 'message',
-      id: peerId,
+    onSend({
       text: text.trim(),
-      attachments: current.current.map((file) => file.attachment!.id),
-      key: crypto.randomUUID(),
-      replyTo: reply?.id || null,
-    };
-    try {
-      await chatRequest('/api/social', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(attempt.current),
-        signal: AbortSignal.timeout(30000),
-      });
-      if (!alive.current) return;
-      for (const file of current.current)
-        if (file.preview) URL.revokeObjectURL(file.preview);
-      changeFiles([]);
-      onText('');
-      onCancelReply?.();
-      attempt.current = null;
-      setUncertain(false);
-      onSent();
-    } catch (e) {
-      if (!alive.current) return;
-      const status = (e as { status?: number }).status;
-      const unknown = !status || status >= 500;
-      setUncertain(unknown);
-      if (!unknown) attempt.current = null;
-      setError(
-        unknown
-          ? 'Ответ не получен. Повтори отправку — сообщение не продублируется.'
-          : e instanceof Error
-            ? e.message
-            : 'Не удалось отправить',
-      );
-    } finally {
-      locked.current = false;
-      if (alive.current) setSending(false);
-    }
+      attachments: current.current.map((file) => file.attachment!),
+      reply: reply ?? undefined,
+    });
+    // Ownership passes to the outbox before unmount cleanup can discard files.
+    for (const file of current.current)
+      if (file.preview) URL.revokeObjectURL(file.preview);
+    changeFiles([]);
+    onText('');
+    onCancelReply?.();
+    setEmojiOpen(false);
+    textarea.current?.focus({ preventScroll: true });
   };
-  const frozen = disabled || sending || uncertain;
+  // Keep rapid duplicate submits locked until React commits the cleared draft.
+  useLayoutEffect(() => {
+    locked.current = false;
+  }, [text, files]);
+  const frozen = disabled;
   useEffect(() => {
     setEmojiOpen(false);
   }, [peerId, frozen]);
@@ -288,9 +252,6 @@ export function ChatComposer({
     // Focus within the tap so iOS can return to its keyboard without zooming.
     textarea.current?.focus({ preventScroll: true });
   };
-  useEffect(() => {
-    onLockedChange?.(sending || uncertain);
-  }, [sending, uncertain, onLockedChange]);
   useEffect(() => {
     if (reply?.id) textarea.current?.focus({ preventScroll: true });
   }, [reply?.id]);
@@ -387,7 +348,7 @@ export function ChatComposer({
         className="message-composer"
         onSubmit={(e) => {
           e.preventDefault();
-          void submit();
+          submit();
         }}
       >
         <input
@@ -489,21 +450,14 @@ export function ChatComposer({
         <button
           type="submit"
           className="send-button"
-          aria-label={uncertain ? 'Повторить отправку' : 'Отправить сообщение'}
+          aria-label="Отправить сообщение"
           disabled={
             disabled ||
-            sending ||
             files.some((file) => !file.attachment) ||
             (!text.trim() && !files.length)
           }
         >
-          {sending ? (
-            <LoaderCircle size={18} className="spin" />
-          ) : uncertain ? (
-            <RotateCcw size={18} />
-          ) : (
-            <Send size={21} fill="currentColor" strokeWidth={1.5} />
-          )}
+          <Send size={21} fill="currentColor" strokeWidth={1.5} />
         </button>
       </form>
     </div>

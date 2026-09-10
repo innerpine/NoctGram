@@ -6,10 +6,12 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { Forward, Trash2, X } from 'lucide-react';
 import type { Message, Person } from '@/lib/client';
 import { chatRequest } from '@/lib/chat-client';
+import { chatOutbox, emptyOutbox, mergeOutgoing } from '@/lib/chat-outbox';
 import { messageSummary } from '@/lib/chat-message-display';
 import { createChatNavigator } from '@/lib/chat-navigation';
 import { createChatDragSelection } from '@/lib/chat-drag-selection';
@@ -56,12 +58,41 @@ export function ChatConversation({
   onReport: (message: Message) => void;
   notify: (text: string) => void;
 }) {
+  const outbox = useSyncExternalStore(
+    chatOutbox.subscribe,
+    chatOutbox.getSnapshot,
+    () => emptyOutbox,
+  );
+  const outgoing = outbox.filter(
+    (entry) =>
+      entry.message.sender === me.id && entry.message.recipient === peer.id,
+  );
+  const history = mergeOutgoing(messages, outgoing);
+  const onRetry = useCallback(
+    (id: string) => chatOutbox.retry(id, me.id),
+    [me.id],
+  );
+  const refreshed = useRef(new Set<string>());
+  useEffect(() => {
+    chatOutbox.acknowledge(messages);
+  }, [messages]);
+  useEffect(() => {
+    const confirmed = outbox.filter(
+      (entry) =>
+        entry.message.sender === me.id &&
+        entry.message.recipient === peer.id &&
+        entry.status === 'sent' &&
+        !refreshed.current.has(entry.message.id),
+    );
+    if (!confirmed.length) return;
+    confirmed.forEach((entry) => refreshed.current.add(entry.message.id));
+    void onRefresh().catch((error) => notify(error.message));
+  }, [outbox, me.id, peer.id, onRefresh, notify]);
   const [initialMessages] = useState(
     () => new Set(messages.map((message) => message.id)),
   );
   const [reply, setReply] = useState<Message | null>(null),
     [selected, setSelected] = useState<string[]>([]),
-    [composerLocked, setComposerLocked] = useState(false),
     [working, setWorking] = useState(false);
   const [operation, setOperation] = useState<{
     type: 'delete' | 'forward' | 'edit';
@@ -179,7 +210,7 @@ export function ChatConversation({
         }
       });
   }, []);
-  const last = messages.at(-1);
+  const last = history.at(-1);
   useLayoutEffect(() => {
     const previous = previousNewest.current;
     if (last?.id === previous?.id) return;
@@ -236,7 +267,13 @@ export function ChatConversation({
       );
       return;
     }
-    if (disabled || working || composerLocked) return;
+    if (
+      disabled ||
+      working ||
+      (outgoing.some((entry) => entry.message.id === message.id) &&
+        !messages.some((item) => item.id === message.id))
+    )
+      return;
     if (kind === 'reply') {
       if (canSend) {
         setReply(message);
@@ -296,8 +333,8 @@ export function ChatConversation({
     }
     void onRefresh().catch((error) => notify(error.message));
   };
-  const readonly = disabled || working || composerLocked;
-  const visibleMessages = removal.current?.visible(messages) ?? messages;
+  const readonly = disabled || working;
+  const visibleMessages = removal.current?.visible(history) ?? history;
   return (
     <div className="chat-conversation">
       <ChatPins
@@ -364,6 +401,12 @@ export function ChatConversation({
           <ChatMessage
             key={message.id}
             message={message}
+            delivery={
+              messages.some((item) => item.id === message.id)
+                ? undefined
+                : outgoing.find((entry) => entry.message.id === message.id)
+            }
+            onRetry={onRetry}
             initial={initialMessages.has(message.id)}
             me={me}
             peer={peer}
@@ -388,16 +431,17 @@ export function ChatConversation({
           reply
             ? {
                 id: reply.id,
+                sender: reply.sender,
                 name: reply.sender === me.id ? 'Вы' : peer.name,
                 text: messageSummary(reply),
+                unavailable: false,
               }
             : null
         }
         onCancelReply={() => setReply(null)}
-        onLockedChange={setComposerLocked}
-        onSent={() => {
+        onSend={(draft) => {
           followTail.current = true;
-          void onRefresh().catch((error) => notify(error.message));
+          chatOutbox.enqueue(me.id, peer.id, draft);
         }}
       />
       {operation?.type === 'delete' && (
