@@ -1004,29 +1004,31 @@ export function MusicPlayerView(p: Props) {
                 </span>{' '}
                 NOCTGRAM <span>/ МУЗЫКА</span>
               </div>
-              <button
-                className="music-stage-icon music-dock-toggle"
-                aria-label="Показать текст справа и вернуться к переписке"
-                title="Текст справа"
-                onClick={() => {
-                  changeDock(true);
-                  p.onExpanded(false);
-                }}
-              >
-                <PanelRightOpen size={22} />
-              </button>
-              <button
-                className="music-stage-icon music-settings-button"
-                aria-label="Настройки плеера"
-                aria-haspopup="dialog"
-                aria-expanded={settingsOpen}
-                onClick={(event) => {
-                  const box = event.currentTarget.getBoundingClientRect();
-                  showSettings(box.left, box.bottom);
-                }}
-              >
-                <SlidersHorizontal size={21} />
-              </button>
+              <div className="music-stage-actions">
+                <button
+                  className="music-stage-icon music-dock-toggle"
+                  aria-label="Показать текст справа и вернуться к переписке"
+                  title="Текст справа"
+                  onClick={() => {
+                    changeDock(true);
+                    p.onExpanded(false);
+                  }}
+                >
+                  <PanelRightOpen size={22} />
+                </button>
+                <button
+                  className="music-stage-icon music-settings-button"
+                  aria-label="Настройки плеера"
+                  aria-haspopup="dialog"
+                  aria-expanded={settingsOpen}
+                  onClick={(event) => {
+                    const box = event.currentTarget.getBoundingClientRect();
+                    showSettings(box.left, box.bottom);
+                  }}
+                >
+                  <SlidersHorizontal size={21} />
+                </button>
+              </div>
             </header>
             <DialogDescription className="sr-only">
               Плеер Noctgram. Настройки открываются правой кнопкой мыши или
