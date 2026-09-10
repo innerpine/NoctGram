@@ -2,7 +2,7 @@
 @media (any-pointer: fine) and (any-hover: hover) and (forced-colors: none) {
   html:not([data-noct-cursor='off']) {
     --noct-cursor-default:
-      url('/assets/cursors/noct-arrow-dark.svg?v=24') 3 3, default;
+      url('/assets/cursors/noct-arrow-dark.svg?v=24-bevel') 3 3, default;
     --noct-cursor-pointer:
       url('/assets/cursors/noct-pointer-dark.svg?v=24') 10 3, pointer;
   }
