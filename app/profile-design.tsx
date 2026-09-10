@@ -2,7 +2,14 @@
 import { useId, useRef, useState } from 'react';
 import { Switch } from '@base-ui/react/switch';
 import { Slider } from '@base-ui/react/slider';
-import { Check, Film, LoaderCircle, Palette, RotateCw } from 'lucide-react';
+import {
+  Check,
+  Film,
+  Headphones,
+  LoaderCircle,
+  Palette,
+  RotateCw,
+} from 'lucide-react';
 import { request, upload, type Profile } from '@/lib/client';
 import {
   profileThemes,
@@ -170,10 +177,46 @@ export function ProfileDesign({
             ))}
           </fieldset>
           {!channel && (
-            <ProfileBackgroundSettings
-              value={background}
-              onChange={setBackground}
-            />
+            <>
+              <ProfileBackgroundSettings
+                value={background}
+                onChange={setBackground}
+              />
+              <section className="design-background" aria-label="Статус музыки">
+                <div className="design-section-heading">
+                  <Headphones size={17} />
+                  <strong>Статус музыки</strong>
+                </div>
+                <fieldset
+                  className="background-modes music-color-modes"
+                  aria-label="Цвет статуса музыки"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={background.musicColor === 'profile'}
+                    onClick={() =>
+                      setBackground({ ...background, musicColor: 'profile' })
+                    }
+                  >
+                    Цвет профиля
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={background.musicColor === 'cover'}
+                    onClick={() =>
+                      setBackground({ ...background, musicColor: 'cover' })
+                    }
+                  >
+                    Цвет обложки
+                  </button>
+                </fieldset>
+                <p>
+                  {background.musicColor === 'profile'
+                    ? 'Фон и акценты карточки — в выбранной палитре профиля.'
+                    : 'Фон и акценты карточки меняются под обложку песни.'}
+                </p>
+              </section>
+            </>
           )}
           <label className="appearance-switch" htmlFor={gradientId}>
             <span>

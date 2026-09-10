@@ -113,10 +113,11 @@ export async function premiumPost(
       ringText: string;
       background: string;
     }>();
+  const previousBackground = readProfileBackground(current?.background);
   const background =
     b.background === undefined
-      ? readProfileBackground(current?.background)
-      : parseProfileBackground(b.background);
+      ? previousBackground
+      : parseProfileBackground(b.background, previousBackground.musicColor);
   if (!background)
     throw new ApiError(400, 'Проверь цвета и интенсивность фона профиля');
   if (isChannel && background.mode !== 'none')
