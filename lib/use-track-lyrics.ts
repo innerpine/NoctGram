@@ -3,7 +3,7 @@
 /* eslint-disable react/react-compiler */
 import { useEffect, useState } from 'react';
 import { findTrackLyrics, LyricsRateLimit } from './music-lyrics-search';
-import type { TrackLyrics } from './music-player';
+import { stableLyricDuration, type TrackLyrics } from './music-player';
 
 const cache = new Map<string, { lyrics: TrackLyrics | null; until: number }>();
 let cooldown = 0;
@@ -14,7 +14,20 @@ export function useTrackLyrics(
   duration: number,
   enabled: boolean,
 ) {
-  const key = `${track.url}:${track.artist}:${track.title}:${Math.round(duration)}`;
+  const trackKey = JSON.stringify([track.url, track.artist, track.title]);
+  const [recording, setRecording] = useState(() => ({
+    trackKey,
+    duration: stableLyricDuration(0, duration),
+  }));
+  const lookupDuration = stableLyricDuration(
+    recording.trackKey === trackKey ? recording.duration : 0,
+    duration,
+  );
+  // Update before committing the render so another track never shows the old
+  // lyrics. Minor duration corrections must not unmount the scroll region.
+  if (recording.trackKey !== trackKey || recording.duration !== lookupDuration)
+    setRecording({ trackKey, duration: lookupDuration });
+  const key = `${trackKey}:${lookupDuration}`;
   const [result, setResult] = useState<{
     key: string;
     lyrics: TrackLyrics | null;
@@ -22,7 +35,7 @@ export function useTrackLyrics(
   } | null>(null);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    if (!enabled || !duration || !track.artist) return;
+    if (!enabled || !lookupDuration || !track.artist) return;
     const cached = cache.get(key);
     if (cached && cached.until > Date.now()) {
       setResult({ key, lyrics: cached.lyrics });
@@ -37,7 +50,7 @@ export function useTrackLyrics(
     let cancelled = false;
     // Only the selected track metadata goes to LRCLIB, without account tokens.
     void findTrackLyrics(
-      { title: track.title, artist: track.artist, duration },
+      { title: track.title, artist: track.artist, duration: lookupDuration },
       controller.signal,
     )
       .then((lyrics) => {
@@ -59,11 +72,11 @@ export function useTrackLyrics(
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [key, enabled, duration, track.artist, track.title, attempt]);
+  }, [key, enabled, lookupDuration, track.artist, track.title, attempt]);
   return {
     key,
     lyrics: result?.key === key ? result.lyrics : null,
-    loading: !duration || !track.artist || result?.key !== key,
+    loading: !lookupDuration || !track.artist || result?.key !== key,
     error: result?.key === key && !!result.error,
     retry: () => {
       cache.delete(key);
