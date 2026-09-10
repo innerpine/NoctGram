@@ -87,7 +87,6 @@ export function ChatPeerProfile({
   lastSeen?: number | null;
 }) {
   const [open, setOpen] = useState(false);
-  const popup = useRef<HTMLDivElement>(null);
   return (
     <>
       <button
@@ -103,29 +102,60 @@ export function ChatPeerProfile({
           <ChatPeerPresence lastSeen={lastSeen} />
         </span>
       </button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent
-          ref={popup}
-          className="chat-peer-dialog"
-          showCloseButton={false}
-          initialFocus={popup}
-        >
-          <PeerProfileBody
-            key={viewerId + ':' + peer.id}
-            peer={peer}
-            onClose={() => setOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
+      <ChatProfileDialog
+        person={peer}
+        viewerId={viewerId}
+        chatPeerId={peer.id}
+        open={open}
+        onOpenChange={setOpen}
+      />
     </>
+  );
+}
+
+export function ChatProfileDialog({
+  person,
+  viewerId,
+  chatPeerId,
+  open,
+  onOpenChange,
+}: {
+  person: Person;
+  viewerId: string;
+  chatPeerId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const popup = useRef<HTMLDivElement>(null);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        ref={popup}
+        className="chat-peer-dialog"
+        showCloseButton={false}
+        initialFocus={popup}
+      >
+        <PeerProfileBody
+          key={viewerId + ':' + chatPeerId + ':' + person.id}
+          peer={person}
+          own={person.id === viewerId}
+          chatPeerId={chatPeerId}
+          onClose={() => onOpenChange(false)}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function PeerProfileBody({
   peer,
+  own,
+  chatPeerId,
   onClose,
 }: {
   peer: Person;
+  own: boolean;
+  chatPeerId: string;
   onClose: () => void;
 }) {
   const [person, setPerson] = useState<Profile | null>(null),
@@ -166,7 +196,9 @@ function PeerProfileBody({
   const online = !!person?.lastSeen && Date.now() - person.lastSeen < 120000;
   const title =
     view.kind === 'profile'
-      ? 'О собеседнике'
+      ? own
+        ? 'Ваш профиль'
+        : 'О собеседнике'
       : view.kind === 'gifts'
         ? 'Подарки'
         : view.kind === 'gift'
@@ -191,7 +223,7 @@ function PeerProfileBody({
       } else if (key === 'stats') {
         const result = await get<ChatLibraryStats>(
           '/api/social?' +
-            new URLSearchParams({ action: 'chatLibrary', peer: peer.id }),
+            new URLSearchParams({ action: 'chatLibrary', peer: chatPeerId }),
           controller?.signal,
         );
         if (!controller?.signal.aborted) setStats(result);
@@ -223,7 +255,7 @@ function PeerProfileBody({
           '/api/social?' +
             new URLSearchParams({
               action: 'chatLibrary',
-              peer: peer.id,
+              peer: chatPeerId,
               kind,
               ...(more && pages[kind]?.next
                 ? { before: pages[kind]!.next! }
@@ -270,7 +302,7 @@ function PeerProfileBody({
       abort.current?.abort();
       if (timer.current) clearTimeout(timer.current);
     };
-    // This dialog body is keyed by both viewer and peer; no background polling.
+    // Keyed by viewer, conversation and displayed person; no background polling.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useLayoutEffect(() => {
@@ -367,7 +399,9 @@ function PeerProfileBody({
         </button>
       </div>
       <DialogDescription className="sr-only">
-        Информация о собеседнике, его подарки и материалы вашей переписки.
+        {own
+          ? 'Ваш профиль, подарки и материалы текущей переписки.'
+          : 'Информация о собеседнике, его подарки и материалы вашей переписки.'}
       </DialogDescription>
       <div ref={scroll} className="peer-profile-scroll">
         <div
@@ -563,7 +597,11 @@ function PeerProfileBody({
                     <Empty
                       icon="gift"
                       text="Пока без подарков"
-                      detail="Здесь появятся подарки, которые собеседник показывает в профиле."
+                      detail={
+                        own
+                          ? 'Здесь появятся подарки, которые вы показываете в профиле.'
+                          : 'Здесь появятся подарки, которые собеседник показывает в профиле.'
+                      }
                     />
                   )}
                   {gifts.next && (
