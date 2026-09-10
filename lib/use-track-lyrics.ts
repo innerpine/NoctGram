@@ -1,12 +1,9 @@
 'use client';
 /* Async results intentionally update React state; no React compiler is enabled. */
 /* eslint-disable react/react-compiler */
-import { useEffect, useState } from 'react';
-import { findTrackLyrics, LyricsRateLimit } from './music-lyrics-search';
+import { useEffect, useRef, useState } from 'react';
+import { trackLyricsCache } from './track-lyrics-cache';
 import { stableLyricDuration, type TrackLyrics } from './music-player';
-
-const cache = new Map<string, { lyrics: TrackLyrics | null; until: number }>();
-let cooldown = 0;
 
 // One lookup belongs to the player, shared by its full and docked lyric views.
 export function useTrackLyrics(
@@ -34,52 +31,41 @@ export function useTrackLyrics(
     error?: boolean;
   } | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const forceRetry = useRef(false);
   useEffect(() => {
     if (!enabled || !lookupDuration || !track.artist) return;
-    const cached = cache.get(key);
-    if (cached && cached.until > Date.now()) {
-      setResult({ key, lyrics: cached.lyrics });
-      return;
-    }
-    if (cooldown > Date.now()) {
-      setResult({ key, lyrics: null, error: true });
-      return;
-    }
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const retry = forceRetry.current;
+    forceRetry.current = false;
     let cancelled = false;
     // Only the selected track metadata goes to LRCLIB, without account tokens.
-    void findTrackLyrics(
-      { title: track.title, artist: track.artist, duration: lookupDuration },
-      controller.signal,
-    )
-      .then((lyrics) => {
-        if (cancelled) return;
-        if (cache.size >= 30) cache.delete(cache.keys().next().value!);
-        cache.set(key, {
-          lyrics,
-          until: Date.now() + (lyrics ? 600000 : 60000),
-        });
-        setResult({ key, lyrics });
-      })
-      .catch((error) => {
-        if (error instanceof LyricsRateLimit) cooldown = error.until;
-        if (!cancelled) setResult({ key, lyrics: null, error: true });
-      })
-      .finally(() => clearTimeout(timeout));
+    void trackLyricsCache
+      .load(
+        trackKey,
+        { title: track.title, artist: track.artist, duration: lookupDuration },
+        retry,
+      )
+      .then((value) => {
+        if (!cancelled) setResult({ key, ...value });
+      });
     return () => {
       cancelled = true;
-      clearTimeout(timeout);
-      controller.abort();
     };
-  }, [key, enabled, lookupDuration, track.artist, track.title, attempt]);
+  }, [
+    key,
+    trackKey,
+    enabled,
+    lookupDuration,
+    track.artist,
+    track.title,
+    attempt,
+  ]);
   return {
     key,
     lyrics: result?.key === key ? result.lyrics : null,
     loading: !lookupDuration || !track.artist || result?.key !== key,
     error: result?.key === key && !!result.error,
     retry: () => {
-      cache.delete(key);
+      forceRetry.current = true;
       setResult(null);
       setAttempt((value) => value + 1);
     },

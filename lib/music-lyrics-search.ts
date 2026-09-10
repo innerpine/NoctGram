@@ -148,33 +148,33 @@ export function chooseLyricMatch(
   return matches[0]?.lyrics || null;
 }
 
-export class LyricsRateLimit extends Error {
+export class LyricsUnavailable extends Error {
   constructor(public until: number) {
-    super('Lyrics rate limit');
+    super('Lyrics unavailable');
   }
 }
+export class LyricsRateLimit extends LyricsUnavailable {}
 export async function findTrackLyrics(
   recording: Recording,
   signal: AbortSignal,
   request: typeof fetch = (input, init) => fetch(input, init),
 ): Promise<TrackLyrics | null> {
-  const get = async (
-    path: string,
-    params: Record<string, string>,
-  ): Promise<unknown> => {
+  const search = async (query: string): Promise<unknown> => {
     signal.throwIfAborted();
     const response = await request(
-      'https://lrclib.net/api/' + path + '?' + new URLSearchParams(params),
+      'https://lrclib.net/api/search?' + new URLSearchParams({ q: query }),
       {
         signal,
         credentials: 'omit',
         referrerPolicy: 'no-referrer',
       },
     );
-    if (response.status === 429) {
+    if (response.status === 429 || response.status >= 500) {
       const header = response.headers.get('Retry-After') || '60',
         seconds = Number(header);
-      throw new LyricsRateLimit(
+      const Failure =
+        response.status === 429 ? LyricsRateLimit : LyricsUnavailable;
+      throw new Failure(
         Math.max(
           Date.now() + 60000,
           Number.isFinite(seconds)
@@ -184,59 +184,23 @@ export async function findTrackLyrics(
       );
     }
     if (response.status === 404) return null;
-    if (!response.ok) throw new Error('Lyrics unavailable');
+    if (!response.ok) throw new LyricsUnavailable(Date.now() + 60000);
     return response.json();
   };
   const identities = recordingIdentities(recording);
-  const lookups = [...identities.slice(1), recording, identities[0]].filter(
-    (identity, index, all) =>
-      all.findIndex(
-        (item) =>
-          item.title === identity.title && item.artist === identity.artist,
-      ) === index,
+  // Search returns an empty array for a missing song. Avoid a chain of exact
+  // /get probes (each missing variant produced a browser-level 404 error).
+  // Matching below still requires artist, title, recording version and duration.
+  const queries = [...identities.slice(1), identities[0]].map(
+    (identity) => identity.artist + ' ' + identity.title,
   );
-  let plain: TrackLyrics | null = null;
-  for (const identity of lookups) {
-    let found: TrackLyrics | null;
-    try {
-      found = chooseLyricMatch(
-        [
-          await get('get', {
-            track_name: identity.title,
-            artist_name: identity.artist,
-            duration: String(recording.duration / 1000),
-          }),
-        ],
-        recording,
-      );
-    } catch (error) {
-      if (signal.aborted || error instanceof LyricsRateLimit) throw error;
-      continue;
-    }
-    if (found?.lines.length || found?.instrumental) return found;
-    plain ||= found;
+  const seen = new Set<string>();
+  for (const query of queries) {
+    const signature = words(query).sort().join(' ');
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    const found = chooseLyricMatch(await search(query), recording);
+    if (found) return found;
   }
-  // Full-text search is more tolerant of uploaded titles and multiple performers.
-  try {
-    const queries = [...identities.slice(1), identities[0]].map(
-      (identity) => identity.artist + ' ' + identity.title,
-    );
-    const seen = new Set<string>();
-    for (const query of queries) {
-      const signature = words(query).sort().join(' ');
-      if (seen.has(signature)) continue;
-      seen.add(signature);
-      const found = chooseLyricMatch(
-        await get('search', { q: query }),
-        recording,
-      );
-      if (found?.lines.length || found?.instrumental) return found;
-      plain ||= found;
-    }
-    return plain;
-  } catch (error) {
-    if (plain && !signal.aborted && !(error instanceof LyricsRateLimit))
-      return plain;
-    throw error;
-  }
+  return null;
 }
