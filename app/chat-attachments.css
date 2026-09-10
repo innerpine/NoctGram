@@ -235,15 +235,6 @@
   border-radius: 9px;
   background: #080809;
 }
-.chat-video > a {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  padding: 7px 2px 2px;
-  font-size: 11px;
-  color: #d1cbd9;
-}
 .chat-message-row > .bubble.chat-media-message {
   padding: 0;
   border: 0;
@@ -300,23 +291,6 @@
   bottom: auto;
   left: 7px;
   right: auto;
-}
-.chat-video > .chat-video-download {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border-radius: 50%;
-  background: #0009;
-  color: #fff;
-}
-.chat-video-download:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: -3px;
 }
 .chat-message-row .chat-media-message > .chat-delivery-retry {
   padding: 8px 10px;

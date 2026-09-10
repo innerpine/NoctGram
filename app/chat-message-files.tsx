@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { Download, File as FileIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { chatFileSize, type ChatAttachment } from '@/lib/chat-files';
+import { ChatVideoPlayer } from './chat-video-player';
 
 export function ChatMessageFiles({
   files,
@@ -49,26 +50,12 @@ export function ChatMessageFiles({
           if (file.kind === 'video')
             return (
               <div key={file.id} className="chat-video">
-                {/* Personal video attachments can have no speech or supplied captions. */}
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <video
+                <ChatVideoPlayer
                   src={url}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  aria-label={file.name}
+                  name={file.name}
+                  flush={flush}
+                  metadata={stamp}
                 />
-                <a
-                  href={url + '?download=1'}
-                  download={file.name}
-                  className={flush ? 'chat-video-download' : undefined}
-                  aria-label={'Скачать видео ' + file.name}
-                  title="Скачать видео"
-                >
-                  {!flush && 'Скачать видео '}
-                  <Download size={flush ? 16 : 13} />
-                </a>
-                {stamp}
               </div>
             );
           return (

@@ -44,6 +44,7 @@ import { ProfileLink } from './profile-link';
 import { ChatPeerPresence } from './chat-peer-presence';
 import { useProfileBackground } from './profile-surface';
 import { prepareProfileVisuals } from '@/lib/profile-visuals';
+import { ChatVideoPlayer } from './chat-video-player';
 
 const sections = [
   { id: 'photos', title: 'Фотографии', icon: ImageIcon },
@@ -793,12 +794,9 @@ function PeerProfileBody({
                   alt={view.item.file.name}
                 />
               ) : view.item.file.kind === 'video' ? (
-                <video
+                <ChatVideoPlayer
                   src={mediaUrl(view.item.file.id)}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  aria-label={view.item.file.name}
+                  name={view.item.file.name}
                 />
               ) : view.item.file.type.startsWith('audio/') ? (
                 <>
@@ -821,13 +819,15 @@ function PeerProfileBody({
               <small>
                 {chatFileSize(view.item.file.size)} · {date(view.item.created)}
               </small>
-              <a
-                className="secondary"
-                href={mediaUrl(view.item.file.id) + '?download=1'}
-                download={view.item.file.name}
-              >
-                <Download size={17} /> Скачать
-              </a>
+              {view.item.file.kind !== 'video' && (
+                <a
+                  className="secondary"
+                  href={mediaUrl(view.item.file.id) + '?download=1'}
+                  download={view.item.file.name}
+                >
+                  <Download size={17} /> Скачать
+                </a>
+              )}
             </div>
           )}
         </div>
