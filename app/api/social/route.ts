@@ -61,6 +61,7 @@ import {
 } from '@/lib/chat-actions';
 import { messageVisible } from '@/lib/chat-access';
 import { readChatTheme, saveChatTheme } from '@/lib/chat-theme-settings';
+import { readChatLibrary } from '@/lib/chat-library-server';
 export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   try {
@@ -224,6 +225,18 @@ export async function GET(req: Request) {
         ).results,
       );
     }
+    if (action === 'chatLibrary')
+      return Response.json(
+        await readChatLibrary(
+          me,
+          s.get('peer') || '',
+          s.get('kind') || '',
+          s.get('before') || '',
+        ),
+        {
+          headers: { 'Cache-Control': 'private, no-store' },
+        },
+      );
     if (action === 'messages') {
       const peer = s.get('peer') || '';
       await assertAccountVisible(peer);
