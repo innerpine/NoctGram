@@ -29,6 +29,7 @@ export { Avatar } from './profile-identity';
 import { StarsIcon } from './stars-icon';
 import { CodeBlock } from './code-block';
 import { MusicLinkCard } from './music-link-card';
+import { ChatVideoPlayer } from './chat-video-player';
 import type { Post, Media } from '@/lib/client';
 import {
   memo,
@@ -349,13 +350,10 @@ export const PostCard = memo(function PostCard({
                     <Video size={32} />
                   </div>
                 ) : (
-                  <video
+                  <ChatVideoPlayer
                     key={m.id}
-                    controls
-                    playsInline
-                    preload="metadata"
-                    src={'/api/media/' + m.id}
-                    aria-label={m.name}
+                    src={'/api/media/' + encodeURIComponent(m.id)}
+                    name={m.name}
                   />
                 ),
               )}

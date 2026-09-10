@@ -2,7 +2,6 @@
   --video-accent: var(--chat-accent, var(--profile-first, #d0b8ed));
   position: relative;
   isolation: isolate;
-  container: chat-video / inline-size;
   width: 100%;
   min-width: 0;
   overflow: hidden;
@@ -81,6 +80,8 @@
   transition: opacity 180ms;
 }
 .chat-video-controls {
+  /* Keep size containment off the player: chat bubbles use its intrinsic width. */
+  container: chat-video / inline-size;
   position: absolute;
   inset: auto 0 0;
   z-index: 3;
@@ -217,6 +218,14 @@
 .peer-media-detail .chat-video-player > video {
   max-height: 56dvh;
 }
+.media-grid .chat-video-player {
+  align-self: start;
+}
+.media-grid .chat-video-player > video {
+  max-height: 420px;
+  object-fit: contain;
+  border: 0;
+}
 .chat-video-player:fullscreen {
   width: 100vw;
   height: 100dvh;
@@ -254,10 +263,6 @@
   .chat-video-control-row button {
     width: 29px;
     height: 32px;
-  }
-  .chat-video-center {
-    width: 46px;
-    height: 46px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
