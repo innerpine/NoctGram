@@ -137,7 +137,7 @@ export const ChatMessage = memo(function ChatMessage({
           )}
           {!!message.text && (
             <p>
-              <ChatEmojiText text={message.text} />
+              <ChatEmojiText text={message.text} large={!!emojiCount} />
             </p>
           )}
           <div className="chat-message-music" data-chat-menu-exempt>

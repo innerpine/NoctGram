@@ -35,16 +35,11 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { insertComposerEmoji } from '@/lib/chat-composer-text';
+import { ChatTextEditor, type ChatTextEditorHandle } from './chat-text-editor';
+import { ChatEmojiText } from './chat-emoji-text';
 import type { ChatDraft } from '@/lib/chat-outbox';
 
 const ChatEmojiPicker = lazy(() => import('./chat-emoji-picker'));
-
-function fitMessageField(field: HTMLTextAreaElement | null) {
-  if (!field) return;
-  field.style.height = '44px';
-  field.style.height = `${Math.min(140, Math.max(44, field.scrollHeight))}px`;
-}
 
 type DraftFile = {
   id: string;
@@ -73,39 +68,12 @@ export function ChatComposer({
   const [files, setFiles] = useState<DraftFile[]>([]);
   const current = useRef(files);
   const input = useRef<HTMLInputElement>(null);
-  const textarea = useRef<HTMLTextAreaElement>(null);
+  const editor = useRef<ChatTextEditorHandle>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
-  const selection = useRef({ start: 0, end: 0 });
-  const pendingCaret = useRef<number | null>(null);
   const alive = useRef(true);
   const controllers = useRef(new Map<string, AbortController>());
   const locked = useRef(false);
   const [error, setError] = useState('');
-  useLayoutEffect(() => {
-    const field = textarea.current;
-    fitMessageField(field);
-    if (field && pendingCaret.current !== null) {
-      field.setSelectionRange(pendingCaret.current, pendingCaret.current);
-      pendingCaret.current = null;
-    }
-  }, [text]);
-  useEffect(() => {
-    const field = textarea.current;
-    if (!field) return;
-    let width = field.clientWidth;
-    let frame = 0;
-    const observer = new ResizeObserver(() => {
-      if (width === field.clientWidth) return;
-      width = field.clientWidth;
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => fitMessageField(field));
-    });
-    observer.observe(field);
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(frame);
-    };
-  }, []);
   const changeFiles = (next: DraftFile[]) => {
     current.current = next;
     setFiles(next);
@@ -222,7 +190,7 @@ export function ChatComposer({
     onText('');
     onCancelReply?.();
     setEmojiOpen(false);
-    textarea.current?.focus({ preventScroll: true });
+    editor.current?.focus();
   };
   // Keep rapid duplicate submits locked until React commits the cleared draft.
   useLayoutEffect(() => {
@@ -234,26 +202,12 @@ export function ChatComposer({
   }, [peerId, frozen]);
   const chooseEmoji = (emoji: string) => {
     if (frozen) return;
-    const next = insertComposerEmoji(
-      text,
-      emoji,
-      selection.current.start,
-      selection.current.end,
-    );
-    if (!next) {
-      setError('В сообщении может быть до 4000 символов');
-      return;
-    }
     setError('');
-    selection.current = { start: next.caret, end: next.caret };
-    pendingCaret.current = next.caret;
-    onText(next.text);
+    editor.current?.insertEmoji(emoji);
     setEmojiOpen(false);
-    // Focus within the tap so iOS can return to its keyboard without zooming.
-    textarea.current?.focus({ preventScroll: true });
   };
   useEffect(() => {
-    if (reply?.id) textarea.current?.focus({ preventScroll: true });
+    if (reply?.id) editor.current?.focus();
   }, [reply?.id]);
   return (
     <div
@@ -274,7 +228,9 @@ export function ChatComposer({
             <Reply size={19} />
             <span key={reply.id}>
               <strong>Ответ · {reply.name}</strong>
-              <small>{reply.text}</small>
+              <small>
+                <ChatEmojiText text={reply.text} mentions={false} />
+              </small>
             </span>
             <button
               type="button"
@@ -371,43 +327,20 @@ export function ChatComposer({
         >
           <Paperclip size={21} />
         </button>
-        <textarea
-          ref={textarea}
-          rows={1}
-          disabled={frozen}
-          aria-label="Сообщение"
-          placeholder={
-            files.length ? 'Добавить подпись…' : 'Написать сообщение…'
-          }
-          maxLength={4000}
-          value={text}
-          onChange={(e) => onText(e.target.value)}
-          onSelect={(e) => {
-            selection.current = {
-              start: e.currentTarget.selectionStart,
-              end: e.currentTarget.selectionEnd,
-            };
-          }}
-          onPaste={(e) => {
-            if (e.clipboardData.files.length) {
-              e.preventDefault();
-              void add(Array.from(e.clipboardData.files));
+        <div className="chat-editor-container">
+          <ChatTextEditor
+            ref={editor}
+            value={text}
+            onChange={onText}
+            disabled={frozen}
+            placeholder={
+              files.length ? 'Добавить подпись…' : 'Написать сообщение…'
             }
-          }}
-          onKeyDown={(e) => {
-            if (
-              e.key === 'Enter' &&
-              !e.shiftKey &&
-              !e.nativeEvent.isComposing &&
-              (!window.matchMedia('(pointer: coarse)').matches ||
-                e.ctrlKey ||
-                e.metaKey)
-            ) {
-              e.preventDefault();
-              e.currentTarget.form?.requestSubmit();
-            }
-          }}
-        />
+            onFiles={(files) => void add(files)}
+            onSubmit={submit}
+            onLimit={() => setError('В сообщении может быть до 4000 символов')}
+          />
+        </div>
         <Popover open={emojiOpen && !frozen} onOpenChange={setEmojiOpen}>
           <PopoverTrigger
             type="button"
@@ -415,14 +348,7 @@ export function ChatComposer({
             disabled={frozen}
             title="Эмодзи"
             aria-label="Выбрать эмодзи"
-            onPointerDown={() => {
-              const field = textarea.current;
-              if (field)
-                selection.current = {
-                  start: field.selectionStart,
-                  end: field.selectionEnd,
-                };
-            }}
+            onPointerDown={() => editor.current?.rememberSelection()}
           >
             <Smile size={23} />
           </PopoverTrigger>
@@ -432,7 +358,10 @@ export function ChatComposer({
             align="end"
             sideOffset={12}
             initialFocus={false}
-            finalFocus={textarea}
+            finalFocus={() => {
+              editor.current?.focus();
+              return false;
+            }}
           >
             <PopoverTitle className="sr-only">Эмодзи</PopoverTitle>
             <Suspense

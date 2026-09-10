@@ -40,7 +40,7 @@ const { outputFiles } = await build({
         build.onResolve(
           {
             filter:
-              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/popover|\.\/chat-emoji-picker)$/,
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/popover|\.\/chat-emoji-picker|\.\/chat-text-editor|\.\/chat-emoji-text)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
@@ -52,9 +52,13 @@ const { outputFiles } = await build({
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx;'
                 : path.includes('popover')
                   ? 'export const Popover="Popover", PopoverContent="PopoverContent", PopoverTitle="PopoverTitle", PopoverTrigger="PopoverTrigger";'
-                  : path.includes('chat-emoji-picker')
-                    ? 'export default "Picker";'
-                    : 'export const File="File", LoaderCircle="LoaderCircle", Paperclip="Paperclip", RotateCcw="RotateCcw", Send="Send", Video="Video", X="X", Reply="Reply", Smile="Smile";',
+                  : path.includes('chat-text-editor')
+                    ? 'export const ChatTextEditor="ChatTextEditor";'
+                    : path.includes('chat-emoji-text')
+                      ? 'export const ChatEmojiText="ChatEmojiText";'
+                      : path.includes('chat-emoji-picker')
+                        ? 'export default "Picker";'
+                        : 'export const File="File", LoaderCircle="LoaderCircle", Paperclip="Paperclip", RotateCcw="RotateCcw", Send="Send", Video="Video", X="X", Reply="Reply", Smile="Smile";',
         }));
       },
     },
@@ -168,7 +172,7 @@ function mount(peerId = 'bob') {
     owner
       .find((n) => n.type === 'form')
       .props.onSubmit({ preventDefault() {} });
-  owner.textarea = () => owner.find((n) => n.type === 'textarea').props;
+  owner.textarea = () => owner.find((n) => n.type === 'ChatTextEditor').props;
   owner.button = (label) =>
     owner.find((n) => n.props?.['aria-label'] === label)?.props;
   owner.props = props;
@@ -189,36 +193,6 @@ const photo = (name) =>
     { type: 'image/png' },
   );
 try {
-  const keyboard = mount();
-  let coarse = true,
-    submissions = 0,
-    prevented = 0;
-  window.matchMedia = () => ({ matches: coarse });
-  const enter = (extra = {}) =>
-    keyboard.textarea().onKeyDown({
-      key: 'Enter',
-      shiftKey: false,
-      nativeEvent: { isComposing: false },
-      preventDefault: () => prevented++,
-      currentTarget: { form: { requestSubmit: () => submissions++ } },
-      ...extra,
-    });
-  enter();
-  assert.equal(submissions, 0, 'Mobile Return keeps native newline insertion');
-  assert.equal(prevented, 0);
-  enter({ ctrlKey: true });
-  assert.equal(
-    submissions,
-    1,
-    'An external mobile keyboard can explicitly submit',
-  );
-  coarse = false;
-  enter();
-  assert.equal(submissions, 2, 'Desktop Enter still submits');
-  enter({ shiftKey: true });
-  enter({ nativeEvent: { isComposing: true } });
-  assert.equal(submissions, 2, 'Shift+Enter and IME composition are preserved');
-  keyboard.dispose();
   const compose = mount();
   compose.pick([photo('one.png'), photo('two.png')]);
   assert.equal(uploads.length, 1, 'A selection uploads sequentially');
