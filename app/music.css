@@ -420,7 +420,7 @@
   border: 1px solid #ffffff20;
   font-size: 12px;
   color: #ddd;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
 }
 .music-audio-upload:hover {
   background: #ffffff0d;
@@ -431,14 +431,14 @@
 }
 .music-audio-upload.disabled {
   opacity: 0.5;
-  cursor: var(--noct-cursor-default, default);
+  cursor: default;
 }
 .music-audio-caption {
   color: #999;
   font-size: 12px;
 }
 .music-track button:disabled {
-  cursor: var(--noct-cursor-default, default);
+  cursor: default;
   opacity: 0.45;
 }
 @media (max-width: 500px) {

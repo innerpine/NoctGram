@@ -60,7 +60,7 @@
 }
 .telegram-link a[aria-disabled='true'] {
   opacity: 0.5;
-  cursor: var(--noct-cursor-default, default);
+  cursor: default;
 }
 .telegram-link-actions {
   display: flex;
@@ -89,7 +89,7 @@
 }
 .telegram-link-text-button:disabled {
   opacity: 0.5;
-  cursor: var(--noct-cursor-default, default);
+  cursor: default;
 }
 .telegram-link-text-button:focus-visible {
   outline: 2px solid #bfa6e6;

@@ -376,7 +376,7 @@
   padding: 16px 0;
   border-top: 1px solid #ffffff0c;
   border-bottom: 1px solid #ffffff0c;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
 }
 .appearance-switch > span {
   display: grid;
@@ -403,7 +403,7 @@
   border-radius: 999px;
   background: #3a393f;
   box-shadow: inset 0 0 0 1px #ffffff09;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
   transition: background 0.2s;
 }
 .appearance-switch .privacy-switch[data-checked] {
@@ -415,7 +415,7 @@
 }
 .appearance-switch .privacy-switch[data-disabled] {
   opacity: 0.45;
-  cursor: var(--noct-cursor-default, default);
+  cursor: default;
 }
 .design-ring-label {
   display: grid;
@@ -456,11 +456,11 @@
   flex-wrap: wrap;
 }
 .design-motion label {
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
 }
 .design-motion .is-disabled {
   opacity: 0.5;
-  cursor: var(--noct-cursor-default, default);
+  cursor: default;
 }
 .design-save {
   width: 100%;

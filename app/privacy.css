@@ -58,7 +58,7 @@
   font: inherit;
   font-size: 14px;
   text-align: left;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
   outline: none;
   transition:
     border-color 180ms ease,
@@ -148,7 +148,7 @@
   padding: 10px 11px;
   border: 1px solid transparent;
   border-radius: 11px;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
   user-select: none;
   outline: none;
   transition:
@@ -257,7 +257,7 @@
   background: #3a393f;
   box-shadow: inset 0 0 0 1px #ffffff09;
   outline: none;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
   transition:
     background 200ms ease,
     box-shadow 200ms ease;
@@ -322,7 +322,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
 }
 .privacy-toggle small {
   display: block;
@@ -428,7 +428,7 @@
   border: 1px solid #303036;
   border-radius: 13px;
   background: #151518;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
   transition:
     background 160ms ease,
     border-color 160ms ease;
@@ -541,7 +541,7 @@
   background: transparent;
   border: 0;
   color: inherit;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
   border-radius: 10px;
 }
 .presence-search-results button:hover,
