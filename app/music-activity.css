@@ -141,9 +141,6 @@
   font-size: 12px;
   line-height: 1.6;
 }
-.profile-identity-main .aliases-prefix {
-  display: none;
-}
 .profile-music-activity[data-state='paused'] .profile-music-label {
   color: color-mix(in srgb, var(--activity-accent) 60%, #b6b3bd);
 }

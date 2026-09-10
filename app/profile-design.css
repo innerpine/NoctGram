@@ -121,6 +121,7 @@
   width: 168%;
   height: 168%;
 }
+.profile-card[data-premium='true'] .handle-main,
 .profile-card[data-premium='true'] .profile-aliases button {
   color: var(--profile-first);
 }
