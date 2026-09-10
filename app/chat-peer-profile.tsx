@@ -6,7 +6,9 @@ import {
   ArrowLeft,
   ArrowUpRight,
   AtSign,
+  Check,
   ChevronRight,
+  Copy,
   Download,
   File as FileIcon,
   Gift,
@@ -38,6 +40,7 @@ import { giftDefinition, type ReceivedGift } from '@/lib/gift-catalog';
 import { Avatar, DisplayName, appearanceStyle } from './profile-identity';
 import { GiftAnimation } from './gift-animation';
 import { ChatEmojiText } from './chat-emoji-text';
+import { ProfileLink } from './profile-link';
 
 const sections = [
   { id: 'photos', title: 'Фотографии', icon: ImageIcon },
@@ -75,11 +78,9 @@ const get = <T,>(url: string, signal?: AbortSignal) =>
 export function ChatPeerProfile({
   peer,
   viewerId,
-  onFullProfile,
 }: {
   peer: Person;
   viewerId: string;
-  onFullProfile: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const popup = useRef<HTMLDivElement>(null);
@@ -109,10 +110,6 @@ export function ChatPeerProfile({
             key={viewerId + ':' + peer.id}
             peer={peer}
             onClose={() => setOpen(false)}
-            onFullProfile={() => {
-              setOpen(false);
-              onFullProfile();
-            }}
           />
         </DialogContent>
       </Dialog>
@@ -123,11 +120,9 @@ export function ChatPeerProfile({
 function PeerProfileBody({
   peer,
   onClose,
-  onFullProfile,
 }: {
   peer: Person;
   onClose: () => void;
-  onFullProfile: () => void;
 }) {
   const [person, setPerson] = useState<Profile | null>(null),
     [stats, setStats] = useState<ChatLibraryStats | null>(null);
@@ -140,6 +135,9 @@ function PeerProfileBody({
   const [view, setView] = useState<View>({ kind: 'profile' }),
     [leaving, setLeaving] = useState(false),
     [backward, setBackward] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>(
+    'idle',
+  );
   const scroll = useRef<HTMLDivElement>(null),
     heading = useRef<HTMLHeadingElement>(null),
     positions = useRef(new Map<string, number>());
@@ -147,6 +145,19 @@ function PeerProfileBody({
     abort = useRef<AbortController | null>(null),
     pending = useRef(new Set<string>());
   const identity = person || peer;
+  useEffect(() => {
+    if (copyStatus === 'idle') return;
+    const reset = setTimeout(() => setCopyStatus('idle'), 2500);
+    return () => clearTimeout(reset);
+  }, [copyStatus]);
+  async function copyHandle() {
+    try {
+      await navigator.clipboard.writeText('@' + identity.handle);
+      if (!abort.current?.signal.aborted) setCopyStatus('copied');
+    } catch {
+      if (!abort.current?.signal.aborted) setCopyStatus('error');
+    }
+  }
   const online = !!person?.lastSeen && Date.now() - person.lastSeen < 120000;
   const title =
     view.kind === 'profile'
@@ -376,9 +387,17 @@ function PeerProfileBody({
                   )}
                 </div>
                 <div className="peer-profile-identity">
-                  <Avatar person={identity} size={86} eager />
+                  <ProfileLink
+                    target={{ id: peer.id }}
+                    className="peer-profile-avatar"
+                    aria-label={'Открыть профиль: ' + identity.name}
+                  >
+                    <Avatar person={identity} size={86} eager />
+                  </ProfileLink>
                   <h2>
-                    <DisplayName person={identity} />
+                    <ProfileLink target={{ id: peer.id }}>
+                      <DisplayName person={identity} />
+                    </ProfileLink>
                   </h2>
                   <p className={online ? 'online' : ''}>
                     {online
@@ -398,22 +417,40 @@ function PeerProfileBody({
                   <button className="secondary" onClick={onClose}>
                     <MessageCircle size={17} /> В чат
                   </button>
-                  <button className="secondary" onClick={onFullProfile}>
+                  <ProfileLink className="secondary" target={{ id: peer.id }}>
                     Полный профиль <ArrowUpRight size={17} />
-                  </button>
+                  </ProfileLink>
                 </div>
               </div>
               <div className="peer-profile-info">
-                <div className="peer-info-row">
+                <button
+                  className="peer-info-row peer-copy-handle"
+                  onClick={() => void copyHandle()}
+                  aria-label={'Скопировать @' + identity.handle}
+                  title="Скопировать имя пользователя"
+                >
                   <AtSign size={19} />
-                  <div>
+                  <span className="peer-copy-text">
                     <span>@{identity.handle}</span>
-                    <small>Имя пользователя</small>
-                  </div>
-                </div>
+                    <small>
+                      <output>
+                        {copyStatus === 'copied'
+                          ? 'Скопировано'
+                          : copyStatus === 'error'
+                            ? 'Не удалось скопировать. Нажмите ещё раз'
+                            : 'Имя пользователя'}
+                      </output>
+                    </small>
+                  </span>
+                  {copyStatus === 'copied' ? (
+                    <Check size={17} className="peer-copy-icon copied" />
+                  ) : (
+                    <Copy size={17} className="peer-copy-icon" />
+                  )}
+                </button>
                 {person?.bio && (
                   <div className="peer-profile-bio">
-                    <ChatEmojiText text={person.bio} mentions={false} />
+                    <ChatEmojiText text={person.bio} />
                     <small>О себе</small>
                   </div>
                 )}
@@ -534,10 +571,15 @@ function PeerProfileBody({
                 <GiftAnimation id={view.gift.giftId} />
               </div>
               <h3>{currentGift?.name || 'Подарок'}</h3>
-              <p>от {view.gift.senderName}</p>
+              <p>
+                от{' '}
+                <ProfileLink target={{ id: view.gift.sender }}>
+                  {view.gift.senderName}
+                </ProfileLink>
+              </p>
               {view.gift.message && (
                 <div className="peer-gift-message">
-                  <ChatEmojiText text={view.gift.message} mentions={false} />
+                  <ChatEmojiText text={view.gift.message} />
                 </div>
               )}
               <time>{date(view.gift.created)}</time>
