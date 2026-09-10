@@ -2602,7 +2602,6 @@ export default function Noctgram({
                       key={'peer-profile:' + me.id + ':' + peer.id}
                       peer={peer}
                       viewerId={me.id}
-                      onFullProfile={() => void openProfile(peer.id)}
                     />
                     <button
                       className="icon-button call-button"
