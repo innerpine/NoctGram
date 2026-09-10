@@ -136,7 +136,7 @@
 }
 .auth-card button:disabled {
   opacity: 0.45;
-  cursor: default;
+  cursor: var(--noct-cursor-default, default);
 }
 .auth-back {
   align-self: flex-start;

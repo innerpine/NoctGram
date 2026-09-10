@@ -74,7 +74,7 @@
 .chat-options-menu [data-slot='dropdown-menu-item'] {
   gap: 10px;
   padding: 10px;
-  cursor: pointer;
+  cursor: var(--noct-cursor-pointer, pointer);
 }
 .chat-options-menu svg {
   color: #c9bddc;

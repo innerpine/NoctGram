@@ -74,7 +74,7 @@
 .music-player button:disabled,
 .music-stage button:disabled {
   opacity: 0.32;
-  cursor: default;
+  cursor: var(--noct-cursor-default, default);
 }
 .music-player button:focus-visible,
 .music-stage button:focus-visible,
