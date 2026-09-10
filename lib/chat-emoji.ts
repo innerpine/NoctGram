@@ -1,6 +1,8 @@
 import names from './chat-emoji-data.json';
 
-export function appleEmojiUrl(unified: string) {
+export function appleEmojiUrl(unified: string, large = false) {
+  if (large)
+    return `https://cdn.jsdelivr.net/gh/iamcal/emoji-data@v16.0.0/img-apple-160/${unified}.png`;
   return `https://cdn.jsdelivr.net/npm/emoji-datasource-apple@16.0.0/img/apple/64/${unified}.png`;
 }
 const normalized = (value: string) =>

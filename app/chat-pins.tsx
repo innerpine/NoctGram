@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { ChatEmojiText } from './chat-emoji-text';
 import { ChatReveal } from './chat-reveal';
 import { ChevronDown, Pin, PinOff } from 'lucide-react';
 import type { Message } from '@/lib/client';
@@ -40,7 +41,12 @@ export function ChatPins({
               <strong>
                 Закреплено{pins.length > 1 ? ` · ${pins.length}` : ''}
               </strong>
-              <span key={pins[0].id}>{messageSummary(pins[0])}</span>
+              <span key={pins[0].id}>
+                <ChatEmojiText
+                  text={messageSummary(pins[0])}
+                  mentions={false}
+                />
+              </span>
             </button>
             <button
               type="button"
@@ -83,7 +89,12 @@ export function ChatPins({
                   }}
                 >
                   <Pin size={15} />
-                  <span>{messageSummary(message)}</span>
+                  <span>
+                    <ChatEmojiText
+                      text={messageSummary(message)}
+                      mentions={false}
+                    />
+                  </span>
                 </button>
                 <button
                   type="button"

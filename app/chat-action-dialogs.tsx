@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/dialog';
 import type { Message, Person } from '@/lib/client';
 import { chatRequest } from '@/lib/chat-client';
+import { ChatTextEditor } from './chat-text-editor';
+import { ChatEmojiText } from './chat-emoji-text';
 import { messageSummary } from '@/lib/chat-message-display';
 import { Avatar } from './profile-identity';
 
@@ -114,7 +116,7 @@ export function ChatDeleteDialog({
           переписки.
         </DialogDescription>
         <div className="chat-operation-preview">
-          {messageSummary(messages[0])}
+          <ChatEmojiText text={messageSummary(messages[0])} mentions={false} />
         </div>
         <label className="chat-delete-choice">
           <input
@@ -191,13 +193,12 @@ export function ChatEditDialog({
             : 'Изменить сообщение'}
         </DialogTitle>
         <DialogDescription>Изменения увидит и собеседник.</DialogDescription>
-        <textarea
+        <ChatTextEditor
           className="chat-edit-text"
-          aria-label="Текст сообщения"
-          maxLength={4000}
+          label="Текст сообщения"
           value={text}
           disabled={mutation.frozen}
-          onChange={(event) => setText(event.target.value)}
+          onChange={setText}
         />
         {mutation.error && (
           <p role="alert" className="chat-send-error">
@@ -301,7 +302,7 @@ export function ChatForwardDialog({
           {messages.length > 1 ? 'выбранные сообщения' : 'это сообщение'}.
         </DialogDescription>
         <div className="chat-operation-preview">
-          {messageSummary(messages[0])}
+          <ChatEmojiText text={messageSummary(messages[0])} mentions={false} />
         </div>
         <label className="chat-forward-search">
           <Search size={18} />

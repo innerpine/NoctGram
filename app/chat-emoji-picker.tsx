@@ -32,7 +32,7 @@ export default function ChatEmojiPicker({
         { category: Categories.SYMBOLS, name: 'Символы' },
         { category: Categories.FLAGS, name: 'Флаги' },
       ]}
-      getEmojiUrl={appleEmojiUrl}
+      getEmojiUrl={(unified) => appleEmojiUrl(unified)}
       onEmojiClick={({ emoji }) => onSelect(emoji)}
       autoFocusSearch={false}
       lazyLoadEmojis

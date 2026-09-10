@@ -104,6 +104,7 @@ import {
   DEFAULT_CHAT_THEME,
   type ChatThemeState,
 } from '@/lib/chat-themes';
+import { ChatEmojiText } from './chat-emoji-text';
 import { MentionText } from './profile-link';
 import { PROFILE_NAVIGATE, type ProfileNavigation } from '@/lib/profile-links';
 import { ChannelsPanel } from './channels-panel';
@@ -2544,7 +2545,12 @@ export default function Noctgram({
                     <strong>
                       <DisplayName person={t} />
                     </strong>
-                    <small>{t.lastText || 'Открыть диалог'}</small>
+                    <small>
+                      <ChatEmojiText
+                        text={t.lastText || 'Открыть диалог'}
+                        mentions={false}
+                      />
+                    </small>
                   </span>
                   {openingChat === t.id && (
                     <LoaderCircle
