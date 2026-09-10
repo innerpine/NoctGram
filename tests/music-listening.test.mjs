@@ -15,6 +15,17 @@ const { MusicListenTracker, adjacentPlayable } = await import(
   'data:text/javascript;base64,' + Buffer.from(js).toString('base64')
 );
 const tick = () => new Promise((resolve) => setImmediate(resolve));
+assert.equal(
+  adjacentPlayable(
+    [
+      { url: 'a', provider: 'spotify', playback: 'file' },
+      { url: 'b', provider: 'spotify', playback: 'file' },
+    ],
+    'a',
+  ).url,
+  'b',
+  'Restored file queues can resolve their audio again without storing its URL',
+);
 let time = 0,
   counts = 0;
 const changes = [],
