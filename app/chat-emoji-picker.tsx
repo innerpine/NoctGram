@@ -7,6 +7,7 @@ import EmojiPicker, {
   Theme,
 } from 'emoji-picker-react';
 import russian from 'emoji-picker-react/dist/data/emojis-ru';
+import { appleEmojiUrl } from '@/lib/chat-emoji';
 
 export default function ChatEmojiPicker({
   onSelect,
@@ -31,9 +32,7 @@ export default function ChatEmojiPicker({
         { category: Categories.SYMBOLS, name: 'Символы' },
         { category: Categories.FLAGS, name: 'Флаги' },
       ]}
-      getEmojiUrl={(unified) =>
-        `https://cdn.jsdelivr.net/npm/emoji-datasource-apple@16.0.0/img/apple/64/${unified}.png`
-      }
+      getEmojiUrl={appleEmojiUrl}
       onEmojiClick={({ emoji }) => onSelect(emoji)}
       autoFocusSearch={false}
       lazyLoadEmojis

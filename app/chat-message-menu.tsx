@@ -39,6 +39,7 @@ export type ChatActionProps = {
   disabled: boolean;
   canSend: boolean;
   selected?: boolean;
+  unconfirmed?: boolean;
   onAction: (action: ChatAction, message: Message) => void;
 };
 // Portalled dialogs and media players own their context menu, even when their
@@ -135,12 +136,12 @@ export function ChatMessageContext({
 }) {
   const pointer = useRef<{ x: number; y: number } | null>(null);
   return (
-    <ContextMenu disabled={removing}>
+    <ContextMenu disabled={removing || props.unconfirmed}>
       <ContextMenuTrigger
         tabIndex={0}
         aria-haspopup="menu"
         aria-keyshortcuts="Shift+F10"
-        data-chat-message-id={props.message.id}
+        data-chat-message-id={props.unconfirmed ? undefined : props.message.id}
         data-chat-initial={initial || undefined}
         data-chat-removing={removing ? '' : undefined}
         inert={removing || undefined}
@@ -195,6 +196,7 @@ export function ChatMessageContext({
           pointer.current = null;
           if (
             !selecting ||
+            props.unconfirmed ||
             preserveContextTarget(event.target, event.currentTarget)
           )
             return;
@@ -220,7 +222,7 @@ export function ChatMessageContext({
           props.onAction('select', props.message);
         }}
       >
-        {selecting && (
+        {selecting && !props.unconfirmed && (
           <button
             type="button"
             className="chat-message-select"

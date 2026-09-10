@@ -29,6 +29,7 @@ import './chat-themes.css';
 import './chat-attachments.css';
 import './chat-actions.css';
 import './chat-motion.css';
+import './chat-emoji.css';
 import './navigation.css';
 import './music-queue.css';
 import './account-management.css';

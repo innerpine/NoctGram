@@ -254,6 +254,15 @@ export async function POST(req: Request) {
     const me = await viewer();
     const d = db();
     const action = typeof b.action === 'string' ? b.action : '';
+    if (
+      action === 'message' &&
+      b.expectedSender !== undefined &&
+      b.expectedSender !== me
+    )
+      throw new ApiError(
+        409,
+        'Аккаунт изменился. Вернись в аккаунт отправителя.',
+      );
     await socialRateLimit(me, action);
     const administration = await administrationPost(action, b, me);
     if (administration) return administration;
