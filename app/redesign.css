@@ -1247,6 +1247,10 @@ textarea::placeholder {
 .comments-panel {
   min-height: 0;
 }
+.comments-panel .chrome-avatar {
+  /* Scrollable author and comment rows need room for the outer ring. */
+  margin: 5px;
+}
 .comments-panel .comment-context {
   display: flex;
   align-items: flex-start;
