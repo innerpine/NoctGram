@@ -2602,6 +2602,10 @@ export default function Noctgram({
                       key={'peer-profile:' + me.id + ':' + peer.id}
                       peer={peer}
                       viewerId={me.id}
+                      lastSeen={
+                        threads.find((thread) => thread.id === peer.id)
+                          ?.lastSeen ?? peer.lastSeen
+                      }
                     />
                     <button
                       className="icon-button call-button"

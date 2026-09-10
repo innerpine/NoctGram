@@ -41,6 +41,7 @@ import { Avatar, DisplayName, appearanceStyle } from './profile-identity';
 import { GiftAnimation } from './gift-animation';
 import { ChatEmojiText } from './chat-emoji-text';
 import { ProfileLink } from './profile-link';
+import { ChatPeerPresence } from './chat-peer-presence';
 
 const sections = [
   { id: 'photos', title: 'Фотографии', icon: ImageIcon },
@@ -78,9 +79,11 @@ const get = <T,>(url: string, signal?: AbortSignal) =>
 export function ChatPeerProfile({
   peer,
   viewerId,
+  lastSeen = peer.lastSeen,
 }: {
   peer: Person;
   viewerId: string;
+  lastSeen?: number;
 }) {
   const [open, setOpen] = useState(false);
   const popup = useRef<HTMLDivElement>(null);
@@ -96,7 +99,7 @@ export function ChatPeerProfile({
           <strong>
             <DisplayName person={peer} />
           </strong>
-          <small>@{peer.handle}</small>
+          <ChatPeerPresence lastSeen={lastSeen} />
         </span>
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
