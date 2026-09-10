@@ -64,6 +64,50 @@ export const ChatMessage = memo(function ChatMessage({
     !message.attachments?.length && !message.reply && !message.forwardedName
       ? largeEmojiCount(message.text)
       : 0;
+  const visualMedia =
+    !!message.attachments?.length &&
+    message.attachments.every(
+      (file) => file.kind === 'image' || file.kind === 'video',
+    );
+  const mediaOnly =
+    visualMedia &&
+    !message.text.trim() &&
+    !message.reply &&
+    !message.forwardedName;
+  const metadata = (
+    <span className="message-time">
+      <time dateTime={new Date(message.created).toISOString()}>
+        {time.format(message.created)}
+      </time>
+      {!!message.editedAt && <small title="Сообщение изменено">изм.</small>}
+      {!!message.pinnedAt && (
+        <span className="chat-pin-mark" aria-label="Закреплено">
+          ·
+        </span>
+      )}
+      {own && (
+        <span
+          aria-label={
+            delivery?.status === 'sending'
+              ? 'Отправляется'
+              : delivery?.status === 'failed'
+                ? 'Не отправлено'
+                : message.read
+                  ? 'Прочитано'
+                  : 'Отправлено'
+          }
+        >
+          {delivery && delivery.status !== 'sent' ? (
+            <Clock3 size={13} />
+          ) : message.read ? (
+            <CheckCheck size={13} />
+          ) : (
+            <Check size={13} />
+          )}
+        </span>
+      )}
+    </span>
+  );
   if (message.gift && me)
     return (
       <ChatMessageContext
@@ -102,7 +146,9 @@ export const ChatMessage = memo(function ChatMessage({
           className={
             'bubble ' +
             (own ? 'self' : 'other') +
-            (emojiCount ? ' chat-emoji-only' : '')
+            (emojiCount ? ' chat-emoji-only' : '') +
+            (visualMedia ? ' chat-media-message' : '') +
+            (mediaOnly ? ' chat-media-only' : '')
           }
           data-emoji-count={emojiCount || undefined}
           data-delivery={delivery?.status}
@@ -143,9 +189,13 @@ export const ChatMessage = memo(function ChatMessage({
             </button>
           )}
           {!!message.attachments?.length && (
-            <ChatMessageFiles files={message.attachments} />
+            <ChatMessageFiles
+              files={message.attachments}
+              flush={visualMedia}
+              metadata={mediaOnly ? metadata : undefined}
+            />
           )}
-          {!!message.text && (
+          {!!message.text.trim() && (
             <p>
               <ChatEmojiText text={message.text} large={!!emojiCount} />
             </p>
@@ -153,40 +203,7 @@ export const ChatMessage = memo(function ChatMessage({
           <div className="chat-message-music" data-chat-menu-exempt>
             <MusicLinkCard text={message.text} />
           </div>
-          <span className="message-time">
-            <time dateTime={new Date(message.created).toISOString()}>
-              {time.format(message.created)}
-            </time>
-            {!!message.editedAt && (
-              <small title="Сообщение изменено">изм.</small>
-            )}
-            {!!message.pinnedAt && (
-              <span className="chat-pin-mark" aria-label="Закреплено">
-                ·
-              </span>
-            )}
-            {own && (
-              <span
-                aria-label={
-                  delivery?.status === 'sending'
-                    ? 'Отправляется'
-                    : delivery?.status === 'failed'
-                      ? 'Не отправлено'
-                      : message.read
-                        ? 'Прочитано'
-                        : 'Отправлено'
-                }
-              >
-                {delivery && delivery.status !== 'sent' ? (
-                  <Clock3 size={13} />
-                ) : message.read ? (
-                  <CheckCheck size={13} />
-                ) : (
-                  <Check size={13} />
-                )}
-              </span>
-            )}
-          </span>
+          {!mediaOnly && metadata}
           {delivery?.status === 'failed' && (
             <button
               type="button"

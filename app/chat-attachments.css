@@ -201,6 +201,11 @@
 .chat-message-files.multiple {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+.chat-photo-tile,
+.chat-video {
+  position: relative;
+  min-width: 0;
+}
 .chat-photo {
   min-width: 0;
   display: block;
@@ -238,6 +243,83 @@
   padding: 7px 2px 2px;
   font-size: 11px;
   color: #d1cbd9;
+}
+.chat-message-row > .bubble.chat-media-message {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+.chat-message-row > .bubble.chat-media-only {
+  background: transparent;
+}
+.chat-media-message .chat-message-files {
+  gap: 3px;
+  margin: 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.chat-media-message:not(.chat-media-only) .chat-message-files {
+  border-radius: 16px 16px 0 0;
+}
+.chat-media-message .chat-photo,
+.chat-media-message .chat-video video {
+  border-radius: 0;
+}
+.chat-media-message .chat-photo {
+  width: 100%;
+}
+.chat-media-message .multiple > .chat-photo-tile:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+.chat-message-row .chat-media-message > p {
+  display: block;
+  margin: 8px 12px 0;
+}
+.chat-media-message > :is(.chat-reply-quote, .chat-forwarded) {
+  margin: 9px 10px;
+}
+.chat-message-row .chat-media-message > .message-time {
+  margin: 3px 10px 7px 12px;
+}
+.chat-message-row .chat-media-message .chat-message-files .message-time {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 1;
+  float: none;
+  margin: 0;
+  padding: 1px 6px;
+  border-radius: 10px;
+  color: #fff;
+  background: #0009;
+  pointer-events: none;
+  text-shadow: 0 1px 2px #0005;
+}
+.chat-message-row .chat-media-message .chat-video .message-time {
+  top: 7px;
+  bottom: auto;
+  left: 7px;
+  right: auto;
+}
+.chat-video > .chat-video-download {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  background: #0009;
+  color: #fff;
+}
+.chat-video-download:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -3px;
+}
+.chat-message-row .chat-media-message > .chat-delivery-retry {
+  padding: 8px 10px;
 }
 .chat-document {
   display: flex;
