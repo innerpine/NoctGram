@@ -25,7 +25,7 @@ const { outputFiles } = await build({
         build.onResolve(
           {
             filter:
-              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog)$/,
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog|\.\/chat-video-player)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
@@ -35,7 +35,7 @@ const { outputFiles } = await build({
               ? 'export const useState=globalThis.__mediaState;'
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
-                : 'export const Download="Download", File="File", Dialog="Dialog", DialogContent="DialogContent", DialogTitle="DialogTitle";',
+                : 'export const Download="Download", File="File", Dialog="Dialog", DialogContent="DialogContent", DialogTitle="DialogTitle", ChatVideoPlayer="ChatVideoPlayer";',
         }));
       },
     },
@@ -73,16 +73,16 @@ for (const kind of ['image', 'video']) {
   const gallery = find(tree, 'div', (props) =>
     props.className.includes('chat-message-files'),
   );
-  assert.equal(nodes(gallery).filter((node) => node === stamp).length, 1);
   assert.equal(nodes(gallery.props.children[0]).includes(stamp), false);
-  assert.equal(nodes(gallery.props.children[1]).includes(stamp), true);
   if (kind === 'video') {
-    assert.equal(find(gallery, 'video').props.controls, true);
-    assert.equal(find(gallery, 'video').props.playsInline, true);
-    const download = find(gallery, 'a');
-    assert.equal(download.props.href, '/api/media/last?download=1');
-    assert.equal(download.props.className, 'chat-video-download');
-    assert.equal(download.props.download, 'Last');
+    const player = find(gallery, 'ChatVideoPlayer');
+    assert.equal(player.props.src, '/api/media/last');
+    assert.equal(player.props.name, 'Last');
+    assert.equal(player.props.metadata, stamp);
+    assert.equal(player.props.flush, true);
+  } else {
+    assert.equal(nodes(gallery).filter((node) => node === stamp).length, 1);
+    assert.equal(nodes(gallery.props.children[1]).includes(stamp), true);
   }
   find(gallery, 'button').props.onClick();
   let modal = find(render(), 'Dialog');

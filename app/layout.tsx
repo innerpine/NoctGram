@@ -32,6 +32,7 @@ import './chat-actions.css';
 import './chat-motion.css';
 import './chat-emoji.css';
 import './chat-peer-profile.css';
+import './chat-video-player.css';
 import './navigation.css';
 import './music-queue.css';
 import './account-management.css';
