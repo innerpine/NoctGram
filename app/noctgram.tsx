@@ -2240,7 +2240,7 @@ export default function Noctgram({
                     </div>
                   </div>
                   <MusicActivityStatus
-                    userId={profile.id}
+                    person={profile}
                     own={profile.id === me?.id}
                     onSettings={
                       profile.id === me?.id

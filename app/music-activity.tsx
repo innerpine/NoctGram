@@ -4,6 +4,9 @@ import { ProfileLink } from './profile-link';
 /* eslint-disable react/react-compiler, next/no-img-element */
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useImagePalette } from '@/lib/use-image-palette';
+import { themeFor } from '@/lib/appearance';
+import { readProfileBackground } from '@/lib/profile-background';
+import type { Profile } from '@/lib/client';
 import {
   Headphones,
   LoaderCircle,
@@ -115,14 +118,15 @@ export function MusicActivitySettings() {
 }
 
 export function MusicActivityStatus({
-  userId,
+  person,
   own = false,
   onSettings,
 }: {
-  userId: string;
+  person: Profile;
   own?: boolean;
   onSettings?: () => void;
 }) {
+  const userId = person.id;
   const music = useMusic();
   const playback = useMusicPlayback();
   const [result, setResult] = useState<{
@@ -182,7 +186,11 @@ export function MusicActivityStatus({
   }, [userId]);
   const activity = result?.userId === userId ? result.activity : null;
   const artwork = playerArtwork(activity?.artwork || '');
-  const palette = useImagePalette(artwork);
+  const profileColor =
+    !!person.premium &&
+    readProfileBackground(person.profileBackground).musicColor === 'profile';
+  const coverPalette = useImagePalette(profileColor ? '' : artwork);
+  const palette = profileColor ? themeFor(person).colors : coverPalette;
   const now = result
     ? result.serverTime + Math.max(0, clock - result.received)
     : 0;
@@ -213,11 +221,13 @@ export function MusicActivityStatus({
         {
           '--activity-color': palette?.[0] || '#9897ac',
           '--activity-second': palette?.[1] || '#777889',
-          '--activity-artwork': artwork
-            ? `url(${JSON.stringify(artwork)})`
-            : 'none',
+          '--activity-artwork':
+            !profileColor && artwork
+              ? `url(${JSON.stringify(artwork)})`
+              : 'none',
         } as CSSProperties
       }
+      data-color={profileColor ? 'profile' : 'cover'}
       data-state={paused ? 'paused' : 'playing'}
       aria-label="Музыкальная активность"
     >

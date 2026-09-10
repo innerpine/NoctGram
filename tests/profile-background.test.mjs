@@ -135,6 +135,7 @@ const defaults = {
   first: '#aa66cc',
   second: '#3366aa',
   intensity: 30,
+  musicColor: 'cover',
 };
 const design = {
   theme: 'ember',
@@ -174,6 +175,8 @@ for (const bad of [
   { ...defaults, intensity: 90 },
   { ...defaults, second: '#fff' },
   { ...defaults, intensity: 30.5 },
+  { ...defaults, musicColor: 'invalid' },
+  { ...defaults, musicColor: null },
   null,
 ]) {
   assert.equal(
@@ -229,6 +232,44 @@ for (const mode of ['cover', 'custom', 'none']) {
   const result = await ok('alice', 'appearance', { ...design, background: b });
   assert.deepEqual(JSON.parse(result.profileBackground), b);
 }
+const profileMusic = { ...defaults, mode: 'none', musicColor: 'profile' };
+await ok('alice', 'appearance', { ...design, background: profileMusic });
+assert.deepEqual(
+  JSON.parse(
+    (await ok('bob', 'profile', undefined, '&id=alice')).profileBackground,
+  ),
+  profileMusic,
+  'Visitors see the music colour choice even with the profile background disabled',
+);
+const legacyBackground = { ...defaults };
+delete legacyBackground.musicColor;
+await ok('alice', 'appearance', { ...design, background: legacyBackground });
+assert.deepEqual(
+  JSON.parse((await ok('alice', 'profile')).profileBackground),
+  { ...defaults, musicColor: 'profile' },
+  'A client without the music colour setting preserves the saved choice',
+);
+await ok('alice', 'appearance', oldClient);
+assert.equal(
+  JSON.parse((await ok('alice', 'profile')).profileBackground).musicColor,
+  'profile',
+  'A client omitting all background settings also preserves the music choice',
+);
+await ok('alice', 'appearance', design);
+assert.equal(
+  JSON.parse(
+    (await ok('bob', 'profile', undefined, '&id=alice')).profileBackground,
+  ).musicColor,
+  'cover',
+  'The owner can switch back to artwork colours',
+);
+sql.exec("DELETE FROM profile_appearance WHERE userId='alice'");
+await ok('alice', 'appearance', { ...design, background: legacyBackground });
+assert.equal(
+  JSON.parse((await ok('alice', 'profile')).profileBackground).musicColor,
+  'cover',
+  'Existing clients and profiles default to artwork colours',
+);
 console.log(
   'Profile background API: auth, Premium, validation, persistence, visitors, old clients and entitlement loss passed',
 );
