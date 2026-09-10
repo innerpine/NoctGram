@@ -209,7 +209,7 @@ export function VideoPlayer({
       restored = true;
       restoreVideoPosition(element, initialPlayback);
       sync();
-      if (initialPlayback.playing) void togglePlay();
+      if (initialPlayback.playing && element.paused) void togglePlay();
     };
     if (element && element.readyState >= 1) restore();
     element?.addEventListener('loadedmetadata', restore);

@@ -120,9 +120,9 @@ const find = (type, label) =>
     (node) =>
       node.type === type && (!label || node.props['aria-label'] === label),
   );
-const render = () => {
+const render = (props = {}) => {
   cursor = 0;
-  tree = VideoPlayer({ src: '/api/media/video', name: 'clip.mp4' });
+  tree = VideoPlayer({ src: '/api/media/video', name: 'clip.mp4', ...props });
   tree.props.ref.current = root;
   videoNode = find('video');
   videoNode.props.ref.current = media;
@@ -292,6 +292,19 @@ try {
   cleanup();
   cleanup = null;
   assert.equal(media.paused, true, 'Closing the viewer stops playback');
+  slots.length = 0;
+  effects.length = 0;
+  Object.assign(media, { readyState: 2, paused: false, ended: false });
+  render({
+    initialPlayback: { position: 15, muted: true, volume: 0.5, playing: true },
+  });
+  cleanup = effects[0]();
+  assert.equal(
+    media.paused,
+    false,
+    'Metadata restoration must not pause a clip the user already started',
+  );
+  assert.equal(media.currentTime, 15);
 } finally {
   cleanup?.();
   globalThis.setTimeout = originalTimeout;
