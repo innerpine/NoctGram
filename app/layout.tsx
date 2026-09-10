@@ -38,7 +38,10 @@ import './account-management.css';
 import './staff-panel.css';
 import './channel-boosts.css';
 import './viewport.css';
+import './cursor.css';
 import { MusicProvider } from './music-provider';
+import { CursorPreferenceSync } from './cursor-preference';
+import { CURSOR_BOOTSTRAP } from '@/lib/cursor-preference';
 import { APP_HISTORY_BOOTSTRAP } from '@/lib/app-history-bootstrap';
 export const viewport: Viewport = {
   width: 'device-width',
@@ -63,8 +66,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ru" className="dark">
+    <html lang="ru" className="dark" suppressHydrationWarning>
       <head>
+        <script
+          id="noctgram-cursor"
+          dangerouslySetInnerHTML={{ __html: CURSOR_BOOTSTRAP }}
+        />
         <script
           id="noctgram-history"
           dangerouslySetInnerHTML={{ __html: APP_HISTORY_BOOTSTRAP }}
@@ -75,6 +82,7 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <CursorPreferenceSync />
         <MusicProvider>{children}</MusicProvider>
       </body>
     </html>

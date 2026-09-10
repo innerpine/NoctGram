@@ -395,7 +395,7 @@ textarea::placeholder {
   color: #ffffffbf;
   gap: 10px;
   border-radius: 8px;
-  cursor: pointer;
+  cursor: var(--noct-cursor-pointer, pointer);
 }
 .post-menu [data-slot='dropdown-menu-item'][data-highlighted] {
   background: #ffffff14;
@@ -924,7 +924,7 @@ textarea::placeholder {
   height: 184px;
   max-width: 100%;
   padding: 0;
-  cursor: pointer;
+  cursor: var(--noct-cursor-pointer, pointer);
   border-radius: 24px;
   background: none;
   touch-action: manipulation;

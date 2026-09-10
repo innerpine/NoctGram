@@ -22,6 +22,7 @@ import { PushSettings } from './notifications';
 import { MusicActivitySettings } from './music-activity';
 import { Avatar } from './post-card';
 import { PresenceSettings } from './presence-settings';
+import { CursorPreference } from './cursor-preference';
 
 type Settings = {
   hideAdult: boolean;
@@ -145,6 +146,7 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
           <MusicActivitySettings />
           <PushSettings />
           <AnimationPreference />
+          <CursorPreference />
           <form
             className="edit-form"
             onSubmit={(e) => {

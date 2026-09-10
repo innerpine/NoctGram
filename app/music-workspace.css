@@ -329,7 +329,7 @@ body:has(.music-shell) .music-player.music-sheet {
   align-items: center;
   gap: 10px;
   padding: 9px 10px;
-  cursor: pointer;
+  cursor: var(--noct-cursor-pointer, pointer);
   border-radius: 11px;
   transition: background 220ms;
 }
