@@ -19,6 +19,7 @@ import { createChatRemoval } from '@/lib/chat-removal';
 import { ChatReveal } from './chat-reveal';
 import { ChatPins } from './chat-pins';
 import { ChatMessage } from './chat-message';
+import { ChatProfileDialog } from './chat-peer-profile';
 import { ChatComposer } from './chat-composer';
 import { chatHistoryContextMenu, type ChatAction } from './chat-message-menu';
 import {
@@ -92,6 +93,12 @@ export function ChatConversation({
     () => new Set(messages.map((message) => message.id)),
   );
   const [replyFocus, setReplyFocus] = useState(0);
+  const [profileId, setProfileId] = useState('');
+  const [profileOpen, setProfileOpen] = useState(false);
+  const openMiniProfile = useCallback((id: string) => {
+    setProfileId(id);
+    setProfileOpen(true);
+  }, []);
   const [reply, setReply] = useState<Message | null>(null),
     [selected, setSelected] = useState<string[]>([]),
     [working, setWorking] = useState(false);
@@ -415,6 +422,7 @@ export function ChatConversation({
             disabled={readonly}
             canSend={canSend}
             onProfile={onProfile}
+            onAvatar={openMiniProfile}
             onAction={onAction}
             onJump={onJump}
             selected={selected.includes(message.id)}
@@ -424,6 +432,13 @@ export function ChatConversation({
         ))}
       </div>
       {!!privacyNote && <p className="message-privacy-note">{privacyNote}</p>}
+      <ChatProfileDialog
+        person={profileId === me.id ? me : peer}
+        viewerId={me.id}
+        chatPeerId={peer.id}
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+      />
       <ChatComposer
         peerId={peer.id}
         replyFocus={replyFocus}

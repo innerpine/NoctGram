@@ -162,11 +162,15 @@
   align-self: flex-end;
   flex-direction: row-reverse;
 }
-.chat-message-avatar.profile-link {
+.chat-message-avatar {
   display: flex;
   flex: 0 0 32px;
   border-radius: 50%;
   margin-bottom: 1px;
+}
+.chat-message-avatar:focus-visible {
+  outline: 2px solid var(--chat-accent, #c9a9ff);
+  outline-offset: 4px;
 }
 .chat-message-row > .bubble {
   display: flow-root;

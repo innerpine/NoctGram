@@ -21,6 +21,7 @@ export const ChatMessage = memo(function ChatMessage({
   me,
   peer,
   onProfile,
+  onAvatar,
   onAction,
   disabled,
   canSend,
@@ -36,6 +37,7 @@ export const ChatMessage = memo(function ChatMessage({
   me: Person | null;
   peer: Person;
   onProfile: (id: string) => void;
+  onAvatar: (id: string) => void;
   onAction: (action: ChatAction, message: Message) => void;
   disabled: boolean;
   canSend: boolean;
@@ -70,7 +72,13 @@ export const ChatMessage = memo(function ChatMessage({
         removing={removing}
         initial={initial}
       >
-        <ChatGift message={message} me={me} peer={peer} onProfile={onProfile} />
+        <ChatGift
+          message={message}
+          me={me}
+          peer={peer}
+          onProfile={onProfile}
+          onAvatar={onAvatar}
+        />
       </ChatMessageContext>
     );
   return (
@@ -81,13 +89,15 @@ export const ChatMessage = memo(function ChatMessage({
       initial={initial}
     >
       <div className={'chat-message-row ' + (own ? 'self' : 'other')}>
-        <ProfileLink
-          target={{ id: sender.id }}
+        <button
+          type="button"
           className="chat-message-avatar"
-          aria-label={'Профиль ' + sender.name}
+          aria-label={'Открыть мини-профиль: ' + sender.name}
+          aria-haspopup="dialog"
+          onClick={() => onAvatar(sender.id)}
         >
           <Avatar person={sender} size={32} />
-        </ProfileLink>
+        </button>
         <div
           className={
             'bubble ' +
