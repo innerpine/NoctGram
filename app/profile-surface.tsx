@@ -5,7 +5,7 @@ import { hasProfileDesign, themeFor } from '@/lib/appearance';
 import { readProfileBackground } from '@/lib/profile-background';
 import { useImagePalette } from '@/lib/use-image-palette';
 import { appearanceStyle } from './profile-identity';
-export function useProfileBackground(person: Profile) {
+export function useProfileBackground(person: Partial<Profile>) {
   const background = readProfileBackground(person.profileBackground);
   const active =
     !!person.premium && person.kind !== 'channel' && background.mode !== 'none';

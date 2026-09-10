@@ -42,6 +42,7 @@ import { GiftAnimation } from './gift-animation';
 import { ChatEmojiText } from './chat-emoji-text';
 import { ProfileLink } from './profile-link';
 import { ChatPeerPresence } from './chat-peer-presence';
+import { useProfileBackground } from './profile-surface';
 
 const sections = [
   { id: 'photos', title: 'Фотографии', icon: ImageIcon },
@@ -148,6 +149,7 @@ function PeerProfileBody({
     abort = useRef<AbortController | null>(null),
     pending = useRef(new Set<string>());
   const identity = person || peer;
+  const surface = useProfileBackground(identity);
   useEffect(() => {
     if (copyStatus === 'idle') return;
     const reset = setTimeout(() => setCopyStatus('idle'), 2500);
@@ -328,7 +330,11 @@ function PeerProfileBody({
     view.kind === 'gift' ? giftDefinition(view.gift.giftId) : null;
 
   return (
-    <div className="peer-profile-shell" style={appearanceStyle(identity)}>
+    <div
+      className="peer-profile-shell"
+      data-profile-background={!!surface}
+      style={{ ...appearanceStyle(identity), ...surface }}
+    >
       <div
         className={
           'peer-profile-toolbar' +
