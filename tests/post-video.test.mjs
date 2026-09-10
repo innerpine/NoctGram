@@ -26,7 +26,7 @@ const { outputFiles } = await build({
         build.onResolve(
           {
             filter:
-              /^(\.\/(profile-identity|profile-link|stars-icon|code-block|music-link-card)|@\/components\/ui\/dropdown-menu)$/,
+              /^(\.\/(profile-identity|profile-link|stars-icon|code-block|music-link-card)|@\/components\/ui\/(dropdown-menu|dialog))$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
@@ -43,6 +43,9 @@ const { outputFiles } = await build({
         export const DropdownMenuTrigger = ({children}) => children;
         export const DropdownMenuContent = () => null;
         export const DropdownMenuItem = () => null;
+        export const Dialog = () => null;
+        export const DialogContent = () => null;
+        export const DialogTitle = () => null;
       `,
         }));
       },
@@ -84,7 +87,7 @@ for (const label of [
   'Воспроизвести видео',
   'Перемотка видео',
   'Выключить звук видео',
-  'Видео на весь экран',
+  'Раскрыть видео',
   'Скачать видео Видео.mp4',
 ]) {
   assert.ok(html.includes('aria-label="' + label + '"'), label);
