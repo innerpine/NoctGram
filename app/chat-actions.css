@@ -5,6 +5,70 @@
   min-height: 0;
   min-width: 0;
 }
+/* Keep native wheel, touch and thumb dragging; only restyle the history rail. */
+.message-list {
+  --chat-scrollbar-thumb: color-mix(
+    in srgb,
+    var(--chat-accent, #cbbadb) 50%,
+    transparent
+  );
+  scrollbar-width: thin;
+  scrollbar-color: var(--chat-scrollbar-thumb) transparent;
+  scrollbar-gutter: stable;
+}
+@supports selector(::-webkit-scrollbar) {
+  .message-list {
+    /* Non-auto standard properties would override the rounded thumb in Chromium. */
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  .message-list::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+  }
+  .message-list::-webkit-scrollbar-track {
+    margin-block: 8px;
+    background: transparent;
+  }
+  .message-list::-webkit-scrollbar-thumb {
+    min-height: 40px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--chat-scrollbar-thumb);
+    background-clip: padding-box;
+  }
+  .message-list::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(
+      in srgb,
+      var(--chat-accent, #cbbadb) 70%,
+      transparent
+    );
+  }
+  .message-list::-webkit-scrollbar-thumb:active {
+    background-color: color-mix(
+      in srgb,
+      var(--chat-accent, #cbbadb) 85%,
+      transparent
+    );
+  }
+  .message-list::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  .message-list::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+@media (forced-colors: active) {
+  .message-list {
+    scrollbar-color: auto;
+  }
+  .message-list::-webkit-scrollbar-thumb {
+    background-color: ButtonText;
+  }
+}
 .message-list[data-chat-dragging],
 .message-list[data-chat-dragging] * {
   cursor: default;
