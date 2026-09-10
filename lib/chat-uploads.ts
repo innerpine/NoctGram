@@ -43,7 +43,7 @@ export async function storeChatUpload(
     id = crypto.randomUUID();
   await reserveUpload(id, me, file);
   try {
-    await bucket().put(id, bytes, { httpMetadata: { contentType: type } });
+    await bucket(me).put(id, bytes, { httpMetadata: { contentType: type } });
     const stored = await db().batch([
       db()
         .prepare(

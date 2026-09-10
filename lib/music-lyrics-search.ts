@@ -1,3 +1,4 @@
+import { readUpstreamJson } from './upstream-json';
 import { readLyrics, type TrackLyrics } from './music-player';
 
 type Recording = { title: string; artist: string; duration: number };
@@ -185,7 +186,7 @@ export async function findTrackLyrics(
     }
     if (response.status === 404) return null;
     if (!response.ok) throw new Error('Lyrics unavailable');
-    return response.json();
+    return readUpstreamJson(response);
   };
   const identities = recordingIdentities(recording);
   const lookups = [...identities.slice(1), recording, identities[0]].filter(

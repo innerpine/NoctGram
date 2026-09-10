@@ -69,7 +69,7 @@ try {
             contents:
               path === './storage'
                 ? 'export const db=()=>globalThis.__perfServer.database; export const bucket=()=>({});'
-                : 'export const identity=async()=>globalThis.__perfServer.user; export const tokenHash=async(value)=>value;',
+                : 'export const setting=()=>""; export const identity=async()=>globalThis.__perfServer.user; export const tokenHash=async(value)=>value;',
           }));
         },
       },

@@ -1,4 +1,5 @@
 'use client';
+import { EmojiPicker, EmojiPreview } from './premium-emoji';
 /* File transfers are scoped to this mounted conversation. */
 /* eslint-disable react/react-compiler, next/no-img-element */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -30,6 +31,7 @@ type DraftFile = {
   error?: string;
 };
 export function ChatComposer({
+  premium = false,
   peerId,
   text,
   onText,
@@ -39,6 +41,7 @@ export function ChatComposer({
   onCancelReply,
   onLockedChange,
 }: {
+  premium?: boolean;
   peerId: string;
   text: string;
   onText: (text: string) => void;
@@ -315,6 +318,7 @@ export function ChatComposer({
           {error}
         </p>
       )}
+      <EmojiPreview text={text} />
       <form
         className="message-composer"
         onSubmit={(e) => {
@@ -342,6 +346,13 @@ export function ChatComposer({
         >
           <Paperclip size={21} />
         </button>
+        <EmojiPicker
+          premium={premium}
+          text={text}
+          onText={onText}
+          field={textarea}
+          disabled={disabled || sending || uncertain}
+        />
         <textarea
           ref={textarea}
           disabled={frozen}

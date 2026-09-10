@@ -4,6 +4,7 @@ import { CHAT_FILE_LIMIT } from '@/lib/chat-files';
 import { storeChatUpload, discardChatUpload } from '@/lib/chat-uploads';
 import { assertWritable } from '@/lib/account-access';
 import { rateLimit } from '@/lib/rate-limit';
+import { readMultipart } from '@/lib/request-body';
 
 function sameOrigin(req: Request) {
   if (
@@ -22,35 +23,7 @@ export async function POST(req: Request) {
     const max = CHAT_FILE_LIMIT + 65536;
     if (Number(req.headers.get('content-length')) > max)
       throw new ApiError(413, 'Файл должен быть меньше 25 МБ');
-    // Enforce the bound for chunked bodies too, before parsing multipart data.
-    const reader = req.body?.getReader();
-    if (!reader) throw new ApiError(400, 'Выбери файл');
-    const parts: Uint8Array[] = [];
-    let length = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      length += value.length;
-      if (length > max) {
-        await reader.cancel();
-        throw new ApiError(413, 'Файл должен быть меньше 25 МБ');
-      }
-      parts.push(value);
-    }
-    const bytes = new Uint8Array(length);
-    let offset = 0;
-    for (const part of parts) {
-      bytes.set(part, offset);
-      offset += part.length;
-    }
-    let form: FormData;
-    try {
-      form = await new Response(bytes, {
-        headers: { 'Content-Type': req.headers.get('content-type') || '' },
-      }).formData();
-    } catch {
-      throw new ApiError(400, 'Некорректная загрузка файла');
-    }
+    const form = await readMultipart(req, max, ['file', 'peer']);
     const file = form.get('file'),
       peer = form.get('peer');
     if (!(file instanceof File) || typeof peer !== 'string')

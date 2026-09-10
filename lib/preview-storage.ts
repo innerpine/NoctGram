@@ -1,6 +1,8 @@
 import { ApiError } from './api-error';
 
 export const PREVIEW_STORAGE_BYTES = 3 * 1024 * 1024 * 1024;
+export const PREVIEW_USER_STORAGE_BYTES = 512 * 1024 * 1024;
+export const PREVIEW_USER_WRITES_PER_MONTH = 2000;
 export const PREVIEW_WRITES_PER_MONTH = 10_000;
 export const PREVIEW_READS_PER_MONTH = 200_000;
 const permanent = Number.MAX_SAFE_INTEGER;
@@ -41,7 +43,11 @@ function bodyBytes(value: unknown) {
   );
 }
 
-export function previewBucket(raw: R2Bucket, db: D1Database): R2Bucket {
+export function previewBucket(
+  raw: R2Bucket,
+  db: D1Database,
+  actor?: string,
+): R2Bucket {
   const monthly = async (kind: 'read' | 'write') => {
     const now = new Date();
     const month = now.toISOString().slice(0, 7);
@@ -68,6 +74,31 @@ export function previewBucket(raw: R2Bucket, db: D1Database): R2Bucket {
       if (prop === 'put')
         return async (...args: unknown[]) => {
           const bytes = bodyBytes(args[1]);
+          if (!actor || actor.length > 200)
+            throw new ApiError(
+              403,
+              'Для загрузки требуется аккаунт.',
+              'PREVIEW_ACTOR_REQUIRED',
+            );
+          const account = encodeURIComponent(actor);
+          const now = new Date();
+          await claim(
+            db,
+            'preview:r2:user-write:' +
+              account +
+              ':' +
+              now.toISOString().slice(0, 7),
+            1,
+            PREVIEW_USER_WRITES_PER_MONTH,
+            Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 2, 1),
+          );
+          await claim(
+            db,
+            'preview:r2:user-uploaded-bytes:' + account,
+            bytes,
+            PREVIEW_USER_STORAGE_BYTES,
+            permanent,
+          );
           await monthly('write');
           await claim(
             db,

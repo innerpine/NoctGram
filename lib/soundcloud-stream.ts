@@ -1,3 +1,4 @@
+import { readUpstreamJson } from './upstream-json';
 import { db } from './storage';
 import { setting } from './auth-session';
 import { ApiError } from './api-error';
@@ -103,7 +104,9 @@ async function storedToken(): Promise<CachedTokens> {
         },
       );
       if (!response.ok) throw unavailable();
-      const token = (await response.json()) as Tokens & { expires_in: number };
+      const token = (await readUpstreamJson(response, 65536)) as Tokens & {
+        expires_in: number;
+      };
       if (
         typeof token.access_token !== 'string' ||
         !token.access_token ||
@@ -203,7 +206,7 @@ async function resource(value: unknown) {
     const response = await request(
       '/resolve?url=' + encodeURIComponent(link.url),
     );
-    const track = (await response.json()) as Data;
+    const track = (await readUpstreamJson(response)) as Data;
     if (
       track.kind !== 'track' ||
       track.sharing !== 'public' ||
@@ -281,7 +284,7 @@ export async function searchSoundCloud(query: unknown, page: unknown = '1') {
         linked_partitioning: 'true',
       }),
   );
-  const data = (await response.json()) as Data;
+  const data = (await readUpstreamJson(response)) as Data;
   const collection = Array.isArray(data) ? data : data.collection;
   if (!Array.isArray(collection)) throw unavailable();
   const seen = new Set<string>();
@@ -319,7 +322,7 @@ export async function soundcloudStream(value: unknown) {
   const response = await request(
     '/tracks/' + encodeURIComponent(String(track.urn)) + '/streams',
   );
-  const streams = (await response.json()) as Data;
+  const streams = (await readUpstreamJson(response)) as Data;
   // Full HLS only. Never substitute a preview or a download for playback.
   const path = streams.hls_mp3_128_url || streams.hls_aac_160_url;
   if (typeof path !== 'string')

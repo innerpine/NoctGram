@@ -11,9 +11,13 @@ export const CODE_SECONDS = 300;
 export function setting(name: string) {
   return (env as unknown as Record<string, string | undefined>)[name] || '';
 }
-// Keep migration access through Sites until the owner explicitly selects email-only.
+// Sites headers are trusted only when the server explicitly selects hybrid mode.
+// Unset or mistyped settings must not enable a proxy authentication fallback.
 export function sitesAuthEnabled() {
-  return !['email', 'access'].includes(setting('NOCT_AUTH_MODE'));
+  return (
+    setting('NOCT_AUTH_MODE') === 'hybrid' &&
+    setting('NOCT_DEPLOYMENT_TARGET') !== 'standalone'
+  );
 }
 export function cookieValue(cookie: string | null, name: string) {
   return (
@@ -52,6 +56,12 @@ export type Identity = {
   source: 'email' | 'sites' | 'access';
 };
 export async function identity(): Promise<Identity | null> {
+  // A standalone release must never fall back to the development proxy identity.
+  if (
+    setting('NOCT_DEPLOYMENT_TARGET') === 'standalone' &&
+    setting('NOCT_AUTH_MODE') !== 'email'
+  )
+    return null;
   const h = await headers();
   // Private preview identities come only from a verified Access application JWT.
   // Old email cookies and development identity headers cannot switch this user.

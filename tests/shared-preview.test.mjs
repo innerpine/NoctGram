@@ -146,7 +146,7 @@ function storage() {
       calls.push(['delete', ...args]);
     },
   };
-  return { sqlite, calls, bucket: previewBucket(raw, db) };
+  return { sqlite, calls, bucket: previewBucket(raw, db, 'alice') };
 }
 await test('concurrent uploads cannot overrun the cumulative byte budget', async () => {
   const { sqlite, calls, bucket } = storage();

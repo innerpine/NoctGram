@@ -126,6 +126,9 @@ function fixture(t) {
     'lib/boost-access.ts',
     'lib/boost-rules.ts',
     'lib/premium-access.ts',
+    'lib/premium-predicate.ts',
+    'lib/premium-emoji.ts',
+    'lib/premium-emoji-access.ts',
     'lib/account-access.ts',
     'lib/channel-access.ts',
     'lib/privacy.ts',
@@ -176,6 +179,7 @@ function fixture(t) {
   }
   function load(file) {
     if (modules.has(file)) return modules.get(file).exports;
+    if (file === 'lib/auth-session.ts') return { setting: () => '1' };
     if (file === 'lib/storage.ts') return { db: () => adapter };
     if (file === 'lib/server.ts') {
       // Actual clean and profile functions, without framework/server initialization.
@@ -333,7 +337,9 @@ function fixture(t) {
   return ctx;
 }
 function scenario(name, fn) {
-  void test(name, { concurrency: false, timeout: 15000 }, (t) => fn(fixture(t), t));
+  void test(name, { concurrency: false, timeout: 15000 }, (t) =>
+    fn(fixture(t), t),
+  );
 }
 async function rejectsApi(f, task, statuses) {
   const allowed = Array.isArray(statuses) ? statuses : [statuses];

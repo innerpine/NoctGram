@@ -1,0 +1,121 @@
+.purchase-open {
+  width: 100%;
+  margin: 12px 0;
+}
+.purchase-dialog {
+  width: min(480px, calc(100vw - 24px));
+  max-height: min(90dvh, 850px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 25px;
+  background: var(--popover);
+  color: var(--foreground);
+}
+.purchase-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+.purchase-packages {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.purchase-packages button {
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 12px 6px;
+  display: grid;
+  gap: 7px;
+  text-align: center;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+.purchase-packages button > span {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.purchase-packages small,
+.purchase-methods small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.purchase-form .selected {
+  border-color: color-mix(in srgb, var(--accent, #b9a0df) 60%, transparent);
+  background: color-mix(in srgb, var(--accent, #b9a0df) 8%, transparent);
+}
+.purchase-methods {
+  display: grid;
+  gap: 8px;
+}
+.purchase-methods button {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 15px;
+  text-align: left;
+}
+.purchase-methods button > span {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+}
+.purchase-methods strong {
+  font-size: 14px;
+}
+.purchase-methods button:disabled {
+  opacity: 0.4;
+}
+.purchase-terms {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+}
+.purchase-agreement {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.purchase-agreement [data-slot='checkbox'] {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.purchase-receipt {
+  display: grid;
+  gap: 14px;
+  text-align: center;
+  padding: 8px 0;
+}
+.purchase-check {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  margin: auto;
+  background: color-mix(in srgb, var(--accent, #b9a0df) 16%, transparent);
+  color: var(--accent, #b9a0df);
+}
+.purchase-receipt h3 {
+  font-size: 20px;
+}
+.purchase-receipt p {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+.purchase-order-id {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}

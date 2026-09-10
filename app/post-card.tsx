@@ -16,6 +16,7 @@ import {
   Eye,
   Video,
   ShieldCheck,
+  Megaphone,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -23,7 +24,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, DisplayName } from './profile-identity';
+import { Avatar, DisplayName, appearanceStyle } from './profile-identity';
 import { ProfileLink, MentionText } from './profile-link';
 export { Avatar } from './profile-identity';
 import { StarsIcon } from './stars-icon';
@@ -151,6 +152,8 @@ export const PostCard = memo(function PostCard({
     recorded = useRef(false);
   const mine = p.userId === me || p.ownerId === me;
   const canManage = mine || !!p.canManagePosts;
+  const isChannel = p.kind === 'channel';
+  const authorLabel = (isChannel ? 'Канал ' : 'Профиль ') + p.name;
   useEffect(() => {
     if (!me || mine || recorded.current || !article.current) return;
     let visible = false;
@@ -212,12 +215,13 @@ export const PostCard = memo(function PostCard({
   const total = p.votes.reduce((n, v) => n + v.count, 0),
     long = p.text.length > 220;
   return (
-    <article ref={article} className="post" id={'post-' + p.id}>
+    <article
+      ref={article}
+      className={'post' + (isChannel ? ' post--channel' : '')}
+      id={'post-' + p.id}
+    >
       <div className="post-avatar">
-        <button
-          onClick={() => onProfile(p.userId)}
-          aria-label={'Профиль ' + p.name}
-        >
+        <button onClick={() => onProfile(p.userId)} aria-label={authorLabel}>
           <Avatar person={p} />
         </button>
       </div>
@@ -225,20 +229,33 @@ export const PostCard = memo(function PostCard({
         {!!p.pinned && (
           <div className="pinned-label">
             <Pin size={11} />
-            Закреплено в профиле
+            {isChannel ? 'Закреплено в канале' : 'Закреплено в профиле'}
           </div>
         )}
         <div className="post-author">
-          <button className="author-button" onClick={() => onProfile(p.userId)}>
-            <DisplayName person={p} />
-          </button>
-
-          <ProfileLink target={{ id: p.userId }} className="meta handle">
-            @{p.handle}
-          </ProfileLink>
-
-          <span className="meta-dot" />
-          <Stamp time={p.created} compact />
+          <span className="post-author-name">
+            <button
+              className="author-button"
+              onClick={() => onProfile(p.userId)}
+              aria-label={authorLabel}
+              title={p.name}
+            >
+              <DisplayName person={p} />
+            </button>
+            {isChannel && (
+              <span className="post-channel-label" style={appearanceStyle(p)}>
+                <Megaphone size={13} aria-hidden="true" />
+                Канал
+              </span>
+            )}
+          </span>
+          <span className="post-author-meta">
+            <ProfileLink target={{ id: p.userId }} className="meta handle">
+              @{p.handle}
+            </ProfileLink>
+            <span className="meta-dot" />
+            <Stamp time={p.created} compact />
+          </span>
           <span className="grow" />
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -259,7 +276,13 @@ export const PostCard = memo(function PostCard({
                     onClick={() => onMenu(p, 'pin')}
                   >
                     <Pin size={15} />
-                    {p.pinned ? 'Открепить от профиля' : 'Закрепить в профиле'}
+                    {p.pinned
+                      ? isChannel
+                        ? 'Открепить от канала'
+                        : 'Открепить от профиля'
+                      : isChannel
+                        ? 'Закрепить в канале'
+                        : 'Закрепить в профиле'}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"

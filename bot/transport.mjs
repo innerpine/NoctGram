@@ -66,9 +66,13 @@ async function jsonPost(url, body, service, headers, signal, timeout = 15000) {
   return service === 'telegram' ? data.result : data;
 }
 export function telegramTransport(token, signal) {
-  // Deliberately no invoice, payment, broadcast or arbitrary-method interface.
+  // Explicit allowlist: paid digital goods use Telegram Stars only.
   const allowed = new Set([
     'getMe',
+    'sendInvoice',
+    'answerPreCheckoutQuery',
+    'getStarTransactions',
+    'refundStarPayment',
     'getWebhookInfo',
     'getUpdates',
     'sendMessage',

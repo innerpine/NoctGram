@@ -78,6 +78,11 @@ try {
   const admin = jar('account_qa_admin'),
     plain = jar(),
     mod = jar('mod_qa_admin');
+  assert.equal(
+    (await api(plain, '/api/auth/session')).sitesEnabled,
+    true,
+    'Start the isolated test Worker with --var NOCT_AUTH_MODE:hybrid for trusted Sites fixtures',
+  );
   await login(admin, `admin-${run}@example.test`, true);
   await login(plain, `person-${run}@example.test`);
   await auth(plain, 'onboarding', {

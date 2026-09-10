@@ -1,3 +1,4 @@
+import { readUpstreamJson } from './upstream-json';
 import { db } from './storage';
 import { ApiError } from './api-error';
 import { resolveSpotifyMetadata } from './spotify-metadata';
@@ -56,7 +57,7 @@ export async function resolveTrack(link: MusicLink): Promise<MusicTrack> {
       422,
       'SoundCloud не нашёл публичную запись по этой ссылке.',
     );
-  const info = (await response.json()) as {
+  const info = (await readUpstreamJson(response, 65536)) as {
     title?: unknown;
     author_name?: unknown;
     author_url?: unknown;

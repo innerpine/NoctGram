@@ -1,3 +1,4 @@
+import { premiumEmoji } from './premium-emoji';
 import type { AnimationItem, LottiePlayer } from 'lottie-web';
 import { giftRenderer, type GiftRenderer } from './gift-renderer';
 
@@ -47,7 +48,13 @@ function dataFor(id: string) {
     dataCache.set(id, cached);
     return cached;
   }
-  const promise: Promise<object> = fetch(`/assets/gifts/${id}.json`, {
+  const emoji = id.startsWith('emoji:')
+    ? premiumEmoji.find((e) => e.id === id.slice(6))
+    : null;
+  const asset = emoji
+    ? '/assets/emoji/' + emoji.id + '.json'
+    : '/assets/gifts/' + encodeURIComponent(id) + '.json';
+  const promise: Promise<object> = fetch(asset, {
     signal: AbortSignal.timeout(15000),
   })
     .then((response) => {

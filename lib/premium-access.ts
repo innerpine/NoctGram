@@ -1,9 +1,9 @@
-import { sqlNow } from './channel-access';
+import { entitlementActive } from './premium-predicate';
 import { activeBoosts, boostChannelActive, channelLevel } from './boost-access';
 import { boostRules } from './boost-rules';
 // Expressions are internal SQL fragments, never request values.
 export function premiumActive(user: string) {
-  return `EXISTS(SELECT 1 FROM premium_entitlements pe WHERE pe.userId=${user} AND pe.startsAt<=${sqlNow} AND pe.expiresAt>${sqlNow} AND pe.revokedAt=0)`;
+  return entitlementActive(user);
 }
 export function animatedAvatarActive(alias: string) {
   // This predicate is nested in media writes. Avoid the level CASE/MIN/CAST here

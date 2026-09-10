@@ -218,6 +218,34 @@
       "when": 1788949642213,
       "tag": "0030_imported_soundcloud_playlists",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1788979154246,
+      "tag": "0031_security_boundaries",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1788983706646,
+      "tag": "0032_chat_rooms",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1789063333566,
+      "tag": "0033_archive_commerce",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1789063481081,
+      "tag": "0034_payment_checkout_guards",
+      "breakpoints": true
     }
   ]
 }

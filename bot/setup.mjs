@@ -42,7 +42,7 @@ try {
       siteUrl,
     ),
     'NOCT_BOT_TEST_MODE',
-    '1',
+    values.NOCT_BOT_TEST_MODE === '1' ? '1' : '0',
   );
   appEnv = replace(
     replace(
@@ -51,7 +51,7 @@ try {
       me.username,
     ),
     'NOCT_BOT_TEST_MODE',
-    '1',
+    values.NOCT_BOT_TEST_MODE === '1' ? '1' : '0',
   );
   await writeFile(local, botEnv, { mode: 0o600 });
   await writeFile(website, appEnv, { mode: 0o600 });
@@ -59,7 +59,7 @@ try {
     commands: [
       { command: 'start', description: 'открыть noct stars' },
       { command: 'balance', description: 'твой баланс звёзд' },
-      { command: 'topup', description: 'тестовое пополнение без оплаты' },
+      { command: 'topup', description: 'купить Noct Stars' },
       { command: 'history', description: 'история пополнений' },
       { command: 'settings', description: 'оформление бота' },
       { command: 'help', description: 'как всё работает' },
@@ -67,10 +67,11 @@ try {
   });
   await telegram('setMyDescription', {
     description:
-      'noct stars · маленькие звёзды — большая поддержка\n\nпривяжи аккаунт noctgram, пополняй тестовый баланс и поддерживай авторов\n\nвсе пополнения без оплаты · telegram stars не списываются',
+      'NoctGram · Stars и Premium\n\nПривяжи аккаунт NoctGram, пополняй баланс Stars и подключай Premium на 30 дней. Оплата в боте — Telegram Stars. Помощь с покупками: /paysupport',
   });
   await telegram('setMyShortDescription', {
-    short_description: 'noct stars · тестовые звёзды для noctgram · без оплаты',
+    short_description:
+      'NoctGram · Noct Stars и Premium · оплата Telegram Stars',
   });
   console.log(
     `@${me.username} настроен. Секреты сохранены только в локальных .env. Перезапусти сайт, затем npm run dev:bot`,

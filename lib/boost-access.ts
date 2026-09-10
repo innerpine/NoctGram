@@ -1,3 +1,4 @@
+import { entitlementActive } from './premium-predicate';
 import { boostRules } from './boost-rules';
 const now = "(strftime('%s','now')*1000)";
 // Internal SQL expressions only; no request values are interpolated here.
@@ -12,9 +13,8 @@ export function boostChannelActive(alias: string) {
 }
 export function activeBoosts(channelId: string) {
   return `(SELECT COUNT(*) FROM channel_boost_slots bs JOIN users bu ON bu.id=bs.userId
-    JOIN premium_entitlements bp ON bp.userId=bu.id
     WHERE bs.channelId=${channelId} AND ${boostPersonActive('bu')}
-    AND bp.startsAt<=${now} AND bp.expiresAt>${now} AND bp.revokedAt=0)`;
+    AND ${entitlementActive('bu.id')})`;
 }
 export function channelLevel(alias: string) {
   return `(CASE WHEN ${boostChannelActive(alias)} THEN MIN(${boostRules.maxLevel},CAST(${activeBoosts(alias + '.id')}/${boostRules.perLevel} AS INTEGER)) ELSE 0 END)`;

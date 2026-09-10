@@ -1,3 +1,4 @@
+import { readUpstreamJson } from './upstream-json';
 import { ApiError } from './api-error';
 
 function networkFailure(error: unknown): ApiError {
@@ -76,7 +77,7 @@ export async function checkYandexConnection(request = fetch) {
     );
   let value: unknown;
   try {
-    value = await response.json();
+    value = await readUpstreamJson(response, 65536);
   } catch {
     /* A proxy/captive portal is not the API. */
   }

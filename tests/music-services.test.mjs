@@ -73,7 +73,10 @@ const result = await build({
       setup(builder) {
         builder.onResolve(
           { filter: /^\.\/(storage|auth-session|account-access)$/ },
-          (args) => ({ path: args.path, namespace: 'fixture' }),
+          (args) => ({
+            path: args.path,
+            namespace: 'fixture',
+          }),
         );
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, (args) => ({
           contents:
@@ -128,7 +131,9 @@ const envelope = await service.sealMusicToken(
 assert.ok(!envelope.includes('test secret'));
 assert.deepEqual(
   await service.openMusicToken(envelope, settings.MUSIC_TOKEN_KEY, 'alice'),
-  { value: 'test secret' },
+  {
+    value: 'test secret',
+  },
 );
 await assert.rejects(
   service.openMusicToken(envelope, settings.MUSIC_TOKEN_KEY, 'bob'),
@@ -349,6 +354,41 @@ try {
   );
   assert.equal(searched.length, 1);
   assert.equal(searched[0].durationMs, 107000);
+  // Exercise the actual connected-provider path: every search is charged before HTTP.
+  const budgetBefore = sqlite
+    .prepare(
+      "SELECT COALESCE(SUM(count),0) AS n FROM auth_limits WHERE key LIKE 'action:music-provider:%'",
+    )
+    .get().n;
+  const providerFetch = globalThis.fetch;
+  let burstRequests = 0;
+  globalThis.fetch = async (...args) => {
+    burstRequests++;
+    return providerFetch(...args);
+  };
+  try {
+    const burst = await Promise.allSettled(
+      Array.from({ length: 61 }, () =>
+        service.searchServiceTracks('alice', provider, 'vendetta'),
+      ),
+    );
+    const successes = burst.filter(
+      (result) => result.status === 'fulfilled',
+    ).length;
+    assert.equal(successes, 60 - budgetBefore);
+    assert.equal(burstRequests, successes);
+    assert.ok(
+      burst
+        .filter((result) => result.status === 'rejected')
+        .every((result) => result.reason.code === 'RATE_LIMIT'),
+    );
+  } finally {
+    globalThis.fetch = providerFetch;
+    sqlite.exec(
+      "DELETE FROM auth_limits WHERE key LIKE 'action:music-provider:%'",
+    );
+  }
+
   await assert.rejects(
     service.searchServiceTracks('bob', provider, 'vendetta'),
     (error) => error.code === 'MUSIC_NOT_CONNECTED',
@@ -369,7 +409,23 @@ try {
     (await service.servicePlaylists('alice', provider, '')).next,
     null,
   );
+  const pagesBefore = sqlite
+    .prepare(
+      "SELECT COALESCE(SUM(count),0) AS n FROM auth_limits WHERE key LIKE 'action:music-provider:%'",
+    )
+    .get().n;
   const copied = await service.importServicePlaylist('alice', provider, '1');
+  const pagesAfter = sqlite
+    .prepare(
+      "SELECT COALESCE(SUM(count),0) AS n FROM auth_limits WHERE key LIKE 'action:music-provider:%'",
+    )
+    .get().n;
+  assert.equal(
+    pagesAfter - pagesBefore,
+    3,
+    'playlist metadata and both imported pages each consume budget',
+  );
+
   assert.ok(copied.localPlaylistId);
   assert.equal(copied.importedTrackCount, 2);
   assert.equal(

@@ -1,3 +1,4 @@
+import { ensureWallet } from './star-wallet';
 import { db } from './storage';
 import { ApiError } from './api-error';
 import { setting, randomToken, tokenHash } from './auth-session';
@@ -30,16 +31,15 @@ function configuration() {
   const botUsername = setting('NOCT_BOT_USERNAME');
   return {
     enabled:
-      setting('NOCT_BOT_TEST_MODE') === '1' &&
       setting('NOCT_BOT_SECRET').length >= 32 &&
       /^[a-zA-Z][a-zA-Z0-9_]{1,28}bot$/i.test(botUsername),
-    testMode: true,
+    testMode: setting('NOCT_BOT_TEST_MODE') === '1',
     botUsername,
   };
 }
 function requireEnabled() {
   if (!configuration().enabled)
-    throw new ApiError(503, 'Тестовое пополнение сейчас отключено');
+    throw new ApiError(503, 'Бот сейчас недоступен');
 }
 function telegramId(value: unknown) {
   if (
@@ -214,11 +214,7 @@ async function linked(id: string) {
 }
 async function snapshot(link: Link) {
   const d = db();
-  await d
-    .prepare(`INSERT INTO star_transfers(id,recipient,amount,kind,created)
-    SELECT 'grant:'||t.userId,t.userId,10000,'grant',? FROM telegram_links t WHERE t.id=? AND t.telegramId=? AND t.userId=? AND ${activeUser} ON CONFLICT DO NOTHING`)
-    .bind(Date.now(), link.id, link.telegramId, link.userId)
-    .run();
+  await ensureWallet(link.userId);
   // One authorized snapshot: an unlink cannot race independent balance/history reads.
   const row = await d
     .prepare(`SELECT u.name,h.handle,
@@ -241,7 +237,7 @@ async function snapshot(link: Link) {
     );
   return {
     linked: true,
-    testMode: true,
+    testMode: setting('NOCT_BOT_TEST_MODE') === '1',
     dailyLimit,
     packages,
     profile: { name: row.name, handle: row.handle },
@@ -305,9 +301,14 @@ export async function botAction(b: Record<string, unknown>) {
       .bind(id)
       .first())
   )
-    return { linked: false, testMode: true };
+    return { linked: false, testMode: setting('NOCT_BOT_TEST_MODE') === '1' };
   const link = await linked(id);
   if (action === 'status') return snapshot(link);
+  if (
+    ['order', 'credit'].includes(action) &&
+    setting('NOCT_BOT_TEST_MODE') !== '1'
+  )
+    throw new ApiError(403, 'Тестовое пополнение отключено');
   if (action === 'order') {
     const key = string(b.key, 100);
     if (

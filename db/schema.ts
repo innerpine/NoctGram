@@ -881,6 +881,15 @@ export const calls = sqliteTable(
   (t) => [
     index('calls_caller').on(t.caller, t.created),
     index('calls_callee').on(t.callee, t.created),
+    index('calls_active_caller')
+      .on(t.caller, t.created)
+      .where(sql`${t.status}<>'ended'`),
+    index('calls_active_callee')
+      .on(t.callee, t.created)
+      .where(sql`${t.status}<>'ended'`),
+    index('calls_active_expiry')
+      .on(t.expiresAt)
+      .where(sql`${t.status}<>'ended'`),
   ],
 );
 export const callCancellations = sqliteTable(
@@ -1063,3 +1072,210 @@ export const telegramTopups = sqliteTable(
     index('telegram_topups_sender').on(t.telegramId, t.created),
   ],
 );
+
+// Groups and device-bound secret conversations have independent membership and
+// message storage. They never masquerade as users, channels, or direct messages.
+export const chatRooms = sqliteTable(
+  'chat_rooms',
+  {
+    id: text().primaryKey(),
+    kind: text().notNull().default('group'),
+    ownerId: text()
+      .notNull()
+      .references(() => users.id),
+    name: text().notNull(),
+    description: text().notNull().default(''),
+    avatar: text().notNull().default(''),
+    visibility: text().notNull().default('private'),
+    username: text(),
+    created: integer().notNull(),
+    updatedAt: integer().notNull(),
+    deletedAt: integer().notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex('chat_rooms_username').on(t.username),
+    index('chat_rooms_owner').on(t.ownerId, t.updatedAt),
+    check('chat_rooms_kind', sql`${t.kind} IN ('group','secret')`),
+    check(
+      'chat_rooms_visibility',
+      sql`${t.visibility} IN ('public','private')`,
+    ),
+    check(
+      'chat_rooms_secret_private',
+      sql`${t.kind} <> 'secret' OR (${t.visibility} = 'private' AND ${t.username} IS NULL AND ${t.description} = '' AND ${t.avatar} = '')`,
+    ),
+    check(
+      'chat_rooms_public_username',
+      sql`(${t.visibility} = 'public' AND ${t.username} IS NOT NULL) OR (${t.visibility} = 'private' AND ${t.username} IS NULL)`,
+    ),
+  ],
+);
+export const chatRoomMembers = sqliteTable(
+  'chat_room_members',
+  {
+    roomId: text()
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: text().notNull().default('member'),
+    status: text().notNull().default('active'),
+    publicKey: text().notNull().default(''),
+    joinedAt: integer().notNull(),
+    lastReadAt: integer().notNull().default(0),
+    lastReadId: text().notNull().default(''),
+    archivedAt: integer().notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.roomId, t.userId] }),
+    index('chat_room_members_user').on(t.userId, t.status),
+    uniqueIndex('chat_room_one_owner')
+      .on(t.roomId)
+      .where(sql`${t.role} = 'owner' AND ${t.status} = 'active'`),
+    check(
+      'chat_room_members_role',
+      sql`${t.role} IN ('owner','admin','member')`,
+    ),
+    check(
+      'chat_room_members_status',
+      sql`${t.status} IN ('active','left','banned')`,
+    ),
+  ],
+);
+export const chatRoomMessages = sqliteTable(
+  'chat_room_messages',
+  {
+    id: text().primaryKey(),
+    roomId: text()
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    sender: text()
+      .notNull()
+      .references(() => users.id),
+    text: text().notNull().default(''),
+    ciphertext: text(),
+    replyTo: text(),
+    created: integer().notNull(),
+    deletedAt: integer().notNull().default(0),
+  },
+  (t) => [
+    index('chat_room_messages_room').on(t.roomId, t.created, t.id),
+    check(
+      'chat_room_message_payload',
+      sql`${t.ciphertext} IS NULL OR (${t.text} = '' AND ${t.replyTo} IS NULL)`,
+    ),
+  ],
+);
+export const chatRoomInvites = sqliteTable('chat_room_invites', {
+  roomId: text()
+    .primaryKey()
+    .references(() => chatRooms.id, { onDelete: 'cascade' }),
+  tokenHash: text().notNull().unique(),
+  createdBy: text()
+    .notNull()
+    .references(() => users.id),
+  created: integer().notNull(),
+});
+
+export const directChatArchives = sqliteTable(
+  'direct_chat_archives',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    peerId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    archivedAt: integer().notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.peerId] })],
+);
+
+export const paymentOrders = sqliteTable(
+  'payment_orders',
+  {
+    id: text().primaryKey(),
+    requestKey: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    telegramId: text(),
+    linkId: text(),
+    sku: text().notNull(),
+    product: text().notNull(),
+    units: integer().notNull(),
+    provider: text().notNull(),
+    currency: text().notNull(),
+    amountMinor: integer().notNull(),
+    providerInvoiceId: text(),
+    checkoutUrl: text(),
+    primaryReceipt: text(),
+    created: integer().notNull(),
+    expiresAt: integer().notNull(),
+    fulfilledAt: integer(),
+    reversedAt: integer(),
+    reviewReason: text().notNull().default(''),
+    checkedAt: integer().notNull().default(0),
+    precheckoutId: text(),
+  },
+  (t) => [
+    uniqueIndex('payment_order_request').on(t.userId, t.requestKey),
+    uniqueIndex('payment_provider_invoice').on(t.provider, t.providerInvoiceId),
+    index('payment_pending').on(t.provider, t.fulfilledAt, t.created),
+    check(
+      'payment_product',
+      sql`${t.product} IN ('stars','premium') AND ${t.units}>0 AND (${t.product}<>'premium' OR ${t.units}=30)`,
+    ),
+    check(
+      'payment_provider_currency',
+      sql`(${t.provider}='telegram' AND ${t.currency}='XTR' AND ${t.telegramId} IS NOT NULL) OR (${t.provider}='crypto' AND ${t.currency}='RUB')`,
+    ),
+    check('payment_amount', sql`${t.amountMinor}>0`),
+  ],
+);
+export const paymentReceipts = sqliteTable(
+  'payment_receipts',
+  {
+    id: text().primaryKey(),
+    provider: text().notNull(),
+    chargeId: text().notNull(),
+    orderId: text()
+      .notNull()
+      .references(() => paymentOrders.id),
+    currency: text().notNull(),
+    amountMinor: integer().notNull(),
+    payerId: text().notNull().default(''),
+    verifiedAt: integer().notNull(),
+    paidAt: integer(),
+    refundedAt: integer(),
+  },
+  (t) => [
+    uniqueIndex('payment_provider_receipt').on(t.provider, t.chargeId),
+    index('payment_receipt_order').on(t.orderId),
+  ],
+);
+export const premiumPurchases = sqliteTable(
+  'premium_purchases',
+  {
+    orderId: text()
+      .primaryKey()
+      .references(() => paymentOrders.id),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    startsAt: integer().notNull(),
+    expiresAt: integer().notNull(),
+    revokedAt: integer().notNull().default(0),
+    created: integer().notNull(),
+  },
+  (t) => [
+    index('premium_purchases_user').on(t.userId, t.revokedAt, t.expiresAt),
+  ],
+);
+export const paymentSupport = sqliteTable('payment_support', {
+  id: text().primaryKey(),
+  telegramId: text().notNull(),
+  text: text().notNull(),
+  created: integer().notNull(),
+});

@@ -1,3 +1,4 @@
+import { readUpstreamJson } from './upstream-json';
 import { ApiError } from './api-error';
 import { parseMusicLink, type MusicTrack } from './music-links';
 
@@ -23,7 +24,10 @@ export async function resolveYouTubeMetadata(url: string): Promise<MusicTrack> {
       422,
       'Видео недоступно или автор запретил встраивание. Попробуйте другую ссылку.',
     );
-  const info = (await response.json()) as Record<string, unknown>;
+  const info = (await readUpstreamJson(response, 65536)) as Record<
+    string,
+    unknown
+  >;
   if (typeof info.title !== 'string' || typeof info.author_name !== 'string')
     throw new ApiError(502, 'Не удалось получить название видео YouTube.');
   const id = new URL(link.url).searchParams.get('v')!;

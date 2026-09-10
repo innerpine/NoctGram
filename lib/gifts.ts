@@ -4,6 +4,7 @@ import { visibleAccount } from './account-access';
 import { messageAllowed } from './privacy';
 import { balance, ensureWallet } from './star-wallet';
 import { availableGiftDefinition, type ReceivedGift } from './gift-catalog';
+import { rateLimit, socialRateLimit } from './rate-limit';
 
 const treasury = 'noctgram_gifts';
 function text(input: unknown, max: number, required = true) {
@@ -40,6 +41,12 @@ export async function sendGift(
       409,
       'Этот запрос уже использован. Выбери подарок заново.',
     );
+  // A gift creates a chat message. Retries of a committed receipt create none.
+  if (!existing) {
+    await socialRateLimit(me, 'message');
+    await rateLimit('gifts', me, 10, 60);
+    await rateLimit('gift-recipient', JSON.stringify([me, recipient]), 5, 60);
+  }
   await ensureWallet(me);
   await db().batch([
     db()

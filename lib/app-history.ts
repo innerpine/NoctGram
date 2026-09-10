@@ -21,6 +21,9 @@ export type AppRoute = {
   profileId?: string;
   handle?: string;
   peerId?: string;
+  roomId?: string;
+  group?: string;
+  invite?: string;
   profileTab?: string;
   musicTab?: string;
   mode?: string;
@@ -43,7 +46,16 @@ export function normalizeAppRoute(input: AppRoute): AppRoute {
         ? input.profileTab
         : 'posts',
     };
-  if (page === 'messages') return { page, peerId: text(input.peerId) };
+  if (page === 'messages') {
+    if (input.roomId) return { page, roomId: text(input.roomId) };
+    if (input.group)
+      return {
+        page,
+        group: text(input.group, 24).replace(/^@/, '').toLowerCase(),
+      };
+    if (input.invite) return { page, invite: text(input.invite, 128) };
+    return { page, peerId: text(input.peerId) };
+  }
   if (page === 'music')
     return {
       page,
@@ -79,6 +91,13 @@ export function appRouteFromURL(href: string, owner: string): AppRoute {
       profileTab:
         params.get('gifts') === '1' ? 'gifts' : params.get('tab') || 'posts',
     });
+  if (params.has('room') || params.has('group') || params.has('invite'))
+    return normalizeAppRoute({
+      page: 'messages',
+      roomId: params.get('room') || '',
+      group: params.get('group') || '',
+      invite: params.get('invite') || '',
+    });
   if (params.has('chat'))
     return normalizeAppRoute({
       page: 'messages',
@@ -110,7 +129,10 @@ export function appRouteHref(input: AppRoute) {
     else params.set('page', 'profile');
     if (route.profileTab !== 'posts') params.set('tab', route.profileTab!);
   } else if (route.page === 'messages') {
-    if (route.peerId) params.set('chat', route.peerId);
+    if (route.roomId) params.set('room', route.roomId);
+    else if (route.group) params.set('group', route.group);
+    else if (route.invite) params.set('invite', route.invite);
+    else if (route.peerId) params.set('chat', route.peerId);
     else params.set('page', 'messages');
   } else if (route.page === 'music') {
     path = '/music';
@@ -256,7 +278,7 @@ export function createAppHistory(
   const ready = transition(initialRoute, 'replace', true);
   return {
     ready,
-    navigate(route: AppRoute) {
+    navigate(route: AppRoute, navigation: { replace?: boolean } = {}) {
       if (disposed) return Promise.resolve(false);
       if (appRouteKey(route) === appRouteKey(active)) {
         if (pending) {
@@ -266,7 +288,7 @@ export function createAppHistory(
         }
         return Promise.resolve(true);
       }
-      return transition(route, 'push');
+      return transition(route, navigation.replace ? 'replace' : 'push');
     },
     cancelPending,
     observe(input: AppRoute) {

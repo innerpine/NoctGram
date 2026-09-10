@@ -1,4 +1,17 @@
 'use client';
+import { EmojiPicker, EmojiPreview } from './premium-emoji';
+import { emojiFallback } from '@/lib/premium-emoji';
+import { ArchiveRow, ArchiveFolderButton } from './chat-archive';
+import {
+  ChatCreateMenu,
+  CreateGroupDialog,
+  SelectSecretPeerDialog,
+} from './chat-create-menu';
+import { RoomConversation } from './room-conversation';
+import { useRoomList, RoomThreadRow, PublicRoomSearch } from './room-list';
+import { roomAction, type RoomTarget } from '@/lib/rooms-client';
+import type { RoomDetail } from '@/lib/rooms-types';
+import { ensureKey } from '@/lib/secret-crypto';
 import { AccountPanel } from './account-panel';
 import { VerifiedProfile } from './profile-identity';
 import { ChannelBoosts } from './channel-boosts';
@@ -216,6 +229,7 @@ export default function Noctgram({
     [editId, setEditId] = useState(''),
     [editHandle, setEditHandle] = useState(''),
     [editAliases, setEditAliases] = useState<string[]>([]);
+  const [chatFolder, setChatFolder] = useState<'active' | 'archive'>('active');
   const [threads, setThreads] = useState<Person[]>([]),
     [threadUnread, setThreadUnread] = useState(0),
     [peer, setPeer] = useState<Person | null>(null),
@@ -223,6 +237,65 @@ export default function Noctgram({
     [messageText, setMessageText] = useState(''),
     [peopleQuery, setPeopleQuery] = useState(''),
     [found, setFound] = useState<Person[]>([]);
+  const [roomTarget, setRoomTarget] = useState<RoomTarget | null>(null);
+  const [roomCreation, setRoomCreation] = useState('');
+  const [creationOwner, setCreationOwner] = useState('');
+  const roomAttempt = useRef<{
+    owner: string;
+    key: string;
+    body: Record<string, unknown>;
+  } | null>(null);
+  const beginRoomCreation = (kind: string) => {
+    if (!me) return;
+    roomAttempt.current = null;
+    setCreationOwner(me.id);
+    setFound([]);
+    setPeopleError('');
+    setPeopleQuery('');
+    setRoomCreation(kind);
+  };
+  const createRoomWithRetry = async (body: Record<string, unknown>) => {
+    if (!me) throw new Error('Войдите в аккаунт');
+    if (!roomAttempt.current || roomAttempt.current.owner !== me.id)
+      roomAttempt.current = { owner: me.id, key: crypto.randomUUID(), body };
+    const attempt = roomAttempt.current;
+    try {
+      return await roomAction<RoomDetail>({
+        ...attempt.body,
+        actor: attempt.owner,
+        key: attempt.key,
+      });
+    } catch (error) {
+      const status = Number((error as { status?: number }).status);
+      if (status >= 400 && status < 500 && roomAttempt.current === attempt)
+        roomAttempt.current = null;
+      throw error;
+    }
+  };
+  const [peopleLoading, setPeopleLoading] = useState(false),
+    [peopleError, setPeopleError] = useState(''),
+    [peopleRetry, setPeopleRetry] = useState(0);
+  const roomOwner = useRef(me?.id);
+  roomOwner.current = me?.id;
+  const roomList = useRoomList(
+    me?.restriction?.mode === 'blocked' ? '' : me?.id || '',
+    page === 'messages',
+  );
+  const openRoom = useCallback((id: string) => {
+    void appHistory.current?.navigate({ page: 'messages', roomId: id });
+  }, []);
+  const resolveRoomLink = useCallback((id: string) => {
+    void appHistory.current?.navigate(
+      { page: 'messages', roomId: id },
+      { replace: true },
+    );
+  }, []);
+  const openPublicGroup = useCallback((group: string) => {
+    void appHistory.current?.navigate({ page: 'messages', group });
+  }, []);
+  const backFromRoom = useCallback(() => {
+    void appHistory.current?.navigate({ page: 'messages' });
+  }, []);
   const [chatAppearance, setChatAppearance] = useState<{
     viewer: string;
     peer: string;
@@ -409,6 +482,8 @@ export default function Noctgram({
       current?.id === next.id ? reconcileSnapshot(current, next) : current,
     );
     if (next.restriction?.mode === 'blocked') {
+      setRoomTarget(null);
+      setRoomCreation('');
       setPosts([]);
       setThreads([]);
       setThreadUnread(0);
@@ -702,9 +777,25 @@ export default function Noctgram({
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [setPage]);
+  const threadsOwner = useRef(myId),
+    threadsRevision = useRef(0);
+  threadsOwner.current = accountBlocked ? undefined : myId;
   const loadThreads = useCallback(async () => {
     if (myId && !accountBlocked) {
-      const next = await request<Person[]>('?action=threads');
+      const revision = ++threadsRevision.current;
+      const pages = await Promise.all(
+        ['0', '1'].map((folder) =>
+          request<Person[]>(
+            '?action=threads&archived=' +
+              folder +
+              '&actor=' +
+              encodeURIComponent(myId),
+          ),
+        ),
+      );
+      if (threadsOwner.current !== myId || revision !== threadsRevision.current)
+        return;
+      const next = [...new Map(pages.flat().map((t) => [t.id, t])).values()];
       setThreads((previous) => reconcileSnapshot(previous, next));
       setThreadUnread(
         next.reduce((sum, thread) => sum + (thread.unread || 0), 0),
@@ -815,28 +906,53 @@ export default function Noctgram({
     };
   }, [peer, page, loadMessages, accountBlocked, notify]);
   useEffect(() => {
-    if (modal !== 'people' || !me) return;
+    if (
+      (modal !== 'people' && !(roomCreation && creationOwner === me?.id)) ||
+      !me
+    )
+      return;
+    setPeopleLoading(true);
+    setPeopleError('');
+    setFound([]);
     let active = true;
     const t = setTimeout(
       () =>
         request<Person[]>('?action=people&q=' + encodeURIComponent(peopleQuery))
           .then((r) => {
-            if (active) setFound(r);
+            if (active) {
+              setFound(r);
+              setPeopleLoading(false);
+            }
           })
-          .catch((e) => notify(e.message)),
+          .catch((e) => {
+            if (active) {
+              setPeopleLoading(false);
+              setPeopleError(e.message);
+              if (!roomCreation) notify(e.message);
+            }
+          }),
       200,
     );
     return () => {
       active = false;
       clearTimeout(t);
     };
-  }, [peopleQuery, modal, me, notify]);
+  }, [
+    peopleQuery,
+    modal,
+    me,
+    notify,
+    roomCreation,
+    peopleRetry,
+    creationOwner,
+  ]);
   const route: AppRoute = {
     page,
     musicTab,
     profileId: profile?.id,
     profileTab,
-    peerId: peer?.id,
+    peerId: roomTarget && page === 'messages' ? undefined : peer?.id,
+    ...(page === 'messages' && roomTarget ? roomTarget : {}),
     mode,
     query,
     ...(page === 'profile' && boostOpen?.open && boostOpen.id === profile?.id
@@ -950,6 +1066,16 @@ export default function Noctgram({
       return {
         route: destination,
         commit: () => {
+          setRoomTarget(
+            destination.page === 'messages' &&
+              (destination.roomId || destination.group || destination.invite)
+              ? {
+                  ...(destination.roomId ? { roomId: destination.roomId } : {}),
+                  ...(destination.group ? { group: destination.group } : {}),
+                  ...(destination.invite ? { invite: destination.invite } : {}),
+                }
+              : null,
+          );
           if (destination.page === 'profile' && destination.boost && person)
             setBoostOpen({ id: person.id, revision: Date.now(), open: true });
           else
@@ -1022,11 +1148,12 @@ export default function Noctgram({
       musicTab,
       profileId: viewedId,
       profileTab,
-      peerId: peer?.id,
+      peerId: roomTarget && page === 'messages' ? undefined : peer?.id,
+      ...(page === 'messages' && roomTarget ? roomTarget : {}),
       mode,
       query,
     });
-  }, [page, viewedId, profileTab, peer?.id, mode, query, musicTab]);
+  }, [page, viewedId, profileTab, peer?.id, mode, query, musicTab, roomTarget]);
   const profileView = page === 'profile' ? viewedId : '';
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -1514,7 +1641,15 @@ export default function Noctgram({
           <small className="meta">Время на этом устройстве</small>
         </div>
       )}
+      <EmojiPreview text={draft} />
       <div className="toolbar">
+        <EmojiPicker
+          premium={!!me?.premium}
+          text={draft}
+          onText={setDraft}
+          field={draftRef}
+          disabled={uploading}
+        />
         <button
           title="Отложить публикацию"
           aria-label="Отложить публикацию"
@@ -1689,7 +1824,31 @@ export default function Noctgram({
         : page === 'saved'
           ? displayPosts.filter((p) => p.saved)
           : displayPosts;
-  const unread = threadUnread;
+  const unread =
+    threadUnread + roomList.rooms.reduce((sum, room) => sum + room.unread, 0);
+  const dialogs = [
+    ...threads.map((person) => ({
+      type: 'person' as const,
+      person,
+      time: person.lastTime || 0,
+    })),
+    ...roomList.rooms.map((room) => ({
+      type: 'room' as const,
+      room,
+      time: room.lastMessage?.created || room.updatedAt,
+    })),
+  ].sort((a, b) => b.time - a.time);
+  const archivedDialogs = dialogs.filter((d) =>
+    d.type === 'room' ? d.room.archivedAt : d.person.archivedAt,
+  );
+  const visibleDialogs = dialogs.filter(
+    (d) =>
+      Boolean(d.type === 'room' ? d.room.archivedAt : d.person.archivedAt) ===
+      (chatFolder === 'archive'),
+  );
+  const archiveDone = async () => {
+    await Promise.all([loadThreads(), roomList.refresh()]);
+  };
   const online = !!profile?.lastSeen && Date.now() - profile.lastSeen < 120000;
   if (accountBlocked && me)
     return (
@@ -2045,7 +2204,7 @@ export default function Noctgram({
                     setQuery(e.target.value);
                   }}
                   aria-label="Поиск в ленте"
-                  placeholder="Публикации, темы, люди"
+                  placeholder="Публикации, люди, группы"
                 />
                 {query && (
                   <button
@@ -2073,6 +2232,13 @@ export default function Noctgram({
               </button>
             </div>
           </div>
+        )}
+        {page === 'search' && me && (
+          <PublicRoomSearch
+            query={query}
+            owner={me.id}
+            onOpen={openPublicGroup}
+          />
         )}
         {page === 'profile' && profile && !profile.blocked && (
           <>
@@ -2512,11 +2678,24 @@ export default function Noctgram({
             </div>
           )}
         {page === 'messages' && (
-          <div className={'messenger ' + (peer ? 'peer-open' : '')}>
+          <div
+            className={'messenger ' + (peer || roomTarget ? 'peer-open' : '')}
+          >
             <section className="threads-panel">
               <div className="threads-heading">
-                <span>Все диалоги</span>
+                <span>
+                  {chatFolder === 'archive' ? 'Архив' : 'Все диалоги'}
+                </span>
                 <span className="grow" />
+                <ChatCreateMenu
+                  disabled={!me || readOnly || accountBlocked}
+                  onCreateGroup={() => {
+                    beginRoomCreation('group');
+                  }}
+                  onCreateSecret={() => {
+                    beginRoomCreation('secret');
+                  }}
+                />
                 <button
                   className="icon-button"
                   aria-label="Новый диалог"
@@ -2528,37 +2707,95 @@ export default function Noctgram({
                   <Pencil size={16} />
                 </button>
               </div>
-              {threads.map((t) => (
-                <button
-                  type="button"
-                  key={t.id}
-                  className={
-                    'thread-row ' + (peer?.id === t.id ? 'active' : '')
-                  }
-                  aria-label={'Открыть диалог с ' + t.name}
-                  aria-busy={openingChat === t.id}
-                  onClick={() => openChat(t)}
-                >
-                  <Avatar person={t} size={38} />
-                  <span className="thread-copy">
-                    <strong>
-                      <DisplayName person={t} />
-                    </strong>
-                    <small>{t.lastText || 'Открыть диалог'}</small>
-                  </span>
-                  {openingChat === t.id && (
-                    <LoaderCircle
-                      size={16}
-                      className="spin"
-                      aria-hidden="true"
-                    />
-                  )}
-                  {!!t.unread && <span className="unread">{t.unread}</span>}
-                </button>
-              ))}
-              {!threads.length && (
+              <ArchiveFolderButton
+                archived={chatFolder === 'archive'}
+                count={archivedDialogs.length}
+                unread={archivedDialogs.reduce(
+                  (n, d) =>
+                    n +
+                    (d.type === 'room' ? d.room.unread : d.person.unread || 0),
+                  0,
+                )}
+                onClick={() =>
+                  setChatFolder(chatFolder === 'archive' ? 'active' : 'archive')
+                }
+              />
+              {roomList.error && (
+                <div className="room-error" role="alert">
+                  {roomList.error}
+                  <button
+                    className="text-button"
+                    onClick={() => void roomList.refresh()}
+                  >
+                    Повторить
+                  </button>
+                </div>
+              )}
+              {visibleDialogs.map((dialog) => {
+                if (dialog.type === 'room')
+                  return (
+                    <ArchiveRow
+                      key={myId + ':room:' + dialog.room.id}
+                      owner={myId || ''}
+                      id={dialog.room.id}
+                      kind="room"
+                      archived={!!dialog.room.archivedAt}
+                      onDone={archiveDone}
+                    >
+                      <RoomThreadRow
+                        room={dialog.room}
+                        active={roomTarget?.roomId === dialog.room.id}
+                        onOpen={() => openRoom(dialog.room.id)}
+                      />
+                    </ArchiveRow>
+                  );
+                const t = dialog.person;
+                return (
+                  <ArchiveRow
+                    key={myId + ':' + t.id}
+                    owner={myId || ''}
+                    id={t.id}
+                    kind="person"
+                    archived={!!t.archivedAt}
+                    onDone={archiveDone}
+                  >
+                    <button
+                      type="button"
+                      className={
+                        'thread-row ' + (peer?.id === t.id ? 'active' : '')
+                      }
+                      aria-label={'Открыть диалог с ' + t.name}
+                      aria-busy={openingChat === t.id}
+                      onClick={() => openChat(t)}
+                    >
+                      <Avatar person={t} size={38} />
+                      <span className="thread-copy">
+                        <strong>
+                          <DisplayName person={t} />
+                        </strong>
+                        <small>
+                          {emojiFallback(t.lastText || 'Открыть диалог')}
+                        </small>
+                      </span>
+                      {openingChat === t.id && (
+                        <LoaderCircle
+                          size={16}
+                          className="spin"
+                          aria-hidden="true"
+                        />
+                      )}
+                      {!!t.unread && <span className="unread">{t.unread}</span>}
+                    </button>
+                  </ArchiveRow>
+                );
+              })}
+              {!visibleDialogs.length && (
                 <Empty>
-                  <p>Найди человека по юзернейму и начни разговор.</p>
+                  <p>
+                    {chatFolder === 'archive'
+                      ? 'Здесь появятся диалоги, которые ты перенесёшь в архив.'
+                      : 'Найди человека по юзернейму и начни разговор.'}
+                  </p>
                   <button
                     className="secondary"
                     onClick={() => setModal('people')}
@@ -2578,7 +2815,18 @@ export default function Noctgram({
                   : undefined
               }
             >
-              {peer && me ? (
+              {roomTarget && me ? (
+                <RoomConversation
+                  key={me.id + JSON.stringify(roomTarget)}
+                  target={roomTarget}
+                  me={me}
+                  disabled={readOnly || accountBlocked}
+                  onOpen={resolveRoomLink}
+                  onBack={backFromRoom}
+                  onProfile={(id) => void openProfile(id)}
+                  onRoomsChanged={roomList.refresh}
+                />
+              ) : peer && me ? (
                 <>
                   <div className="chat-header">
                     <button
@@ -2835,6 +3083,82 @@ export default function Noctgram({
           </div>
         </aside>
       )}
+      <CreateGroupDialog
+        key={'create-group:' + (me?.id || '')}
+        open={creationOwner === me?.id && roomCreation === 'group'}
+        onOpenChange={(open) => {
+          if (!open) setRoomCreation('');
+        }}
+        people={found}
+        ownerId={me?.id || ''}
+        peopleLoading={peopleLoading}
+        peopleError={peopleError}
+        onQueryChange={setPeopleQuery}
+        onRetryPeople={() => setPeopleRetry((value) => value + 1)}
+        onSubmit={async (input) => {
+          if (!me) throw new Error('Войдите в аккаунт');
+          const owner = me.id;
+          const data = await createRoomWithRetry({
+            action: 'create',
+            actor: owner,
+            kind: 'group',
+            ...input,
+          });
+          if (roomOwner.current !== owner) return;
+          openRoom(data.id);
+          void roomList.refresh();
+        }}
+      />
+      <SelectSecretPeerDialog
+        key={'create-secret:' + (me?.id || '')}
+        open={creationOwner === me?.id && roomCreation === 'secret'}
+        onOpenChange={(open) => {
+          if (!open) setRoomCreation('');
+        }}
+        people={found}
+        ownerId={me?.id || ''}
+        peopleLoading={peopleLoading}
+        peopleError={peopleError}
+        onQueryChange={setPeopleQuery}
+        onRetryPeople={() => setPeopleRetry((value) => value + 1)}
+        onSubmit={async (person) => {
+          if (!me) throw new Error('Войдите в аккаунт');
+          const owner = me.id;
+          const data = await createRoomWithRetry({
+            action: 'create',
+            actor: owner,
+            kind: 'secret',
+            peerId: person.id,
+          });
+          if (roomOwner.current !== owner) return;
+          try {
+            const key = await ensureKey(
+              owner,
+              data.id,
+              data.members.find((member) => member.userId === owner)
+                ?.publicKey || null,
+            );
+            if (roomOwner.current !== owner) return;
+            await roomAction({
+              action: 'acceptSecret',
+              actor: owner,
+              id: data.id,
+              publicKey: key.publicKey,
+            });
+          } catch (error) {
+            if (roomOwner.current === owner)
+              notify(
+                error instanceof Error
+                  ? error.message
+                  : 'Подключите устройство в секретном чате',
+              );
+          }
+          if (roomOwner.current === owner) {
+            openRoom(data.id);
+            void roomList.refresh();
+          }
+        }}
+      />
       <Dialog
         open={modalOpen}
         onOpenChangeComplete={(open) => {

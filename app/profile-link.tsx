@@ -1,4 +1,5 @@
 'use client';
+import { EmojiText } from './premium-emoji';
 import { useContext, type ComponentProps } from 'react';
 import {
   PROFILE_NAVIGATE,
@@ -64,7 +65,7 @@ export function MentionText({ text }: { text: string }) {
             {part.text}
           </ProfileLink>
         ) : (
-          part.text
+          <EmojiText key={index} text={part.text} />
         ),
       )}
     </>

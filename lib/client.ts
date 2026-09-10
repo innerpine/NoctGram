@@ -7,6 +7,7 @@ export type Person = Appearance & {
   avatar: string;
   handle: string;
   followed?: number;
+  archivedAt?: number;
   lastText?: string;
   lastTime?: number;
   unread?: number;

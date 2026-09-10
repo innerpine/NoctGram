@@ -27,6 +27,14 @@ try {
       {
         name: 'profile-link-events',
         setup(build) {
+          build.onResolve({ filter: /^\.\/premium-emoji$/ }, () => ({
+            path: 'emoji',
+            namespace: 'fixture-emoji',
+          }));
+          build.onLoad({ filter: /.*/, namespace: 'fixture-emoji' }, () => ({
+            contents:
+              'export const EmojiPicker=()=>null,EmojiPreview=()=>null,EmojiText=({text})=>text;',
+          }));
           build.onResolve(
             { filter: /^react(?:\/jsx-runtime)?$/ },
             ({ path }) => ({ path, namespace: 'fixture' }),

@@ -27,9 +27,9 @@ export async function premiumGet(
     .first();
   const entitlement = await db()
     .prepare(
-      'SELECT expiresAt,source,revokedAt FROM premium_entitlements WHERE userId=?',
+      `SELECT MAX(expiresAt) AS expiresAt FROM (SELECT expiresAt FROM premium_entitlements WHERE userId=? AND revokedAt=0 ${setting('NOCT_PREMIUM_TEST_MODE') === '1' ? '' : "AND source<>'test'"} UNION ALL SELECT expiresAt FROM premium_purchases WHERE userId=? AND revokedAt=0)`,
     )
-    .bind(me)
+    .bind(me, me)
     .first();
   return Response.json({
     ...state,

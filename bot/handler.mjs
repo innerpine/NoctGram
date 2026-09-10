@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { RemoteError } from './transport.mjs';
 import { screen, num } from './screens.mjs';
+import { handlePaymentUpdate, handleShop } from './payments.mjs';
 export class NoctBot {
   constructor({
     telegram,
@@ -120,7 +121,7 @@ export class NoctBot {
     const key = 'chat:' + chatId,
       preferences = this.store.get(key) || {};
     if (!preferences.pinned) return;
-    const text = `noct stars · ${state.linked ? num(state.balance) + ' звёзд' : 'аккаунт не привязан'} · тест`;
+    const text = `noct stars · ${state.linked ? num(state.balance) + ' звёзд' : 'аккаунт не привязан'}${state.testMode ? ' · тест' : ''}`;
     if (preferences.statusText === text && preferences.statusPinned) return;
     if (preferences.statusMessageId) {
       try {
@@ -170,6 +171,7 @@ export class NoctBot {
     });
   }
   async handle(update) {
+    if (await handlePaymentUpdate(this, update)) return;
     const callback = update.callback_query,
       message = callback?.message || update.message;
     const user = callback?.from || message?.from;
@@ -200,8 +202,6 @@ export class NoctBot {
       : { commandUpdateId: update.update_id };
     const render = (name, state, extra = {}) =>
       this.render(chatId, name, state, { ...extra, delivery });
-    // A bot cannot prove an inbound transaction. This runtime never handles money.
-    if (message.successful_payment || message.refunded_payment) return;
     try {
       const start = text.match(
         /^\/start(?:@[a-z0-9_]+)?\s+link_([a-f0-9]{32})$/i,
@@ -227,6 +227,10 @@ export class NoctBot {
         return;
       }
       const state = await this.site({ action: 'status', telegramId });
+      if (await handleShop(this, update, state)) {
+        await this.statusLine(chatId, state);
+        return;
+      }
       if (data.startsWith('toggle:')) {
         const option = data.slice(7);
         if (

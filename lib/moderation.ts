@@ -1,6 +1,14 @@
 import { appearanceColumns } from '@/lib/premium-access';
 import { db, profile, clean, ApiError } from './server';
-import { restriction, requireModerator, isModerator } from './account-access';
+import { accountExport } from './account-export';
+import { groupRoomExportSections } from './rooms';
+import { rateLimit } from './rate-limit';
+import {
+  restriction,
+  requireModerator,
+  isModerator,
+  moderatorWriteAllowed,
+} from './account-access';
 import {
   contentModerationGet,
   contentModerationPost,
@@ -15,29 +23,44 @@ export async function moderationGet(
   if (contentResult) return contentResult;
   if (action === 'account') return Response.json(await profile(me, me));
   if (action === 'exportAccount') {
+    await rateLimit('account-export', me, 2, 60);
     const user = await profile(me, me);
     const queries = [
       [
         'posts',
-        'SELECT p.* FROM posts p JOIN users u ON u.id=p.userId WHERE u.id=? OR u.ownerId=?',
+        'SELECT p.* FROM posts p JOIN users u ON u.id=p.userId WHERE (u.id=? OR u.ownerId=?) AND p.id>? ORDER BY p.id LIMIT 100',
         [me, me],
+        'id',
       ],
-      ['comments', 'SELECT * FROM comments WHERE userId=?', [me]],
+      [
+        'comments',
+        'SELECT * FROM comments WHERE userId=? AND id>? ORDER BY id LIMIT 100',
+        [me],
+        'id',
+      ],
       [
         'messages',
-        'SELECT * FROM messages WHERE sender=? OR recipient=?',
+        'SELECT * FROM messages WHERE (sender=? OR recipient=?) AND deletedAt=0 AND id>? ORDER BY id LIMIT 100',
         [me, me],
+        'id',
       ],
-      ['following', 'SELECT following FROM follows WHERE follower=?', [me]],
+      [
+        'following',
+        'SELECT following FROM follows WHERE follower=? AND following>? ORDER BY following LIMIT 100',
+        [me],
+        'following',
+      ],
       [
         'uploads',
-        'SELECT id,type,name,created FROM uploads WHERE userId=?',
+        'SELECT id,type,name,created FROM uploads WHERE userId=? AND id>? ORDER BY id LIMIT 100',
         [me],
+        'id',
       ],
       [
         'stars',
-        'SELECT * FROM star_transfers WHERE sender=? OR recipient=?',
+        'SELECT * FROM star_transfers WHERE (sender=? OR recipient=?) AND id>? ORDER BY id LIMIT 100',
         [me, me],
+        'id',
       ],
     ] as const;
     const data: Record<string, unknown> = {
@@ -45,19 +68,27 @@ export async function moderationGet(
       profile: user,
       format: 'JSON: тексты и сведения о файлах; сами медиа не включены.',
     };
-    for (const [key, sql, args] of queries)
-      data[key] = (
-        await d
-          .prepare(sql)
-          .bind(...args)
-          .all()
-      ).results;
-    return Response.json(data, {
-      headers: {
-        'Content-Disposition': 'attachment; filename="noctgram-account.json"',
-        'Cache-Control': 'no-store',
-      },
-    });
+    return accountExport(data, [
+      ...queries.map(([name, sql, args, cursor]) => ({
+        name,
+        async page(after: string) {
+          const rows = (
+            await d
+              .prepare(sql)
+              .bind(...args, after)
+              .all<Record<string, unknown>>()
+          ).results;
+          return {
+            rows,
+            next:
+              rows.length === 100
+                ? String(rows[rows.length - 1][cursor])
+                : null,
+          };
+        },
+      })),
+      ...groupRoomExportSections(me),
+    ]);
   }
   if (
     ![
@@ -156,6 +187,7 @@ export async function moderationPost(
   }
   if (!['moderate', 'reviewAppeal'].includes(action)) return null;
   await requireModerator(me);
+  const writeAllowed = `${moderatorWriteAllowed('?')} AND NOT EXISTS(SELECT 1 FROM moderators WHERE userId=? UNION SELECT 1 FROM administrators WHERE userId=?)`;
   if (action === 'reviewAppeal') {
     const id = clean(b.id, 100, true),
       note = clean(b.note, 1000, true);
@@ -177,9 +209,21 @@ export async function moderationPost(
       statements.push(
         d
           .prepare(
-            "INSERT INTO moderation_events(id,userId,moderatorId,mode,reason,created) SELECT ?,?,?,'active',?,? WHERE EXISTS(SELECT 1 FROM account_restrictions WHERE userId=? AND eventId=?) AND EXISTS(SELECT 1 FROM moderation_appeals WHERE id=? AND status='pending')",
+            `INSERT INTO moderation_events(id,userId,moderatorId,mode,reason,created) SELECT ?,?,?,'active',?,? WHERE EXISTS(SELECT 1 FROM account_restrictions WHERE userId=? AND eventId=?) AND EXISTS(SELECT 1 FROM moderation_appeals WHERE id=? AND status='pending') AND ${writeAllowed}`,
           )
-          .bind(eventId, a.userId, me, note, now, a.userId, a.eventId, id),
+          .bind(
+            eventId,
+            a.userId,
+            me,
+            note,
+            now,
+            a.userId,
+            a.eventId,
+            id,
+            me,
+            a.userId,
+            a.userId,
+          ),
       );
       statements.push(
         d
@@ -192,13 +236,13 @@ export async function moderationPost(
     statements.push(
       d
         .prepare(
-          "UPDATE moderation_appeals SET status=?,reviewNote=?,reviewedBy=?,reviewedAt=? WHERE id=? AND status='pending'",
+          `UPDATE moderation_appeals SET status=?,reviewNote=?,reviewedBy=?,reviewedAt=? WHERE id=? AND status='pending' AND ${writeAllowed}`,
         )
-        .bind(b.decision, note, me, now, id),
+        .bind(b.decision, note, me, now, id, me, a.userId, a.userId),
     );
     const results = await d.batch(statements);
     if (!results.at(-1)?.meta.changes)
-      throw new ApiError(409, 'Обращение уже рассмотрено');
+      throw new ApiError(409, 'Обращение или права модерации изменились.');
     return Response.json({ ok: true });
   }
   const id = clean(b.id, 200, true),
@@ -231,28 +275,34 @@ export async function moderationPost(
         ? null
         : now + Number(minutes) * 60000,
     eventId = crypto.randomUUID();
-  await d.batch([
+  const results = await d.batch([
     d
       .prepare(
-        'INSERT INTO moderation_events(id,userId,moderatorId,mode,reason,expiresAt,created) VALUES(?,?,?,?,?,?,?)',
+        `INSERT INTO moderation_events(id,userId,moderatorId,mode,reason,expiresAt,created) SELECT ?,?,?,?,?,?,? WHERE ${writeAllowed}`,
       )
-      .bind(eventId, id, me, mode, reason, until, now),
+      .bind(eventId, id, me, mode, reason, until, now, me, id, id),
     mode === 'active'
-      ? d.prepare('DELETE FROM account_restrictions WHERE userId=?').bind(id)
+      ? d
+          .prepare(
+            'DELETE FROM account_restrictions WHERE userId=? AND EXISTS(SELECT 1 FROM moderation_events WHERE id=?)',
+          )
+          .bind(id, eventId)
       : d
           .prepare(
-            'INSERT INTO account_restrictions(userId,eventId,mode,reason,expiresAt,created) VALUES(?,?,?,?,?,?) ON CONFLICT(userId) DO UPDATE SET eventId=excluded.eventId,mode=excluded.mode,reason=excluded.reason,expiresAt=excluded.expiresAt,created=excluded.created',
+            'INSERT INTO account_restrictions(userId,eventId,mode,reason,expiresAt,created) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM moderation_events WHERE id=?) ON CONFLICT(userId) DO UPDATE SET eventId=excluded.eventId,mode=excluded.mode,reason=excluded.reason,expiresAt=excluded.expiresAt,created=excluded.created',
           )
-          .bind(id, eventId, mode, reason, until, now),
+          .bind(id, eventId, mode, reason, until, now, eventId),
     ...(mode === 'active'
       ? []
       : [
           d
             .prepare(
-              'UPDATE posts SET cancelledAt=? WHERE cancelledAt=0 AND publishAt>? AND (userId=? OR publisherId=? OR userId IN(SELECT id FROM users WHERE ownerId=?))',
+              'UPDATE posts SET cancelledAt=? WHERE cancelledAt=0 AND publishAt>? AND (userId=? OR publisherId=? OR userId IN(SELECT id FROM users WHERE ownerId=?)) AND EXISTS(SELECT 1 FROM moderation_events WHERE id=?)',
             )
-            .bind(now, now, id, id, id),
+            .bind(now, now, id, id, id, eventId),
         ]),
   ]);
+  if (!results[0].meta.changes)
+    throw new ApiError(409, 'Аккаунт или права модерации изменились.');
   return Response.json({ ok: true });
 }

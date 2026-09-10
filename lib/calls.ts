@@ -11,22 +11,57 @@ export function callAllowed() {
   return `${messageAllowed} AND s.kind='person' AND r.kind='person' AND s.id<>r.id AND ${visibleAccount('s')} AND ${visibleAccount('r')}
     AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId IN(s.id,r.id) AND (ar.expiresAt IS NULL OR ar.expiresAt>${sqlNow}))`;
 }
-export async function expireCalls() {
-  await db()
-    .prepare('DELETE FROM call_cancellations WHERE created<?')
-    .bind(Date.now() - 300000)
-    .run();
-  await db()
-    .prepare(`UPDATE calls SET status='ended',reason=CASE WHEN status='ringing' THEN 'missed' ELSE 'disconnected' END,endedAt=?,offer=NULL,answer=NULL
-    WHERE status<>'ended' AND (expiresAt<? OR (status='accepted' AND (callerSeen<? OR calleeSeen<?))
-    OR NOT EXISTS(SELECT 1 FROM users s,users r WHERE s.id=calls.caller AND r.id=calls.callee AND ${callAllowed()}))`)
-    .bind(Date.now(), Date.now(), Date.now() - 90000, Date.now() - 90000)
-    .run();
-  await db()
-    .prepare(
-      "DELETE FROM call_signals WHERE callId IN(SELECT id FROM calls WHERE status='ended')",
+export async function expireCalls(participants?: string[]) {
+  const d = db(),
+    now = Date.now();
+  const scope = participants
+    ? `WITH scoped AS MATERIALIZED (
+        SELECT id FROM calls WHERE status<>'ended' AND caller IN(SELECT value FROM json_each(?))
+        UNION SELECT id FROM calls WHERE status<>'ended' AND callee IN(SELECT value FROM json_each(?))
+      )`
+    : '';
+  // Reads only inspect the participants' active calls. Global cleanup belongs to jobs.
+  const expired = await d
+    .prepare(`${scope} SELECT id FROM calls WHERE status<>'ended' ${participants ? 'AND id IN(SELECT id FROM scoped)' : ''}
+    AND (expiresAt<? OR (status='accepted' AND (callerSeen<? OR calleeSeen<?))
+      OR NOT EXISTS(SELECT 1 FROM users s,users r WHERE s.id=calls.caller AND r.id=calls.callee AND ${callAllowed()})) LIMIT 100`)
+    .bind(
+      ...(participants
+        ? [JSON.stringify(participants), JSON.stringify(participants)]
+        : []),
+      now,
+      now - 90000,
+      now - 90000,
     )
-    .run();
+    .all<{ id: string }>();
+  if (expired.results.length) {
+    const ids = JSON.stringify(expired.results.map((row) => row.id));
+    await d.batch([
+      d
+        .prepare(`UPDATE calls SET status='ended',reason=CASE WHEN status='ringing' THEN 'missed' ELSE 'disconnected' END,endedAt=?,offer=NULL,answer=NULL
+        WHERE id IN(SELECT value FROM json_each(?)) AND status<>'ended'
+        AND (expiresAt<? OR (status='accepted' AND (callerSeen<? OR calleeSeen<?))
+          OR NOT EXISTS(SELECT 1 FROM users s,users r WHERE s.id=calls.caller AND r.id=calls.callee AND ${callAllowed()}))`)
+        .bind(now, ids, now, now - 90000, now - 90000),
+      d
+        .prepare(
+          "DELETE FROM call_signals WHERE callId IN(SELECT value FROM json_each(?)) AND EXISTS(SELECT 1 FROM calls c WHERE c.id=call_signals.callId AND c.status='ended')",
+        )
+        .bind(ids),
+    ]);
+  }
+  if (!participants) {
+    await d.batch([
+      d
+        .prepare(
+          'DELETE FROM call_cancellations WHERE callId IN(SELECT callId FROM call_cancellations WHERE created<? ORDER BY created LIMIT 1000)',
+        )
+        .bind(now - 300000),
+      d.prepare(
+        "DELETE FROM call_signals WHERE id IN(SELECT cs.id FROM call_signals cs JOIN calls c ON c.id=cs.callId WHERE c.status='ended' LIMIT 1000)",
+      ),
+    ]);
+  }
 }
 function device(value: unknown) {
   const v = clean(value, 80, true);
@@ -41,11 +76,12 @@ export async function callsGet(
   me: string,
 ): Promise<Response | null> {
   if (!['callState', 'callConfig'].includes(action)) return null;
+  const client = device(s.get('device'));
+  const id = clean(s.get('id') || '', 100, action === 'callConfig');
+  await rateLimit('call-read', me, 180, 60);
   await assertReadable(me);
+  await expireCalls([me]);
   if (action === 'callConfig') {
-    await expireCalls();
-    const client = device(s.get('device')),
-      id = clean(s.get('id'), 100, true);
     const eligible = () =>
       db()
         .prepare(
@@ -61,9 +97,6 @@ export async function callsGet(
       headers: { 'Cache-Control': 'private, no-store' },
     });
   }
-  await expireCalls();
-  const client = device(s.get('device')),
-    id = s.get('id');
   const row = await db()
     .prepare(
       `SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM calls c JOIN users u ON u.id=CASE WHEN c.caller=? THEN c.callee ELSE c.caller END LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE (c.caller=? OR c.callee=?) AND ${id ? 'c.id=?' : "c.status<>'ended'"} AND (c.status='ended' OR EXISTS(SELECT 1 FROM users s,users r WHERE s.id=c.caller AND r.id=c.callee AND ${callAllowed()})) ORDER BY c.created DESC LIMIT 1`,
@@ -178,7 +211,9 @@ export async function callsPost(
     return Response.json({ ok: true });
   }
   await assertReadable(me);
-  await expireCalls();
+  await expireCalls(
+    action === 'callStart' ? [me, clean(b.peer, 200, true)] : [me],
+  );
   if (action === 'callStart') {
     const peer = clean(b.peer, 200, true);
     const existing = await d

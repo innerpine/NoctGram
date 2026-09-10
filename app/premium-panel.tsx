@@ -1,4 +1,5 @@
 'use client';
+import { PurchaseButton } from './purchase-panel';
 /* Async entitlement fetch is cancelled when the panel closes. */
 /* eslint-disable react/react-compiler */
 import { useEffect, useState } from 'react';
@@ -158,6 +159,25 @@ export function PremiumPanel({
         ))}
       </ul>
       <div className="premium-bottom">
+        {me && (
+          <PurchaseButton
+            owner={me.id}
+            product="premium"
+            onPaid={() => {
+              void Promise.all([
+                request<Profile>(
+                  '?action=profile&id=' + encodeURIComponent(me.id),
+                ),
+                request<NonNullable<typeof state>>('?action=premium'),
+              ])
+                .then(([profile, premium]) => {
+                  onUpdate(profile);
+                  setState(premium);
+                })
+                .catch(() => {});
+            }}
+          />
+        )}
         <button className="primary premium-cta" onClick={onDesign}>
           <PremiumIcon size={21} />
           {me?.premium ? 'Настроить оформление' : 'Примерить оформление'}
@@ -191,7 +211,7 @@ export function PremiumPanel({
         <p className="premium-note">
           {state?.testMode
             ? 'Тестовый Premium без оплаты. Один период на аккаунт, без автопродления.'
-            : 'Платная подписка появится позже.'}
+            : '30 дней без автопродления. Продлить можно в любой момент.'}
         </p>
       </div>
     </section>

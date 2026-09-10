@@ -1,3 +1,5 @@
+import { musicProviderRequestLimit } from './music-request-budget';
+import { readUpstreamJson } from './upstream-json';
 import { db } from './storage';
 import { ApiError } from './api-error';
 import {
@@ -149,7 +151,7 @@ async function requestJSON(url: string, init: RequestInit = {}): Promise<Data> {
       );
     throw new ApiError(502, 'Не удалось получить ответ музыкального сервиса.');
   }
-  const data: unknown = await response.json();
+  const data: unknown = await readUpstreamJson(response);
   if (!data || typeof data !== 'object' || Array.isArray(data))
     throw new ApiError(502, 'Некорректный ответ музыкального сервиса.');
   return data as Data;
@@ -527,6 +529,7 @@ async function serviceRequest(
   path: string,
 ) {
   const auth = await access(user, provider);
+  await musicProviderRequestLimit(user);
   try {
     return {
       data: await requestJSON(endpoints[provider].api + path, {

@@ -91,6 +91,14 @@ export async function assertUploadAvailable(id: string) {
     .first<{ total: number; visible: number }>();
   if (uses?.total && !uses.visible) throw new ApiError(404, 'Файл недоступен');
 }
+// Actor is an internal SQL expression (usually a single bound placeholder).
+// Sensitive writes repeat this check at commit, after asynchronous preflight work.
+export function moderatorWriteAllowed(actor: string) {
+  return `EXISTS(SELECT 1 FROM users staff WHERE staff.id=${actor}
+    AND staff.deletedAt=0 AND staff.onboardingComplete=1
+    AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=staff.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
+    AND (EXISTS(SELECT 1 FROM moderators m WHERE m.userId=staff.id) OR EXISTS(SELECT 1 FROM administrators a WHERE a.userId=staff.id)))`;
+}
 export async function requireModerator(id: string) {
   if (!(await isModerator(id)))
     throw new ApiError(403, 'Доступ только для модератора');

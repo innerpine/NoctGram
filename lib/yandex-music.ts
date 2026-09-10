@@ -1,3 +1,5 @@
+import { musicProviderRequestLimit } from './music-request-budget';
+import { readUpstreamJson } from './upstream-json';
 import { db } from './storage';
 import { setting, randomToken } from './auth-session';
 import { ApiError } from './api-error';
@@ -95,7 +97,7 @@ async function api(token: string, path: string): Promise<unknown> {
     );
   let payload: Data;
   try {
-    payload = object(await response.json());
+    payload = object(await readUpstreamJson(response));
   } catch {
     throw new ApiError(502, 'Яндекс вернул некорректный ответ.');
   }
@@ -132,6 +134,7 @@ async function request(user: string, row: Connection, path: string) {
     context(user),
   );
   try {
+    await musicProviderRequestLimit(user);
     const result = await api(token.access_token, path);
     await current(user, row.id);
     return result;
@@ -170,6 +173,7 @@ export async function yandexStatus(user: string): Promise<ServiceStatus> {
 export async function checkYandexAccess(user: string) {
   const status = await yandexStatus(user);
   if (status.status === 'disconnected' || status.status === 'setup_required') {
+    await musicProviderRequestLimit(user);
     await checkYandexConnection();
     return { ok: true, scope: 'network' };
   }
@@ -204,6 +208,7 @@ export async function connectYandex(user: string, value: unknown) {
       .bind(id, user, Date.now() + 60000),
   ]);
   try {
+    await musicProviderRequestLimit(user);
     const profile = object(await api(value, '/account/status'));
     const account = object(profile.account),
       uid = identifier(account.uid);

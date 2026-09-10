@@ -22,7 +22,9 @@ assert.ok(root, 'Run from NoctGram root or copy this file into tests/.');
 const require = createRequire(join(root, 'package.json'));
 // Load the Node-only test runtime by path; its ambient declarations must not
 // change the app's Worker/browser type environment during linting.
-const { Miniflare } = require(require.resolve('miniflare'));
+const { Miniflare, convertV4MiniflareOptions } = require(
+  require.resolve('miniflare'),
+);
 const ts = require('typescript');
 const source = (file) => readFileSync(join(root, file), 'utf8');
 const modules = new Map();
@@ -31,6 +33,9 @@ const allowed = new Set([
   'lib/chat-access.ts',
   'lib/chat-files.ts',
   'lib/premium-access.ts',
+  'lib/premium-predicate.ts',
+  'lib/premium-emoji.ts',
+  'lib/premium-emoji-access.ts',
   'lib/boost-access.ts',
   'lib/boost-rules.ts',
   'lib/channel-access.ts',
@@ -40,6 +45,13 @@ const allowed = new Set([
 ]);
 function load(file) {
   if (modules.has(file)) return modules.get(file).exports;
+  if (file === 'lib/auth-session.ts') return { setting: () => '1' };
+  if (file === 'lib/storage.ts')
+    return {
+      db: () => {
+        throw Error('Only extracted SQL may access D1');
+      },
+    };
   if (file === 'lib/server.ts')
     return {
       db() {
@@ -128,23 +140,84 @@ function compileInsert(declarationText) {
 }
 const insert = compileInsert(declaration.getText(route));
 
+// Use the real nested predicates: SQLite alone does not enforce D1's depth limit.
+function sqlFunction(file, name, bindings) {
+  const ast = ts.createSourceFile(
+    file,
+    source(file),
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  const declaration = find(
+    ast,
+    (node) => ts.isFunctionDeclaration(node) && node.name?.text === name,
+  );
+  assert.ok(declaration);
+  const text = declaration.getText(ast).replace(/^export\s+/, '');
+  return compileFunction(
+    ts.transpileModule('return ' + text, {
+      compilerOptions: { target: ts.ScriptTarget.ES2022 },
+    }).outputText,
+    Object.keys(bindings),
+  )(...Object.values(bindings));
+}
+const pushSqlHelpers = {
+  ...load('lib/channel-access.ts'),
+  visibleAccount: load('lib/account-access.ts').visibleAccount,
+  messageVisible: load('lib/chat-access.ts').messageVisible,
+  messageAllowed: load('lib/privacy.ts').messageAllowed,
+};
+pushSqlHelpers.notificationVisible = sqlFunction(
+  'lib/notifications.ts',
+  'notificationVisible',
+  pushSqlHelpers,
+);
+pushSqlHelpers.callAllowed = sqlFunction(
+  'lib/calls.ts',
+  'callAllowed',
+  pushSqlHelpers,
+);
+const pushAst = ts.createSourceFile(
+  'notifications.ts',
+  source('lib/notifications.ts'),
+  ts.ScriptTarget.Latest,
+  true,
+);
+const pushRead = find(
+  pushAst,
+  (node) =>
+    ts.isVariableDeclaration(node) &&
+    node.name.getText(pushAst) === 'valid' &&
+    node.getText(pushAst).includes('push_deliveries'),
+);
+assert.ok(pushRead);
+const checkPushSql = compileFunction(
+  ts.transpileModule(
+    `return async (d,r,lease) => { const ${pushRead.getText(pushAst)}; return valid; };`,
+    { compilerOptions: { target: ts.ScriptTarget.ES2022 } },
+  ).outputText,
+  Object.keys(pushSqlHelpers),
+)(...Object.values(pushSqlHelpers));
+
 void test(
   'posting uses real D1 parser limits and atomic access conditions',
   { timeout: 120000 },
   async (t) => {
-    const mf = new Miniflare({
-      modules: true,
-      script:
-        'export default { fetch() { return new Response("D1 SQL test only",{status:404}); } };',
-      compatibilityDate: '2026-05-15',
-      d1Databases: ['DB'],
-      d1Persist: false,
-      cachePersist: false,
-      durableObjectsPersist: false,
-      outboundService: () => {
-        throw new Error('External network forbidden.');
-      },
-    });
+    const mf = new Miniflare(
+      convertV4MiniflareOptions({
+        modules: true,
+        script:
+          'export default { fetch() { return new Response("D1 SQL test only",{status:404}); } };',
+        compatibilityDate: '2026-05-15',
+        d1Databases: ['DB'],
+        d1Persist: false,
+        cachePersist: false,
+        durableObjectsPersist: false,
+        outboundService: () => {
+          throw new Error('External network forbidden.');
+        },
+      }),
+    );
     t.after(() => mf.dispose());
     const d = await mf.getD1Database('DB');
     for (const migration of JSON.parse(source('drizzle/meta/_journal.json'))
@@ -632,6 +705,39 @@ void test(
     assert.deepEqual(
       (await d.prepare('PRAGMA foreign_key_check').all()).results,
       [],
+    );
+    await t.test(
+      'push privacy and lease recheck compiles under the real D1 depth limit',
+      async () => {
+        assert.equal(
+          await checkPushSql(
+            d,
+            { notificationId: 'missing', subscriptionId: 'missing' },
+            'missing',
+          ),
+          null,
+        );
+      },
+    );
+    await t.test(
+      'commit-time moderator predicate compiles and rechecks live roles in D1',
+      async () => {
+        const f = await fixture();
+        const predicate = load('lib/account-access.ts').moderatorWriteAllowed(
+          '?',
+        );
+        const eligible = () =>
+          first('SELECT 1 allowed WHERE ' + predicate, f.actor);
+        assert.equal(await eligible(), null);
+        await run(
+          'INSERT INTO moderators(userId,created) VALUES(?,?)',
+          f.actor,
+          f.now,
+        );
+        assert.equal((await eligible()).allowed, 1);
+        await run('DELETE FROM moderators WHERE userId=?', f.actor);
+        assert.equal(await eligible(), null);
+      },
     );
   },
 );

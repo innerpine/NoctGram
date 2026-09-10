@@ -6,6 +6,7 @@ import { icons } from '../bot/emoji.mjs';
 import { RemoteError, safeBase, telegramTransport } from '../bot/transport.mjs';
 import { BotStore } from '../bot/store.mjs';
 const state = {
+  testMode: true,
   linked: true,
   profile: { name: '<script>', handle: 'qa<&>' },
   balance: 11000,
@@ -62,7 +63,7 @@ function command(id, text = '/start') {
     },
   };
 }
-void test('Every bot screen is HTML-safe, has bounded buttons and never offers a payment', () => {
+void test('Legacy test-mode screens stay HTML-safe and bounded; arbitrary API methods are denied', () => {
   for (const preferences of [{}, { rich: false }, { customEmoji: true }]) {
     for (const name of [
       'home',
@@ -98,7 +99,7 @@ void test('Every bot screen is HTML-safe, has bounded buttons and never offers a
     }
   }
   assert.throws(
-    () => telegramTransport('fake')('sendInvoice', {}),
+    () => telegramTransport('fake')('transferGift', {}),
     /not enabled/,
   );
 });

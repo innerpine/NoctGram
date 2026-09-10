@@ -1,3 +1,4 @@
+import { assertPremiumEmoji } from './premium-emoji-access';
 import { db } from './storage';
 import { ApiError } from './api-error';
 import { assertWritable, visibleAccount } from './account-access';
@@ -86,6 +87,7 @@ export async function editMessage(me: string, body: Record<string, unknown>) {
   )
     throw new ApiError(400, 'Некорректное редактирование');
   const caption = text.trim();
+  await assertPremiumEmoji(me, caption);
   const access = `m.sender=s.id AND m.recipient=r.id AND m.giftReceiptId IS NULL AND m.forwardSourceId IS NULL AND ${messageVisible('m', 's.id')} AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageWritable('s.id')} AND ${messageAllowed}`;
   const message = await db()
     .prepare(

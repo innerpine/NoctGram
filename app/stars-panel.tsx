@@ -1,4 +1,5 @@
 'use client';
+import { PurchaseButton } from './purchase-panel';
 import { DisplayName } from './profile-identity';
 import { ProfileLink } from './profile-link';
 /* Loading effects subscribe to the API; the React compiler is not enabled. */
@@ -170,7 +171,9 @@ export function StarsPanel({
     wallet?.transactions.filter(
       (t) =>
         filter === 'all' ||
-        (filter === 'incoming' ? t.recipient === me.id : t.sender === me.id),
+        (filter === 'incoming'
+          ? t.recipient === me.id && t.amount > 0
+          : t.sender === me.id || (t.recipient === me.id && t.amount < 0)),
     ) || [];
   return (
     <section className="premium-page stars-page">
@@ -206,10 +209,9 @@ export function StarsPanel({
           <StarsIcon size={30} />
           <strong>{wallet ? num(wallet.balance) : '—'}</strong>
         </div>
-        <span className="test-stars-label">Тестовые звёзды · без оплаты</span>
+        <span className="test-stars-label">Noct Stars</span>
         <p className="stars-help">
-          При первом открытии — 10 000 тестовых звёзд. Пополняй тестовый баланс
-          через Telegram-бота.
+          Подарки, поддержка авторов и маленькие знаки внимания.
         </p>
       </div>
       <div className="stars-stats">
@@ -226,6 +228,11 @@ export function StarsPanel({
           </span>
         </div>
       </div>
+      <PurchaseButton
+        owner={me.id}
+        product="stars"
+        onPaid={() => void load(false, undefined, true)}
+      />
       <TelegramLink onWalletChange={() => void load(false, undefined, true)} />
       <div className="stars-history">
         <div className="row">
@@ -255,7 +262,7 @@ export function StarsPanel({
         {!wallet && loading && <p className="meta">Загружаем баланс…</p>}
         {rows.map((t) => (
           <div className="star-transaction" key={t.id}>
-            {t.kind === 'admin_grant' ? (
+            {['admin_grant', 'purchase', 'purchase_refund'].includes(t.kind) ? (
               <span className="transaction-grant">
                 <StarsIcon size={26} />
               </span>
@@ -282,7 +289,11 @@ export function StarsPanel({
             )}
             <div>
               <strong>
-                {t.kind === 'admin_grant' ? (
+                {t.kind === 'purchase' ? (
+                  'Покупка Noct Stars'
+                ) : t.kind === 'purchase_refund' ? (
+                  'Возврат покупки'
+                ) : t.kind === 'admin_grant' ? (
                   'Подарок от NoctGram'
                 ) : t.kind === 'telegram_test' ? (
                   'Пополнение через Telegram'
@@ -297,25 +308,33 @@ export function StarsPanel({
                 )}
               </strong>
               <span>
-                {t.kind === 'gift'
-                  ? 'Подарок «' +
-                    (giftDefinition(t.giftId)?.name || 'Подарок') +
-                    '»'
-                  : t.kind === 'admin_grant'
-                    ? 'Начислено администратором'
-                  : t.kind === 'telegram_test'
-                    ? 'Тестовые звёзды · без оплаты'
-                    : t.kind === 'grant'
-                      ? 'Стартовые звёзды'
-                      : t.sender === me.id
-                        ? 'Поддержка автора'
-                        : 'Поддержали твою публикацию'}
+                {t.kind === 'purchase'
+                  ? 'Оплата подтверждена'
+                  : t.kind === 'purchase_refund'
+                    ? 'Сумма возвращена через платёжный сервис'
+                    : t.kind === 'gift'
+                      ? 'Подарок «' +
+                        (giftDefinition(t.giftId)?.name || 'Подарок') +
+                        '»'
+                      : t.kind === 'admin_grant'
+                        ? 'Начислено администратором'
+                        : t.kind === 'telegram_test'
+                          ? 'Тестовые звёзды · без оплаты'
+                          : t.kind === 'grant'
+                            ? 'Стартовые звёзды'
+                            : t.sender === me.id
+                              ? 'Поддержка автора'
+                              : 'Поддержали твою публикацию'}
               </span>
               <Stamp time={t.created} />
             </div>
-            <b className={t.recipient === me.id ? 'incoming' : ''}>
-              {t.recipient === me.id ? '+' : '−'}
-              {num(t.amount)}
+            <b
+              className={
+                t.recipient === me.id && t.amount > 0 ? 'incoming' : ''
+              }
+            >
+              {(t.recipient === me.id ? t.amount : -t.amount) >= 0 ? '+' : '−'}
+              {num(Math.abs(t.amount))}
               <StarsIcon size={15} />
             </b>
           </div>
@@ -448,7 +467,7 @@ export function SupportPanel({
             ))}
         </div>
         <span className="meta">
-          Баланс: {balance === null ? 'загружаем…' : num(balance)} · тестовые
+          Баланс: {balance === null ? 'загружаем…' : num(balance)}
           звёзды
         </span>
         <button className="primary" disabled={!valid || busy}>

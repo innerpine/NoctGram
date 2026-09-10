@@ -1,3 +1,4 @@
+import { startBotWorkers } from './payment-worker.mjs';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -19,18 +20,12 @@ if (!/^\d+:[a-zA-Z0-9_-]{30,}$/.test(token) || secret.length < 32) {
   );
   process.exit(1);
 }
-if (process.env.NOCT_BOT_TEST_MODE !== '1') {
-  console.error(
-    'Этот бот поддерживает только тестовые пополнения. Установи NOCT_BOT_TEST_MODE=1 в bot/.env',
-  );
-  process.exit(1);
-}
 const controller = new AbortController();
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.on(signal, () => controller.abort());
 const telegram = telegramTransport(token, controller.signal),
   site = siteTransport(siteUrl, secret, controller.signal);
-let store;
+let store, stopWorkers;
 try {
   const me = await telegram('getMe'),
     webhook = await telegram('getWebhookInfo');
@@ -41,7 +36,6 @@ try {
   const health = await site({ action: 'health' });
   if (
     !health.enabled ||
-    !health.testMode ||
     health.botUsername.toLowerCase() !== me.username.toLowerCase()
   )
     throw new Error(
@@ -60,37 +54,40 @@ try {
     siteUrl,
     emojiAvailable: process.env.NOCT_BOT_CUSTOM_EMOJI !== '0',
   });
-  console.log(`@${me.username} запущен · тестовые звёзды · ${siteUrl}`);
+  console.log(`@${me.username} запущен · Telegram Stars · оплата · ${siteUrl}`);
+  await telegram('setMyCommands', {
+    commands: [
+      { command: 'start', description: 'NoctGram · Stars и Premium' },
+      { command: 'topup', description: 'Пополнить Noct Stars' },
+      { command: 'premium', description: 'Noct Premium на 30 дней' },
+      { command: 'history', description: 'Покупки' },
+      { command: 'terms', description: 'Условия покупки' },
+      { command: 'paysupport', description: 'Помощь с платежом' },
+      { command: 'settings', description: 'Оформление бота' },
+    ],
+  });
   let failures = 0;
+  stopWorkers = startBotWorkers(bot, controller.signal);
   while (!controller.signal.aborted) {
     try {
       const updates = await telegram('getUpdates', {
         offset: store.get('offset') || 0,
         timeout: 30,
         limit: 20,
-        allowed_updates: ['message', 'callback_query'],
+        allowed_updates: ['message', 'callback_query', 'pre_checkout_query'],
       });
-      for (const update of updates) {
-        if (controller.signal.aborted) break;
+      // Checkout deadlines are independent of command delivery and slow providers.
+      for (const update of updates.filter((u) => u.pre_checkout_query)) {
         try {
           await bot.handle(update);
-        } catch (e) {
-          // A chat that blocked/deleted the bot must not stall all other users.
-          if (
-            !(
-              e instanceof RemoteError &&
-              e.service === 'telegram' &&
-              [400, 403].includes(e.status)
-            )
-          )
-            throw e;
-          console.warn(
-            'Telegram отклонил ответ в чат; операция сохранена, можно открыть /start заново',
-          );
+        } catch {
+          /* Telegram retries/declines expired checkout; no goods granted. */
         }
-        // Durable receipt commits before this cursor, so crashes cannot double-credit.
+      }
+      for (const update of updates) {
+        if (controller.signal.aborted) break;
+        if (!update.pre_checkout_query) store.enqueue(update);
         store.set('offset', update.update_id + 1);
-        store.set('lastHandledAt', Date.now());
       }
       failures = 0;
     } catch (e) {
@@ -131,5 +128,7 @@ try {
     process.exitCode = 1;
   }
 } finally {
+  controller.abort();
+  await stopWorkers?.();
   store?.close();
 }

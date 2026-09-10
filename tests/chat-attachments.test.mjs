@@ -118,7 +118,7 @@ const compiled = await build({
         }));
         build.onLoad({ filter: /.*/, namespace: 'auth-fixture' }, () => ({
           contents:
-            'import {createHash} from "node:crypto"; export const tokenHash=async(value)=>createHash("sha256").update(value).digest("hex");',
+            'import {createHash} from "node:crypto"; export const setting=()=> "1"; export const tokenHash=async(value)=>createHash("sha256").update(value).digest("hex");',
         }));
         build.onResolve(
           { filter: /^(\.\/|@\/lib\/)(storage|server)$/ },
@@ -513,7 +513,7 @@ const malformed = await api.uploadPOST(
     body: 'not multipart',
   }),
 );
-assert.equal(malformed.status, 400);
+assert.equal(malformed.status, 415);
 globalThis.__chatFilesViewer = null;
 assert.equal(
   (

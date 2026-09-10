@@ -44,6 +44,13 @@ try {
       {
         name: 'theme-database',
         setup(build) {
+          build.onResolve({ filter: /^\.\/auth-session$/ }, () => ({
+            path: 'auth',
+            namespace: 'fixture-settings',
+          }));
+          build.onLoad({ filter: /.*/, namespace: 'fixture-settings' }, () => ({
+            contents: "export const setting=()=> '1';",
+          }));
           build.onResolve({ filter: /^\.\/(storage|server)$/ }, ({ path }) => ({
             path,
             namespace: 'fixture',

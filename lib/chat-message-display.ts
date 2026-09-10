@@ -1,9 +1,10 @@
+import { emojiFallback } from './premium-emoji';
 import type { Message } from './client';
 export function messageSummary(
   message: Pick<Message, 'text' | 'attachments' | 'gift'>,
 ) {
   return (
-    message.text ||
+    emojiFallback(message.text) ||
     message.attachments
       ?.map((file) =>
         file.kind === 'image'

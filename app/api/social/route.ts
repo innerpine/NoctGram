@@ -1,3 +1,5 @@
+import { assertPremiumEmoji } from '@/lib/premium-emoji-access';
+import { archiveDirectChat } from '@/lib/chat-archive';
 import { telegramGet, telegramPost } from '@/lib/telegram';
 import { boostsGet, boostsPost } from '@/lib/boosts';
 import { administrationGet, administrationPost } from '@/lib/administration';
@@ -6,7 +8,12 @@ import { premiumGet, premiumPost } from '@/lib/premium';
 import { appearanceColumns } from '@/lib/premium-access';
 import { assertMediaRead, mediaPermission } from '@/lib/media-access';
 import { callsGet, callsPost } from '@/lib/calls';
-import { notificationsGet, notificationsPost } from '@/lib/notifications';
+import {
+  flushPush,
+  notificationsGet,
+  notificationsPost,
+} from '@/lib/notifications';
+import { after } from 'next/server';
 import {
   channelFeatureGet,
   channelFeaturePost,
@@ -67,6 +74,8 @@ export async function GET(req: Request) {
     const me = await viewer();
     await seed();
     const s = new URL(req.url).searchParams;
+    if (s.has('actor') && s.get('actor') !== me)
+      throw new ApiError(401, 'Аккаунт изменился');
     const action = s.get('action') || 'feed';
     const administration = await administrationGet(action, s, me);
     if (administration) return administration;
@@ -217,9 +226,22 @@ export async function GET(req: Request) {
           await d
             .prepare(
               `WITH visible_messages AS (SELECT m.* FROM messages m WHERE (m.sender=? OR m.recipient=?) AND ${messageVisible('m', '?')})
-              SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,(SELECT CASE WHEN text<>'' THEN text WHEN json_array_length(media)>0 THEN CASE json_extract(media,'$[0].kind') WHEN 'image' THEN 'Фото' WHEN 'video' THEN 'Видео' ELSE 'Файл: '||json_extract(media,'$[0].name') END ELSE text END FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC,id DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM visible_messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
+              SELECT u.id,u.name,u.avatar,COALESCE(a.archivedAt,0) AS archivedAt,${appearanceColumns('u')},h.handle,(SELECT CASE WHEN text<>'' THEN text WHEN json_array_length(media)>0 THEN CASE json_extract(media,'$[0].kind') WHEN 'image' THEN 'Фото' WHEN 'video' THEN 'Видео' ELSE 'Файл: '||json_extract(media,'$[0].name') END ELSE text END FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC,id DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM visible_messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 LEFT JOIN direct_chat_archives a ON a.peerId=u.id AND a.userId=? WHERE (COALESCE(a.archivedAt,0)>0)=? AND ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
             )
-            .bind(me, me, me, me, me, me, me, me, me, me)
+            .bind(
+              me,
+              me,
+              me,
+              me,
+              me,
+              me,
+              me,
+              me,
+              me,
+              s.get('archived') === '1' ? 1 : 0,
+              me,
+              me,
+            )
             .all()
         ).results,
       );
@@ -262,7 +284,25 @@ export async function POST(req: Request) {
     const telegram = await telegramPost(action, b, me);
     if (telegram) return telegram;
     const call = await callsPost(action, b, me);
-    if (call) return call;
+    if (call) {
+      if (action === 'callStart' && call.ok) {
+        const notificationId = 'call:' + clean(b.id, 100, true);
+        try {
+          after(async () => {
+            try {
+              await flushPush(notificationId);
+            } catch {
+              // The durable queue remains available to cron; never log credentials
+              // or provider responses and never turn a committed call into an error.
+              console.error('Incoming call push delivery failed');
+            }
+          });
+        } catch {
+          console.error('Incoming call push scheduling failed');
+        }
+      }
+      return call;
+    }
     const premium = await premiumPost(String(action), b, me);
     if (premium) return premium;
     const boosts = await boostsPost(String(action), b, me);
@@ -275,6 +315,13 @@ export async function POST(req: Request) {
     if (story) return story;
     const moderation = await moderationPost(action, b, me);
     if (moderation) return moderation;
+    if (action === 'archiveChat')
+      return Response.json(await archiveDirectChat(me, b));
+    if (
+      ['post', 'comment'].includes(String(action)) &&
+      typeof b.text === 'string'
+    )
+      await assertPremiumEmoji(me, b.text);
     if (action === 'view') await assertReadable(me);
     else await assertWritable(me);
     if (action === 'messagePin') return Response.json(await pinMessage(me, b));

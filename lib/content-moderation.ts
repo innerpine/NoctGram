@@ -3,6 +3,7 @@ import {
   assertPostVisible,
   assertWritable,
   requireModerator,
+  moderatorWriteAllowed,
 } from './account-access';
 
 type TargetType = 'post' | 'comment' | 'story';
@@ -140,11 +141,14 @@ export async function contentModerationPost(
     const note = clean(b.note || '', 1000, status === 'closed');
     const r = await d
       .prepare(`UPDATE content_reports SET status=?,reviewedBy=?,reviewNote=?,updated=?
-      WHERE id=? AND status=? AND status<>?`)
-      .bind(status, me, note, Date.now(), id, expected, status)
+      WHERE id=? AND status=? AND status<>? AND ${moderatorWriteAllowed('?')}`)
+      .bind(status, me, note, Date.now(), id, expected, status, me)
       .run();
     if (!r.meta.changes)
-      throw new ApiError(409, 'Жалоба уже изменена. Обновите список.');
+      throw new ApiError(
+        409,
+        'Жалоба или права модерации изменились. Обновите список.',
+      );
     return Response.json({ ok: true });
   }
   const type = targetType(b.targetType),
@@ -161,7 +165,7 @@ export async function contentModerationPost(
     d
       .prepare(`INSERT OR IGNORE INTO content_removals
     (id,targetType,targetId,postId,authorId,moderatorId,text,snapshot,reason,created)
-    SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM ${table} WHERE id=?)`)
+    SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM ${table} WHERE id=?) AND ${moderatorWriteAllowed('?')}`)
       .bind(
         eventId,
         type,
@@ -174,6 +178,7 @@ export async function contentModerationPost(
         reason,
         now,
         id,
+        me,
       ),
   ];
   if (type === 'post') {
@@ -209,6 +214,9 @@ export async function contentModerationPost(
   );
   const result = await d.batch(statements);
   if (!result.at(-1)?.meta.changes)
-    throw new ApiError(409, 'Контент уже удалён. Обновите список.');
+    throw new ApiError(
+      409,
+      'Контент или права модерации изменились. Обновите список.',
+    );
   return Response.json({ ok: true });
 }

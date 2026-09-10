@@ -16,6 +16,30 @@ const { createAppHistory, appRouteFromURL, appRouteHref, appRouteKey } =
       Buffer.from(compiled.outputFiles[0].text).toString('base64')
   );
 const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+void test('group, invite and secret-room links survive routing without opening a personal dialog', () => {
+  const examples = [
+    [{ page: 'messages', roomId: 'secret-room-123' }, '/?room=secret-room-123'],
+    [{ page: 'messages', group: 'night_club' }, '/?group=night_club'],
+    [
+      { page: 'messages', invite: 'random-private_token' },
+      '/?invite=random-private_token',
+    ],
+  ];
+  for (const [route, href] of examples) {
+    assert.equal(appRouteHref(route), href);
+    assert.deepEqual(appRouteFromURL(href, 'alice'), route);
+    assert.notEqual(
+      appRouteKey(route),
+      appRouteKey({ page: 'messages', peerId: route.roomId || 'bob' }),
+    );
+  }
+  assert.equal(
+    appRouteHref({ page: 'messages', group: '@Night_Club', peerId: 'bob' }),
+    '/?group=night_club',
+  );
+  assert.equal(appRouteHref({ page: 'feed', invite: 'must-not-leak' }), '/');
+});
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((yes, no) => {
@@ -34,7 +58,7 @@ const bootstrap = await build({
 });
 const { APP_HISTORY_BOOTSTRAP } = await import(
   'data:text/javascript;base64,' +
-  Buffer.from(bootstrap.outputFiles[0].text).toString('base64')
+    Buffer.from(bootstrap.outputFiles[0].text).toString('base64')
 );
 
 // A session history with native Window listener order, including an earlier account
@@ -230,6 +254,25 @@ void test('messages → profiles → gift tab restores in both directions withou
   );
   assert.equal(f.host.history.state.foreign, 'keep');
   assert.deepEqual(f.host.history.state.tree, ['existing-router-tree']);
+});
+
+void test('resolving a joined group link replaces its preview and does not trap browser Back', async () => {
+  const f = fixture();
+  await f.controller.ready;
+  await f.controller.navigate({ page: 'messages', invite: 'private-token' });
+  const length = f.entries.length;
+  await f.controller.navigate(
+    { page: 'messages', roomId: 'joined-group' },
+    { replace: true },
+  );
+  assert.equal(f.entries.length, length);
+  f.pop(-1);
+  await tick();
+  assert.equal(f.ui.page, 'feed');
+  f.pop(1);
+  await tick();
+  assert.equal(f.ui.roomId, 'joined-group');
+  assert.equal(f.ui.invite, undefined);
 });
 
 void test('search typing replaces its entry, while sections, profile tabs and peers add entries', async () => {

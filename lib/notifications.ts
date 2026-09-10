@@ -6,6 +6,7 @@ import { setting } from './auth-session';
 import { assertReadable, visibleAccount } from './account-access';
 import { published, sqlNow } from './channel-access';
 import { messageVisible } from './chat-access';
+import { callAllowed } from './calls';
 
 export function validPushEndpoint(endpoint: string) {
   const u = new URL(endpoint),
@@ -227,29 +228,32 @@ export async function notificationsPost(
     );
   return Response.json({ ok: true });
 }
-export async function flushPush() {
-  await fanoutPosts();
+export async function flushPush(notificationId?: string) {
+  const targeted = notificationId !== undefined;
+  // Request-triggered delivery must not scan or mutate the global notification queue.
+  if (!targeted) await fanoutPosts();
   const cfg = config();
   if (!cfg) return { configured: false, sent: 0 };
   const d = db(),
     now = Date.now();
-  await d
-    .prepare('DELETE FROM push_subscriptions WHERE expiresAt<?')
-    .bind(now)
-    .run();
+  if (!targeted)
+    await d
+      .prepare('DELETE FROM push_subscriptions WHERE expiresAt<?')
+      .bind(now)
+      .run();
   await d
     .prepare(`INSERT OR IGNORE INTO push_deliveries(notificationId,subscriptionId)
-    SELECT n.id,s.id FROM notifications n JOIN push_subscriptions s ON s.userId=n.userId WHERE n.created>=s.created AND n.created>? AND n.read=0`)
-    .bind(now - 86400000)
+    SELECT n.id,s.id FROM notifications n JOIN push_subscriptions s ON s.userId=n.userId WHERE n.created>=s.created AND n.created>? AND s.expiresAt>? AND n.read=0${targeted ? ' AND n.id=?' : ''}`)
+    .bind(now - 86400000, now, ...(targeted ? [notificationId] : []))
     .run();
   const rows = await d
     .prepare(`SELECT pd.*,n.kind,n.actorId,n.targetId,n.created,n.read,s.endpoint,s.p256dh,s.auth,u.name
     FROM push_deliveries pd JOIN notifications n ON n.id=pd.notificationId JOIN push_subscriptions s ON s.id=pd.subscriptionId JOIN users u ON u.id=n.actorId
-    WHERE pd.state='pending' AND pd.retryAt<=? AND pd.attempts<5 ORDER BY (n.kind='call') DESC,n.created LIMIT 10`)
-    .bind(now)
+    WHERE pd.state='pending' AND pd.retryAt<=? AND pd.attempts<5${targeted ? ' AND pd.notificationId=?' : ''} ORDER BY (n.kind='call') DESC,n.created,n.id,pd.subscriptionId LIMIT 10`)
+    .bind(now, ...(targeted ? [notificationId] : []))
     .all();
   let sent = 0;
-  for (const r of rows.results) {
+  const deliver = async (r: (typeof rows.results)[number]) => {
     const lease = crypto.randomUUID(),
       claimNow = Date.now();
     const claim = await d
@@ -264,10 +268,10 @@ export async function flushPush() {
         claimNow,
       )
       .run();
-    if (!claim.meta.changes) continue;
+    if (!claim.meta.changes) return;
     const valid = await d
       .prepare(
-        `SELECT n.id FROM notifications n JOIN users u ON u.id=n.actorId WHERE n.id=? AND n.read=0 AND EXISTS(SELECT 1 FROM push_deliveries pd JOIN push_subscriptions ps ON ps.id=pd.subscriptionId WHERE pd.notificationId=n.id AND pd.subscriptionId=? AND pd.lease=? AND ps.userId=n.userId AND ps.expiresAt>${sqlNow}) AND ${notificationVisible()} AND (n.kind<>'call' OR EXISTS(SELECT 1 FROM calls WHERE id=n.targetId AND status='ringing' AND expiresAt>?))`,
+        `SELECT n.id FROM notifications n JOIN users u ON u.id=n.actorId WHERE n.id=? AND n.read=0 AND EXISTS(SELECT 1 FROM push_deliveries pd JOIN push_subscriptions ps ON ps.id=pd.subscriptionId WHERE pd.notificationId=n.id AND pd.subscriptionId=? AND pd.lease=? AND ps.userId=n.userId AND ps.expiresAt>${sqlNow}) AND ${notificationVisible()} AND (n.kind<>'call' OR EXISTS(SELECT 1 FROM calls c JOIN users s ON s.id=c.caller JOIN users r ON r.id=c.callee WHERE c.id=n.targetId AND c.caller=n.actorId AND c.callee=n.userId AND c.status='ringing' AND c.expiresAt>? AND ${callAllowed()}))`,
       )
       .bind(r.notificationId, r.subscriptionId, lease, Date.now())
       .first();
@@ -339,6 +343,25 @@ export async function flushPush() {
       )
       .bind(state, retryAt, r.notificationId, r.subscriptionId, lease)
       .run();
-  }
+  };
+  // At most ten subscriptions per account. Four workers fit their 7s network
+  // timeouts into three waves; claims happen only when a worker is ready to send.
+  let next = 0;
+  const workers = await Promise.allSettled(
+    Array.from(
+      { length: targeted ? Math.min(4, rows.results.length) : 1 },
+      async () => {
+        for (;;) {
+          const row = rows.results[next++];
+          if (!row) return;
+          await deliver(row);
+        }
+      },
+    ),
+  );
+  // Await every active send even if one database operation fails. The durable
+  // queue and expired leases remain available to the scheduled retry worker.
+  if (workers.some((result) => result.status === 'rejected'))
+    throw new Error('Push delivery batch did not complete');
   return { configured: true, sent };
 }

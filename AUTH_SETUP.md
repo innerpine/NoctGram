@@ -1,6 +1,6 @@
 # Почтовый вход Noctgram
 
-Подготовлены `/login`, `/welcome` и серверные `/api/auth/*`. Реальные письма появятся после подключения Supabase Auth и почтового сервиса. Пока настройки пусты, почтовый вход сообщает, что отправка не подключена; старый вход через ChatGPT остаётся доступным. Тестовых кодов и обхода подтверждения в приложении нет.
+Подготовлены `/login`, `/welcome` и серверные `/api/auth/*`. Реальные письма появляются после подключения Supabase Auth и почтового сервиса. Пока почтовые настройки пусты, вход сообщает, что отправка не подключена. Старый вход через ChatGPT доступен только при явном `NOCT_AUTH_MODE=hybrid` за доверенным Sites-шлюзом или локально. Пустой или неизвестный режим не включает этот fallback. Тестовых кодов и обхода подтверждения в приложении нет.
 
 ## 1. Настройте Supabase и письма
 
@@ -68,7 +68,7 @@ SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```powershell
 npm run build
 npx wrangler d1 execute DB --local --config wrangler.local.json --persist-to work/auth-qa --file tests/fixtures/auth.sql
-npx wrangler dev --config dist/server/wrangler.json --port 8787 --persist-to work/auth-qa --var SUPABASE_URL:http://127.0.0.1:8791 --var SUPABASE_PUBLISHABLE_KEY:qa-publishable --var NOCT_AUTH_ALLOW_LOCAL_PROVIDER:1
+npx wrangler dev --config dist/server/wrangler.json --port 8787 --persist-to work/auth-qa --var NOCT_AUTH_MODE:hybrid --var SUPABASE_URL:http://127.0.0.1:8791 --var SUPABASE_PUBLISHABLE_KEY:qa-publishable --var NOCT_AUTH_ALLOW_LOCAL_PROVIDER:1
 ```
 
 В другом терминале: `node tests/auth.integration.mjs`. Фикстуры и параметры провайдера предназначены только для тестового Worker. **Не задавайте `NOCT_AUTH_ALLOW_LOCAL_PROVIDER` в рабочем окружении.** Провайдер находится только в тестовом файле; в сборке приложения нет выдачи тестовых кодов.

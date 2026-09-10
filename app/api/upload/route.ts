@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     const id = crypto.randomUUID();
     await reserveUpload(id, me, file);
     try {
-      await bucket().put(id, bytes, {
+      await bucket(me).put(id, bytes, {
         httpMetadata: { contentType: file.type },
       });
       const stored = await db()

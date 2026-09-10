@@ -1,4 +1,5 @@
 'use client';
+import { EmojiPicker, EmojiPreview } from './premium-emoji';
 import { DisplayName } from './profile-identity';
 import { ProfileLink, MentionText } from './profile-link';
 /* The subscription starts an asynchronous request and updates its loading state. */
@@ -292,6 +293,7 @@ export function CommentsPanel({
         </div>
       )}
       {notice && <output className="moderation-notice">{notice}</output>}
+      <EmojiPreview text={text} />
       <form
         className="comment-form"
         onSubmit={(e) => {
@@ -301,6 +303,12 @@ export function CommentsPanel({
       >
         <Avatar person={me} size={34} />
         <div className="comment-input">
+          <EmojiPicker
+            premium={!!me.premium}
+            text={text}
+            onText={setText}
+            disabled={sending || readOnly}
+          />
           <textarea
             aria-label="Комментарий"
             placeholder="Добавить мысль…"

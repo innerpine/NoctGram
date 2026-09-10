@@ -34,7 +34,7 @@ async function status(id: string, me: string) {
   const level = boostLevel(channel.count);
   const entitlement = await db()
     .prepare(
-      `SELECT pe.expiresAt FROM premium_entitlements pe JOIN users u ON u.id=pe.userId WHERE pe.userId=? AND ${premiumActive('u.id')} AND ${boostPersonActive('u')}`,
+      `SELECT ${entitlementExpiry('u.id')} AS expiresAt FROM users u WHERE u.id=? AND ${premiumActive('u.id')} AND ${boostPersonActive('u')}`,
     )
     .bind(me)
     .first<{ expiresAt: number }>();
@@ -142,3 +142,4 @@ export async function boostsPost(
     profile: await profile(id, me),
   });
 }
+import { entitlementExpiry } from './premium-predicate';

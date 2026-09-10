@@ -119,13 +119,15 @@ try {
                             ? '[]'
                             : name === 'hasProfileDesign'
                               ? '()=>false'
-                              : ['appearanceStyle', 'useAudioCalls'].includes(
-                                    name,
-                                  )
-                                ? '()=>({})'
-                                : name === 'localDate'
-                                  ? '()=>"2026-09-08T12:00"'
-                                  : JSON.stringify(name);
+                              : name === 'useRoomList'
+                                ? '()=>({rooms:[],error:"",refresh:async()=>{}})'
+                                : ['appearanceStyle', 'useAudioCalls'].includes(
+                                      name,
+                                    )
+                                  ? '()=>({})'
+                                  : name === 'localDate'
+                                    ? '()=>"2026-09-08T12:00"'
+                                    : JSON.stringify(name);
                         return `export const ${name}=${value};`;
                       })
                       .join('\n'),
@@ -371,6 +373,54 @@ try {
       Object.defineProperty(globalThis, 'window', previousWindow);
     else delete globalThis.window;
   }
+  states.set(stateSlots.get('page'), 'messages');
+  states.set(stateSlots.get('me'), account('room-owner'));
+  states.set(stateSlots.get('peer'), null);
+  states.set(stateSlots.get('roomTarget'), null);
+  let chatTree = render();
+  const heading = all(chatTree, 'div').find(
+    (node) => node.props.className === 'threads-heading',
+  );
+  const createMenu = all(heading, 'ChatCreateMenu')[0];
+  const pencil = all(heading, 'button').find(
+    (node) => node.props['aria-label'] === 'Новый диалог',
+  );
+  assert.ok(
+    heading.props.children.indexOf(createMenu) <
+      heading.props.children.indexOf(pencil),
+    'Create menu precedes the existing pencil',
+  );
+  createMenu.props.onCreateGroup();
+  assert.equal(all(render(), 'CreateGroupDialog')[0].props.open, true);
+  assert.equal(all(render(), 'SelectSecretPeerDialog')[0].props.open, false);
+  states.set(stateSlots.get('me'), account('another-account'));
+  assert.equal(
+    all(render(), 'CreateGroupDialog')[0].props.open,
+    false,
+    'Account switch closes a foreign creation flow before effects',
+  );
+  chatTree = render();
+  all(chatTree, 'ChatCreateMenu')[0].props.onCreateSecret();
+  assert.equal(all(render(), 'SelectSecretPeerDialog')[0].props.open, true);
+  states.set(stateSlots.get('roomTarget'), { roomId: 'one-room' });
+  chatTree = render();
+  const workspace = all(chatTree, 'RoomConversation')[0];
+  assert.equal(workspace.props.target.roomId, 'one-room');
+  assert.ok(
+    all(chatTree, 'div').some(
+      (node) => node.props.className === 'messenger peer-open',
+    ),
+  );
+  const oldKey = workspace.key;
+  states.set(stateSlots.get('me'), account('third-account'));
+  assert.notEqual(
+    all(render(), 'RoomConversation')[0].key,
+    oldKey,
+    'Changing identity remounts the private workspace',
+  );
+  console.log(
+    'Room entry passed: plus placement, controlled dialogs, account isolation and mobile conversation state.',
+  );
 } finally {
   delete globalThis[hookKey];
 }

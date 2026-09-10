@@ -42,6 +42,7 @@ export function screen(name, state, options = {}) {
     block,
     head,
   } = ui(preferences, emojiAvailable);
+  if (name === 'shop') return options.view(ui(preferences, emojiAvailable));
   const site = new URL(siteUrl);
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(site.hostname);
   const siteRow = local ? [] : [[{ text: '☾ открыть noctgram', url: siteUrl }]];
@@ -122,7 +123,7 @@ export function screen(name, state, options = {}) {
         block(
           'привяжи свой аккаунт noctgram, чтобы пополнять баланс и поддерживать авторов',
         ) +
-        `\n\n${webHint} → привязать telegram\n\n<i>тестовый режим · без оплаты</i>`,
+        `\n\n${webHint} → привязать telegram`,
       rows: [
         [b('проверить привязку ›', 'home', 'link')],
         ...siteRow,

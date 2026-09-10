@@ -21,7 +21,7 @@ type TelegramAccount = {
 };
 type TelegramState = {
   enabled: boolean;
-  testMode: true;
+  testMode: boolean;
   botUsername: string;
   link: TelegramAccount | null;
   pending: {
@@ -248,7 +248,7 @@ export function TelegramLink({
           setError('Не удалось получить ссылку на бота. Создай новую ссылку.');
       }
       if (action === 'telegramConfirm') {
-        setNotice('Telegram привязан. Можно пополнять тестовый баланс.');
+        setNotice('Telegram привязан. Можно оплачивать покупки в боте.');
         walletCallback.current();
       }
       if (action === 'telegramCancel') setNotice('Запрос привязки отменён.');
@@ -286,7 +286,7 @@ export function TelegramLink({
         </span>
         <div>
           <h3 id={titleId}>Stars через Telegram</h3>
-          <p>Тестовое пополнение без оплаты</p>
+          <p>Привязка для оплаты Telegram Stars</p>
         </div>
         {busy && (
           <LoaderCircle className="spin" size={17} aria-label="Сохраняем" />
@@ -489,8 +489,8 @@ export function TelegramLink({
           ) : (
             <div className="telegram-link-step">
               <p className="telegram-link-copy">
-                Привяжи свой Telegram и получай тестовые звёзды в боте. Каждую
-                привязку подтверждаешь ты.
+                Привяжи свой Telegram, чтобы покупать Stars и Premium в боте.
+                Каждую привязку подтверждаешь ты.
               </p>
               <button
                 type="button"
@@ -503,7 +503,7 @@ export function TelegramLink({
             </div>
           )}
           <p className="telegram-link-limit">
-            До 50 000 тестовых звёзд за 24 часа. Покупка появится позже.
+            Начисления появляются после подтверждения оплаты.
           </p>
         </>
       )}

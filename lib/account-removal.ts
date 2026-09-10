@@ -27,6 +27,16 @@ export async function deleteAccount(
       409,
       'Подтвердите удаление своих каналов вместе с аккаунтом.',
     );
+  // Shared groups survive their founder: deletion requires an explicit transfer
+  // before the account can disappear. The same condition is repeated at commit.
+  const sharedGroups = `EXISTS(SELECT 1 FROM chat_rooms gr WHERE gr.ownerId=? AND gr.kind='group' AND gr.deletedAt=0
+    AND EXISTS(SELECT 1 FROM chat_room_members gm JOIN users gu ON gu.id=gm.userId WHERE gm.roomId=gr.id AND gm.status='active' AND gm.userId<>gr.ownerId AND gu.deletedAt=0))`;
+  if (await d.prepare(`SELECT 1 WHERE ${sharedGroups}`).bind(me).first())
+    throw new ApiError(
+      409,
+      'Перед удалением аккаунта передайте владение группами с другими участниками. Это можно сделать в настройках каждой группы.',
+      'GROUP_OWNERSHIP_REQUIRED',
+    );
   const gate =
     'EXISTS(SELECT 1 FROM account_deletions WHERE userId=? AND requestId=?)';
   const args = [me, requestId];
@@ -34,7 +44,7 @@ export async function deleteAccount(
   const statements: D1PreparedStatement[] = [
     d
       .prepare(
-        `INSERT INTO account_deletions(userId,requestId,created) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM auth_sessions s JOIN users u ON u.id=s.userId WHERE s.tokenHash=? AND s.userId=? AND s.expiresAt>? AND s.verifiedAt>? AND u.deletedAt=0) AND NOT EXISTS(SELECT 1 FROM administrators WHERE userId=?) AND (?=1 OR NOT EXISTS(SELECT 1 FROM users WHERE ownerId=? AND deletedAt=0))`,
+        `INSERT INTO account_deletions(userId,requestId,created) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM auth_sessions s JOIN users u ON u.id=s.userId WHERE s.tokenHash=? AND s.userId=? AND s.expiresAt>? AND s.verifiedAt>? AND u.deletedAt=0) AND NOT EXISTS(SELECT 1 FROM administrators WHERE userId=?) AND (?=1 OR NOT EXISTS(SELECT 1 FROM users WHERE ownerId=? AND deletedAt=0)) AND NOT (${sharedGroups})`,
       )
       .bind(
         me,
@@ -47,7 +57,29 @@ export async function deleteAccount(
         me,
         deleteChannels ? 1 : 0,
         me,
+        me,
       ),
+    d
+      .prepare(
+        `DELETE FROM direct_chat_archives WHERE (userId=? OR peerId=?) AND ${gate}`,
+      )
+      .bind(me, me, ...args),
+    // Secret room deletion cascades all ciphertext, both public keys and room
+    // membership. Owned groups have no other live members after the gate above.
+    d
+      .prepare(
+        `DELETE FROM chat_rooms WHERE (ownerId=? OR (kind='secret' AND EXISTS(SELECT 1 FROM chat_room_members sm WHERE sm.roomId=chat_rooms.id AND sm.userId=?))) AND ${gate}`,
+      )
+      .bind(me, me, ...args),
+    d
+      .prepare(`DELETE FROM chat_room_messages WHERE sender=? AND ${gate}`)
+      .bind(me, ...args),
+    d
+      .prepare(`DELETE FROM chat_room_invites WHERE createdBy=? AND ${gate}`)
+      .bind(me, ...args),
+    d
+      .prepare(`DELETE FROM chat_room_members WHERE userId=? AND ${gate}`)
+      .bind(me, ...args),
     d
       .prepare(
         `INSERT OR IGNORE INTO storage_deletions(objectKey,created) SELECT objectKey,? FROM music_audio WHERE userId=? AND ${gate}`,

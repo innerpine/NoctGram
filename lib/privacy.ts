@@ -1,4 +1,5 @@
 import { appearanceColumns } from '@/lib/premium-access';
+import { assertPremiumEmoji } from './premium-emoji-access';
 import { db, clean, ApiError } from './server';
 import { assertReadable, visibleAccount } from './account-access';
 import { CHAT_ATTACHMENT_LIMIT, type ChatAttachment } from './chat-files';
@@ -39,6 +40,7 @@ export async function sendPrivateMessage(
   key: unknown = crypto.randomUUID(),
   replyTo: unknown = null,
 ) {
+  await assertPremiumEmoji(me, text);
   if (
     replyTo !== null &&
     (typeof replyTo !== 'string' || !replyTo || replyTo.length > 250)

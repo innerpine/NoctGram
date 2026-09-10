@@ -1,0 +1,14 @@
+[
+  {"id":"premium30","product":"premium","units":30,"title":"Noct Premium · 30 дней","xtr":650,"rub":149},
+  {"id":"stars100","product":"stars","units":100,"title":"100 Noct Stars","xtr":19,"rub":19},
+  {"id":"stars150","product":"stars","units":150,"title":"150 Noct Stars","xtr":25,"rub":25},
+  {"id":"stars250","product":"stars","units":250,"title":"250 Noct Stars","xtr":39,"rub":39},
+  {"id":"stars350","product":"stars","units":350,"title":"350 Noct Stars","xtr":55,"rub":55},
+  {"id":"stars500","product":"stars","units":500,"title":"500 Noct Stars","xtr":75,"rub":75},
+  {"id":"stars750","product":"stars","units":750,"title":"750 Noct Stars","xtr":109,"rub":109},
+  {"id":"stars1000","product":"stars","units":1000,"title":"1 000 Noct Stars","xtr":139,"rub":139},
+  {"id":"stars1500","product":"stars","units":1500,"title":"1 500 Noct Stars","xtr":199,"rub":199},
+  {"id":"stars2500","product":"stars","units":2500,"title":"2 500 Noct Stars","xtr":319,"rub":319},
+  {"id":"stars5000","product":"stars","units":5000,"title":"5 000 Noct Stars","xtr":599,"rub":599},
+  {"id":"stars10000","product":"stars","units":10000,"title":"10 000 Noct Stars","xtr":999,"rub":999}
+]

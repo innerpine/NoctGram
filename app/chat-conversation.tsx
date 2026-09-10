@@ -380,6 +380,7 @@ export function ChatConversation({
       </div>
       {!!privacyNote && <p className="message-privacy-note">{privacyNote}</p>}
       <ChatComposer
+        premium={!!me.premium}
         peerId={peer.id}
         text={text}
         onText={onText}

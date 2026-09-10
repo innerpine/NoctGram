@@ -95,7 +95,7 @@ export async function POST(req: Request, { params }: Params) {
     // Register first: an interrupted PUT/commit remains discoverable by cleanup.
     await queueStorageDeletion(pendingKey);
     if (previous) await queueStorageDeletion(previous.objectKey);
-    await bucket().put(pendingKey, bytes, {
+    await bucket(me).put(pendingKey, bytes, {
       httpMetadata: { contentType: mime },
     });
     const stored = await db()

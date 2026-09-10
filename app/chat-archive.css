@@ -1,0 +1,61 @@
+.archive-row-wrap {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.archive-row-wrap > .thread-row {
+  flex: 1;
+  min-width: 0;
+  padding-right: 38px;
+}
+.archive-row-menu {
+  position: absolute;
+  right: 7px;
+  top: 18px;
+  opacity: 0.65;
+}
+.archive-row-wrap:hover .archive-row-menu,
+.archive-row-menu:focus-visible {
+  opacity: 1;
+}
+.archive-error {
+  font-size: 12px;
+  color: #efaaaa;
+  padding: 0 14px 10px;
+}
+.archive-folder {
+  display: flex;
+  width: 100%;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 15px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+}
+.archive-folder:hover {
+  background: var(--muted);
+}
+.archive-folder > span:nth-child(2) {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+}
+.archive-folder strong {
+  font-size: 14px;
+  font-weight: 550;
+}
+.archive-folder small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.archive-folder-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: var(--raised);
+  color: var(--foreground);
+}

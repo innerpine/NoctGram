@@ -78,6 +78,14 @@ const compiled = await build({
     {
       name: 'sqlite-runtime',
       setup(build) {
+        build.onResolve({ filter: /^\.\/auth-session$/ }, () => ({
+          path: 'auth-session',
+          namespace: 'gift-crypto',
+        }));
+        build.onLoad({ filter: /.*/, namespace: 'gift-crypto' }, () => ({
+          contents:
+            "export const setting=()=> '1'; export async function tokenHash(value) { return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))), b=>b.toString(16).padStart(2,'0')).join('') }",
+        }));
         build.onResolve({ filter: /^\.\/(storage|server)$/ }, (args) => ({
           path: args.path,
           namespace: 'fixture',
@@ -97,13 +105,17 @@ const api = await import(
 );
 const now = Date.now();
 let serial = 0;
-const purchase = (extra = {}) => ({
-  recipient: 'bob',
-  giftId: 'toy_bear',
-  message: 'Спасибо тебе!',
-  key: 'gift-request-' + String(++serial).padStart(8, '0'),
-  ...extra,
-});
+const purchase = (extra = {}) => {
+  // Independent wallet/privacy cases; shared rate limits have dedicated regressions.
+  sqlite.exec('DELETE FROM auth_limits');
+  return {
+    recipient: 'bob',
+    giftId: 'toy_bear',
+    message: 'Спасибо тебе!',
+    key: 'gift-request-' + String(++serial).padStart(8, '0'),
+    ...extra,
+  };
+};
 const count = (table) =>
   Number(sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n);
 await api.ensureWallet('alice');

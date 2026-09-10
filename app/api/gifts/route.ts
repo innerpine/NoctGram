@@ -4,6 +4,7 @@ import { readJsonBody } from '@/lib/request-body';
 import { GIFT_CATALOG } from '@/lib/gift-catalog';
 import { balance, ensureWallet } from '@/lib/star-wallet';
 import { sendGift, listGifts, giftVisibility } from '@/lib/gifts';
+import { rateLimit } from '@/lib/rate-limit';
 export const dynamic = 'force-dynamic';
 const reply = (data: unknown) =>
   Response.json(data, { headers: { 'Cache-Control': 'private, no-store' } });
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
       throw new ApiError(403, 'Недопустимый источник');
     const me = await viewer();
     const body = await readJsonBody(req, 4096);
+    await rateLimit('gift-requests', me, 60, 60);
     if (body.action === 'visibility') {
       await assertReadable(me);
       return reply(await giftVisibility(me, body));

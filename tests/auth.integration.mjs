@@ -144,7 +144,13 @@ async function upload(jar) {
 try {
   const a = browser(),
     b = browser();
-  assert.equal((await status(a)).emailEnabled, true);
+  const configured = await status(a);
+  assert.equal(
+    configured.sitesEnabled,
+    true,
+    'Start the isolated test Worker with --var NOCT_AUTH_MODE:hybrid for trusted Sites fixtures',
+  );
+  assert.equal(configured.emailEnabled, true);
   assert.equal((await status(a)).user, null);
   const expiredSession = browser('mod_qa_admin');
   expiredSession.cookies.set('noct_session', 'a'.repeat(64));

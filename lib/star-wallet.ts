@@ -1,6 +1,8 @@
+import { setting } from './auth-session';
 import { db } from './storage';
 
 export async function ensureWallet(me: string) {
+  if (setting('NOCT_STARS_TEST_MODE') !== '1') return;
   await db()
     .prepare(
       "INSERT OR IGNORE INTO star_transfers(id,recipient,amount,kind,created) VALUES(?,?,10000,'grant',?)",

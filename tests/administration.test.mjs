@@ -204,6 +204,9 @@ function fixture(t) {
     'lib/administration.ts',
     'lib/account-access.ts',
     'lib/premium-access.ts',
+    'lib/premium-predicate.ts',
+    'lib/premium-emoji.ts',
+    'lib/premium-emoji-access.ts',
     'lib/boost-access.ts',
     'lib/boost-rules.ts',
     'lib/channel-access.ts',
@@ -256,7 +259,9 @@ function fixture(t) {
       return result;
     }
     if (file === 'lib/auth-session.ts')
-      return evaluate(file, declaration(file, 'tokenHash'));
+      return Object.assign(evaluate(file, declaration(file, 'tokenHash')), {
+        setting: () => '1',
+      });
     if (file === 'lib/privacy.ts')
       return new Proxy(
         {},

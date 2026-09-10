@@ -1,3 +1,4 @@
+import { setting } from './auth-session';
 import { assertStaticAvatar } from './avatar-media';
 import { appearanceColumns } from '@/lib/premium-access';
 import { assertMediaRead, mediaAssignment } from '@/lib/media-access';
@@ -6,6 +7,8 @@ import {
   channelRights,
   channelPermission,
   writableTarget,
+  published,
+  sqlNow,
 } from './channel-access';
 import { personalVisibility } from './privacy';
 import {
@@ -113,13 +116,13 @@ export async function featureGet(
       .all();
     const totals = await d
       .prepare(
-        "SELECT COALESCE(SUM(CASE WHEN recipient=? AND kind='support' THEN amount ELSE 0 END),0) AS received,COALESCE(SUM(CASE WHEN sender=? THEN amount ELSE 0 END),0) AS sent,COALESCE(SUM(CASE WHEN recipient=? AND kind IN ('telegram_test','admin_grant') THEN 1 ELSE 0 END),0) AS topupCount,COALESCE(SUM(CASE WHEN recipient=? AND kind IN ('telegram_test','admin_grant') THEN amount ELSE 0 END),0) AS topupTotal FROM star_transfers WHERE sender=? OR recipient=?",
+        "SELECT COALESCE(SUM(CASE WHEN recipient=? AND kind='support' THEN amount ELSE 0 END),0) AS received,COALESCE(SUM(CASE WHEN sender=? THEN amount ELSE 0 END),0) AS sent,COALESCE(SUM(CASE WHEN recipient=? AND kind IN ('telegram_test','admin_grant','purchase') THEN 1 ELSE 0 END),0) AS topupCount,COALESCE(SUM(CASE WHEN recipient=? AND kind IN ('telegram_test','admin_grant','purchase') THEN amount ELSE 0 END),0) AS topupTotal FROM star_transfers WHERE sender=? OR recipient=?",
       )
       .bind(me, me, me, me, me, me)
       .first();
     return Response.json({
       balance: await balance(me),
-      testMode: true,
+      testMode: setting('NOCT_STARS_TEST_MODE') === '1',
       ...totals,
       transactions: rows.results,
     });
@@ -317,23 +320,25 @@ export async function featurePost(
     // One SQLite write statement checks the current ledger and debits/credits together.
     const result = await d
       .prepare(
-        "INSERT INTO star_transfers(id,sender,recipient,postId,postText,amount,kind,created) SELECT ?,?,?,?,?,?,'support',? WHERE ? <= (SELECT COALESCE(SUM(CASE WHEN recipient=? THEN amount ELSE -amount END),0) FROM star_transfers WHERE recipient=? OR sender=?) AND ? + (SELECT COALESCE(SUM(amount),0) FROM star_transfers WHERE sender=? AND postId=? AND kind='support') <= 10000 ON CONFLICT(id) DO NOTHING",
+        `INSERT INTO star_transfers(id,sender,recipient,postId,postText,amount,kind,created)
+        SELECT ?,s.id,r.id,p.id,substr(p.text,1,120),?,'support',? FROM users s,posts p
+        JOIN users u ON u.id=p.userId JOIN users r ON r.id=COALESCE(u.ownerId,u.id)
+        WHERE s.id=? AND p.id=? AND r.id=? AND s.id<>r.id
+          AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${visibleAccount('u')} AND ${published('p')}
+          AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=s.id AND (ar.expiresAt IS NULL OR ar.expiresAt>${sqlNow}))
+          AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE (b.blocker=s.id AND b.blocked IN(u.id,r.id)) OR (b.blocker IN(u.id,r.id) AND b.blocked=s.id))
+          AND ? <= (SELECT COALESCE(SUM(CASE WHEN recipient=s.id THEN amount ELSE -amount END),0) FROM star_transfers WHERE recipient=s.id OR sender=s.id)
+          AND ? + (SELECT COALESCE(SUM(amount),0) FROM star_transfers WHERE sender=s.id AND postId=p.id AND kind='support') <= 10000 ON CONFLICT(id) DO NOTHING`,
       )
       .bind(
         transferId,
-        me,
-        post.recipient,
-        id,
-        post.text.slice(0, 120),
         amount,
         Date.now(),
-        amount,
-        me,
-        me,
-        me,
-        amount,
         me,
         id,
+        post.recipient,
+        amount,
+        amount,
       )
       .run();
     if (!result.meta.changes) {
@@ -346,7 +351,7 @@ export async function featurePost(
       if (!retry)
         throw new ApiError(
           409,
-          'Недостаточно звёзд или достигнут лимит 10 000 на этот пост',
+          'Поддержка недоступна: изменились права, не хватает звёзд или достигнут лимит 10 000 на этот пост',
         );
     }
     return Response.json({ ok: true, balance: await balance(me) });
