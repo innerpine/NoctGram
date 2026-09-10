@@ -21,6 +21,26 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.chat-header .chat-peer-presence {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-header .chat-peer-presence[data-online='true'] {
+  color: #89ceb6;
+}
+.chat-presence-compact {
+  display: none;
+}
+@media (max-width: 600px) {
+  .chat-presence-full {
+    display: none;
+  }
+  .chat-presence-compact {
+    display: inline;
+  }
+}
 .chat-header :is(.call-button, .chat-block, .chat-more, .chat-back) {
   flex-shrink: 0;
 }
