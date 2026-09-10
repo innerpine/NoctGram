@@ -46,7 +46,7 @@
 }
 .music-sort-handle:disabled {
   opacity: 0.3;
-  cursor: var(--noct-cursor-default, default);
+  cursor: default;
 }
 .playlist-tracks.music-sort-list {
   max-height: min(60dvh, 600px);

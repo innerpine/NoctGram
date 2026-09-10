@@ -329,7 +329,7 @@
   font-size: 13px;
 }
 .moderation-history summary {
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
   color: #ffffffbf;
 }
 .moderation-history > div {

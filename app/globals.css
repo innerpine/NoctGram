@@ -69,7 +69,7 @@ textarea {
 button {
   -webkit-appearance: none;
   appearance: none;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
   color: inherit;
   border: 0;
   background: none;
@@ -186,7 +186,7 @@ small {
   border-radius: 10px;
   padding: 9px 15px;
   font-size: 13px;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
 }
 .secondary:hover {
   background: #ffffff1e;

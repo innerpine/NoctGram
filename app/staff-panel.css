@@ -253,7 +253,7 @@
   color: #ddd7e8;
   font-size: 13px;
   line-height: 1.5;
-  cursor: var(--noct-cursor-pointer, pointer);
+  cursor: pointer;
 }
 .staff-select-option > :first-child {
   display: flex;

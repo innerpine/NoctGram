@@ -281,7 +281,7 @@
 }
 .channel-boosts-dialog .channel-boosts-slot:disabled {
   opacity: 0.6;
-  cursor: var(--noct-cursor-default, default);
+  cursor: default;
 }
 .channel-boosts-dialog .channel-boosts-slot.is-here {
   opacity: 1;
