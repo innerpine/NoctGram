@@ -141,6 +141,30 @@
 .peer-profile-avatar > .avatar {
   box-shadow: 0 0 0 5px #19191d;
 }
+.peer-profile-shell[data-profile-background='true'] .peer-profile-hero {
+  background: transparent;
+}
+.peer-profile-shell[data-profile-background='true']
+  .peer-profile-toolbar:not(.over-cover) {
+  background: #00000018;
+}
+.peer-profile-shell[data-profile-background='true']
+  .peer-profile-avatar
+  > .avatar {
+  box-shadow: 0 0 0 5px
+    color-mix(in srgb, var(--surface-first) var(--surface-intensity), #0b0b10);
+}
+.peer-profile-shell[data-profile-background='true']
+  :is(
+    .peer-profile-info small,
+    .peer-chat-stats h3,
+    .peer-stats-grid small,
+    .peer-chat-stats > p,
+    .peer-profile-sections > button > small,
+    .peer-profile-sections > button > svg:last-child
+  ) {
+  color: #ffffffb8;
+}
 .peer-profile-identity h2 {
   max-width: 100%;
   font-size: 22px;

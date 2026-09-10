@@ -310,6 +310,7 @@
   overflow-wrap: anywhere;
 }
 .profile-card[data-profile-background='true'],
+.peer-profile-shell[data-profile-background='true'],
 .design-preview[data-profile-background='true'] {
   background: linear-gradient(
     145deg,
