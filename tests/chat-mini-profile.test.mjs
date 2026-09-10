@@ -3,10 +3,51 @@ import { build } from 'esbuild';
 
 const effects = [],
   requests = [];
+let slots = [],
+  cursor = 0,
+  reveal;
 globalThis.__miniProfileEffects = effects;
+globalThis.__miniProfileState = (value) => {
+  const index = cursor++;
+  if (!(index in slots))
+    slots[index] = typeof value === 'function' ? value() : value;
+  return [
+    slots[index],
+    (next) => {
+      slots[index] = typeof next === 'function' ? next(slots[index]) : next;
+    },
+  ];
+};
+globalThis.__miniProfilePrepare = () =>
+  new Promise((resolve) => {
+    reveal = resolve;
+  });
 globalThis.__miniProfileRequest = async (url) => {
-  requests.push(new URL(url, 'https://noctgram.test'));
-  return { gifts: [], items: [], next: null };
+  const request = new URL(url, 'https://noctgram.test');
+  requests.push(request);
+  if (request.searchParams.get('action') === 'profile')
+    return {
+      id: request.searchParams.get('id'),
+      name: 'Styled profile',
+      handle: 'styled',
+      premium: true,
+      profileBackground: '{}',
+      cover: '',
+      avatar: '',
+    };
+  return {
+    gifts: [],
+    items: [],
+    next: null,
+    messages: 2,
+    sent: 1,
+    received: 1,
+    first: 1,
+    photos: 0,
+    videos: 0,
+    files: 0,
+    audio: 0,
+  };
 };
 const { outputFiles } = await build({
   entryPoints: ['app/chat-peer-profile.tsx'],
@@ -32,14 +73,15 @@ const { outputFiles } = await build({
         build.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({
           contents:
             path === 'react'
-              ? `export const useState = value => [typeof value === 'function' ? value() : value, () => {}];
-             export const useRef = current => ({current});
+              ? `export const useState = globalThis.__miniProfileState;
+             export const useRef = current => useState(() => ({current}))[0];
              export const useEffect = effect => globalThis.__miniProfileEffects.push(effect);
              export const useLayoutEffect = () => {};`
               : `export const Dialog='Dialog', DialogContent='DialogContent', DialogDescription='DialogDescription', DialogTitle='DialogTitle',
              Avatar='Avatar', DisplayName='DisplayName', GiftAnimation='GiftAnimation', ChatEmojiText='ChatEmojiText',
              ProfileLink='ProfileLink', ChatPeerPresence='ChatPeerPresence';
-             export const appearanceStyle=()=>({}), useProfileBackground=()=>undefined, giftDefinition=()=>null, chatFileSize=()=>'';
+             export const appearanceStyle=()=>({}), useProfileBackground=person=>person.profileBackground ? {'--surface-first':'#ffaa88'} : undefined, giftDefinition=()=>null, chatFileSize=()=>'';
+             export const prepareProfileVisuals=(...args)=>globalThis.__miniProfilePrepare(...args);
              export const chatRequest=(...args)=>globalThis.__miniProfileRequest(...args);`,
         }));
       },
@@ -59,6 +101,8 @@ globalThis.window = { matchMedia: () => ({ matches: true }) };
 for (const id of ['bob', 'alice']) {
   effects.length = 0;
   requests.length = 0;
+  slots = [];
+  cursor = 0;
   const dialog = ChatProfileDialog({
     person: { id, name: id, handle: id },
     viewerId: 'alice',
@@ -67,9 +111,33 @@ for (const id of ['bob', 'alice']) {
     onOpenChange: () => {},
   });
   const body = dialog.props.children.props.children;
-  const content = body.type(body.props);
+  slots = [];
+  cursor = 0;
+  const render = () => {
+    cursor = 0;
+    return body.type(body.props);
+  };
+  let content = render();
+  assert.match(content.props.className, /peer-profile-loading/);
+  assert.equal(
+    nodes(content).some((node) => node.type === 'Avatar'),
+    false,
+    'Do not expose the undecorated chat identity before the full profile loads',
+  );
   const cleanup = effects.map((effect) => effect());
   await new Promise((resolve) => setImmediate(resolve));
+  content = render();
+  assert.match(
+    content.props.className,
+    /peer-profile-loading/,
+    'Keep the placeholder while the banner and palette are being prepared',
+  );
+  reveal();
+  await new Promise((resolve) => setImmediate(resolve));
+  content = render();
+  assert.match(content.props.className, /peer-profile-ready/);
+  assert.equal(content.props['data-profile-background'], true);
+  assert.equal(content.props.style['--surface-first'], '#ffaa88');
   assert.equal(
     requests
       .find((url) => url.searchParams.get('action') === 'profile')
@@ -115,6 +183,8 @@ for (const id of ['bob', 'alice']) {
 delete globalThis.window;
 delete globalThis.__miniProfileEffects;
 delete globalThis.__miniProfileRequest;
+delete globalThis.__miniProfileState;
+delete globalThis.__miniProfilePrepare;
 console.log(
   'Chat mini-profile: own/peer identity and gifts, current conversation statistics and media passed.',
 );

@@ -43,6 +43,7 @@ import { ChatEmojiText } from './chat-emoji-text';
 import { ProfileLink } from './profile-link';
 import { ChatPeerPresence } from './chat-peer-presence';
 import { useProfileBackground } from './profile-surface';
+import { prepareProfileVisuals } from '@/lib/profile-visuals';
 
 const sections = [
   { id: 'photos', title: 'Фотографии', icon: ImageIcon },
@@ -219,6 +220,8 @@ function PeerProfileBody({
           '/api/social?action=profile&id=' + encodeURIComponent(peer.id),
           controller?.signal,
         );
+        if (controller?.signal.aborted) return;
+        await prepareProfileVisuals(result);
         if (!controller?.signal.aborted) setPerson(result);
       } else if (key === 'stats') {
         const result = await get<ChatLibraryStats>(
@@ -361,9 +364,44 @@ function PeerProfileBody({
   const currentGift =
     view.kind === 'gift' ? giftDefinition(view.gift.giftId) : null;
 
+  if (!person) {
+    return (
+      <div
+        className="peer-profile-shell peer-profile-loading"
+        aria-busy={!errors.profile}
+      >
+        <DialogTitle className="sr-only">{title}</DialogTitle>
+        <DialogDescription className="sr-only">
+          Загружаем профиль и его оформление.
+        </DialogDescription>
+        <div className="peer-profile-toolbar over-cover">
+          <button
+            className="icon-button peer-profile-close"
+            aria-label="Закрыть мини-профиль"
+            onClick={onClose}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="peer-profile-placeholder" aria-hidden="true">
+          <div className="peer-placeholder-cover" />
+          <div className="peer-placeholder-avatar" />
+          <div className="peer-placeholder-line" />
+          <div className="peer-placeholder-line short" />
+        </div>
+        <div className="peer-profile-load-status">
+          {errors.profile ? (
+            feedback('profile')
+          ) : (
+            <span role="status">Загружаем профиль…</span>
+          )}
+        </div>
+      </div>
+    );
+  }
   return (
     <div
-      className="peer-profile-shell"
+      className="peer-profile-shell peer-profile-ready"
       data-profile-background={!!surface}
       style={{ ...appearanceStyle(identity), ...surface }}
     >

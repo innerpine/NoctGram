@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { paletteFromPixels, type ImagePalette } from './image-palette';
 const cache = new Map<string, Promise<ImagePalette | null>>();
 const resolved = new Map<string, ImagePalette | null>();
-function sample(url: string) {
+export function preloadImagePalette(url: string) {
   let pending = cache.get(url);
   if (pending) return pending;
   pending = new Promise<ImagePalette | null>((resolve) => {
@@ -63,7 +63,7 @@ export function useImagePalette(url: string) {
   useEffect(() => {
     if (!url) return;
     let active = true;
-    void sample(url).then((colors) => {
+    void preloadImagePalette(url).then((colors) => {
       if (active) setValue({ url, colors });
     });
     return () => {
