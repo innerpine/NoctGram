@@ -29,7 +29,10 @@ const { outputFiles } = await build({
       name: 'video-controls',
       setup(build) {
         build.onResolve(
-          { filter: /^(react(?:\/jsx-runtime)?|lucide-react)$/ },
+          {
+            filter:
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog)$/,
+          },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
         build.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({
@@ -38,17 +41,24 @@ const { outputFiles } = await build({
               ? `export const useState=globalThis.__videoState; export const useRef=value=>useState({current:value})[0]; export const useEffect=effect=>globalThis.__videoEffects.push(effect);`
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
-                : 'export const Download="Download", LoaderCircle="LoaderCircle", Maximize="Maximize", Minimize="Minimize", Pause="Pause", Play="Play", RotateCcw="RotateCcw", Volume2="Volume2", VolumeX="VolumeX";',
+                : 'export const Dialog="Dialog", DialogContent="DialogContent", DialogTitle="DialogTitle", Expand="Expand", X="X", Download="Download", LoaderCircle="LoaderCircle", Maximize="Maximize", Minimize="Minimize", Pause="Pause", Play="Play", RotateCcw="RotateCcw", Volume2="Volume2", VolumeX="VolumeX";',
         }));
       },
     },
   ],
 });
-const { ChatVideoPlayer, readVideoState, seekVideo, toggleVideoFullscreen } =
-  await import(
-    'data:text/javascript;base64,' +
-      Buffer.from(outputFiles[0].text).toString('base64')
-  );
+const {
+  VideoPlayer,
+  readVideoState,
+  seekVideo,
+  toggleVideoFullscreen,
+  claimVideoPlayback,
+  captureVideoPlayback,
+  restoreVideoPosition,
+} = await import(
+  'data:text/javascript;base64,' +
+    Buffer.from(outputFiles[0].text).toString('base64')
+);
 const timers = new Map();
 let timerId = 0;
 const originalTimeout = globalThis.setTimeout,
@@ -78,6 +88,7 @@ let tree,
   rejectPlay = false;
 const media = new EventTarget();
 Object.assign(media, {
+  ownerDocument: doc,
   duration: 120,
   currentTime: 0,
   paused: true,
@@ -111,7 +122,7 @@ const find = (type, label) =>
   );
 const render = () => {
   cursor = 0;
-  tree = ChatVideoPlayer({ src: '/api/media/video', name: 'clip.mp4' });
+  tree = VideoPlayer({ src: '/api/media/video', name: 'clip.mp4' });
   tree.props.ref.current = root;
   videoNode = find('video');
   videoNode.props.ref.current = media;
@@ -259,6 +270,25 @@ try {
   await flush();
   render();
   assert.equal(media.currentTime, 0);
+  media.currentTime = 42;
+  media.volume = 0.35;
+  media.muted = true;
+  const snapshot = captureVideoPlayback(media);
+  const restored = { duration: 120, currentTime: 0, volume: 1, muted: false };
+  restoreVideoPosition(restored, snapshot);
+  assert.deepEqual(restored, {
+    duration: 120,
+    currentTime: 42,
+    volume: 0.35,
+    muted: true,
+  });
+  claimVideoPlayback(media);
+  claimVideoPlayback({ ownerDocument: doc, pause() {} });
+  assert.equal(
+    media.paused,
+    true,
+    'Starting another video pauses the previous one',
+  );
   cleanup();
   cleanup = null;
   assert.equal(media.paused, true, 'Closing the viewer stops playback');
