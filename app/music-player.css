@@ -142,11 +142,21 @@
     rgb(0 0 0 / var(--music-darkness));
 }
 .music-stage-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   flex-shrink: 0;
   padding: 10px 24px;
+}
+.music-stage-header > .music-stage-icon {
+  justify-self: start;
+}
+.music-stage-actions {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
 }
 .music-stage-label {
   display: flex;

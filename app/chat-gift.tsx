@@ -19,11 +19,13 @@ export function ChatGift({
   me,
   peer,
   onProfile,
+  onAvatar,
 }: {
   message: Message;
   me: Person;
   peer: Person;
   onProfile: (id: string) => void;
+  onAvatar: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const gift = message.gift && giftDefinition(message.gift.giftId);
@@ -62,8 +64,17 @@ export function ChatGift({
         <h3>{gift.name}</h3>
         <div className="chat-gift-person">
           <span>{outgoing ? 'для' : 'от'}</span>
-          <ProfileLink target={{ id: (outgoing ? recipient : sender).id }}>
+          <button
+            type="button"
+            aria-label={
+              'Открыть мини-профиль: ' + (outgoing ? recipient : sender).name
+            }
+            aria-haspopup="dialog"
+            onClick={() => onAvatar((outgoing ? recipient : sender).id)}
+          >
             <Avatar person={outgoing ? recipient : sender} size={22} />
+          </button>
+          <ProfileLink target={{ id: (outgoing ? recipient : sender).id }}>
             <DisplayName person={outgoing ? recipient : sender} />
           </ProfileLink>
         </div>

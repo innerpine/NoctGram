@@ -18,6 +18,8 @@ import {
   Plus,
   Sparkles,
   Trophy,
+  Music2,
+  Users,
   X,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -40,13 +42,6 @@ type MusicData = {
   library: MusicTrack[];
   discoveries: MusicTrack[];
   tracks: RankedTrack[];
-  artists: {
-    artist: string;
-    authorUrl: string;
-    plays: number;
-    tracks: number;
-    provider: string;
-  }[];
   listeners: (Person & { plays: number; tracks: number })[];
   mine: ListenerScore | null;
   period: string;
@@ -68,7 +63,7 @@ export function MusicPanel({
   tab: string;
   onTabChange: (value: string) => void;
 }) {
-  const [chart, setChart] = useState('listeners');
+  const [chart, setChart] = useState('tracks');
   const [period, setPeriod] = useState('7');
   const [url, setUrl] = useState(''),
     [error, setError] = useState('');
@@ -351,56 +346,59 @@ export function MusicPanel({
                 className="music-chart music-content-enter card"
                 key="charts"
               >
-                <div className="music-section-heading">
-                  <Trophy size={18} />
-                  <h3>На повторе у Noctgram</h3>
-                  <span>{chart === 'listeners' ? 'Топ 25' : 'Топ 30'}</span>
+                <div className="music-chart-heading">
+                  <span className="music-chart-mark">
+                    <Trophy size={22} />
+                  </span>
+                  <div>
+                    <h3>На повторе у Noctgram</h3>
+                    <p aria-live="polite">
+                      {loading
+                        ? 'Обновляем…'
+                        : `Обновлено ${new Date(data.updatedAt).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`}
+                    </p>
+                  </div>
+                  <span className="music-chart-top">
+                    {chart === 'listeners' ? 'Топ 25' : 'Топ 30'}
+                  </span>
                 </div>
-                <Tabs
-                  value={period}
-                  onValueChange={(v) => setPeriod(String(v))}
+                <div className="music-chart-controls">
+                  <Tabs
+                    className="music-chart-kind"
+                    value={chart}
+                    onValueChange={(v) => setChart(String(v))}
+                  >
+                    <TabsList aria-label="Тип чарта">
+                      <TabsTrigger value="tracks">
+                        <Music2 size={17} />
+                        Треки
+                      </TabsTrigger>
+                      <TabsTrigger value="listeners">
+                        <Users size={17} />
+                        Слушатели
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <Tabs
+                    className="music-chart-period"
+                    value={period}
+                    onValueChange={(v) => setPeriod(String(v))}
+                  >
+                    <TabsList aria-label="Период чарта">
+                      <TabsTrigger value="today">Сегодня</TabsTrigger>
+                      <TabsTrigger value="7">7 дней</TabsTrigger>
+                      <TabsTrigger value="30">30 дней</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+                <div
+                  className="music-chart-results music-content-enter"
+                  key={chart + data.period}
                 >
-                  <TabsList aria-label="Период чарта">
-                    <TabsTrigger value="today">Сегодня</TabsTrigger>
-                    <TabsTrigger value="7">7 дней</TabsTrigger>
-                    <TabsTrigger value="30">30 дней</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-                <Tabs value={chart} onValueChange={(v) => setChart(String(v))}>
-                  <TabsList>
-                    <TabsTrigger value="tracks">Треки</TabsTrigger>
-                    <TabsTrigger value="artists">Исполнители</TabsTrigger>
-                    <TabsTrigger value="listeners">Слушатели</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-                <div className="music-content-enter" key={chart + data.period}>
                   {chart === 'tracks' && trackRows(data.tracks, true)}
-                  {chart === 'artists' &&
-                    data.artists.map((artist, i) => (
-                      <div
-                        className="music-ranking-row"
-                        key={artist.provider + artist.authorUrl + artist.artist}
-                      >
-                        <span className="music-rank">
-                          {String(i + 1).padStart(2, '0')}
-                        </span>
-                        <span className="music-avatar">
-                          <Headphones size={20} />
-                        </span>
-                        <span>
-                          <strong>{artist.artist}</strong>
-                          <small>
-                            {artist.provider === 'spotify'
-                              ? 'Spotify · личное аудио'
-                              : 'SoundCloud'}{' '}
-                            · треков: {artist.tracks}
-                          </small>
-                        </span>
-                        <b>{artist.plays}</b>
-                      </div>
-                    ))}
                   {chart === 'listeners' && (
                     <MusicLeaderboard
+                      heading={false}
                       listeners={data.listeners}
                       profile={data.profile}
                       mine={data.mine}
@@ -408,27 +406,16 @@ export function MusicPanel({
                       onProfile={onProfile}
                     />
                   )}
-                  {chart !== 'listeners' &&
-                    (chart === 'tracks' ? data.tracks : data.artists).length ===
-                      0 && (
-                      <div className="music-empty">
-                        <Trophy size={28} />
-                        <h3>Первое место ещё свободно</h3>
-                        <p>
-                          Чарт появится после первых прослушиваний участников.
-                        </p>
-                      </div>
-                    )}
+                  {chart === 'tracks' && data.tracks.length === 0 && (
+                    <div className="music-empty">
+                      <Trophy size={28} />
+                      <h3>Первое место ещё свободно</h3>
+                      <p>
+                        Чарт появится после первых прослушиваний участников.
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <p className="music-footnote">
-                  Прослушивание от 30 секунд · один трек в сутки (UTC) от
-                  слушателя.
-                </p>
-                <p className="music-footnote">
-                  {loading
-                    ? 'Обновляем…'
-                    : `Обновлено ${new Date(data.updatedAt).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })} · автообновление раз в минуту`}
-                </p>
               </section>
             ) : (
               <section

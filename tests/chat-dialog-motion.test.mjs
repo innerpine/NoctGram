@@ -55,7 +55,7 @@ const compiled = await build({
         build.onResolve(
           {
             filter:
-              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog|\.\/profile-identity)$/,
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog|\.\/profile-identity|\.\/chat-text-editor|\.\/chat-emoji-text|\.\/chat-video-player)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
@@ -67,9 +67,15 @@ const compiled = await build({
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
                 : path === 'lucide-react'
                   ? 'export const Check="Check", Forward="Forward", LoaderCircle="LoaderCircle", Search="Search", Trash2="Trash2", Download="Download", File="File", ChevronDown="ChevronDown", Pin="Pin", PinOff="PinOff";'
-                  : path === './profile-identity'
-                    ? 'export const Avatar="Avatar";'
-                    : 'export const Dialog="Dialog", DialogContent="DialogContent", DialogDescription="DialogDescription", DialogTitle="DialogTitle";',
+                  : path === './chat-text-editor'
+                    ? 'export const ChatTextEditor="ChatTextEditor";'
+                    : path === './chat-emoji-text'
+                      ? 'export const ChatEmojiText="ChatEmojiText";'
+                      : path === './chat-video-player'
+                        ? 'export const ChatVideoPlayer="ChatVideoPlayer";'
+                        : path === './profile-identity'
+                          ? 'export const Avatar="Avatar";'
+                          : 'export const Dialog="Dialog", DialogContent="DialogContent", DialogDescription="DialogDescription", DialogTitle="DialogTitle";',
         }));
       },
     },
@@ -256,7 +262,7 @@ void test('an uncertain edit remains open and preserves its immutable retry whil
     onDone: () => done++,
   });
   let tree = component.render();
-  find(tree, 'textarea').props.onChange({ target: { value: 'Правка' } });
+  find(tree, 'ChatTextEditor').props.onChange('Правка');
   tree = component.render();
   find(
     tree,
@@ -268,7 +274,7 @@ void test('an uncertain edit remains open and preserves its immutable retry whil
   tree.props.onOpenChange(false);
   tree = component.render();
   assert.equal(tree.props.open, true);
-  assert.equal(find(tree, 'textarea').props.disabled, true);
+  assert.equal(find(tree, 'ChatTextEditor').props.disabled, true);
   assert.equal(
     find(tree, 'button', (props) => props.className === 'primary').props
       .disabled,

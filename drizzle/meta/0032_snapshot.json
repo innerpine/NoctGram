@@ -1225,460 +1225,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "chat_room_invites": {
-      "name": "chat_room_invites",
-      "columns": {
-        "roomId": {
-          "name": "roomId",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "tokenHash": {
-          "name": "tokenHash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "createdBy": {
-          "name": "createdBy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created": {
-          "name": "created",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "chat_room_invites_tokenHash_unique": {
-          "name": "chat_room_invites_tokenHash_unique",
-          "columns": [
-            "tokenHash"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "chat_room_invites_roomId_chat_rooms_id_fk": {
-          "name": "chat_room_invites_roomId_chat_rooms_id_fk",
-          "tableFrom": "chat_room_invites",
-          "tableTo": "chat_rooms",
-          "columnsFrom": [
-            "roomId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "chat_room_invites_createdBy_users_id_fk": {
-          "name": "chat_room_invites_createdBy_users_id_fk",
-          "tableFrom": "chat_room_invites",
-          "tableTo": "users",
-          "columnsFrom": [
-            "createdBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "chat_room_members": {
-      "name": "chat_room_members",
-      "columns": {
-        "roomId": {
-          "name": "roomId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "userId": {
-          "name": "userId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'member'"
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'active'"
-        },
-        "publicKey": {
-          "name": "publicKey",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "joinedAt": {
-          "name": "joinedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "lastReadAt": {
-          "name": "lastReadAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "lastReadId": {
-          "name": "lastReadId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        }
-      },
-      "indexes": {
-        "chat_room_members_user": {
-          "name": "chat_room_members_user",
-          "columns": [
-            "userId",
-            "status"
-          ],
-          "isUnique": false
-        },
-        "chat_room_one_owner": {
-          "name": "chat_room_one_owner",
-          "columns": [
-            "roomId"
-          ],
-          "isUnique": true,
-          "where": "\"chat_room_members\".\"role\" = 'owner' AND \"chat_room_members\".\"status\" = 'active'"
-        }
-      },
-      "foreignKeys": {
-        "chat_room_members_roomId_chat_rooms_id_fk": {
-          "name": "chat_room_members_roomId_chat_rooms_id_fk",
-          "tableFrom": "chat_room_members",
-          "tableTo": "chat_rooms",
-          "columnsFrom": [
-            "roomId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "chat_room_members_userId_users_id_fk": {
-          "name": "chat_room_members_userId_users_id_fk",
-          "tableFrom": "chat_room_members",
-          "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "chat_room_members_roomId_userId_pk": {
-          "columns": [
-            "roomId",
-            "userId"
-          ],
-          "name": "chat_room_members_roomId_userId_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "chat_room_members_role": {
-          "name": "chat_room_members_role",
-          "value": "\"chat_room_members\".\"role\" IN ('owner','admin','member')"
-        },
-        "chat_room_members_status": {
-          "name": "chat_room_members_status",
-          "value": "\"chat_room_members\".\"status\" IN ('active','left','banned')"
-        }
-      }
-    },
-    "chat_room_messages": {
-      "name": "chat_room_messages",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "roomId": {
-          "name": "roomId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "sender": {
-          "name": "sender",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "text": {
-          "name": "text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "ciphertext": {
-          "name": "ciphertext",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "replyTo": {
-          "name": "replyTo",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created": {
-          "name": "created",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "deletedAt": {
-          "name": "deletedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        }
-      },
-      "indexes": {
-        "chat_room_messages_room": {
-          "name": "chat_room_messages_room",
-          "columns": [
-            "roomId",
-            "created",
-            "id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "chat_room_messages_roomId_chat_rooms_id_fk": {
-          "name": "chat_room_messages_roomId_chat_rooms_id_fk",
-          "tableFrom": "chat_room_messages",
-          "tableTo": "chat_rooms",
-          "columnsFrom": [
-            "roomId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "chat_room_messages_sender_users_id_fk": {
-          "name": "chat_room_messages_sender_users_id_fk",
-          "tableFrom": "chat_room_messages",
-          "tableTo": "users",
-          "columnsFrom": [
-            "sender"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "chat_room_message_payload": {
-          "name": "chat_room_message_payload",
-          "value": "\"chat_room_messages\".\"ciphertext\" IS NULL OR (\"chat_room_messages\".\"text\" = '' AND \"chat_room_messages\".\"replyTo\" IS NULL)"
-        }
-      }
-    },
-    "chat_rooms": {
-      "name": "chat_rooms",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'group'"
-        },
-        "ownerId": {
-          "name": "ownerId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "avatar": {
-          "name": "avatar",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "''"
-        },
-        "visibility": {
-          "name": "visibility",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'private'"
-        },
-        "username": {
-          "name": "username",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created": {
-          "name": "created",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "deletedAt": {
-          "name": "deletedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        }
-      },
-      "indexes": {
-        "chat_rooms_username": {
-          "name": "chat_rooms_username",
-          "columns": [
-            "username"
-          ],
-          "isUnique": true
-        },
-        "chat_rooms_owner": {
-          "name": "chat_rooms_owner",
-          "columns": [
-            "ownerId",
-            "updatedAt"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "chat_rooms_ownerId_users_id_fk": {
-          "name": "chat_rooms_ownerId_users_id_fk",
-          "tableFrom": "chat_rooms",
-          "tableTo": "users",
-          "columnsFrom": [
-            "ownerId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "chat_rooms_kind": {
-          "name": "chat_rooms_kind",
-          "value": "\"chat_rooms\".\"kind\" IN ('group','secret')"
-        },
-        "chat_rooms_visibility": {
-          "name": "chat_rooms_visibility",
-          "value": "\"chat_rooms\".\"visibility\" IN ('public','private')"
-        },
-        "chat_rooms_secret_private": {
-          "name": "chat_rooms_secret_private",
-          "value": "\"chat_rooms\".\"kind\" <> 'secret' OR (\"chat_rooms\".\"visibility\" = 'private' AND \"chat_rooms\".\"username\" IS NULL AND \"chat_rooms\".\"description\" = '' AND \"chat_rooms\".\"avatar\" = '')"
-        },
-        "chat_rooms_public_username": {
-          "name": "chat_rooms_public_username",
-          "value": "(\"chat_rooms\".\"visibility\" = 'public' AND \"chat_rooms\".\"username\" IS NOT NULL) OR (\"chat_rooms\".\"visibility\" = 'private' AND \"chat_rooms\".\"username\" IS NULL)"
-        }
-      }
-    },
     "chat_themes": {
       "name": "chat_themes",
       "columns": {
@@ -6425,6 +5971,460 @@
       },
       "uniqueConstraints": {},
       "checkConstraints": {}
+    },
+    "chat_room_invites": {
+      "name": "chat_room_invites",
+      "columns": {
+        "roomId": {
+          "name": "roomId",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tokenHash": {
+          "name": "tokenHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdBy": {
+          "name": "createdBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "chat_room_invites_tokenHash_unique": {
+          "name": "chat_room_invites_tokenHash_unique",
+          "columns": [
+            "tokenHash"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "chat_room_invites_roomId_chat_rooms_id_fk": {
+          "name": "chat_room_invites_roomId_chat_rooms_id_fk",
+          "tableFrom": "chat_room_invites",
+          "tableTo": "chat_rooms",
+          "columnsFrom": [
+            "roomId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "chat_room_invites_createdBy_users_id_fk": {
+          "name": "chat_room_invites_createdBy_users_id_fk",
+          "tableFrom": "chat_room_invites",
+          "tableTo": "users",
+          "columnsFrom": [
+            "createdBy"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "chat_room_members": {
+      "name": "chat_room_members",
+      "columns": {
+        "roomId": {
+          "name": "roomId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'member'"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'active'"
+        },
+        "publicKey": {
+          "name": "publicKey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "joinedAt": {
+          "name": "joinedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "lastReadAt": {
+          "name": "lastReadAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "lastReadId": {
+          "name": "lastReadId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        }
+      },
+      "indexes": {
+        "chat_room_members_user": {
+          "name": "chat_room_members_user",
+          "columns": [
+            "userId",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "chat_room_one_owner": {
+          "name": "chat_room_one_owner",
+          "columns": [
+            "roomId"
+          ],
+          "isUnique": true,
+          "where": "\"chat_room_members\".\"role\" = 'owner' AND \"chat_room_members\".\"status\" = 'active'"
+        }
+      },
+      "foreignKeys": {
+        "chat_room_members_roomId_chat_rooms_id_fk": {
+          "name": "chat_room_members_roomId_chat_rooms_id_fk",
+          "tableFrom": "chat_room_members",
+          "tableTo": "chat_rooms",
+          "columnsFrom": [
+            "roomId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "chat_room_members_userId_users_id_fk": {
+          "name": "chat_room_members_userId_users_id_fk",
+          "tableFrom": "chat_room_members",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "chat_room_members_roomId_userId_pk": {
+          "columns": [
+            "roomId",
+            "userId"
+          ],
+          "name": "chat_room_members_roomId_userId_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "chat_room_members_role": {
+          "name": "chat_room_members_role",
+          "value": "\"chat_room_members\".\"role\" IN ('owner','admin','member')"
+        },
+        "chat_room_members_status": {
+          "name": "chat_room_members_status",
+          "value": "\"chat_room_members\".\"status\" IN ('active','left','banned')"
+        }
+      }
+    },
+    "chat_room_messages": {
+      "name": "chat_room_messages",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "roomId": {
+          "name": "roomId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sender": {
+          "name": "sender",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "ciphertext": {
+          "name": "ciphertext",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "replyTo": {
+          "name": "replyTo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deletedAt": {
+          "name": "deletedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "chat_room_messages_room": {
+          "name": "chat_room_messages_room",
+          "columns": [
+            "roomId",
+            "created",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "chat_room_messages_roomId_chat_rooms_id_fk": {
+          "name": "chat_room_messages_roomId_chat_rooms_id_fk",
+          "tableFrom": "chat_room_messages",
+          "tableTo": "chat_rooms",
+          "columnsFrom": [
+            "roomId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "chat_room_messages_sender_users_id_fk": {
+          "name": "chat_room_messages_sender_users_id_fk",
+          "tableFrom": "chat_room_messages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "sender"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "chat_room_message_payload": {
+          "name": "chat_room_message_payload",
+          "value": "\"chat_room_messages\".\"ciphertext\" IS NULL OR (\"chat_room_messages\".\"text\" = '' AND \"chat_room_messages\".\"replyTo\" IS NULL)"
+        }
+      }
+    },
+    "chat_rooms": {
+      "name": "chat_rooms",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'group'"
+        },
+        "ownerId": {
+          "name": "ownerId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "avatar": {
+          "name": "avatar",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "visibility": {
+          "name": "visibility",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'private'"
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deletedAt": {
+          "name": "deletedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "chat_rooms_username": {
+          "name": "chat_rooms_username",
+          "columns": [
+            "username"
+          ],
+          "isUnique": true
+        },
+        "chat_rooms_owner": {
+          "name": "chat_rooms_owner",
+          "columns": [
+            "ownerId",
+            "updatedAt"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "chat_rooms_ownerId_users_id_fk": {
+          "name": "chat_rooms_ownerId_users_id_fk",
+          "tableFrom": "chat_rooms",
+          "tableTo": "users",
+          "columnsFrom": [
+            "ownerId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "chat_rooms_kind": {
+          "name": "chat_rooms_kind",
+          "value": "\"chat_rooms\".\"kind\" IN ('group','secret')"
+        },
+        "chat_rooms_visibility": {
+          "name": "chat_rooms_visibility",
+          "value": "\"chat_rooms\".\"visibility\" IN ('public','private')"
+        },
+        "chat_rooms_secret_private": {
+          "name": "chat_rooms_secret_private",
+          "value": "\"chat_rooms\".\"kind\" <> 'secret' OR (\"chat_rooms\".\"visibility\" = 'private' AND \"chat_rooms\".\"username\" IS NULL AND \"chat_rooms\".\"description\" = '' AND \"chat_rooms\".\"avatar\" = '')"
+        },
+        "chat_rooms_public_username": {
+          "name": "chat_rooms_public_username",
+          "value": "(\"chat_rooms\".\"visibility\" = 'public' AND \"chat_rooms\".\"username\" IS NOT NULL) OR (\"chat_rooms\".\"visibility\" = 'private' AND \"chat_rooms\".\"username\" IS NULL)"
+        }
+      }
     }
   },
   "views": {},

@@ -1,11 +1,20 @@
 'use client';
 /* eslint-disable next/no-img-element */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Download, File as FileIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { chatFileSize, type ChatAttachment } from '@/lib/chat-files';
+import { ChatVideoPlayer } from './chat-video-player';
 
-export function ChatMessageFiles({ files }: { files: ChatAttachment[] }) {
+export function ChatMessageFiles({
+  files,
+  flush = false,
+  metadata,
+}: {
+  files: ChatAttachment[];
+  flush?: boolean;
+  metadata?: ReactNode;
+}) {
   const [photo, setPhoto] = useState<ChatAttachment | null>(null);
   const [open, setOpen] = useState(false);
   return (
@@ -13,43 +22,40 @@ export function ChatMessageFiles({ files }: { files: ChatAttachment[] }) {
       <div
         className={'chat-message-files' + (files.length > 1 ? ' multiple' : '')}
       >
-        {files.map((file) => {
+        {files.map((file, index) => {
           const url = '/api/media/' + encodeURIComponent(file.id);
+          const stamp = index === files.length - 1 ? metadata : undefined;
           if (file.kind === 'image')
             return (
-              <button
-                key={file.id}
-                type="button"
-                className="chat-photo"
-                aria-label={'Открыть фото ' + file.name}
-                onClick={() => {
-                  setPhoto(file);
-                  setOpen(true);
-                }}
-              >
-                <img
-                  src={url}
-                  alt={file.name}
-                  loading="lazy"
-                  decoding="async"
-                />
-              </button>
+              <div key={file.id} className="chat-photo-tile">
+                <button
+                  type="button"
+                  className="chat-photo"
+                  aria-label={'Открыть фото ' + file.name}
+                  onClick={() => {
+                    setPhoto(file);
+                    setOpen(true);
+                  }}
+                >
+                  <img
+                    src={url}
+                    alt={file.name}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </button>
+                {stamp}
+              </div>
             );
           if (file.kind === 'video')
             return (
               <div key={file.id} className="chat-video">
-                {/* Personal video attachments can have no speech or supplied captions. */}
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <video
+                <ChatVideoPlayer
                   src={url}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  aria-label={file.name}
+                  name={file.name}
+                  flush={flush}
+                  metadata={stamp}
                 />
-                <a href={url + '?download=1'} download={file.name}>
-                  Скачать видео <Download size={13} />
-                </a>
               </div>
             );
           return (

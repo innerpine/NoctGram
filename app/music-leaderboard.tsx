@@ -24,12 +24,14 @@ export function MusicLeaderboard({
   mine,
   period,
   onProfile,
+  heading = true,
 }: {
   listeners: Listener[];
   profile: Person | null;
   mine: ListenerScore | null;
   period: string;
   onProfile: (id: string) => void;
+  heading?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const row = (person: Listener, index: number) => (
@@ -56,11 +58,13 @@ export function MusicLeaderboard({
   );
   return (
     <section className="music-leaderboard" aria-label="Топ слушателей">
-      <div className="music-section-heading">
-        <Trophy size={18} />
-        <h3>Топ слушателей</h3>
-        <span>{period === 'today' ? 'Сегодня' : `${period} дней`}</span>
-      </div>
+      {heading && (
+        <div className="music-section-heading">
+          <Trophy size={18} />
+          <h3>Топ слушателей</h3>
+          <span>{period === 'today' ? 'Сегодня' : `${period} дней`}</span>
+        </div>
+      )}
       <Collapsible open={expanded} onOpenChange={setExpanded}>
         <div className="music-leaderboard-preview">
           {listeners.slice(0, 5).map(row)}

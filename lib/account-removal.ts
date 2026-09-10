@@ -158,6 +158,7 @@ export async function deleteAccount(
     'post_views',
     'story_views',
     'user_privacy',
+    'user_presence_privacy',
     'music_audio',
     'music_activity',
     'music_playlist_members',
@@ -197,6 +198,11 @@ export async function deleteAccount(
       .bind(me, me, ...args),
   );
   statements.push(
+    d
+      .prepare(
+        `DELETE FROM user_presence_exceptions WHERE (userId=? OR viewerId=?) AND ${gate}`,
+      )
+      .bind(me, me, ...args),
     d
       .prepare(`DELETE FROM music_playlists WHERE ownerId=? AND ${gate}`)
       .bind(me, ...args),

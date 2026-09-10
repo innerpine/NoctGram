@@ -19,9 +19,24 @@ const {
   parseLrc,
   currentLyric,
   readLyrics,
+  stableLyricDuration,
 } = await import(
   'data:text/javascript;base64,' + Buffer.from(js).toString('base64')
 );
+
+// A playing HLS recording retains its lyrics while duration metadata settles.
+const settledDuration = 102947;
+for (const correction of [102984, 102942, 103201, 102500, 105447])
+  assert.equal(stableLyricDuration(settledDuration, correction), settledDuration);
+// A temporary unknown duration must not blank text already on screen.
+for (const unavailable of [0, -1, NaN, Infinity])
+  assert.equal(stableLyricDuration(settledDuration, unavailable), settledDuration);
+// Late metadata starts the lookup; a materially different recording is checked
+// again. Compare against the original duration so small changes cannot drift.
+assert.equal(stableLyricDuration(0, 102946.802), settledDuration);
+assert.equal(stableLyricDuration(settledDuration, 105448), 105448);
+assert.equal(stableLyricDuration(settledDuration, 99000), 99000);
+assert.equal(stableLyricDuration(0, 0), 0);
 
 // Old/corrupted browser storage must not produce an invisible or invalid player.
 for (const value of [null, false, 'bad', [], {}])

@@ -36,6 +36,7 @@ export function adjacentPlayable(
       item.provider === 'soundcloud' ||
       item.provider === 'youtube' ||
       item.audioUrl ||
+      item.playback === 'file' ||
       item.playback === 'spotify'
     )
       return item;
@@ -53,7 +54,7 @@ export class MusicListenTracker {
   private busy = false;
   private attempts = 0;
   private retryAt = 0;
-  private day = 0;
+  private lastPlayedPosition = -1;
   private url = '';
   private state: ListenState = { status: 'idle', seconds: 0 };
   constructor(
@@ -61,7 +62,6 @@ export class MusicListenTracker {
     private changed: (state: ListenState) => void,
     private counted: () => void,
     private now = () => performance.now(),
-    private wall = () => Date.now(),
   ) {}
   private publish(status: ListenState['status']) {
     const seconds = Math.min(30, Math.floor(this.total / 1000));
@@ -80,7 +80,7 @@ export class MusicListenTracker {
   async start(url: string) {
     const version = ++this.version;
     this.url = url;
-    this.day = Math.floor(this.wall() / 86400000);
+    this.lastPlayedPosition = -1;
     this.total = 0;
     this.session = '';
     this.busy = false;
@@ -102,10 +102,19 @@ export class MusicListenTracker {
     }
   }
   sample(position: number, playing: boolean) {
-    if (this.url && this.day !== Math.floor(this.wall() / 86400000)) {
+    // A replay (including seeking back to the start) begins a new listen.
+    // Pausing, ordinary seeks and the UTC date changing do not create plays.
+    if (
+      this.url &&
+      playing &&
+      this.state.status === 'counted' &&
+      position < 2000 &&
+      this.lastPlayedPosition > 2000
+    ) {
       void this.start(this.url);
       return;
     }
+    if (playing) this.lastPlayedPosition = position;
     const now = this.now(),
       delta = position - this.position,
       elapsed = now - this.time;

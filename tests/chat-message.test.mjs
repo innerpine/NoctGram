@@ -43,11 +43,13 @@ const { ChatMessage } = await import(
 const me = { id: 'alice', name: 'Alice' },
   peer = { id: 'bob', name: 'Bob' };
 const profiles = [],
+  miniProfiles = [],
   pinned = [];
 const props = {
   me,
   peer,
   onProfile: (id) => profiles.push(id),
+  onAvatar: (id) => miniProfiles.push(id),
   onAction: (action, message) => {
     if (action === 'pin') pinned.push(message.id);
   },
@@ -69,8 +71,15 @@ const context = ChatMessage.type({ ...props, message });
 assert.equal(context.type, 'ChatMessageContext');
 const row = context.props.children;
 const [avatar, rendered] = row.props.children;
-assert.equal(avatar.type, 'ProfileLink');
-assert.deepEqual(avatar.props.target, { id: peer.id });
+assert.equal(avatar.type, 'button');
+assert.equal(avatar.props['aria-haspopup'], 'dialog');
+avatar.props.onClick();
+assert.deepEqual(miniProfiles, ['bob']);
+assert.deepEqual(
+  profiles,
+  [],
+  'Opening the mini-profile does not navigate away',
+);
 assert.equal(avatar.props.children.props.person, peer);
 assert.equal(rendered.props.className, 'bubble other');
 const content = rendered.props.children;
@@ -102,6 +111,13 @@ const outgoing = ChatMessage.type({
   message: { ...message, sender: 'alice', read: 1 },
 }).props.children.props.children[1];
 assert.equal(outgoing.props.className, 'bubble self');
+const ownAvatar = ChatMessage.type({
+  ...props,
+  message: { ...message, sender: me.id },
+}).props.children.props.children[0];
+ownAvatar.props.onClick();
+assert.equal(ownAvatar.props.children.props.person, me);
+assert.deepEqual(miniProfiles, ['bob', 'alice']);
 assert.equal(
   outgoing.props.children
     .find((child) => child?.props?.className === 'message-time')
@@ -118,6 +134,7 @@ const gift = ChatMessage.type({
 }).props.children;
 assert.equal(gift.type, 'ChatGift');
 assert.equal(gift.props.peer, peer);
+assert.equal(gift.props.onAvatar, props.onAvatar);
 gift.props.onProfile('bob');
 assert.deepEqual(profiles, ['bob']);
 assert.equal(gift.props.actions, undefined);
@@ -130,6 +147,46 @@ const fileMessage = ChatMessage.type({
   message: { ...message, text: '', attachments: files },
 }).props.children.props.children[1];
 assert.equal(fileMessage.props.id, 'chat-message-m1');
+assert.match(fileMessage.props.className, /chat-media-only/);
+const media = fileMessage.props.children.find(
+  (child) => child?.type === 'ChatMessageFiles',
+);
+assert.equal(media.props.flush, true);
+assert.equal(media.props.metadata.props.className, 'message-time');
+assert.equal(
+  fileMessage.props.children.some(
+    (child) => child?.props?.className === 'message-time',
+  ),
+  false,
+  'Bare media shows its timestamp only over the attachment',
+);
+for (const attachment of [files[0], { ...files[0], kind: 'video' }]) {
+  const captioned = ChatMessage.type({
+    ...props,
+    message: { ...message, text: 'Подпись', attachments: [attachment] },
+  }).props.children.props.children[1];
+  assert.match(captioned.props.className, /chat-media-message/);
+  assert.doesNotMatch(captioned.props.className, /chat-media-only/);
+  assert.equal(
+    captioned.props.children.find((child) => child?.type === 'p').props.children
+      .props.text,
+    'Подпись',
+  );
+  assert.equal(
+    captioned.props.children.find((child) => child?.type === 'ChatMessageFiles')
+      .props.metadata,
+    undefined,
+  );
+}
+const document = ChatMessage.type({
+  ...props,
+  message: {
+    ...message,
+    text: '',
+    attachments: [{ ...files[0], kind: 'file' }],
+  },
+}).props.children.props.children[1];
+assert.doesNotMatch(document.props.className, /chat-media-message/);
 assert.equal(
   fileMessage.props.children.find((child) => child?.type === 'ChatMessageFiles')
     .props.files,

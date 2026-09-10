@@ -7,11 +7,16 @@ const result = await build({
   format: 'esm',
   platform: 'node',
 });
-const { cleanLyricTitle, chooseLyricMatch, findTrackLyrics, LyricsRateLimit } =
-  await import(
-    'data:text/javascript;base64,' +
-      Buffer.from(result.outputFiles[0].text).toString('base64')
-  );
+const {
+  cleanLyricTitle,
+  chooseLyricMatch,
+  findTrackLyrics,
+  LyricsRateLimit,
+  LyricsUnavailable,
+} = await import(
+  'data:text/javascript;base64,' +
+    Buffer.from(result.outputFiles[0].text).toString('base64')
+);
 const recording = {
   title: 'Vendetta! (prod. Mupp)',
   artist: 'Sadfriendd',
@@ -133,9 +138,9 @@ const found = await findTrackLyrics(
   fake,
 );
 assert.equal(found.lines.length, 1);
-assert.equal(calls.length, 3);
-assert.equal(calls[1].searchParams.get('track_name'), 'Vendetta!');
-assert.equal(calls[2].searchParams.get('q'), 'Sadfriendd Vendetta!');
+assert.equal(calls.length, 1);
+assert.equal(calls[0].pathname, '/api/search');
+assert.equal(calls[0].searchParams.get('q'), 'Sadfriendd Vendetta!');
 const reuploadCalls = [];
 const reuploadLyrics = await findTrackLyrics(
   reupload,
@@ -152,20 +157,17 @@ const reuploadLyrics = await findTrackLyrics(
   },
 );
 assert.equal(reuploadLyrics?.lines.length, 1);
-assert.equal(reuploadCalls[0].searchParams.get('artist_name'), 'LIZER & FLESH');
-assert.equal(reuploadCalls[0].searchParams.get('track_name'), 'FALSE MIRROR');
+assert.equal(reuploadCalls.length, 1);
 assert.equal(
   reuploadCalls
     .find((url) => url.pathname.endsWith('/search'))
     .searchParams.get('q'),
   'LIZER & FLESH FALSE MIRROR',
 );
-// Even an exact-get response must pass metadata validation.
+// Search candidates must still pass metadata validation.
 assert.equal(
-  await findTrackLyrics(reupload, new AbortController().signal, async (url) =>
-    new URL(url).pathname.endsWith('/search')
-      ? Response.json([])
-      : Response.json({ ...mirror, artistName: 'Wrong artist' }),
+  await findTrackLyrics(reupload, new AbortController().signal, async () =>
+    Response.json([{ ...mirror, artistName: 'Wrong artist' }]),
   ),
   null,
 );
@@ -182,6 +184,31 @@ await assert.rejects(
     error instanceof LyricsRateLimit && error.until >= Date.now() + 119000,
 );
 assert.equal(count, 1, '429 stops the fallback request chain');
+for (const status of [500, 503, 504]) {
+  count = 0;
+  await assert.rejects(
+    findTrackLyrics(reupload, new AbortController().signal, async () => {
+      count++;
+      return new Response(null, { status });
+    }),
+    (error) => error instanceof LyricsUnavailable,
+  );
+  assert.equal(count, 1, 'A server outage stops all fallback requests');
+}
+const missing = [];
+assert.equal(
+  await findTrackLyrics(reupload, new AbortController().signal, async (url) => {
+    missing.push(new URL(url));
+    return Response.json([]);
+  }),
+  null,
+);
+assert.equal(
+  missing.length,
+  2,
+  'At most performer and uploader searches; no reversed duplicate or /get probes',
+);
+assert.ok(missing.every((url) => url.pathname === '/api/search'));
 const abort = new AbortController();
 abort.abort();
 await assert.rejects(

@@ -202,6 +202,125 @@ for (const label of ['remote-main-472cb91', 'local-chat-music-628d699']) {
     db.close();
   }
 }
+// September 10 parents share migrations through 0030, then diverge.
+for (const [label, additions] of [
+  [
+    'local-security-rooms-commerce',
+    [
+      '0031_security_boundaries',
+      '0032_chat_rooms',
+      '0033_archive_commerce',
+      '0034_payment_checkout_guards',
+    ],
+  ],
+  [
+    'friend-main-6ebde2f',
+    [
+      '0031_repeat_music_listens',
+      '0032_presence_privacy',
+      '0033_profile_background',
+    ],
+  ],
+]) {
+  const db = new DatabaseSync(':memory:');
+  const local = label.startsWith('local');
+  const applied = new Set(
+    journal
+      .slice(0, 31)
+      .map((entry) => entry.tag)
+      .concat(additions),
+  );
+  try {
+    db.exec('PRAGMA foreign_keys=ON');
+    for (const tag of applied) db.exec(scripts.get(tag));
+    db.exec(`
+      INSERT INTO users(id,name,created) VALUES('one','Owner',1),('two','Peer',1);
+      INSERT INTO messages(id,sender,recipient,text,created) VALUES('message','one','two','Keep direct message',1);
+      INSERT INTO music_tracks(id,url,kind,title,artist,authorUrl,created) VALUES('song','https://example.test/song','track','Song','Artist','https://example.test',1);
+      INSERT INTO music_library(userId,trackId,created) VALUES('one','song',1);
+      INSERT INTO music_listens(userId,trackId,day,created) VALUES('one','song',1,1);
+      INSERT INTO music_sessions(userId,id,trackId,created,updated,totalMs) VALUES('one','session','song',1,2,30000);
+      INSERT INTO profile_appearance(userId,theme,updated) VALUES('one','rose',1);
+    `);
+    if (local) {
+      db.exec(`
+        INSERT INTO chat_rooms(id,ownerId,name,created,updatedAt) VALUES('room','one','Room',1,1);
+        INSERT INTO chat_room_members(roomId,userId,role,joinedAt,archivedAt) VALUES('room','one','owner',1,123);
+        INSERT INTO chat_room_messages(id,roomId,sender,text,created) VALUES('roommessage','room','one','Keep room message',1);
+        INSERT INTO direct_chat_archives(userId,peerId,archivedAt) VALUES('one','two',456);
+        INSERT INTO payment_orders(id,requestKey,userId,sku,product,units,provider,currency,amountMinor,created,expiresAt,checkedAt,precheckoutId) VALUES('order','request','one','stars','stars',100,'crypto','RUB',100,1,999,789,'checkout');
+        INSERT INTO payment_receipts(id,provider,chargeId,orderId,currency,amountMinor,verifiedAt) VALUES('receipt','crypto','charge','order','RUB',100,1);
+      `);
+    } else {
+      db.exec(`
+        INSERT INTO user_presence_privacy(userId,policy) VALUES('one','nobody');
+        INSERT INTO user_presence_exceptions(userId,viewerId,rule) VALUES('one','two','show');
+        UPDATE profile_appearance SET background='{"mode":"none"}' WHERE userId='one';
+        UPDATE music_listens SET plays=7 WHERE userId='one';
+        UPDATE music_sessions SET counted=1 WHERE userId='one';
+      `);
+    }
+    const tables = [
+      'users',
+      'messages',
+      'music_tracks',
+      'music_library',
+      'music_listens',
+      'music_sessions',
+      'profile_appearance',
+      ...(local
+        ? [
+            'chat_rooms',
+            'chat_room_members',
+            'chat_room_messages',
+            'direct_chat_archives',
+            'payment_orders',
+            'payment_receipts',
+          ]
+        : ['user_presence_privacy', 'user_presence_exceptions']),
+    ];
+    const saved = tables.map((table) => {
+      const columns = db
+        .prepare(`PRAGMA table_info('${table}')`)
+        .all()
+        .map((column) => column.name);
+      const query = `SELECT ${columns.join(',')} FROM ${table} ORDER BY 1`;
+      return { table, query, rows: db.prepare(query).all() };
+    });
+    for (const [tag, sql] of scripts) if (!applied.has(tag)) db.exec(sql);
+    assert.deepEqual(
+      schema(db),
+      expected,
+      label + ' reaches the complete schema',
+    );
+    for (const { table, query, rows } of saved)
+      assert.deepEqual(
+        db.prepare(query).all(),
+        rows,
+        label + ' preserves ' + table,
+      );
+    assert.equal(
+      db.prepare("SELECT plays FROM music_listens WHERE userId='one'").get()
+        .plays,
+      local ? 1 : 7,
+    );
+    assert.equal(
+      db.prepare("SELECT counted FROM music_sessions WHERE userId='one'").get()
+        .counted,
+      local ? 0 : 1,
+    );
+    assert.equal(
+      db
+        .prepare("SELECT background FROM profile_appearance WHERE userId='one'")
+        .get().background,
+      local ? '' : '{"mode":"none"}',
+    );
+    assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
+  } finally {
+    db.close();
+  }
+}
+
 const alphabetic = new DatabaseSync(':memory:');
 for (const tag of [...scripts.keys()].sort((a, b) => a.localeCompare(b)))
   alphabetic.exec(scripts.get(tag));

@@ -106,6 +106,10 @@
   .chat-peer > .avatar {
     flex-shrink: 0;
   }
+  .chat-header .chat-peer > .chrome-avatar {
+    /* Keep the outer ring inside the peer button's clipping bounds. */
+    margin: 5px;
+  }
   .chat-peer :is(strong, small) {
     display: block;
     overflow: hidden;

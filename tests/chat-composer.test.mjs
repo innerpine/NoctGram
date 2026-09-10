@@ -46,16 +46,27 @@ const { outputFiles } = await build({
             'export const EmojiPicker=()=>null,EmojiPreview=()=>null,EmojiText=({text})=>text;',
         }));
         build.onResolve(
-          { filter: /^(react(?:\/jsx-runtime)?|lucide-react)$/ },
+          {
+            filter:
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/popover|\.\/chat-emoji-picker|\.\/chat-text-editor|\.\/chat-emoji-text)$/,
+          },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
         build.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({
           contents:
             path === 'react'
-              ? 'export const {useState,useRef,useEffect}=globalThis.__composerHooks; export const useLayoutEffect=useEffect;'
+              ? 'export const {useState,useRef,useEffect}=globalThis.__composerHooks; export const useLayoutEffect=useEffect; export const lazy=()=>"Lazy"; export const Suspense="Suspense";'
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx;'
-                : 'export const File="File", LoaderCircle="LoaderCircle", Paperclip="Paperclip", RotateCcw="RotateCcw", Send="Send", Video="Video", X="X", Reply="Reply";',
+                : path.includes('popover')
+                  ? 'export const Popover="Popover", PopoverContent="PopoverContent", PopoverTitle="PopoverTitle", PopoverTrigger="PopoverTrigger";'
+                  : path.includes('chat-text-editor')
+                    ? 'export const ChatTextEditor="ChatTextEditor";'
+                    : path.includes('chat-emoji-text')
+                      ? 'export const ChatEmojiText="ChatEmojiText";'
+                      : path.includes('chat-emoji-picker')
+                        ? 'export default "Picker";'
+                        : 'export const File="File", LoaderCircle="LoaderCircle", Paperclip="Paperclip", RotateCcw="RotateCcw", Send="Send", Video="Video", X="X", Reply="Reply", Smile="Smile";',
         }));
       },
     },
@@ -78,8 +89,7 @@ const previews = new Set(),
   calls = [],
   uploads = [],
   deleted = [];
-let serial = 0,
-  responseMode = 'success';
+let serial = 0;
 URL.createObjectURL = () => {
   const url = 'blob:fixture-' + ++serial;
   previews.add(url);
@@ -114,12 +124,9 @@ globalThis.fetch = async (url, init) => {
     });
     return promise;
   }
-  assert.equal(url, '/api/social');
-  calls.push(JSON.parse(init.body));
-  if (responseMode === 'lost') throw new TypeError('Failed to fetch');
-  if (responseMode === 'rejected')
-    return new Response('<html>Denied</html>', { status: 413 });
-  return Response.json({ id: 'sent' });
+  throw new Error(
+    'Composer must hand off to the outbox, not await a message request',
+  );
 };
 const flush = async () => {
   for (let i = 0; i < 4; i++)
@@ -148,7 +155,10 @@ function mount(peerId = 'bob') {
       props.text = text;
       owner.edits.push(text);
     },
-    onSent: () => owner.sent++,
+    onSend: (draft) => {
+      owner.sent++;
+      calls.push(draft);
+    },
   };
   owner.render = () => {
     active = owner;
@@ -170,7 +180,7 @@ function mount(peerId = 'bob') {
     owner
       .find((n) => n.type === 'form')
       .props.onSubmit({ preventDefault() {} });
-  owner.textarea = () => owner.find((n) => n.type === 'textarea').props;
+  owner.textarea = () => owner.find((n) => n.type === 'ChatTextEditor').props;
   owner.button = (label) =>
     owner.find((n) => n.props?.['aria-label'] === label)?.props;
   owner.props = props;
@@ -191,36 +201,6 @@ const photo = (name) =>
     { type: 'image/png' },
   );
 try {
-  const keyboard = mount();
-  let coarse = true,
-    submissions = 0,
-    prevented = 0;
-  window.matchMedia = () => ({ matches: coarse });
-  const enter = (extra = {}) =>
-    keyboard.textarea().onKeyDown({
-      key: 'Enter',
-      shiftKey: false,
-      nativeEvent: { isComposing: false },
-      preventDefault: () => prevented++,
-      currentTarget: { form: { requestSubmit: () => submissions++ } },
-      ...extra,
-    });
-  enter();
-  assert.equal(submissions, 0, 'Mobile Return keeps native newline insertion');
-  assert.equal(prevented, 0);
-  enter({ ctrlKey: true });
-  assert.equal(
-    submissions,
-    1,
-    'An external mobile keyboard can explicitly submit',
-  );
-  coarse = false;
-  enter();
-  assert.equal(submissions, 2, 'Desktop Enter still submits');
-  enter({ shiftKey: true });
-  enter({ nativeEvent: { isComposing: true } });
-  assert.equal(submissions, 2, 'Shift+Enter and IME composition are preserved');
-  keyboard.dispose();
   const compose = mount();
   compose.pick([photo('one.png'), photo('two.png')]);
   assert.equal(uploads.length, 1, 'A selection uploads sequentially');
@@ -240,7 +220,7 @@ try {
   await flush();
   assert.equal(calls.length, 1, 'A rapid double submit sends once');
   assert.deepEqual(
-    calls[0].attachments,
+    calls[0].attachments.map((file) => file.id),
     uploads.slice(0, 2).map((u) => u.attachment.id),
   );
   assert.equal(calls[0].text, '');
@@ -309,56 +289,27 @@ try {
   );
   newPeer.dispose();
 
-  const uncertain = mount();
-  uncertain.props.text = 'Не потеряй это сообщение';
-  uncertain.props.reply = { id: 'reply-original', name: 'Bob', text: 'Цитата' };
-  responseMode = 'lost';
-  uncertain.submit();
-  await flush();
-  const lostBody = calls.at(-1);
-  assert.equal(lostBody.replyTo, 'reply-original');
-  assert.ok(uncertain.button('Отменить ответ').disabled);
+  const immediate = mount();
+  immediate.props.text = 'Следующее сообщение';
+  immediate.props.reply = {
+    id: 'original',
+    sender: 'bob',
+    name: 'Bob',
+    text: 'Цитата',
+    unavailable: false,
+  };
+  immediate.submit();
+  assert.equal(immediate.props.text, '', 'Draft clears synchronously');
   assert.equal(
-    uncertain.textarea().disabled,
-    true,
-    'An uncertain request is immutable until retried',
-  );
-  assert.equal(uncertain.button('Повторить отправку').disabled, false);
-  uncertain.pick([photo('must-not-add.png')]);
-  assert.equal(uncertain.button('Убрать must-not-add.png'), undefined);
-  responseMode = 'success';
-  uncertain.submit();
-  await flush();
-  assert.deepEqual(
-    calls.at(-1),
-    lostBody,
-    'Retry sends the identical idempotency key, text and attachment IDs',
-  );
-  assert.equal(uncertain.sent, 1);
-  assert.equal(uncertain.props.text, '');
-  uncertain.dispose();
-
-  const rejected = mount();
-  rejected.props.text = 'Не отправилось';
-  responseMode = 'rejected';
-  rejected.submit();
-  await flush();
-  const rejectedKey = calls.at(-1).key;
-  assert.equal(
-    rejected.textarea().disabled,
+    immediate.textarea().disabled,
     false,
-    'A non-JSON definitive 4xx restores editing',
+    'Network does not disable the next draft',
   );
-  rejected.props.text = 'Исправленное сообщение';
-  responseMode = 'success';
-  rejected.submit();
-  await flush();
-  assert.notEqual(calls.at(-1).key, rejectedKey);
-  assert.equal(calls.at(-1).text, 'Исправленное сообщение');
-  rejected.dispose();
+  assert.equal(calls.at(-1).reply.id, 'original');
+  immediate.dispose();
   assert.deepEqual(revoked, previews, 'All preview object URLs are released');
   console.log(
-    'Chat composer: upload queue, remove/retry, conversation switch, cleanup, double submit and immutable network retry passed.',
+    'Chat composer: upload queue, remove/retry, conversation switch, cleanup, double submit and instant draft handoff passed.',
   );
 } finally {
   mounted.forEach((owner) => owner.dispose());

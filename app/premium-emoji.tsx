@@ -60,12 +60,16 @@ export function EmojiPicker({
   text,
   onText,
   field,
+  onInsert,
+  onPrepareOpen,
   disabled = false,
 }: {
   premium: boolean;
   text: string;
   onText: (text: string) => void;
   field?: RefObject<HTMLTextAreaElement | null>;
+  onInsert?: (token: string) => void;
+  onPrepareOpen?: () => void;
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -76,10 +80,19 @@ export function EmojiPicker({
         aria-label="Premium-эмодзи"
         title="Premium-эмодзи"
         disabled={disabled}
+        onPointerDown={onPrepareOpen}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') onPrepareOpen?.();
+        }}
       >
         <Smile size={20} />
       </PopoverTrigger>
-      <PopoverContent className="emoji-picker" side="top" align="start">
+      <PopoverContent
+        className="emoji-picker"
+        side="top"
+        align="start"
+        finalFocus={onInsert ? false : undefined}
+      >
         <div className="emoji-picker-heading">
           <strong>Noct Emoji</strong>
           <span>Premium</span>
@@ -103,6 +116,11 @@ export function EmojiPicker({
                     aria-label={emoji.fallback + ' · ' + pack}
                     title={emoji.fallback}
                     onClick={() => {
+                      if (onInsert) {
+                        onInsert(emojiToken(emoji));
+                        setOpen(false);
+                        return;
+                      }
                       const el = field?.current,
                         start = el?.selectionStart ?? text.length,
                         end = el?.selectionEnd ?? text.length,

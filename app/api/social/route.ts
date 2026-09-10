@@ -1,5 +1,6 @@
 import { assertPremiumEmoji } from '@/lib/premium-emoji-access';
 import { archiveDirectChat } from '@/lib/chat-archive';
+import { visibleLastSeen } from '@/lib/presence-privacy';
 import { telegramGet, telegramPost } from '@/lib/telegram';
 import { boostsGet, boostsPost } from '@/lib/boosts';
 import { administrationGet, administrationPost } from '@/lib/administration';
@@ -68,6 +69,7 @@ import {
 } from '@/lib/chat-actions';
 import { messageVisible } from '@/lib/chat-access';
 import { readChatTheme, saveChatTheme } from '@/lib/chat-theme-settings';
+import { readChatLibrary } from '@/lib/chat-library-server';
 export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   try {
@@ -226,9 +228,10 @@ export async function GET(req: Request) {
           await d
             .prepare(
               `WITH visible_messages AS (SELECT m.* FROM messages m WHERE (m.sender=? OR m.recipient=?) AND ${messageVisible('m', '?')})
-              SELECT u.id,u.name,u.avatar,COALESCE(a.archivedAt,0) AS archivedAt,${appearanceColumns('u')},h.handle,(SELECT CASE WHEN text<>'' THEN text WHEN json_array_length(media)>0 THEN CASE json_extract(media,'$[0].kind') WHEN 'image' THEN 'Фото' WHEN 'video' THEN 'Видео' ELSE 'Файл: '||json_extract(media,'$[0].name') END ELSE text END FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC,id DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM visible_messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 LEFT JOIN direct_chat_archives a ON a.peerId=u.id AND a.userId=? WHERE (COALESCE(a.archivedAt,0)>0)=? AND ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
+              SELECT u.id,u.name,u.avatar,${visibleLastSeen('u')} AS lastSeen,COALESCE(a.archivedAt,0) AS archivedAt,${appearanceColumns('u')},h.handle,(SELECT CASE WHEN text<>'' THEN text WHEN json_array_length(media)>0 THEN CASE json_extract(media,'$[0].kind') WHEN 'image' THEN 'Фото' WHEN 'video' THEN 'Видео' ELSE 'Файл: '||json_extract(media,'$[0].name') END ELSE text END FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC,id DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM visible_messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 LEFT JOIN direct_chat_archives a ON a.peerId=u.id AND a.userId=? WHERE (COALESCE(a.archivedAt,0)>0)=? AND ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
             )
             .bind(
+              me,
               me,
               me,
               me,
@@ -246,6 +249,18 @@ export async function GET(req: Request) {
         ).results,
       );
     }
+    if (action === 'chatLibrary')
+      return Response.json(
+        await readChatLibrary(
+          me,
+          s.get('peer') || '',
+          s.get('kind') || '',
+          s.get('before') || '',
+        ),
+        {
+          headers: { 'Cache-Control': 'private, no-store' },
+        },
+      );
     if (action === 'messages') {
       const peer = s.get('peer') || '';
       await assertAccountVisible(peer);
@@ -276,6 +291,15 @@ export async function POST(req: Request) {
     const me = await viewer();
     const d = db();
     const action = typeof b.action === 'string' ? b.action : '';
+    if (
+      action === 'message' &&
+      b.expectedSender !== undefined &&
+      b.expectedSender !== me
+    )
+      throw new ApiError(
+        409,
+        'Аккаунт изменился. Вернись в аккаунт отправителя.',
+      );
     await socialRateLimit(me, action);
     const administration = await administrationPost(action, b, me);
     if (administration) return administration;

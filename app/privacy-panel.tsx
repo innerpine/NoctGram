@@ -21,6 +21,7 @@ import { request, type Person } from '@/lib/client';
 import { PushSettings } from './notifications';
 import { MusicActivitySettings } from './music-activity';
 import { Avatar } from './post-card';
+import { PresenceSettings } from './presence-settings';
 
 type Settings = {
   hideAdult: boolean;
@@ -140,6 +141,7 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
       )}
       {settings && (
         <div className="privacy-content">
+          <PresenceSettings onChanged={onChanged} />
           <MusicActivitySettings />
           <PushSettings />
           <AnimationPreference />

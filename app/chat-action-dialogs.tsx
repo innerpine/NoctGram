@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable react/react-compiler */
 import { useEffect, useRef, useState } from 'react';
-import { Check, Forward, LoaderCircle, Search, Trash2 } from 'lucide-react';
+import { Check, Forward, LoaderCircle, Search } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/dialog';
 import type { Message, Person } from '@/lib/client';
 import { chatRequest } from '@/lib/chat-client';
+import { ChatTextEditor } from './chat-text-editor';
+import { ChatEmojiText } from './chat-emoji-text';
 import { messageSummary } from '@/lib/chat-message-display';
 import { Avatar } from './profile-identity';
 
@@ -97,25 +99,29 @@ export function ChatDeleteDialog({
 }: Shared & { messages: Message[] }) {
   const [everyone, setEveryone] = useState(false);
   const mutation = useMutation(onDone, onClose);
+  const messageWord = {
+    one: 'сообщение',
+    few: 'сообщения',
+    many: 'сообщений',
+    other: 'сообщений',
+    zero: 'сообщений',
+    two: 'сообщения',
+  }[new Intl.PluralRules('ru').select(messages.length)];
   return (
     <Dialog {...mutation.dialogProps}>
       <DialogContent
-        className="noct-dialog chat-operation-dialog"
-        showCloseButton={!mutation.frozen}
+        className="noct-dialog chat-operation-dialog chat-delete-dialog"
+        overlayClassName="chat-delete-backdrop"
+        showCloseButton={false}
       >
         <DialogTitle>
           {messages.length > 1
-            ? `Удалить сообщения · ${messages.length}`
-            : 'Удалить сообщение'}
+            ? `Удалить ${messages.length} ${messageWord}?`
+            : 'Удалить сообщение?'}
         </DialogTitle>
-        <DialogDescription>
-          Выбери, у кого убрать{' '}
-          {messages.length > 1 ? 'выбранные сообщения' : 'это сообщение'} из
-          переписки.
+        <DialogDescription className="sr-only">
+          Без галочки сообщения удалятся только у тебя.
         </DialogDescription>
-        <div className="chat-operation-preview">
-          {messageSummary(messages[0])}
-        </div>
         <label className="chat-delete-choice">
           <input
             type="checkbox"
@@ -123,7 +129,9 @@ export function ChatDeleteDialog({
             disabled={mutation.frozen}
             onChange={(event) => setEveryone(event.target.checked)}
           />
-          <span>Также удалить у {peer.name}</span>
+          <span>
+            Также удалить для <bdi>{peer.name}</bdi>
+          </span>
         </label>
         {messages.some((message) => message.gift) && (
           <p className="chat-operation-note">
@@ -155,16 +163,12 @@ export function ChatDeleteDialog({
               })
             }
           >
-            {mutation.busy ? (
-              <LoaderCircle className="spin" size={17} />
-            ) : (
-              <Trash2 size={17} />
-            )}
-            {mutation.uncertain
-              ? 'Повторить удаление'
-              : everyone
-                ? 'Удалить у обоих'
-                : 'Удалить у меня'}
+            {mutation.busy && <LoaderCircle className="spin" size={17} />}
+            {mutation.busy
+              ? 'Удаляем…'
+              : mutation.uncertain
+                ? 'Повторить'
+                : 'Удалить'}
           </button>
         </div>
       </DialogContent>
@@ -191,13 +195,12 @@ export function ChatEditDialog({
             : 'Изменить сообщение'}
         </DialogTitle>
         <DialogDescription>Изменения увидит и собеседник.</DialogDescription>
-        <textarea
+        <ChatTextEditor
           className="chat-edit-text"
-          aria-label="Текст сообщения"
-          maxLength={4000}
+          label="Текст сообщения"
           value={text}
           disabled={mutation.frozen}
-          onChange={(event) => setText(event.target.value)}
+          onChange={setText}
         />
         {mutation.error && (
           <p role="alert" className="chat-send-error">
@@ -301,7 +304,7 @@ export function ChatForwardDialog({
           {messages.length > 1 ? 'выбранные сообщения' : 'это сообщение'}.
         </DialogDescription>
         <div className="chat-operation-preview">
-          {messageSummary(messages[0])}
+          <ChatEmojiText text={messageSummary(messages[0])} mentions={false} />
         </div>
         <label className="chat-forward-search">
           <Search size={18} />

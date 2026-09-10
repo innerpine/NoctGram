@@ -124,11 +124,13 @@ assert.equal(
 
 const previousElement = Object.getOwnPropertyDescriptor(globalThis, 'Element');
 class TestElement {
-  constructor(exempt = false, contained = true) {
+  constructor(exempt = false, contained = true, content = false) {
     this.exempt = exempt;
     this.contained = contained;
+    this.content = content;
   }
   closest(selector) {
+    if (this.content && selector.includes('.bubble')) return this;
     return this.exempt && selector.includes('video') ? this : null;
   }
 }
@@ -199,6 +201,53 @@ try {
     'Players and portals remain untouched by the history guard',
   );
   assert.equal(preserveContextTarget(null, root), true);
+  const doubleClick = (surface, target, extra = {}) => {
+    surface.props.onClickCapture({ ...event(target), ...extra });
+    surface.props.onDoubleClick({ ...event(target), detail: 2, ...extra });
+  };
+  const beforeReply = actions.length;
+  trigger.props.onClickCapture(event(new TestElement()));
+  assert.equal(
+    actions.length,
+    beforeReply,
+    'A single gutter click does not reply',
+  );
+  doubleClick(trigger, new TestElement());
+  assert.deepEqual(
+    actions.at(-1),
+    ['reply', 'm1'],
+    'Double click replies to the message owning the gutter',
+  );
+  const replied = actions.length;
+  for (const target of [
+    new TestElement(true),
+    new TestElement(false, false),
+    new TestElement(false, true, true),
+  ])
+    doubleClick(trigger, target);
+  for (const key of ['ctrlKey', 'metaKey', 'altKey', 'shiftKey'])
+    doubleClick(trigger, new TestElement(), { [key]: true });
+  assert.equal(
+    actions.length,
+    replied,
+    'Message content, portals, media and modified clicks keep their existing behaviour',
+  );
+  for (const restrictions of [
+    { disabled: true },
+    { canSend: false },
+    { unconfirmed: true },
+    { removing: true },
+  ]) {
+    const locked = nodes(
+      ChatMessageContext({ ...props, selecting: false, ...restrictions }),
+    ).find((node) => node.type === 'ContextMenuTrigger');
+    doubleClick(locked, new TestElement());
+  }
+  assert.equal(
+    actions.length,
+    replied,
+    'Unavailable messages and read-only chats cannot start a reply',
+  );
   const selection = nodes(
     ChatMessageContext({ ...props, selecting: true }),
   ).find((node) => node.type === 'ContextMenuTrigger');
@@ -211,6 +260,12 @@ try {
   );
   selection.props.onClickCapture(event(new TestElement()));
   assert.deepEqual(actions.at(-1), ['select', 'm1']);
+  selection.props.onDoubleClick({ ...event(new TestElement()), detail: 2 });
+  assert.deepEqual(
+    actions.at(-1),
+    ['select', 'm1'],
+    'Selection mode does not trigger a reply',
+  );
   const oldWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   Object.defineProperty(globalThis, 'window', {
     configurable: true,

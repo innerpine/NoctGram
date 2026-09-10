@@ -15,8 +15,18 @@ const { MusicListenTracker, adjacentPlayable } = await import(
   'data:text/javascript;base64,' + Buffer.from(js).toString('base64')
 );
 const tick = () => new Promise((resolve) => setImmediate(resolve));
+assert.equal(
+  adjacentPlayable(
+    [
+      { url: 'a', provider: 'spotify', playback: 'file' },
+      { url: 'b', provider: 'spotify', playback: 'file' },
+    ],
+    'a',
+  ).url,
+  'b',
+  'Restored file queues can resolve their audio again without storing its URL',
+);
 let time = 0,
-  day = 1,
   counts = 0;
 const changes = [],
   requests = [];
@@ -29,7 +39,6 @@ const tracker = new MusicListenTracker(
   (s) => changes.push(s),
   () => counts++,
   () => time,
-  () => day * 86400000,
 );
 await tracker.start('song');
 tracker.sample(0, true);
@@ -67,11 +76,28 @@ for (let i = 20; i < 60; i++) {
 }
 await tick();
 assert.equal(requests.length, 2);
-day++;
+// Replaying a counted song starts a new 30-second listen in the same day.
+tracker.resetPosition();
 tracker.sample(0, true);
 await tick();
 assert.equal(requests.at(-1).action, 'start');
 assert.equal(changes.at(-1).seconds, 0);
+tracker.sample(0, true);
+for (let i = 1; i <= 30; i++) {
+  time += 1000;
+  tracker.sample(i * 1000, true);
+}
+await tick();
+assert.equal(counts, 2);
+tracker.resetPosition();
+tracker.sample(31000, false);
+tracker.sample(31000, true);
+await tick();
+assert.equal(
+  requests.length,
+  4,
+  'Pausing does not start another counted listen',
+);
 
 let acknowledge;
 const seen = [];
@@ -146,5 +172,5 @@ assert.equal(adjacentPlayable([queue[0], queue[1]], 'a'), undefined);
 assert.equal(adjacentPlayable([queue[0]], 'a'), undefined);
 assert.equal(adjacentPlayable(queue, 'missing'), undefined);
 console.log(
-  'Listening: elapsed audio, pause/seek/suspension, repeat, UTC rollover, stale responses, retries, consent and playable queue passed.',
+  'Listening: elapsed audio, pause/seek/suspension, repeat without daily cap, stale responses, retries, consent and playable queue passed.',
 );

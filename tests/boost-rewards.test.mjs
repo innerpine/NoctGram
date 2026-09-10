@@ -139,6 +139,8 @@ function fixture(t) {
     'lib/boost-access.ts',
     'lib/boost-rules.ts',
     'lib/premium-access.ts',
+    'lib/presence-privacy.ts',
+    'lib/profile-background.ts',
     'lib/premium-predicate.ts',
     'lib/premium-emoji.ts',
     'lib/premium-emoji-access.ts',
@@ -205,7 +207,8 @@ function fixture(t) {
         file,
         `
         import { ApiError } from './api-error';
-        import { appearanceColumns } from './premium-access';
+        import { appearanceColumns, premiumActive } from './premium-access';
+        import { visibleLastSeen } from './presence-privacy';
         import { visibleAccount,blockingRestriction,restriction,isModerator } from './account-access';
         import { channelRights } from './channel-access';
         import { db } from './storage';

@@ -4,6 +4,7 @@ import { db, clean, ApiError } from './server';
 import { assertReadable, visibleAccount } from './account-access';
 import { CHAT_ATTACHMENT_LIMIT, type ChatAttachment } from './chat-files';
 import { messageVisible, messagePair } from './chat-access';
+import { readPresencePrivacy, savePresencePrivacy } from './presence-privacy';
 
 // Each predicate consumes one viewer binding; aliases are internal identifiers.
 export function personalVisibility(alias: string) {
@@ -145,6 +146,10 @@ export async function privacyGet(
   s: URLSearchParams,
   me: string,
 ): Promise<Response | null> {
+  if (action === 'presencePrivacy')
+    return Response.json(await readPresencePrivacy(me), {
+      headers: { 'Cache-Control': 'private, no-store' },
+    });
   if (action === 'privacy') {
     const settings = await db()
       .prepare(
@@ -197,9 +202,16 @@ export async function privacyPost(
   b: Record<string, unknown>,
   me: string,
 ): Promise<Response | null> {
-  if (!['privacy', 'blockUser', 'reportMessage'].includes(action)) return null;
+  if (
+    !['privacy', 'presencePrivacy', 'blockUser', 'reportMessage'].includes(
+      action,
+    )
+  )
+    return null;
   // Read-only users still need tools to protect themselves and report abuse.
   await assertReadable(me);
+  if (action === 'presencePrivacy')
+    return Response.json(await savePresencePrivacy(me, b));
   if (action === 'privacy') {
     if (
       typeof b.hideAdult !== 'boolean' ||

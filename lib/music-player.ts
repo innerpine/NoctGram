@@ -100,6 +100,19 @@ export function currentLyric(lines: LyricLine[], position: number): number {
   return lo - 1;
 }
 
+const LYRIC_DURATION_TOLERANCE = 2500;
+
+// HLS refines the duration as segments arrive. Keep one lyric lookup for the
+// same recording, but recheck a materially different duration (e.g. a remix).
+export function stableLyricDuration(previous: number, next: number): number {
+  if (!Number.isFinite(next) || next <= 0) return previous;
+  const duration = Math.round(next);
+  return previous > 0 &&
+    Math.abs(duration - previous) <= LYRIC_DURATION_TOLERANCE
+    ? previous
+    : duration;
+}
+
 export function readLyrics(
   value: unknown,
   durationMs: number,
@@ -110,7 +123,7 @@ export function readLyrics(
   if (
     typeof data.duration !== 'number' ||
     !Number.isFinite(data.duration) ||
-    Math.abs(data.duration * 1000 - durationMs) > 2500
+    Math.abs(data.duration * 1000 - durationMs) > LYRIC_DURATION_TOLERANCE
   )
     return null;
   const lines =

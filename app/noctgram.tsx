@@ -15,7 +15,6 @@ import { ensureKey } from '@/lib/secret-crypto';
 import { AccountPanel } from './account-panel';
 import { VerifiedProfile } from './profile-identity';
 import { ChannelBoosts } from './channel-boosts';
-import { hasProfileDesign } from '@/lib/appearance';
 /* Auth routes require top-level links; private R2 images must keep session cookies.
    Async subscription effects intentionally set loading state; no React compiler is enabled. */
 /* eslint-disable next/no-img-element, next/no-html-link-for-pages, react/react-compiler */
@@ -98,12 +97,9 @@ import { Avatar, Empty, PostCard, PostSkeleton } from './post-card';
 import { CommentsPanel } from './comments-panel';
 import { ContentDecisionForm } from './content-decision-form';
 import { ProfileDesign } from './profile-design';
+import { ProfileSurface } from './profile-surface';
 import { EditorPane } from './editor-pane';
-import {
-  DisplayName,
-  ProfileAvatar,
-  appearanceStyle,
-} from './profile-identity';
+import { DisplayName, ProfileAvatar } from './profile-identity';
 import { PremiumPanel } from './premium-panel';
 import { PremiumIcon } from './premium-icon';
 import { NavBorderBeam } from './nav-border-beam';
@@ -112,11 +108,13 @@ import { StarsPanel, SupportPanel } from './stars-panel';
 import { SendGiftButton, ProfileGifts } from './gifts';
 import { ChatThemeMenu } from './chat-theme-menu';
 import { ChatConversation } from './chat-conversation';
+import { ChatPeerProfile } from './chat-peer-profile';
 import {
   chatTheme,
   DEFAULT_CHAT_THEME,
   type ChatThemeState,
 } from '@/lib/chat-themes';
+import { ChatEmojiText } from './chat-emoji-text';
 import { MentionText } from './profile-link';
 import { PROFILE_NAVIGATE, type ProfileNavigation } from '@/lib/profile-links';
 import { ChannelsPanel } from './channels-panel';
@@ -2242,17 +2240,7 @@ export default function Noctgram({
         )}
         {page === 'profile' && profile && !profile.blocked && (
           <>
-            <section
-              key={'profile-card:' + profile.id}
-              style={
-                hasProfileDesign(profile) ? appearanceStyle(profile) : undefined
-              }
-              data-premium={hasProfileDesign(profile)}
-              className={
-                'profile-card ' +
-                (profile.kind === 'channel' ? 'channel-profile' : '')
-              }
-            >
+            <ProfileSurface key={'profile-card:' + profile.id} person={profile}>
               <div
                 className="profile-cover"
                 style={
@@ -2389,9 +2377,36 @@ export default function Noctgram({
                             })}
                       </div>
                     )}
+                    <div className="profile-aliases">
+                      {profile.handles.some((h) => h !== profile.handle) && (
+                        <>
+                          <span className="aliases-prefix">а также</span>
+                          {profile.handles
+                            .filter((h) => h !== profile.handle)
+                            .map((h, i) => (
+                              <span className="profile-alias" key={h}>
+                                {i > 0 && (
+                                  <span className="alias-comma">, </span>
+                                )}
+                                <button
+                                  title={'Скопировать @' + h}
+                                  onClick={() =>
+                                    void navigator.clipboard
+                                      .writeText('@' + h)
+                                      .then(() => notify('Юзернейм скопирован'))
+                                      .catch(() => notify('@' + h))
+                                  }
+                                >
+                                  @{h}
+                                </button>
+                              </span>
+                            ))}
+                        </>
+                      )}
+                    </div>
                   </div>
                   <MusicActivityStatus
-                    userId={profile.id}
+                    person={profile}
                     own={profile.id === me?.id}
                     onSettings={
                       profile.id === me?.id
@@ -2399,31 +2414,6 @@ export default function Noctgram({
                         : undefined
                     }
                   />
-                </div>
-                <div className="profile-aliases">
-                  {profile.handles.some((h) => h !== profile.handle) && (
-                    <>
-                      <span className="aliases-prefix">а также</span>
-                      {profile.handles
-                        .filter((h) => h !== profile.handle)
-                        .map((h, i) => (
-                          <span className="profile-alias" key={h}>
-                            {i > 0 && <span className="alias-comma">, </span>}
-                            <button
-                              title={'Скопировать @' + h}
-                              onClick={() =>
-                                void navigator.clipboard
-                                  .writeText('@' + h)
-                                  .then(() => notify('Юзернейм скопирован'))
-                                  .catch(() => notify('@' + h))
-                              }
-                            >
-                              @{h}
-                            </button>
-                          </span>
-                        ))}
-                    </>
-                  )}
                 </div>
                 <p className="bio">
                   {profile.bio ? (
@@ -2507,7 +2497,7 @@ export default function Noctgram({
                 )}
                 <VerifiedProfile person={profile} />
               </div>
-            </section>
+            </ProfileSurface>
             {profile.kind === 'channel' && me && (
               <StoriesBar
                 key={profile.id}
@@ -2774,7 +2764,10 @@ export default function Noctgram({
                           <DisplayName person={t} />
                         </strong>
                         <small>
-                          {emojiFallback(t.lastText || 'Открыть диалог')}
+                          <ChatEmojiText
+                            text={emojiFallback(t.lastText || 'Открыть диалог')}
+                            mentions={false}
+                          />
                         </small>
                       </span>
                       {openingChat === t.id && (
@@ -2839,18 +2832,17 @@ export default function Noctgram({
                     >
                       <ArrowLeft size={18} />
                     </button>
-                    <button
-                      className="chat-peer"
-                      onClick={() => void openProfile(peer.id)}
-                    >
-                      <Avatar person={peer} size={34} />
-                      <span>
-                        <strong>
-                          <DisplayName person={peer} />
-                        </strong>
-                        <small>@{peer.handle}</small>
-                      </span>
-                    </button>
+                    <ChatPeerProfile
+                      key={'peer-profile:' + me.id + ':' + peer.id}
+                      peer={peer}
+                      viewerId={me.id}
+                      lastSeen={
+                        (
+                          threads.find((thread) => thread.id === peer.id) ||
+                          peer
+                        ).lastSeen
+                      }
+                    />
                     <button
                       className="icon-button call-button"
                       aria-label="Аудиозвонок"

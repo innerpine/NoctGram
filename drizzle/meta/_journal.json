@@ -236,12 +236,33 @@
     {
       "idx": 33,
       "version": "6",
+      "when": 1789028052072,
+      "tag": "0031_repeat_music_listens",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1789035711294,
+      "tag": "0032_presence_privacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1789057584071,
+      "tag": "0033_profile_background",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
       "when": 1789063333566,
       "tag": "0033_archive_commerce",
       "breakpoints": true
     },
     {
-      "idx": 34,
+      "idx": 37,
       "version": "6",
       "when": 1789063481081,
       "tag": "0034_payment_checkout_guards",

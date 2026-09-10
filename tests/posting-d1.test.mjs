@@ -33,6 +33,7 @@ const allowed = new Set([
   'lib/chat-access.ts',
   'lib/chat-files.ts',
   'lib/premium-access.ts',
+  'lib/presence-privacy.ts',
   'lib/premium-predicate.ts',
   'lib/premium-emoji.ts',
   'lib/premium-emoji-access.ts',
