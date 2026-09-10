@@ -57,6 +57,12 @@ import {
   adjacentPlayable,
   type ListenState,
 } from '@/lib/music-listening';
+import {
+  MUSIC_SESSION_KEY,
+  musicSession,
+  readMusicSession,
+  type MusicSession,
+} from '@/lib/music-session';
 
 export function MusicAccountGuard({ blocked }: { blocked: boolean }) {
   const stop = useMusic()?.stop;
@@ -104,6 +110,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [],
   );
   const [queue, setQueue] = useState<MusicLink[]>([]);
+  const [dormant, setDormant] = useState(false);
+  const dormantSession = useRef<MusicSession | null>(null);
+  const resumePosition = useRef<number | null>(null);
+  const restored = useRef(false);
+  const savedSession = useRef<unknown>(null);
+  const lastSaved = useRef('');
   const nativeOrder = useRef<MusicLink[] | null>(null);
   const frame = useRef<HTMLIFrameElement>(null),
     widget = useRef<Widget | null>(null);
@@ -178,6 +190,16 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setListening({ status: 'idle', seconds: 0 });
   };
   const stop = useCallback(() => {
+    dormantSession.current = null;
+    resumePosition.current = null;
+    savedSession.current = null;
+    lastSaved.current = '';
+    setDormant(false);
+    try {
+      localStorage.removeItem(MUSIC_SESSION_KEY);
+    } catch {
+      /* Optional. */
+    }
     nativeOrder.current = null;
     generation.current++;
     widget.current?.pause();
@@ -204,6 +226,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const play = useCallback((next: MusicLink, nextQueue?: MusicLink[]) => {
     const parsed = parseMusicLink(next.url);
     if (!parsed) return;
+    const saved =
+      !roomRef.current?.detail &&
+      dormantSession.current?.track.url === parsed.url
+        ? dormantSession.current
+        : null;
+    dormantSession.current = null;
+    setDormant(false);
     const valid = {
       ...next,
       ...parsed,
@@ -275,6 +304,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       nativeAudio.current?.resume();
       return;
     }
+    resumePosition.current = saved?.position ?? null;
     // The widget remains a fallback for deployments without API credentials and
     // for native SoundCloud playlists. Track queues use the persistent audio.
     if (valid.provider === 'soundcloud' && valid.playback !== 'soundcloud') {
@@ -303,8 +333,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setError('');
     setSound(null);
     setLocalTrack(null);
-    setPosition(0);
-    setDuration(0);
+    setPosition(saved?.position || 0);
+    setDuration(saved?.duration || 0);
     setPlaylistIndex(0);
     setPlaylistLength(0);
     setPlaylistSounds([]);
@@ -336,6 +366,31 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    let saved: MusicSession | null = null;
+    try {
+      saved = readMusicSession(localStorage.getItem(MUSIC_SESSION_KEY));
+    } catch {
+      /* Optional. */
+    }
+    if (!saved || desired.current) return;
+    // Restore the controls and lyrics without starting an audio engine. The
+    // first explicit Play loads the track and seeks to this saved position.
+    dormantSession.current = saved;
+    lastSaved.current = JSON.stringify(saved);
+    desired.current = saved.track;
+    queueRef.current = saved.queue;
+    setQueue(saved.queue);
+    setLink(saved.track);
+    setPosition(saved.position);
+    setDuration(saved.duration);
+    setPlaying(false);
+    setReady(true);
+    setNeedsGesture(false);
+    setDormant(true);
+  }, []);
+  useEffect(() => {
     const disconnected = (event: Event) => {
       if (
         (event as CustomEvent).detail === 'spotify' &&
@@ -348,7 +403,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('noctgram:music-disconnect', disconnected);
   }, [stop]);
   useEffect(() => {
-    if (link?.provider !== 'spotify' || link.playback !== 'spotify') return;
+    if (dormant || link?.provider !== 'spotify' || link.playback !== 'spotify')
+      return;
     clearStats();
     setListening({ status: 'excluded', seconds: 0 });
     let active = true;
@@ -363,6 +419,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           link.url,
           musicGain(volumeRef.current),
           {
+            startPosition: () => {
+              const position = resumePosition.current || 0;
+              resumePosition.current = null;
+              return position;
+            },
             ready: () => {
               if (current()) {
                 engine?.volume(musicGain(volumeRef.current));
@@ -422,9 +483,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       engine?.dispose();
       if (spotify.current === engine) spotify.current = null;
     };
-  }, [link, retry, play]);
+  }, [link, retry, play, dormant]);
   useEffect(() => {
     if (
+      dormant ||
       link?.provider !== 'soundcloud' ||
       link.playback === 'soundcloud' ||
       !frame.current
@@ -479,7 +541,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           // load must precede READY binding: an already-ready widget invokes
           // newly bound READY listeners immediately, with the previous sound.
           w.load(link.url, {
-            auto_play: roomRef.current?.detail?.playback.playing !== 0,
+            auto_play:
+              resumePosition.current === null &&
+              roomRef.current?.detail?.playback.playing !== 0,
             show_artwork: false,
           });
         }
@@ -544,6 +608,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             if (isCurrent()) setDuration(ms);
           });
           syncSound();
+          if (resumePosition.current !== null) {
+            w.seekTo(resumePosition.current);
+            resumePosition.current = null;
+          }
           // A paused room must not briefly start playing when its frame loads.
           if (roomRef.current?.detail?.playback.playing === 0)
             setNeedsGesture(false);
@@ -650,9 +718,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       }
       widget.current = null;
     };
-  }, [link, retry, play]);
+  }, [link, retry, play, dormant]);
   useEffect(() => {
-    if (!link || !nativeMusicPlayback(link.playback) || !audio.current) return;
+    if (
+      dormant ||
+      !link ||
+      !nativeMusicPlayback(link.playback) ||
+      !audio.current
+    )
+      return;
     const element = audio.current;
     nativeAudio.current ??= new NativeMusicAudio(element);
     const engine = nativeAudio.current;
@@ -685,6 +759,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         return;
       }
       setDuration(Math.round(element.duration * 1000));
+      if (resumePosition.current !== null) {
+        const target = Math.min(
+          resumePosition.current,
+          element.duration * 1000,
+        );
+        element.currentTime = target / 1000;
+        resumePosition.current = null;
+        setPosition(target);
+      }
       setReady(true);
       if (engine.failure) {
         failed();
@@ -696,7 +779,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (!element.paused) started();
     };
     const progress = () => {
-      if (current()) {
+      if (current() && resumePosition.current === null) {
         setPosition(engine.positionMs);
         tracker.current?.sample(
           engine.positionMs,
@@ -784,7 +867,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         if (!current()) return;
         if (!response.ok && stream && data.code === 'MUSIC_SETUP_REQUIRED') {
           soundCloudNative.current = false;
+          const pending = resumePosition.current;
           play(link);
+          resumePosition.current = pending;
           return;
         }
         if (!response.ok)
@@ -827,9 +912,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       element.removeEventListener('ended', ended);
       if (!nativeMusicPlayback(desired.current?.playback)) engine.dispose();
     };
-  }, [link, retry, play]);
+  }, [link, retry, play, dormant]);
   useEffect(() => {
-    if (link?.provider !== 'youtube' || !youtubeHost.current) return;
+    if (dormant || link?.provider !== 'youtube' || !youtubeHost.current) return;
     const token = ++generation.current;
     let active = true;
     let engine: YouTubePlayback | null = null;
@@ -853,6 +938,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           ready: () => {
             if (!current()) return;
             engine?.volume(youtubeVolume(volumeRef.current));
+            if (resumePosition.current !== null) {
+              engine?.seek(resumePosition.current);
+              resumePosition.current = null;
+            }
             setReady(true);
             setError('');
             if (roomRef.current?.detail?.playback.playing === 0)
@@ -929,7 +1018,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         if (youtube.current === engine) youtube.current = null;
       }
     };
-  }, [link, retry, play]);
+  }, [link, retry, play, dormant]);
   const queueIndex = queue.findIndex(
     (x) => x.url === (nativeOrder.current ? sound?.permalink_url : link?.url),
   );
@@ -1003,7 +1092,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       (selected ? metadata(selected).artwork : ''),
   };
   const room = useMusicRoom({
-    url: currentUrl,
+    url: dormant ? '' : currentUrl,
     playing,
     ready,
     error,
@@ -1081,6 +1170,56 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     : link?.kind === 'playlist' && !nativeOrder.current
       ? playlistSounds.map((item) => item.track)
       : queue.map((item) => (item.url === currentUrl ? track : metadata(item)));
+  savedSession.current =
+    link && !room.detail
+      ? {
+          version: 1,
+          track: { ...link, ...track },
+          queue:
+            link.kind === 'playlist' && !nativeOrder.current
+              ? displayQueue
+              : queue,
+          position,
+          duration,
+        }
+      : null;
+  useEffect(() => {
+    if (!currentUrl) return;
+    const save = () => {
+      const snapshot = musicSession(savedSession.current);
+      if (!snapshot) return;
+      // Read the latest native position when the page is leaving, even if a
+      // final timeupdate has not reached React yet. Do not overwrite a seek.
+      const current =
+        !dormantSession.current &&
+        resumePosition.current === null &&
+        nativeMusicPlayback(desired.current?.playback) &&
+        nativeAudio.current?.hasMetadata
+          ? { ...snapshot, position: nativeAudio.current.positionMs }
+          : snapshot;
+      try {
+        const serialized = JSON.stringify(current);
+        if (serialized === lastSaved.current) return;
+        localStorage.setItem(MUSIC_SESSION_KEY, serialized);
+        lastSaved.current = serialized;
+      } catch {
+        /* Optional. */
+      }
+    };
+    const hidden = () => {
+      if (document.hidden) save();
+    };
+    save();
+    const timer = setInterval(save, 5000);
+    window.addEventListener('pagehide', save);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      save();
+      clearInterval(timer);
+      window.removeEventListener('pagehide', save);
+      document.removeEventListener('visibilitychange', hidden);
+    };
+  }, [currentUrl, playing, dormant]);
   const select = (index: number) => {
     if (room.detail) {
       const target = room.detail.tracks[index];
@@ -1117,6 +1256,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   };
   const togglePlayer = () => {
     if (!link) return;
+    if (dormantSession.current) {
+      play(dormantSession.current.track, queueRef.current);
+      return;
+    }
     soundCloudState.current?.invalidate();
     if (needsGesture) {
       if (room.detail && !room.detail.playback.playing)
@@ -1150,6 +1293,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       return;
     }
     const value = Math.max(0, Math.min(ms, duration));
+    if (dormantSession.current) {
+      dormantSession.current.position = value;
+      setPosition(value);
+      return;
+    }
     tracker.current?.resetPosition();
     setPosition(value);
     if (link.provider === 'youtube') youtube.current?.seek(value);
@@ -1184,7 +1332,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       {/* This element also survives changes between music providers. */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audio} preload="metadata" />
-      {link && (
+      {link && !dormant && (
         <MusicActivityPublisher
           track={track}
           playing={playing}
@@ -1256,14 +1404,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             }}
           />
           {/* Keep one engine mounted outside the dialog: collapsing never restarts audio. */}
-          {link.provider === 'youtube' ? (
+          {!dormant && link.provider === 'youtube' ? (
             <div
               ref={youtubeHost}
               className="music-audio-engine"
               aria-hidden="true"
               inert
             />
-          ) : link.provider === 'soundcloud' &&
+          ) : !dormant &&
+            link.provider === 'soundcloud' &&
             link.playback !== 'soundcloud' ? (
             <iframe
               ref={frame}

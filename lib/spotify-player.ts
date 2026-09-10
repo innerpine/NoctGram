@@ -80,6 +80,7 @@ export function loadSpotifySDK(): Promise<SpotifySDK> {
   return loading;
 }
 type Hooks = {
+  startPosition?: () => number;
   ready: () => void;
   state: (value: {
     playing: boolean;
@@ -234,7 +235,10 @@ export class SpotifyPlayback {
           Authorization: 'Bearer ' + token,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ uris: ['spotify:track:' + id], position_ms: 0 }),
+        body: JSON.stringify({
+          uris: ['spotify:track:' + id],
+          position_ms: this.hooks.startPosition?.() || 0,
+        }),
         signal: this.abort.signal,
         credentials: 'omit',
         referrerPolicy: 'no-referrer',

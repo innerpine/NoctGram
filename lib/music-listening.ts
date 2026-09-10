@@ -36,6 +36,7 @@ export function adjacentPlayable(
       item.provider === 'soundcloud' ||
       item.provider === 'youtube' ||
       item.audioUrl ||
+      item.playback === 'file' ||
       item.playback === 'spotify'
     )
       return item;

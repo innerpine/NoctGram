@@ -58,6 +58,7 @@ class Device {
   }
 }
 const hooks = {
+  startPosition: () => 45250,
   ready() {},
   state: (state) => states.push(state),
   error: (error) => errors.push(error),
@@ -89,6 +90,11 @@ try {
     'spotify:track:' + id,
   ]);
   assert.equal(requests[1].init.credentials, 'omit');
+  assert.equal(
+    JSON.parse(requests[1].init.body).position_ms,
+    45250,
+    'Restored playback starts at the saved position',
+  );
   const state = {
     paused: false,
     position: 105000,
