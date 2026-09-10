@@ -99,6 +99,7 @@ import { StarsPanel, SupportPanel } from './stars-panel';
 import { SendGiftButton, ProfileGifts } from './gifts';
 import { ChatThemeMenu } from './chat-theme-menu';
 import { ChatConversation } from './chat-conversation';
+import { ChatPeerProfile } from './chat-peer-profile';
 import {
   chatTheme,
   DEFAULT_CHAT_THEME,
@@ -2597,18 +2598,12 @@ export default function Noctgram({
                     >
                       <ArrowLeft size={18} />
                     </button>
-                    <button
-                      className="chat-peer"
-                      onClick={() => void openProfile(peer.id)}
-                    >
-                      <Avatar person={peer} size={34} />
-                      <span>
-                        <strong>
-                          <DisplayName person={peer} />
-                        </strong>
-                        <small>@{peer.handle}</small>
-                      </span>
-                    </button>
+                    <ChatPeerProfile
+                      key={'peer-profile:' + me.id + ':' + peer.id}
+                      peer={peer}
+                      viewerId={me.id}
+                      onFullProfile={() => void openProfile(peer.id)}
+                    />
                     <button
                       className="icon-button call-button"
                       aria-label="Аудиозвонок"
