@@ -30,6 +30,35 @@ export function seekVideo(video: HTMLVideoElement, position: number) {
     return;
   video.currentTime = Math.max(0, Math.min(video.duration, position));
 }
+const activeVideos = new WeakMap<Document, HTMLVideoElement>();
+export function claimVideoPlayback(video: HTMLVideoElement) {
+  const previous = activeVideos.get(video.ownerDocument);
+  if (previous && previous !== video) previous.pause();
+  activeVideos.set(video.ownerDocument, video);
+}
+export type VideoPlayback = {
+  position: number;
+  volume: number;
+  muted: boolean;
+  playing: boolean;
+};
+export function captureVideoPlayback(video: HTMLVideoElement): VideoPlayback {
+  const state = readVideoState(video);
+  return {
+    position: state.position,
+    volume: state.volume,
+    muted: state.muted,
+    playing: !state.paused,
+  };
+}
+export function restoreVideoPosition(
+  video: HTMLVideoElement,
+  state: VideoPlayback,
+) {
+  seekVideo(video, state.position);
+  video.volume = state.volume;
+  video.muted = state.muted;
+}
 export type FullscreenVideo = HTMLVideoElement & {
   webkitEnterFullscreen?: () => void;
   webkitExitFullscreen?: () => void;
