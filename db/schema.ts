@@ -33,6 +33,33 @@ export const users = sqliteTable('users', {
   sessionsRevokedAt: integer().notNull().default(0),
   ownerId: text().references((): AnySQLiteColumn => users.id),
 });
+export const userPresencePrivacy = sqliteTable(
+  'user_presence_privacy',
+  {
+    userId: text()
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    policy: text().notNull().default('everyone'),
+  },
+  (t) => [check('presence_policy', sql`${t.policy} IN ('everyone','nobody')`)],
+);
+export const userPresenceExceptions = sqliteTable(
+  'user_presence_exceptions',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    viewerId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    rule: text().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.rule, t.viewerId] }),
+    check('presence_rule', sql`${t.rule} IN ('hide','show')`),
+    check('presence_peer', sql`${t.userId} <> ${t.viewerId}`),
+  ],
+);
 export const chatThemes = sqliteTable(
   'chat_themes',
   {

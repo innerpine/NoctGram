@@ -83,7 +83,7 @@ export function ChatPeerProfile({
 }: {
   peer: Person;
   viewerId: string;
-  lastSeen?: number;
+  lastSeen?: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const popup = useRef<HTMLDivElement>(null);
@@ -405,15 +405,17 @@ function PeerProfileBody({
                   <p className={online ? 'online' : ''}>
                     {online
                       ? 'В сети'
-                      : person?.lastSeen
-                        ? 'Был(а) ' +
-                          new Date(person.lastSeen).toLocaleString('ru-RU', {
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                        : 'Личный диалог'}
+                      : person?.lastSeen === null
+                        ? 'Статус скрыт'
+                        : person?.lastSeen
+                          ? 'Был(а) ' +
+                            new Date(person.lastSeen).toLocaleString('ru-RU', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          : 'Личный диалог'}
                   </p>
                 </div>
                 <div className="peer-profile-actions">

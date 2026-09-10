@@ -10,7 +10,7 @@ const units = [
   [60000, 'minute', 'мин.'],
 ] as const;
 
-export function ChatPeerPresence({ lastSeen }: { lastSeen?: number }) {
+export function ChatPeerPresence({ lastSeen }: { lastSeen?: number | null }) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const update = () => {
@@ -26,7 +26,8 @@ export function ChatPeerPresence({ lastSeen }: { lastSeen?: number }) {
   const known = Number.isFinite(lastSeen) && Number(lastSeen) > 0;
   const elapsed = known ? Math.max(0, now - lastSeen!) : 0;
   const online = known && elapsed < 120000;
-  let full = online ? 'В сети' : 'Не в сети';
+  let full =
+    lastSeen === null ? 'Статус скрыт' : online ? 'В сети' : 'Не в сети';
   let compact = full;
   if (known && !online) {
     const [duration, unit, short] = units.find(

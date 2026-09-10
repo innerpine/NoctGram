@@ -7,7 +7,10 @@ const sqlite = new DatabaseSync(':memory:');
 const journal = JSON.parse(
   await readFile('drizzle/meta/_journal.json', 'utf8'),
 );
-for (const entry of journal.entries.slice(0, -1))
+const scoreMigration = journal.entries.findIndex(
+  (entry) => entry.tag === '0031_repeat_music_listens',
+);
+for (const entry of journal.entries.slice(0, scoreMigration))
   sqlite.exec(await readFile(`drizzle/${entry.tag}.sql`, 'utf8'));
 sqlite.exec(
   "INSERT INTO users(id,name,created,onboardingComplete) VALUES('alice','Alice',1,1),('bob','Bob',1,1); INSERT INTO handles(handle,userId,main) VALUES('alice','alice',1),('bobby','bob',1)",
@@ -31,9 +34,7 @@ sqlite
 sqlite.exec(
   "INSERT INTO music_listens(userId,trackId,day,created) VALUES('bob','song',1,86400000)",
 );
-sqlite.exec(
-  await readFile(`drizzle/${journal.entries.at(-1).tag}.sql`, 'utf8'),
-);
+sqlite.exec(await readFile('drizzle/0031_repeat_music_listens.sql', 'utf8'));
 assert.equal(
   sqlite.prepare('SELECT plays FROM music_listens').get().plays,
   1,

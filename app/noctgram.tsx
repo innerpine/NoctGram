@@ -2603,8 +2603,10 @@ export default function Noctgram({
                       peer={peer}
                       viewerId={me.id}
                       lastSeen={
-                        threads.find((thread) => thread.id === peer.id)
-                          ?.lastSeen ?? peer.lastSeen
+                        (
+                          threads.find((thread) => thread.id === peer.id) ||
+                          peer
+                        ).lastSeen
                       }
                     />
                     <button
