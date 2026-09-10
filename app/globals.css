@@ -590,7 +590,7 @@ small {
   object-fit: cover;
   border-radius: 10px;
 }
-.media-grid button {
+.media-grid > button {
   padding: 0;
   overflow: hidden;
   width: 100%;
