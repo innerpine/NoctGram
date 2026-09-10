@@ -10,7 +10,7 @@ export type Person = Appearance & {
   lastText?: string;
   lastTime?: number;
   unread?: number;
-  lastSeen?: number;
+  lastSeen?: number | null;
   kind?: string;
   ownerId?: string | null;
 };

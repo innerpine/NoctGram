@@ -10,6 +10,7 @@ import {
 import { db } from './storage';
 import { ApiError } from './api-error';
 import { identity } from './auth-session';
+import { visibleLastSeen } from './presence-privacy';
 import { isAdministrator } from './administration';
 export { db, bucket } from './storage';
 export { ApiError, failure } from './api-error';
@@ -137,11 +138,13 @@ export async function profile(id: string, me: string) {
   const d = db();
   const user = await d
     .prepare(
-      `SELECT users.*,${appearanceColumns('users')}, (SELECT id FROM posts WHERE userId=users.id AND cancelledAt=0 AND publishAt<=strftime('%s','now')*1000 AND pinned=1 LIMIT 1) as pinnedPostId, (SELECT handle FROM handles WHERE userId=users.id AND main=1 LIMIT 1) as handle, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.follower WHERE f.following=users.id AND ${visibleAccount('fu')}) as followers, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.following WHERE f.follower=users.id AND ${visibleAccount('fu')}) as following, (SELECT COUNT(*) FROM posts WHERE userId=users.id AND cancelledAt=0 AND publishAt<=strftime('%s','now')*1000) as postCount, EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=users.id) as followed FROM users WHERE id=?`,
+      `SELECT users.*,${appearanceColumns('users')}, (SELECT id FROM posts WHERE userId=users.id AND cancelledAt=0 AND publishAt<=strftime('%s','now')*1000 AND pinned=1 LIMIT 1) as pinnedPostId, (SELECT handle FROM handles WHERE userId=users.id AND main=1 LIMIT 1) as handle, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.follower WHERE f.following=users.id AND ${visibleAccount('fu')}) as followers, (SELECT COUNT(*) FROM follows f JOIN users fu ON fu.id=f.following WHERE f.follower=users.id AND ${visibleAccount('fu')}) as following, (SELECT COUNT(*) FROM posts WHERE userId=users.id AND cancelledAt=0 AND publishAt<=strftime('%s','now')*1000) as postCount, EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=users.id) as followed,${visibleLastSeen('users')} AS visibleLastSeen FROM users WHERE id=?`,
     )
-    .bind(me, id)
+    .bind(me, me, id)
     .first();
   if (!user || user.deletedAt) throw new ApiError(404, 'Профиль не найден');
+  user.lastSeen = user.visibleLastSeen;
+  delete user.visibleLastSeen;
   if (!user.onboardingComplete && id !== me)
     throw new ApiError(404, 'Профиль не найден');
   const hs = await d

@@ -400,3 +400,206 @@
   color: #999;
   flex-shrink: 0;
 }
+.presence-settings > .meta {
+  margin: 8px 0 18px;
+}
+.presence-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.presence-fields > legend {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #ababba;
+}
+.presence-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.presence-choice {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 50px;
+  padding: 12px;
+  border: 1px solid #303036;
+  border-radius: 13px;
+  background: #151518;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+.presence-choice[data-selected='true'] {
+  background: #24202f;
+  border-color: #927cbe;
+}
+.presence-choice input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #b79deb;
+}
+.presence-choice > svg {
+  color: #bcaace;
+  flex-shrink: 0;
+}
+.presence-exceptions {
+  margin-top: 22px;
+  animation: presence-enter 180ms ease both;
+}
+.presence-exceptions-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.presence-exceptions-title h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.presence-exceptions-title .secondary {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 38px;
+}
+.presence-exceptions > .meta {
+  margin: 9px 0 14px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.presence-people,
+.presence-search-results {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.presence-people > li,
+.presence-search-results button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+  padding: 8px 3px;
+}
+.presence-person-copy {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.presence-people strong,
+.presence-search-results strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.presence-people small,
+.presence-search-results small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #90909c;
+  font-size: 12px;
+}
+.presence-people .icon-button {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+}
+.presence-picker {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #303036;
+  border-radius: 14px;
+  background: #101013;
+  animation: presence-enter 180ms ease both;
+}
+.presence-picker .meta {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+.presence-picker .privacy-search {
+  margin: 0;
+}
+.presence-search-results {
+  max-height: 250px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 6px;
+}
+.presence-search-results button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.presence-search-results button:hover,
+.presence-search-results button[aria-pressed='true'] {
+  background: #ffffff08;
+}
+.presence-search-results button > svg {
+  flex-shrink: 0;
+  color: #c4afe9;
+}
+.presence-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+.presence-actions button {
+  min-height: 40px;
+}
+.presence-notice {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  color: #b8d9bd;
+  margin-top: 12px;
+  font-size: 13px;
+}
+@keyframes presence-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 480px) {
+  .presence-choice {
+    gap: 7px;
+    padding: 10px;
+  }
+  .presence-exceptions-title {
+    gap: 7px;
+  }
+  .presence-exceptions-title .secondary {
+    padding: 8px 10px;
+  }
+  .presence-picker {
+    padding: 9px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .presence-choice {
+    transition: none;
+  }
+  .presence-exceptions,
+  .presence-picker {
+    animation: none;
+  }
+}
