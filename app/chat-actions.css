@@ -345,6 +345,47 @@
 .chat-delete-confirm:hover {
   background: #623241;
 }
+.noct-dialog.chat-delete-dialog {
+  max-width: 340px !important;
+  padding: 20px 22px 12px !important;
+  border-radius: 12px !important;
+  gap: 12px !important;
+}
+.chat-delete-dialog [data-slot='dialog-title'] {
+  margin: 0;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+.chat-delete-dialog .chat-delete-choice {
+  min-height: 40px;
+  overflow-wrap: anywhere;
+}
+.chat-delete-dialog .chat-delete-choice input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+.chat-delete-dialog .chat-operation-buttons {
+  gap: 4px;
+  margin: 0 -10px;
+}
+.chat-delete-dialog .chat-operation-buttons button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: #c9b1e3;
+}
+.chat-delete-dialog .chat-operation-buttons button:hover:not(:disabled) {
+  background: #c9b1e310;
+}
+.chat-delete-dialog .chat-operation-buttons button:focus-visible {
+  outline: 2px solid #c9b1e3;
+  outline-offset: 1px;
+}
 .chat-operation-note {
   font-size: 13px;
   line-height: 1.4;
