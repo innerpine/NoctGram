@@ -2,7 +2,6 @@
 import { AccountPanel } from './account-panel';
 import { VerifiedProfile } from './profile-identity';
 import { ChannelBoosts } from './channel-boosts';
-import { hasProfileDesign } from '@/lib/appearance';
 /* Auth routes require top-level links; private R2 images must keep session cookies.
    Async subscription effects intentionally set loading state; no React compiler is enabled. */
 /* eslint-disable next/no-img-element, next/no-html-link-for-pages, react/react-compiler */
@@ -85,12 +84,9 @@ import { Avatar, Empty, PostCard, PostSkeleton } from './post-card';
 import { CommentsPanel } from './comments-panel';
 import { ContentDecisionForm } from './content-decision-form';
 import { ProfileDesign } from './profile-design';
+import { ProfileSurface } from './profile-surface';
 import { EditorPane } from './editor-pane';
-import {
-  DisplayName,
-  ProfileAvatar,
-  appearanceStyle,
-} from './profile-identity';
+import { DisplayName, ProfileAvatar } from './profile-identity';
 import { PremiumPanel } from './premium-panel';
 import { PremiumIcon } from './premium-icon';
 import { NavBorderBeam } from './nav-border-beam';
@@ -2078,17 +2074,7 @@ export default function Noctgram({
         )}
         {page === 'profile' && profile && !profile.blocked && (
           <>
-            <section
-              key={'profile-card:' + profile.id}
-              style={
-                hasProfileDesign(profile) ? appearanceStyle(profile) : undefined
-              }
-              data-premium={hasProfileDesign(profile)}
-              className={
-                'profile-card ' +
-                (profile.kind === 'channel' ? 'channel-profile' : '')
-              }
-            >
+            <ProfileSurface key={'profile-card:' + profile.id} person={profile}>
               <div
                 className="profile-cover"
                 style={
@@ -2225,6 +2211,33 @@ export default function Noctgram({
                             })}
                       </div>
                     )}
+                    <div className="profile-aliases">
+                      {profile.handles.some((h) => h !== profile.handle) && (
+                        <>
+                          <span className="aliases-prefix">а также</span>
+                          {profile.handles
+                            .filter((h) => h !== profile.handle)
+                            .map((h, i) => (
+                              <span className="profile-alias" key={h}>
+                                {i > 0 && (
+                                  <span className="alias-comma">, </span>
+                                )}
+                                <button
+                                  title={'Скопировать @' + h}
+                                  onClick={() =>
+                                    void navigator.clipboard
+                                      .writeText('@' + h)
+                                      .then(() => notify('Юзернейм скопирован'))
+                                      .catch(() => notify('@' + h))
+                                  }
+                                >
+                                  @{h}
+                                </button>
+                              </span>
+                            ))}
+                        </>
+                      )}
+                    </div>
                   </div>
                   <MusicActivityStatus
                     userId={profile.id}
@@ -2235,31 +2248,6 @@ export default function Noctgram({
                         : undefined
                     }
                   />
-                </div>
-                <div className="profile-aliases">
-                  {profile.handles.some((h) => h !== profile.handle) && (
-                    <>
-                      <span className="aliases-prefix">а также</span>
-                      {profile.handles
-                        .filter((h) => h !== profile.handle)
-                        .map((h, i) => (
-                          <span className="profile-alias" key={h}>
-                            {i > 0 && <span className="alias-comma">, </span>}
-                            <button
-                              title={'Скопировать @' + h}
-                              onClick={() =>
-                                void navigator.clipboard
-                                  .writeText('@' + h)
-                                  .then(() => notify('Юзернейм скопирован'))
-                                  .catch(() => notify('@' + h))
-                              }
-                            >
-                              @{h}
-                            </button>
-                          </span>
-                        ))}
-                    </>
-                  )}
                 </div>
                 <p className="bio">
                   {profile.bio ? (
@@ -2343,7 +2331,7 @@ export default function Noctgram({
                 )}
                 <VerifiedProfile person={profile} />
               </div>
-            </section>
+            </ProfileSurface>
             {profile.kind === 'channel' && me && (
               <StoriesBar
                 key={profile.id}

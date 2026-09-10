@@ -11,6 +11,9 @@ import {
   type ProfileTheme,
 } from '@/lib/appearance';
 import { avatarPoster } from '@/lib/avatar-poster';
+import { readProfileBackground } from '@/lib/profile-background';
+import { ProfileBackgroundSettings } from './profile-background-settings';
+import { useProfileBackground } from './profile-surface';
 import {
   AnimationPreference,
   appearanceStyle,
@@ -33,6 +36,9 @@ export function ProfileDesign({
   const channel = me.kind === 'channel';
   const level = channel ? me.boostLevel || 0 : 5;
   const canSave = channel ? level >= 1 : !!me.premium;
+  const [background, setBackground] = useState(() =>
+    readProfileBackground(me.profileBackground),
+  );
   const [theme, setTheme] = useState<ProfileTheme>(
       (me.profileTheme || 'iris') as ProfileTheme,
     ),
@@ -76,6 +82,7 @@ export function ProfileDesign({
     premium: !channel,
     boostLevel: channel ? Math.max(1, level) : 0,
     profileTheme: theme,
+    profileBackground: JSON.stringify(background),
     nameGradient: gradient,
     ringText: ring,
     chromeFlow: chrome,
@@ -84,6 +91,7 @@ export function ProfileDesign({
     avatarMotion: motion,
     avatarMotionType: motionType,
   };
+  const surface = useProfileBackground(preview);
   async function perform(fn: () => Promise<void>) {
     if (lock.current) return;
     lock.current = true;
@@ -102,7 +110,11 @@ export function ProfileDesign({
   }
   return (
     <div className="profile-design">
-      <div className="design-preview" style={appearanceStyle(preview)}>
+      <div
+        className="design-preview"
+        data-profile-background={!!surface}
+        style={{ ...appearanceStyle(preview), ...surface }}
+      >
         <span className="design-preview-label">Предпросмотр</span>
         <ProfileAvatar person={preview} size={80} />
         <h3>
@@ -125,6 +137,7 @@ export function ProfileDesign({
               chromeTempo: tempo,
               avatarMotion: motion,
               poster,
+              ...(!channel ? { background } : {}),
             });
             onSaved(updated);
           });
@@ -156,6 +169,12 @@ export function ProfileDesign({
               </button>
             ))}
           </fieldset>
+          {!channel && (
+            <ProfileBackgroundSettings
+              value={background}
+              onChange={setBackground}
+            />
+          )}
           <label className="appearance-switch" htmlFor={gradientId}>
             <span>
               <strong>

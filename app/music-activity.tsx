@@ -2,7 +2,8 @@
 import { ProfileLink } from './profile-link';
 /* Presence polling updates external state and cancels stale responses. */
 /* eslint-disable react/react-compiler, next/no-img-element */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useImagePalette } from '@/lib/use-image-palette';
 import {
   Headphones,
   LoaderCircle,
@@ -180,6 +181,8 @@ export function MusicActivityStatus({
     };
   }, [userId]);
   const activity = result?.userId === userId ? result.activity : null;
+  const artwork = playerArtwork(activity?.artwork || '');
+  const palette = useImagePalette(artwork);
   const now = result
     ? result.serverTime + Math.max(0, clock - result.received)
     : 0;
@@ -203,10 +206,18 @@ export function MusicActivityStatus({
             (paused ? 0 : Math.max(0, now - activity.updatedAt)),
         ),
       );
-  const artwork = playerArtwork(activity.artwork);
   return (
     <section
       className="profile-music-activity"
+      style={
+        {
+          '--activity-color': palette?.[0] || '#9897ac',
+          '--activity-second': palette?.[1] || '#777889',
+          '--activity-artwork': artwork
+            ? `url(${JSON.stringify(artwork)})`
+            : 'none',
+        } as CSSProperties
+      }
       data-state={paused ? 'paused' : 'playing'}
       aria-label="Музыкальная активность"
     >
