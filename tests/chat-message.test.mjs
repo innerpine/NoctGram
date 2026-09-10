@@ -147,6 +147,46 @@ const fileMessage = ChatMessage.type({
   message: { ...message, text: '', attachments: files },
 }).props.children.props.children[1];
 assert.equal(fileMessage.props.id, 'chat-message-m1');
+assert.match(fileMessage.props.className, /chat-media-only/);
+const media = fileMessage.props.children.find(
+  (child) => child?.type === 'ChatMessageFiles',
+);
+assert.equal(media.props.flush, true);
+assert.equal(media.props.metadata.props.className, 'message-time');
+assert.equal(
+  fileMessage.props.children.some(
+    (child) => child?.props?.className === 'message-time',
+  ),
+  false,
+  'Bare media shows its timestamp only over the attachment',
+);
+for (const attachment of [files[0], { ...files[0], kind: 'video' }]) {
+  const captioned = ChatMessage.type({
+    ...props,
+    message: { ...message, text: 'Подпись', attachments: [attachment] },
+  }).props.children.props.children[1];
+  assert.match(captioned.props.className, /chat-media-message/);
+  assert.doesNotMatch(captioned.props.className, /chat-media-only/);
+  assert.equal(
+    captioned.props.children.find((child) => child?.type === 'p').props.children
+      .props.text,
+    'Подпись',
+  );
+  assert.equal(
+    captioned.props.children.find((child) => child?.type === 'ChatMessageFiles')
+      .props.metadata,
+    undefined,
+  );
+}
+const document = ChatMessage.type({
+  ...props,
+  message: {
+    ...message,
+    text: '',
+    attachments: [{ ...files[0], kind: 'file' }],
+  },
+}).props.children.props.children[1];
+assert.doesNotMatch(document.props.className, /chat-media-message/);
 assert.equal(
   fileMessage.props.children.find((child) => child?.type === 'ChatMessageFiles')
     .props.files,
