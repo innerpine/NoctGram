@@ -15,6 +15,7 @@ import './stars-topup.css';
 import './gifts.css';
 import './dialog-motion.css';
 import './music.css';
+import './music-charts.css';
 import './music-search.css';
 import './music-services.css';
 import './music-player.css';

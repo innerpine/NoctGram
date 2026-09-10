@@ -1,3 +1,7 @@
+import {
+  recordMusicListen,
+  musicScoreEligible as eligible,
+} from '@/lib/music-score';
 import { rateLimit } from '@/lib/rate-limit';
 import { queueStorageDeletion } from '@/lib/upload-storage';
 import { appearanceColumns } from '@/lib/premium-access';
@@ -16,9 +20,6 @@ export const dynamic = 'force-dynamic';
 const DAY = 86400000;
 // Listening is automatic. Check account eligibility again inside score writes
 // so a restriction added during playback still prevents a new score.
-const eligible = `EXISTS(SELECT 1 FROM users u
-  WHERE u.id=? AND ${visibleAccount('u')}
-  AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=u.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000)))`;
 
 export async function GET(req: Request) {
   try {
@@ -52,9 +53,9 @@ export async function GET(req: Request) {
       since =
         period === 'today'
           ? Math.floor(Date.now() / DAY) * DAY
-          : Date.now() - Number(period) * DAY;
+          : Math.floor(Date.now() / DAY) * DAY - (Number(period) - 1) * DAY;
     const visibility = `${visibleAccount('u')} AND ${personalVisibility('u')}`;
-    const [profile, library, discoveries, tracks, artists, listeners, mine] =
+    const [profile, library, discoveries, tracks, listeners, mine] =
       await Promise.all([
         d
           .prepare(
@@ -77,15 +78,7 @@ export async function GET(req: Request) {
         chart
           ? d
               .prepare(
-                `SELECT t.*,COUNT(*) as plays,COUNT(DISTINCT l.userId) as listeners FROM music_listens l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId WHERE l.created>=? AND ${visibility} GROUP BY t.id ORDER BY plays DESC,t.id LIMIT 30`,
-              )
-              .bind(since, me)
-              .all()
-          : { results: [] },
-        chart
-          ? d
-              .prepare(
-                `SELECT t.artist,t.authorUrl,t.provider,COUNT(*) as plays,COUNT(DISTINCT t.id) as tracks FROM music_listens l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId WHERE l.created>=? AND ${visibility} GROUP BY t.provider,t.authorUrl,t.artist ORDER BY plays DESC,t.provider,t.authorUrl,t.artist LIMIT 30`,
+                `SELECT t.*,SUM(l.plays) as plays,COUNT(DISTINCT l.userId) as listeners FROM music_listens l JOIN music_tracks t ON t.id=l.trackId JOIN users u ON u.id=l.userId WHERE l.created>=? AND ${visibility} GROUP BY t.id ORDER BY plays DESC,t.id LIMIT 30`,
               )
               .bind(since, me)
               .all()
@@ -93,7 +86,7 @@ export async function GET(req: Request) {
         leaders
           ? d
               .prepare(
-                `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,COUNT(*) as plays,COUNT(DISTINCT l.trackId) as tracks FROM music_listens l JOIN users u ON u.id=l.userId JOIN handles h ON h.userId=u.id AND h.main=1 WHERE l.created>=? AND ${visibility} GROUP BY u.id ORDER BY plays DESC,u.id LIMIT 25`,
+                `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,SUM(l.plays) as plays,COUNT(DISTINCT l.trackId) as tracks FROM music_listens l JOIN users u ON u.id=l.userId JOIN handles h ON h.userId=u.id AND h.main=1 WHERE l.created>=? AND ${visibility} GROUP BY u.id ORDER BY plays DESC,u.id LIMIT 25`,
               )
               .bind(since, me)
               .all()
@@ -101,8 +94,8 @@ export async function GET(req: Request) {
         leaders
           ? d
               .prepare(`WITH ranked AS (
-          SELECT u.id,COUNT(*) AS plays,COUNT(DISTINCT l.trackId) AS tracks,
-          ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC,u.id) AS rank
+          SELECT u.id,SUM(l.plays) AS plays,COUNT(DISTINCT l.trackId) AS tracks,
+          ROW_NUMBER() OVER (ORDER BY SUM(l.plays) DESC,u.id) AS rank
           FROM music_listens l JOIN users u ON u.id=l.userId JOIN handles h ON h.userId=u.id AND h.main=1
           WHERE l.created>=? AND ${visibility} GROUP BY u.id
         ) SELECT COALESCE(r.plays,0) AS plays,COALESCE(r.tracks,0) AS tracks,r.rank,
@@ -122,7 +115,6 @@ export async function GET(req: Request) {
             library.results.find((item) => item.id === track.id)?.audioUrl ||
             null,
         })),
-        artists: artists.results,
         listeners: listeners.results,
         mine,
         period,
@@ -234,25 +226,11 @@ export async function POST(req: Request) {
           );
         return Response.json(track);
       }
-      if (
-        await d
-          .prepare(
-            'SELECT 1 FROM music_listens WHERE userId=? AND trackId=? AND day=?',
-          )
-          .bind(me, track.id, Math.floor(now / DAY))
-          .first()
-      ) {
-        await d
-          .prepare('DELETE FROM music_sessions WHERE userId=?')
-          .bind(me)
-          .run();
-        return Response.json({ session: null, counted: true });
-      }
       const id = crypto.randomUUID(),
         started = Date.now();
       const result = await d
-        .prepare(`INSERT INTO music_sessions(userId,id,trackId,created,updated,totalMs) SELECT ?,?,?,?,?,0 WHERE ${eligible}
-        ON CONFLICT(userId) DO UPDATE SET id=excluded.id,trackId=excluded.trackId,created=excluded.created,updated=excluded.updated,totalMs=0`)
+        .prepare(`INSERT INTO music_sessions(userId,id,trackId,created,updated,totalMs,counted) SELECT ?,?,?,?,?,0,0 WHERE ${eligible}
+        ON CONFLICT(userId) DO UPDATE SET id=excluded.id,trackId=excluded.trackId,created=excluded.created,updated=excluded.updated,totalMs=0,counted=0`)
         .bind(me, id, track.id, started, started, me)
         .run();
       return Response.json({ session: result.meta.changes ? id : null });
@@ -316,18 +294,7 @@ export async function POST(req: Request) {
           'Сессия прослушивания истекла или событие пришло слишком рано',
         );
       if (result.totalMs < 30000) return Response.json({ counted: false });
-      await d
-        .prepare(
-          `INSERT OR IGNORE INTO music_listens(userId,trackId,day,created) SELECT userId,trackId,?,? FROM music_sessions WHERE userId=? AND id=? AND totalMs>=30000 AND created<=? AND ${eligible}`,
-        )
-        .bind(Math.floor(now / DAY), now, me, body.session, now - 30000, me)
-        .run();
-      const counted = !!(await d
-        .prepare(
-          'SELECT 1 FROM music_listens l JOIN music_sessions s ON s.userId=l.userId AND s.trackId=l.trackId WHERE s.userId=? AND s.id=? AND l.day=?',
-        )
-        .bind(me, body.session, Math.floor(now / DAY))
-        .first());
+      const counted = await recordMusicListen(me, body.session, now);
       return Response.json({ counted });
     }
     throw new ApiError(400, 'Неизвестное действие');

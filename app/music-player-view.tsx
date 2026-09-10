@@ -796,7 +796,7 @@ export function MusicPlayerView(p: Props) {
                   title="Открыть чарт прослушиваний"
                 >
                   {p.listening.status === 'counted'
-                    ? 'Учтено в чарте сегодня'
+                    ? 'Прослушивание учтено'
                     : p.listening.status === 'tracking'
                       ? `В чарт · ${p.listening.seconds} / 30 с`
                       : p.listening.status === 'error'
