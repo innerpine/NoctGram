@@ -91,6 +91,7 @@ export function ChatConversation({
   const [initialMessages] = useState(
     () => new Set(messages.map((message) => message.id)),
   );
+  const [replyFocus, setReplyFocus] = useState(0);
   const [reply, setReply] = useState<Message | null>(null),
     [selected, setSelected] = useState<string[]>([]),
     [working, setWorking] = useState(false);
@@ -277,6 +278,7 @@ export function ChatConversation({
     if (kind === 'reply') {
       if (canSend) {
         setReply(message);
+        setReplyFocus((version) => version + 1);
         setSelected([]);
       }
       return;
@@ -424,6 +426,7 @@ export function ChatConversation({
       {!!privacyNote && <p className="message-privacy-note">{privacyNote}</p>}
       <ChatComposer
         peerId={peer.id}
+        replyFocus={replyFocus}
         text={text}
         onText={onText}
         disabled={disabled || working || !canSend}
