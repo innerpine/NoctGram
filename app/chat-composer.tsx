@@ -55,6 +55,7 @@ export function ChatComposer({
   disabled,
   onSend,
   reply,
+  replyFocus,
   onCancelReply,
 }: {
   peerId: string;
@@ -63,6 +64,7 @@ export function ChatComposer({
   disabled: boolean;
   onSend: (draft: ChatDraft) => void;
   reply?: NonNullable<ChatDraft['reply']> | null;
+  replyFocus?: number;
   onCancelReply?: () => void;
 }) {
   const [files, setFiles] = useState<DraftFile[]>([]);
@@ -208,7 +210,7 @@ export function ChatComposer({
   };
   useEffect(() => {
     if (reply?.id) editor.current?.focus();
-  }, [reply?.id]);
+  }, [reply?.id, replyFocus]);
   return (
     <div
       className="chat-compose-area"

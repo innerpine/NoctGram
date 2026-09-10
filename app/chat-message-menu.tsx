@@ -16,6 +16,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { Message } from '@/lib/client';
+import { isChatSelectionSurface } from '@/lib/chat-drag-selection';
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -135,6 +136,13 @@ export function ChatMessageContext({
   initial?: boolean;
 }) {
   const pointer = useRef<{ x: number; y: number } | null>(null);
+  const replyGesture = useRef(false);
+  const canQuickReply =
+    !selecting &&
+    !removing &&
+    !props.disabled &&
+    props.canSend &&
+    !props.unconfirmed;
   return (
     <ContextMenu disabled={removing || props.unconfirmed}>
       <ContextMenuTrigger
@@ -190,8 +198,38 @@ export function ChatMessageContext({
         }}
         onPointerCancel={() => {
           pointer.current = null;
+          replyGesture.current = false;
+        }}
+        onDoubleClick={(event) => {
+          const startedOnGutter = replyGesture.current;
+          replyGesture.current = false;
+          if (
+            !startedOnGutter ||
+            !canQuickReply ||
+            event.button !== 0 ||
+            event.ctrlKey ||
+            event.metaKey ||
+            event.altKey ||
+            event.shiftKey ||
+            !isChatSelectionSurface(event.target, event.currentTarget)
+          )
+            return;
+          event.preventDefault();
+          event.stopPropagation();
+          props.onAction('reply', props.message);
         }}
         onClickCapture={(event) => {
+          // Remember the first click: deselecting the final selected message
+          // during a double click must not turn that gesture into a reply.
+          if (event.detail === 1)
+            replyGesture.current =
+              event.button === 0 &&
+              canQuickReply &&
+              !event.ctrlKey &&
+              !event.metaKey &&
+              !event.altKey &&
+              !event.shiftKey &&
+              isChatSelectionSurface(event.target, event.currentTarget);
           const start = pointer.current;
           pointer.current = null;
           if (
