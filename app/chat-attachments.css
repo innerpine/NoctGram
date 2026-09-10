@@ -7,21 +7,122 @@
   overscroll-behavior-y: contain;
 }
 .chat-compose-area .message-composer {
-  margin-top: 8px;
+  margin: 8px 12px 12px;
+  padding: 4px;
+  gap: 4px;
   align-items: flex-end;
+  border: 1px solid #ffffff09;
+  border-radius: 27px;
+  background: #222224;
 }
-.chat-compose-area textarea {
+.chat-compose-area .message-composer textarea {
   min-width: 0;
+  min-height: 44px;
+  max-height: 140px;
+  height: 44px;
+  padding: 10px 5px;
+  margin: 0;
+  line-height: 24px;
+  font-size: 16px;
+  resize: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
 }
-.chat-attach-button {
-  flex: 0 0 34px;
-  height: 40px;
-  color: #b2aebd;
-  border-radius: 9px;
+.chat-compose-area :is(.chat-attach-button, .chat-emoji-button) {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 44px;
+  color: #a9a5b4;
+  border-radius: 50%;
+  transition:
+    color 150ms,
+    background-color 150ms;
 }
-.chat-attach-button:hover {
-  background: #ffffff0a;
-  color: var(--chat-accent, #ddd);
+.chat-compose-area :is(.chat-attach-button, .chat-emoji-button):hover,
+.chat-compose-area .chat-emoji-button[data-popup-open] {
+  background: #ffffff08;
+  color: #d9cef6;
+}
+.chat-compose-area .send-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  margin: 1px 1px 1px 0;
+  border-radius: 50%;
+  transition:
+    background-color 150ms,
+    transform 150ms,
+    opacity 150ms;
+}
+.chat-compose-area .send-button:not(:disabled) {
+  background: #8774e1;
+  color: #fff;
+}
+.chat-compose-area .send-button:not(:disabled):hover {
+  background: #9785ee;
+}
+.chat-compose-area .send-button:not(:disabled):active {
+  transform: scale(0.94);
+}
+.chat-emoji-popover[data-slot='popover-content'] {
+  width: min(352px, calc(100vw - 24px));
+  height: min(408px, var(--available-height, 408px));
+  max-height: calc(var(--app-viewport-height, 100dvh) - 100px);
+  overflow: hidden;
+  padding: 0;
+  gap: 0;
+  border: 1px solid #ffffff18;
+  border-radius: 20px;
+  background: #222224;
+  box-shadow: 0 12px 40px #0007;
+}
+.chat-emoji-popover .EmojiPickerReact.epr-dark-theme {
+  --epr-bg-color: #222224;
+  --epr-category-label-bg-color: #222224;
+  --epr-hover-bg-color: #ffffff0b;
+  --epr-focus-bg-color: #8774e125;
+  --epr-search-input-bg-color: #ffffff08;
+  --epr-search-input-bg-color-active: #ffffff0d;
+  --epr-search-border-color: transparent;
+  --epr-highlight-color: #ab99f3;
+  --epr-category-icon-active-color: #ab99f3;
+  --epr-text-color: #dedbe5;
+  --epr-search-input-text-color: #fff;
+  --epr-picker-border-color: transparent;
+  --epr-picker-border-radius: 20px;
+  --epr-emoji-size: 28px;
+  --epr-emoji-padding: 6px;
+  min-height: 0;
+  border: 0;
+  font-family: inherit;
+}
+.chat-emoji-popover .epr-emoji-category-label {
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: none;
+}
+.chat-emoji-popover input {
+  font-size: 16px;
+}
+.chat-emoji-loading {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #c4bdcf;
+  font-size: 13px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-compose-area
+    :is(.send-button, .chat-attach-button, .chat-emoji-button) {
+    transition: none;
+  }
 }
 .chat-draft-files {
   display: grid;

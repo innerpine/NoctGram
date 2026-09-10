@@ -1,7 +1,14 @@
 'use client';
 /* File transfers are scoped to this mounted conversation. */
 /* eslint-disable react/react-compiler, next/no-img-element */
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   File as FileIcon,
   LoaderCircle,
@@ -11,6 +18,7 @@ import {
   Video,
   X,
   Reply,
+  Smile,
 } from 'lucide-react';
 import {
   CHAT_ATTACHMENT_LIMIT,
@@ -21,6 +29,21 @@ import {
 } from '@/lib/chat-files';
 import { chatRequest, discardChatFile } from '@/lib/chat-client';
 import { ChatReveal } from './chat-reveal';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { insertComposerEmoji } from '@/lib/chat-composer-text';
+
+const ChatEmojiPicker = lazy(() => import('./chat-emoji-picker'));
+
+function fitMessageField(field: HTMLTextAreaElement | null) {
+  if (!field) return;
+  field.style.height = '44px';
+  field.style.height = `${Math.min(140, Math.max(44, field.scrollHeight))}px`;
+}
 
 type DraftFile = {
   id: string;
@@ -52,6 +75,9 @@ export function ChatComposer({
   const current = useRef(files);
   const input = useRef<HTMLInputElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const selection = useRef({ start: 0, end: 0 });
+  const pendingCaret = useRef<number | null>(null);
   const alive = useRef(true);
   const controllers = useRef(new Map<string, AbortController>());
   const locked = useRef(false);
@@ -60,10 +86,29 @@ export function ChatComposer({
     [error, setError] = useState('');
   useLayoutEffect(() => {
     const field = textarea.current;
-    if (!field || !window.matchMedia('(pointer: coarse)').matches) return;
-    field.style.height = '44px';
-    field.style.height = `${Math.min(120, Math.max(44, field.scrollHeight))}px`;
+    fitMessageField(field);
+    if (field && pendingCaret.current !== null) {
+      field.setSelectionRange(pendingCaret.current, pendingCaret.current);
+      pendingCaret.current = null;
+    }
   }, [text]);
+  useEffect(() => {
+    const field = textarea.current;
+    if (!field) return;
+    let width = field.clientWidth;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      if (width === field.clientWidth) return;
+      width = field.clientWidth;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => fitMessageField(field));
+    });
+    observer.observe(field);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, []);
   const attempt = useRef<{
     action: string;
     id: string;
@@ -221,6 +266,29 @@ export function ChatComposer({
   };
   const frozen = disabled || sending || uncertain;
   useEffect(() => {
+    setEmojiOpen(false);
+  }, [peerId, frozen]);
+  const chooseEmoji = (emoji: string) => {
+    if (frozen) return;
+    const next = insertComposerEmoji(
+      text,
+      emoji,
+      selection.current.start,
+      selection.current.end,
+    );
+    if (!next) {
+      setError('В сообщении может быть до 4000 символов');
+      return;
+    }
+    setError('');
+    selection.current = { start: next.caret, end: next.caret };
+    pendingCaret.current = next.caret;
+    onText(next.text);
+    setEmojiOpen(false);
+    // Focus within the tap so iOS can return to its keyboard without zooming.
+    textarea.current?.focus({ preventScroll: true });
+  };
+  useEffect(() => {
     onLockedChange?.(sending || uncertain);
   }, [sending, uncertain, onLockedChange]);
   useEffect(() => {
@@ -344,6 +412,7 @@ export function ChatComposer({
         </button>
         <textarea
           ref={textarea}
+          rows={1}
           disabled={frozen}
           aria-label="Сообщение"
           placeholder={
@@ -352,6 +421,12 @@ export function ChatComposer({
           maxLength={4000}
           value={text}
           onChange={(e) => onText(e.target.value)}
+          onSelect={(e) => {
+            selection.current = {
+              start: e.currentTarget.selectionStart,
+              end: e.currentTarget.selectionEnd,
+            };
+          }}
           onPaste={(e) => {
             if (e.clipboardData.files.length) {
               e.preventDefault();
@@ -372,7 +447,47 @@ export function ChatComposer({
             }
           }}
         />
+        <Popover open={emojiOpen && !frozen} onOpenChange={setEmojiOpen}>
+          <PopoverTrigger
+            type="button"
+            className="chat-emoji-button"
+            disabled={frozen}
+            title="Эмодзи"
+            aria-label="Выбрать эмодзи"
+            onPointerDown={() => {
+              const field = textarea.current;
+              if (field)
+                selection.current = {
+                  start: field.selectionStart,
+                  end: field.selectionEnd,
+                };
+            }}
+          >
+            <Smile size={23} />
+          </PopoverTrigger>
+          <PopoverContent
+            className="chat-emoji-popover"
+            side="top"
+            align="end"
+            sideOffset={12}
+            initialFocus={false}
+            finalFocus={textarea}
+          >
+            <PopoverTitle className="sr-only">Эмодзи</PopoverTitle>
+            <Suspense
+              fallback={
+                <output className="chat-emoji-loading">
+                  <LoaderCircle className="spin" size={22} />
+                  <span>Загружаем эмодзи…</span>
+                </output>
+              }
+            >
+              <ChatEmojiPicker onSelect={chooseEmoji} />
+            </Suspense>
+          </PopoverContent>
+        </Popover>
         <button
+          type="submit"
           className="send-button"
           aria-label={uncertain ? 'Повторить отправку' : 'Отправить сообщение'}
           disabled={
@@ -387,7 +502,7 @@ export function ChatComposer({
           ) : uncertain ? (
             <RotateCcw size={18} />
           ) : (
-            <Send size={18} />
+            <Send size={21} fill="currentColor" strokeWidth={1.5} />
           )}
         </button>
       </form>
