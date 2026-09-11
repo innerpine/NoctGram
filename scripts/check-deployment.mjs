@@ -11,6 +11,7 @@ const secretKeys = new Set([
   'NOCT_TURN_SECRET',
   'NOCT_BOT_SECRET',
   'TELEGRAM_BOT_TOKEN',
+  'TELEGRAM_WEBHOOK_SECRET',
 ]);
 const present = (value) => typeof value === 'string' && value.trim().length > 0;
 const object = (value) =>

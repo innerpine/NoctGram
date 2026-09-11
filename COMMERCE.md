@@ -2,6 +2,8 @@
 
 Implemented 2026-09-10. Payment catalog: `lib/commerce-catalog.json`.
 
+Public deployment uses a persistent Cloudflare webhook bot; see [bot/CLOUDFLARE.md](bot/CLOUDFLARE.md). The local long-polling instructions below remain available for development with a separate bot.
+
 ## Prices
 
 Noct Premium: **30 days**, **650 Telegram Stars** or **149 RUB** through independent website Crypto Pay checkout. No auto-renewal. Purchased periods stack. Existing administrator grants remain separate.

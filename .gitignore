@@ -42,6 +42,7 @@ next-env.d.ts
 /outputs/
 /work/
 /bot/data/
+/bot/work/
 
 *.tsbuildinfo
 *.log

@@ -1,0 +1,18 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "noctgram-payments",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "NOCT_SITE_URL": "https://noctgram.com",
+    "NOCT_BOT_CUSTOM_EMOJI": "0"
+  },
+  "durable_objects": { "bindings": [{ "name": "BOT", "class_name": "TelegramBot" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TelegramBot"] }],
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "limits": { "cpu_ms": 10000 },
+  "observability": { "enabled": false }
+}

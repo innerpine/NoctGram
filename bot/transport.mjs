@@ -74,6 +74,7 @@ export function telegramTransport(token, signal) {
     'getStarTransactions',
     'refundStarPayment',
     'getWebhookInfo',
+    'setWebhook',
     'getUpdates',
     'sendMessage',
     'editMessageText',

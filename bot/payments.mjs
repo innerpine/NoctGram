@@ -18,7 +18,8 @@ export async function handlePaymentUpdate(bot, update) {
   const pre = update.pre_checkout_query;
   if (pre) {
     let ok = false,
-      error = 'Не удалось проверить счёт. Попробуй снова.';
+      error = 'Не удалось проверить счёт. Попробуй снова.',
+      timer;
     try {
       await Promise.race([
         bot.site({
@@ -30,13 +31,15 @@ export async function handlePaymentUpdate(bot, update) {
           precheckoutId: pre.id,
         }),
         new Promise((_, reject) => {
-          const timer = setTimeout(() => reject(new Error('timeout')), 7500);
+          timer = setTimeout(() => reject(new Error('timeout')), 7500);
           timer.unref?.();
         }),
       ]);
       ok = true;
     } catch (e) {
       if (e.service === 'site' && e.status < 500) error = e.message;
+    } finally {
+      clearTimeout(timer);
     }
     await bot.telegram('answerPreCheckoutQuery', {
       pre_checkout_query_id: pre.id,
