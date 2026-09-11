@@ -44,7 +44,8 @@ export function CommentsPanel({
     generation = useRef(0),
     lock = useRef(false),
     end = useRef<HTMLDivElement>(null),
-    cursor = useRef<Comment | null>(null);
+    cursor = useRef<Comment | null>(null),
+    emojiField = useRef<HTMLTextAreaElement>(null);
   const load = useCallback(
     async (append = false) => {
       const gen = ++generation.current;
@@ -304,12 +305,15 @@ export function CommentsPanel({
         <Avatar person={me} size={34} />
         <div className="comment-input">
           <EmojiPicker
+            key={post.id}
             premium={!!me.premium}
             text={text}
             onText={setText}
+            field={emojiField}
             disabled={sending || readOnly}
           />
           <textarea
+            ref={emojiField}
             aria-label="Комментарий"
             placeholder="Добавить мысль…"
             maxLength={2000}

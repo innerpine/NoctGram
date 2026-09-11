@@ -138,6 +138,19 @@ assert.equal(largeEmojiCount('😀\n😀\n😀\n😀'), 4);
 assert.equal(largeEmojiCount('👍🏽 👨‍👩‍👧‍👦 🇺🇦'), 3);
 assert.equal(largeEmojiCount('Текст 😀'), 0);
 assert.equal(largeEmojiCount('😀'.repeat(7)), 0);
+const premiumMixed = 'Привет :noct_fire: 😀 :noct_unknown: @alice';
+const premiumParts = chatEmojiParts(premiumMixed);
+assert.equal(premiumParts.map((part) => part.text).join(''), premiumMixed);
+assert.equal(premiumParts.filter((part) => part.premium).length, 1);
+assert.equal(premiumParts.find((part) => part.premium).premium.name, 'fire');
+assert.ok(
+  premiumParts.some(
+    (part) => part.text.includes(':noct_unknown:') && !part.premium,
+  ),
+);
+assert.equal(largeEmojiCount(':noct_fire: 😀 :noct_heart:'), 3);
+assert.equal(largeEmojiCount(':noct_fire:'.repeat(7)), 0);
+assert.equal(largeEmojiCount('Текст :noct_fire:'), 0);
 const mixed = 'Привет @alice 👨‍👩‍👧‍👦 ❤️\nhttps://soundcloud.com/a/b';
 assert.equal(
   chatEmojiParts(mixed)

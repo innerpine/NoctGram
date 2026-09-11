@@ -625,7 +625,7 @@ scenario(
       assert.equal(response.status, 200);
       receipts.push(await response.json());
     }
-    assert.equal(receipts[4].balance, 10000 - 5 * 25);
+    assert.equal(receipts[4].balance, 10000 - 5 * 75);
     const denied = await send(body(5));
     assert.equal(denied.status, 429);
     assert.equal((await denied.json()).code, 'RATE_LIMIT');
@@ -680,7 +680,7 @@ scenario(
     );
     const other = await send(body(6, 'outsider'));
     assert.equal(other.status, 200);
-    assert.equal((await other.json()).balance, 10000 - 6 * 25);
+    assert.equal((await other.json()).balance, 10000 - 6 * 75);
   },
 );
 

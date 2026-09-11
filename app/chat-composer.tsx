@@ -1,15 +1,8 @@
 'use client';
-import { EmojiPicker, EmojiPreview } from './premium-emoji';
+import { EmojiPicker } from './premium-emoji';
 /* File transfers are scoped to this mounted conversation. */
 /* eslint-disable react/react-compiler, next/no-img-element */
-import {
-  lazy,
-  Suspense,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   File as FileIcon,
   LoaderCircle,
@@ -19,7 +12,6 @@ import {
   Video,
   X,
   Reply,
-  Smile,
 } from 'lucide-react';
 import {
   CHAT_ATTACHMENT_LIMIT,
@@ -30,17 +22,9 @@ import {
 } from '@/lib/chat-files';
 import { chatRequest, discardChatFile } from '@/lib/chat-client';
 import { ChatReveal } from './chat-reveal';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { ChatTextEditor, type ChatTextEditorHandle } from './chat-text-editor';
 import { ChatEmojiText } from './chat-emoji-text';
 import type { ChatDraft } from '@/lib/chat-outbox';
-
-const ChatEmojiPicker = lazy(() => import('./chat-emoji-picker'));
 
 type DraftFile = {
   id: string;
@@ -74,7 +58,6 @@ export function ChatComposer({
   const current = useRef(files);
   const input = useRef<HTMLInputElement>(null);
   const editor = useRef<ChatTextEditorHandle>(null);
-  const [emojiOpen, setEmojiOpen] = useState(false);
   const alive = useRef(true);
   const controllers = useRef(new Map<string, AbortController>());
   const locked = useRef(false);
@@ -194,7 +177,6 @@ export function ChatComposer({
     changeFiles([]);
     onText('');
     onCancelReply?.();
-    setEmojiOpen(false);
     editor.current?.focus();
   };
   // Keep rapid duplicate submits locked until React commits the cleared draft.
@@ -202,14 +184,10 @@ export function ChatComposer({
     locked.current = false;
   }, [text, files]);
   const frozen = disabled;
-  useEffect(() => {
-    setEmojiOpen(false);
-  }, [peerId, frozen]);
   const chooseEmoji = (emoji: string) => {
     if (frozen) return;
     setError('');
     editor.current?.insertEmoji(emoji);
-    setEmojiOpen(false);
   };
   useEffect(() => {
     if (reply?.id) editor.current?.focus();
@@ -305,7 +283,6 @@ export function ChatComposer({
           {error}
         </p>
       )}
-      <EmojiPreview text={text} />
       <form
         className="message-composer"
         onSubmit={(e) => {
@@ -333,14 +310,6 @@ export function ChatComposer({
         >
           <Paperclip size={21} />
         </button>
-        <EmojiPicker
-          premium={premium}
-          text={text}
-          onText={onText}
-          onPrepareOpen={() => editor.current?.rememberSelection()}
-          onInsert={(token) => editor.current?.insertEmoji(token)}
-          disabled={frozen}
-        />
         <div className="chat-editor-container">
           <ChatTextEditor
             ref={editor}
@@ -352,44 +321,27 @@ export function ChatComposer({
             }
             onFiles={(files) => void add(files)}
             onSubmit={submit}
-            onLimit={() => setError('В сообщении может быть до 4000 символов')}
+            onLimit={(reason) =>
+              setError(
+                reason === 'premium'
+                  ? 'Можно добавить до 30 Premium-эмодзи'
+                  : 'В сообщении может быть до 4000 символов',
+              )
+            }
           />
         </div>
-        <Popover open={emojiOpen && !frozen} onOpenChange={setEmojiOpen}>
-          <PopoverTrigger
-            type="button"
-            className="chat-emoji-button"
-            disabled={frozen}
-            title="Эмодзи"
-            aria-label="Выбрать эмодзи"
-            onPointerDown={() => editor.current?.rememberSelection()}
-          >
-            <Smile size={23} />
-          </PopoverTrigger>
-          <PopoverContent
-            className="chat-emoji-popover"
-            side="top"
-            align="end"
-            sideOffset={12}
-            initialFocus={false}
-            finalFocus={() => {
-              editor.current?.focus();
-              return false;
-            }}
-          >
-            <PopoverTitle className="sr-only">Эмодзи</PopoverTitle>
-            <Suspense
-              fallback={
-                <output className="chat-emoji-loading">
-                  <LoaderCircle className="spin" size={22} />
-                  <span>Загружаем эмодзи…</span>
-                </output>
-              }
-            >
-              <ChatEmojiPicker onSelect={chooseEmoji} />
-            </Suspense>
-          </PopoverContent>
-        </Popover>
+        <EmojiPicker
+          key={peerId}
+          premium={premium}
+          text={text}
+          onText={onText}
+          className="chat-emoji-button"
+          align="end"
+          onPrepareOpen={() => editor.current?.rememberSelection()}
+          onInsert={chooseEmoji}
+          onRestoreFocus={() => editor.current?.focus()}
+          disabled={frozen}
+        />
         <button
           type="submit"
           className="send-button"

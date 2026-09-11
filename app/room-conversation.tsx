@@ -103,6 +103,7 @@ export function RoomConversation({
   const pageBefore = useRef(''),
     paging = useRef(false);
   const sending = useRef(false);
+  const emojiField = useRef<HTMLTextAreaElement>(null);
   const load = useCallback(async () => {
     const ticket = ++serial.current;
     readController.current?.abort();
@@ -755,12 +756,20 @@ export function RoomConversation({
             }}
           >
             <EmojiPicker
+              key={room.id}
               premium={!!me.premium}
               text={text}
               onText={setText}
-              disabled={disabled || pending || !room.canSend}
+              field={emojiField}
+              disabled={
+                disabled ||
+                pending ||
+                !room.canSend ||
+                (room.kind === 'secret' && !secretReady)
+              }
             />
             <textarea
+              ref={emojiField}
               aria-label="Сообщение"
               placeholder={
                 room.kind === 'secret'

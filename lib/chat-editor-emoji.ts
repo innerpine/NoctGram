@@ -22,9 +22,14 @@ export class ChatEmojiNode extends TextNode {
   }
   createDOM(config: EditorConfig) {
     const dom = super.createDOM(config);
-    const unified = chatEmojiParts(this.__text)[0]?.unified;
+    const part = chatEmojiParts(this.__text)[0];
+    if (!part?.unified && !part?.premium) return dom;
     dom.classList.add('chat-editor-emoji');
-    if (unified) dom.style.backgroundImage = `url("${appleEmojiUrl(unified)}")`;
+    const url = part.premium
+      ? '/assets/emoji/' + part.premium.id + '.preview.webp'
+      : appleEmojiUrl(part.unified!);
+    dom.style.backgroundImage = `url("${url}")`;
+    if (part.premium) dom.setAttribute('aria-label', part.premium.fallback);
     return dom;
   }
   updateDOM(previous: this, dom: HTMLElement, config: EditorConfig) {
@@ -42,7 +47,7 @@ export function $transformChatEmoji(node: TextNode) {
   if (!node.isSimpleText() || node.isComposing()) return;
   let offset = 0;
   for (const part of chatEmojiParts(node.getTextContent())) {
-    if (part.unified) {
+    if (part.unified || part.premium) {
       const pieces = node.splitText(offset, offset + part.text.length);
       const target = pieces[offset === 0 ? 0 : 1];
       target.replace($createChatEmojiNode(part.text));

@@ -11,6 +11,7 @@ import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  $getNodeByKey,
   $getSelection,
   $isRangeSelection,
   $setSelection,
@@ -27,6 +28,7 @@ import {
   type RangeSelection,
 } from 'lexical';
 import { ChatEmojiNode, $transformChatEmoji } from '@/lib/chat-editor-emoji';
+import { emojiParts } from '@/lib/premium-emoji';
 
 export type ChatTextEditorHandle = {
   focus: () => void;
@@ -51,7 +53,7 @@ export function ChatTextEditor(props: {
   className?: string;
   onFiles?: (files: File[]) => void;
   onSubmit?: () => void;
-  onLimit?: () => void;
+  onLimit?: (reason: 'length' | 'premium') => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const instance = useRef<LexicalEditor | null>(null);
@@ -77,7 +79,13 @@ export function ChatTextEditor(props: {
         root.current?.focus({ preventScroll: true });
         editor.update(
           () => {
-            if (remembered.current) $setSelection(remembered.current.clone());
+            if (
+              remembered.current &&
+              $getNodeByKey(remembered.current.anchor.key) &&
+              $getNodeByKey(remembered.current.focus.key)
+            )
+              $setSelection(remembered.current.clone());
+            remembered.current = null;
             const selection = $getSelection() ?? $getRoot().selectEnd();
             if ($isRangeSelection(selection)) selection.insertText(emoji);
           },
@@ -145,12 +153,14 @@ export function ChatTextEditor(props: {
         ({ editorState, prevEditorState, tags }) => {
           if (!ready) return;
           const text = editorState.read(() => $getRoot().getTextContent());
-          if (text.length > 4000) {
+          const tooManyPremium =
+            emojiParts(text).filter((part) => part.emoji).length > 30;
+          if (text.length > 4000 || tooManyPremium) {
             editor.update(() => $restoreEditorState(editor, prevEditorState), {
               tag: HISTORIC_TAG,
               discrete: true,
             });
-            latest.current.onLimit?.();
+            latest.current.onLimit?.(tooManyPremium ? 'premium' : 'length');
             return;
           }
           if (!tags.has('external-draft') && text !== latest.current.value)
