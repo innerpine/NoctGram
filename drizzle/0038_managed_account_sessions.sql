@@ -1,0 +1,1 @@
+ALTER TABLE `auth_sessions` ADD `actingAs` text DEFAULT '' NOT NULL;

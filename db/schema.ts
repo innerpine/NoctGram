@@ -496,6 +496,7 @@ export const authSessions = sqliteTable(
     created: integer().notNull(),
     expiresAt: integer().notNull(),
     verifiedAt: integer().notNull().default(0),
+    actingAs: text().notNull().default(''),
   },
   (t) => [
     index('auth_sessions_user').on(t.userId),

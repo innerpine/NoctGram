@@ -424,7 +424,7 @@ export async function finishOnboarding(b: Record<string, unknown>) {
   return Response.json({ redirectTo: '/' });
 }
 export async function signOut(req: Request) {
-  const current = await currentIdentity();
+  const current = await currentIdentity(false);
   await removePushDevice();
   if (current) {
     await db().batch([

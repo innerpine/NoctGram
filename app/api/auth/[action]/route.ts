@@ -1,6 +1,11 @@
 import { readJsonBody } from '@/lib/request-body';
 import { setting } from '@/lib/auth-session';
 import { ApiError, failure } from '@/lib/api-error';
+import {
+  managedAccounts,
+  switchAccount,
+  requirePersonalAccount,
+} from '@/lib/managed-accounts';
 import { accountAction, accountStatus } from '@/lib/account-management';
 import {
   authStatus,
@@ -21,8 +26,12 @@ export async function GET(
   { params }: { params: Promise<{ action: string }> },
 ) {
   try {
-    if ((await params).action === 'account')
+    if ((await params).action === 'accounts')
+      return privateResponse(Response.json(await managedAccounts()));
+    if ((await params).action === 'account') {
+      await requirePersonalAccount();
       return privateResponse(Response.json(await accountStatus(req)));
+    }
     if ((await params).action !== 'session')
       throw new ApiError(404, 'Не найдено');
     return privateResponse(Response.json(await authStatus(req)));
@@ -50,6 +59,13 @@ export async function POST(
   try {
     const data = await body(req),
       action = (await params).action;
+    if (action === 'switch-account')
+      return privateResponse(await switchAccount(data));
+    if (
+      !['start', 'verify', 'recover', 'logout'].includes(action) ||
+      data.link === true
+    )
+      await requirePersonalAccount();
     if (
       setting('NOCT_AUTH_MODE') === 'access' &&
       !['onboarding', 'logout'].includes(action)

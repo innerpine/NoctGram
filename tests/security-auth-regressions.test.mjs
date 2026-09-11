@@ -722,6 +722,227 @@ for (const type of ['post', 'comment', 'story'])
     },
   );
 await check(
+  'Managed accounts require explicit grants and retain the personal login',
+  async () => {
+    const manager = freshPerson('manager'),
+      teammate = freshPerson('teammate'),
+      official = freshPerson('official');
+    const cookie = 'c'.repeat(64),
+      secondCookie = 'd'.repeat(64),
+      foreignCookie = 'e'.repeat(64);
+    for (const [value, id] of [
+      [cookie, manager],
+      [secondCookie, teammate],
+      [foreignCookie, 'mallory'],
+    ]) {
+      sql
+        .prepare(
+          'INSERT INTO auth_sessions(tokenHash,userId,created,expiresAt,verifiedAt) VALUES(?,?,?,?,?)',
+        )
+        .run(
+          await tokenHash(value),
+          id,
+          Date.now(),
+          Date.now() + 3600000,
+          Date.now(),
+        );
+    }
+    env.NOCT_AUTH_MODE = 'email';
+    env.NOCT_DEPLOYMENT_TARGET = 'standalone';
+    env.NOCT_MANAGED_ACCOUNTS = JSON.stringify({
+      [manager]: [official],
+      [teammate]: [official],
+    });
+    function authRequest(
+      action,
+      payload,
+      sessionCookie = cookie,
+      origin = 'https://synthetic.invalid',
+    ) {
+      requestHeaders = new Headers({
+        cookie: 'noct_session=' + sessionCookie,
+        Origin: origin,
+        'Content-Type': 'application/json',
+      });
+      const req = new Request('https://synthetic.invalid/api/auth/' + action, {
+        method: payload === undefined ? 'GET' : 'POST',
+        headers: requestHeaders,
+        ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+      });
+      return payload === undefined
+        ? authRoute.GET(req, { params: Promise.resolve({ action }) })
+        : authRoute.POST(req, { params: Promise.resolve({ action }) });
+    }
+    const ownProfileBefore = JSON.stringify(
+      sql.prepare('SELECT id,name,avatar FROM users WHERE id=?').get(manager),
+    );
+    const listed = await (await authRequest('accounts')).json();
+    assert.deepEqual(
+      new Set(listed.accounts.map((x) => x.id)),
+      new Set([manager, official]),
+    );
+    assert.equal(
+      (
+        await authRequest(
+          'switch-account',
+          { accountId: official },
+          foreignCookie,
+        )
+      ).status,
+      403,
+    );
+    assert.equal(
+      (await authRequest('switch-account', { accountId: 'owner' })).status,
+      403,
+    );
+    assert.equal(
+      (
+        await authRequest(
+          'switch-account',
+          { accountId: official },
+          cookie,
+          'https://attacker.invalid',
+        )
+      ).status,
+      403,
+    );
+    assert.equal(
+      (await authRequest('switch-account', { accountId: official })).status,
+      200,
+    );
+    assert.equal((await identity()).userId, official);
+    assert.equal((await identity()).principalUserId, manager);
+    assert.equal((await identity(false)).userId, manager);
+    assert.equal((await authRequest('account')).status, 403);
+    for (const action of [
+      'email-change-start',
+      'logout-all',
+      'delete',
+      'onboarding',
+    ])
+      assert.equal((await authRequest(action, {})).status, 403);
+    assert.equal(
+      (
+        await authRequest('start', {
+          email: 'synthetic@example.test',
+          link: true,
+        })
+      ).status,
+      403,
+    );
+    // Real social writes and authorization resolve the selected account, not the manager.
+    requestHeaders = new Headers({
+      cookie: 'noct_session=' + cookie,
+      Origin: 'https://synthetic.invalid',
+      'Content-Type': 'application/json',
+    });
+    const publish = await socialRoute.POST(
+      new Request('https://synthetic.invalid/api/social', {
+        method: 'POST',
+        headers: requestHeaders,
+        body: JSON.stringify({
+          action: 'post',
+          text: 'managed synthetic post',
+          actor: official,
+        }),
+      }),
+    );
+    assert.equal(publish.status, 200);
+    const publishedId = (await publish.json()).id;
+    assert.equal(
+      sql.prepare('SELECT userId FROM posts WHERE id=?').get(publishedId)
+        .userId,
+      official,
+    );
+    const stale = await socialRoute.GET(
+      new Request(
+        'https://synthetic.invalid/api/social?action=bootstrap&actor=' +
+          manager,
+        { headers: requestHeaders },
+      ),
+    );
+    assert.equal(stale.status, 401);
+    assert.equal(
+      JSON.stringify(
+        sql.prepare('SELECT id,name,avatar FROM users WHERE id=?').get(manager),
+      ),
+      ownProfileBefore,
+    );
+    // Each teammate chooses independently; switching one session does not change the other.
+    assert.equal(
+      (await (await authRequest('accounts', undefined, secondCookie)).json())
+        .activeId,
+      teammate,
+    );
+    assert.equal(
+      (
+        await authRequest(
+          'switch-account',
+          { accountId: official },
+          secondCookie,
+        )
+      ).status,
+      200,
+    );
+    assert.equal((await identity()).principalUserId, teammate);
+    assert.equal(
+      (await authRequest('switch-account', { accountId: manager })).status,
+      200,
+    );
+    assert.equal((await identity()).userId, manager);
+    assert.equal(
+      sql
+        .prepare('SELECT actingAs FROM auth_sessions WHERE tokenHash=?')
+        .get(await tokenHash(secondCookie)).actingAs,
+      official,
+    );
+    // Revoking the grant fails closed on the next request, but returning to self remains possible.
+    assert.equal(
+      (await authRequest('switch-account', { accountId: official })).status,
+      200,
+    );
+    env.NOCT_MANAGED_ACCOUNTS = '{}';
+    await assert.rejects(
+      () => identity(),
+      (e) => e.status === 403,
+    );
+    assert.equal(
+      (await authRequest('switch-account', { accountId: manager })).status,
+      200,
+    );
+    env.NOCT_MANAGED_ACCOUNTS = JSON.stringify({ [manager]: [official] });
+    restrict(manager);
+    assert.equal(
+      (await authRequest('switch-account', { accountId: official })).status,
+      403,
+    );
+    sql.prepare('DELETE FROM account_restrictions WHERE userId=?').run(manager);
+    restrict(official);
+    assert.equal(
+      (await authRequest('switch-account', { accountId: official })).status,
+      403,
+    );
+    sql
+      .prepare('DELETE FROM account_restrictions WHERE userId=?')
+      .run(official);
+    assert.equal(
+      (await authRequest('switch-account', { accountId: official })).status,
+      200,
+    );
+    sql
+      .prepare('DELETE FROM auth_sessions WHERE tokenHash=?')
+      .run(await tokenHash(cookie));
+    assert.equal(await identity(), null);
+    assert.equal((await authRequest('accounts')).status, 401);
+    assert.equal(
+      (await authRequest('switch-account', { accountId: official })).status,
+      401,
+    );
+    delete env.NOCT_MANAGED_ACCOUNTS;
+    delete env.NOCT_DEPLOYMENT_TARGET;
+  },
+);
+await check(
   'All synthetic mutations preserve full-schema foreign keys',
   async () => {
     assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length, 0);

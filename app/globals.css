@@ -342,6 +342,58 @@ small {
 .logout:hover {
   color: #fff;
 }
+.managed-account-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  color: var(--muted-foreground, #a6a6b0);
+  font-size: 13px;
+  border-radius: 10px;
+}
+.managed-account-trigger:hover {
+  color: #fff;
+  background: #ffffff09;
+}
+.managed-account-dialog {
+  max-width: min(400px, calc(100vw - 32px));
+}
+.managed-account-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.managed-account-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  text-align: left;
+  border: 1px solid #ffffff12;
+  border-radius: 14px;
+  background: #ffffff04;
+}
+.managed-account-option:hover,
+.managed-account-option[aria-pressed='true'] {
+  background: #ffffff0c;
+  border-color: #ffffff2b;
+}
+.managed-account-option > span {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.managed-account-option strong {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.managed-account-option small {
+  font-size: 12px;
+  color: #96969f;
+  overflow-wrap: anywhere;
+}
 .sidebar-footnote {
   color: #4c4c4c;
   font-size: 11px;

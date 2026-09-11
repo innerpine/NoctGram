@@ -267,6 +267,13 @@
       "when": 1789063481081,
       "tag": "0034_payment_checkout_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1789139273475,
+      "tag": "0038_managed_account_sessions",
+      "breakpoints": true
     }
   ]
 }

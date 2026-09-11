@@ -13,6 +13,7 @@ import { roomAction, type RoomTarget } from '@/lib/rooms-client';
 import type { RoomDetail } from '@/lib/rooms-types';
 import { ensureKey } from '@/lib/secret-crypto';
 import { AccountPanel } from './account-panel';
+import { AccountSwitcher } from './account-switcher';
 import { VerifiedProfile } from './profile-identity';
 import { ChannelBoosts } from './channel-boosts';
 /* Auth routes require top-level links; private R2 images must keep session cookies.
@@ -1963,6 +1964,7 @@ export default function Noctgram({
                   <Settings size={20} />
                 </button>
               </div>
+              <AccountSwitcher userId={me.id} />
               <SignOutButton className="logout">
                 <LogOut size={17} />
                 <span>Выйти</span>
@@ -3233,14 +3235,17 @@ export default function Noctgram({
             </a>
           )}
           {modal === 'settings' && me && (
-            <PrivacyPanel
-              onChanged={() => {
-                setPrivacyVersion((value) => value + 1);
-                void latestRefresh.current();
-                void loadThreads().catch(() => {});
-                if (peer) void loadMessages().catch(() => {});
-              }}
-            />
+            <>
+              <AccountSwitcher userId={me.id} />
+              <PrivacyPanel
+                onChanged={() => {
+                  setPrivacyVersion((value) => value + 1);
+                  void latestRefresh.current();
+                  void loadThreads().catch(() => {});
+                  if (peer) void loadMessages().catch(() => {});
+                }}
+              />
+            </>
           )}
           {modal === 'edit' && editTarget && (
             <div

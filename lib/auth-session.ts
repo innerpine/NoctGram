@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { db } from './storage';
 import { accessIdentity, type AccessSettings } from './access-auth';
+import { canManageAccount } from './managed-account-access';
+import { ApiError } from './api-error';
 
 export const SESSION_COOKIE = 'noct_session';
 export const CHALLENGE_COOKIE = 'noct_email_challenge';
@@ -54,8 +56,11 @@ export type Identity = {
   userId: string;
   fullName: string | null;
   source: 'email' | 'sites' | 'access';
+  principalUserId?: string;
 };
-export async function identity(): Promise<Identity | null> {
+export async function identity(
+  useManagedAccount = true,
+): Promise<Identity | null> {
   // A standalone release must never fall back to the development proxy identity.
   if (
     setting('NOCT_DEPLOYMENT_TARGET') === 'standalone' &&
@@ -83,10 +88,30 @@ export async function identity(): Promise<Identity | null> {
     if (!/^[a-f0-9]{64}$/.test(token)) return null;
     const row = await db()
       .prepare(
-        'SELECT s.userId FROM auth_sessions s JOIN users u ON u.id=s.userId WHERE s.tokenHash=? AND s.expiresAt>? AND u.deletedAt=0',
+        'SELECT s.userId,s.actingAs FROM auth_sessions s JOIN users u ON u.id=s.userId WHERE s.tokenHash=? AND s.expiresAt>? AND u.deletedAt=0',
       )
       .bind(await tokenHash(token), Date.now())
-      .first<{ userId: string }>();
+      .first<{ userId: string; actingAs: string }>();
+    if (row?.actingAs && useManagedAccount) {
+      if (
+        !(await canManageAccount(
+          setting('NOCT_MANAGED_ACCOUNTS'),
+          row.userId,
+          row.actingAs,
+        ))
+      )
+        throw new ApiError(
+          403,
+          'Доступ к этому аккаунту недоступен. Переключитесь на личный аккаунт.',
+          'ACCOUNT_ACCESS_REVOKED',
+        );
+      return {
+        userId: row.actingAs,
+        principalUserId: row.userId,
+        fullName: null,
+        source: 'email',
+      };
+    }
     return row ? { userId: row.userId, fullName: null, source: 'email' } : null;
   }
   if (!sitesAuthEnabled()) return null;
