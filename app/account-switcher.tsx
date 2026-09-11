@@ -12,13 +12,15 @@ import type { Person } from '@/lib/client';
 import { Avatar } from './post-card';
 
 type Accounts = { principalId: string; activeId: string; accounts: Person[] };
-const pageInstance = crypto.randomUUID();
+let pageInstance = '';
 export function AccountSwitcher({ userId }: { userId: string }) {
   const [data, setData] = useState<Accounts | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   useEffect(() => {
+    // Initialize only in the browser, never at Cloudflare module startup.
+    pageInstance ||= crypto.randomUUID();
     let disposed = false;
     void authRequest<Accounts>('accounts')
       .then((value) => {
