@@ -5,6 +5,10 @@ import { defineConfig } from 'vite';
 import hostingConfig from './.openai/hosting.json';
 import { localTestAccounts } from './scripts/local-test-accounts';
 import { readFileSync } from 'node:fs';
+import {
+  parseSecretNames,
+  validateDeployment,
+} from './scripts/check-deployment.mjs';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   '00000000-0000-4000-8000-000000000000';
@@ -38,6 +42,31 @@ const localBindingConfig = {
 
 export default defineConfig(async () => {
   const previewConfigPath = process.env.NOCT_PREVIEW_CONFIG;
+  const publicConfigPath = process.env.NOCT_PUBLIC_CONFIG;
+  if (previewConfigPath && publicConfigPath)
+    throw new Error(
+      'Choose either the private preview or the public deployment',
+    );
+  const publicConfig = publicConfigPath
+    ? JSON.parse(readFileSync(publicConfigPath, 'utf8').replace(/^\uFEFF/, ''))
+    : null;
+  if (publicConfig) {
+    const secretNames = process.env.NOCT_PUBLIC_SECRET_NAMES
+      ? parseSecretNames(
+          JSON.parse(
+            readFileSync(process.env.NOCT_PUBLIC_SECRET_NAMES, 'utf8').replace(
+              /^\uFEFF/,
+              '',
+            ),
+          ),
+        )
+      : new Set<string>();
+    const errors = validateDeployment(publicConfig, {
+      target: 'public',
+      secretNames,
+    });
+    if (errors.length) throw new Error(errors.join('\n'));
+  }
   const previewConfig = previewConfigPath
     ? JSON.parse(readFileSync(previewConfigPath, 'utf8'))
     : null;
@@ -73,14 +102,21 @@ export default defineConfig(async () => {
       ...localTestAccounts(sites()),
       cloudflare({
         viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
-        config: previewConfig
+        config: publicConfig
           ? {
-              ...previewConfig,
-              main: './worker/shared-preview.ts',
+              ...publicConfig,
+              main: './worker/public.ts',
               compatibility_flags: ['nodejs_compat'],
               assets: { binding: 'ASSETS', run_worker_first: true },
             }
-          : localBindingConfig,
+          : previewConfig
+            ? {
+                ...previewConfig,
+                main: './worker/shared-preview.ts',
+                compatibility_flags: ['nodejs_compat'],
+                assets: { binding: 'ASSETS', run_worker_first: true },
+              }
+            : localBindingConfig,
       }),
     ],
   };
