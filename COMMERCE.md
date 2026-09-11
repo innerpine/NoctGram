@@ -6,7 +6,7 @@ Public deployment uses a persistent Cloudflare webhook bot; see [bot/CLOUDFLARE.
 
 ## Prices
 
-Noct Premium: **30 days**, **650 Telegram Stars** or **149 RUB** through independent website Crypto Pay checkout. No auto-renewal. Purchased periods stack. Existing administrator grants remain separate.
+Noct Premium: **30 days**, **75 Telegram Stars** or **149 RUB** through independent website Crypto Pay checkout. No auto-renewal. Purchased periods stack. Existing administrator grants remain separate.
 
 | Noct Stars | Telegram Stars | RUB via Crypto Pay |
 | ---: | ---: | ---: |

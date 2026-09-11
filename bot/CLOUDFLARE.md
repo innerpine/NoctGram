@@ -35,4 +35,4 @@ Keep the Durable Object namespace and migration history when updating the bot. I
 
 Rotating a BotFather token for the same bot ID keeps its Durable Object state. Update the secret and rerun setup. When rotating the webhook secret, coordinate the Worker secret update and `setWebhook`; any temporary rejected updates are retried by Telegram and must not be discarded.
 
-Live purchases must be tested by the operator using their own Telegram account. Automated deployment validation does not spend Stars. Premium is 650 Telegram Stars for 30 days; Noct Stars packages use the existing catalog. Bot `/terms` and `/paysupport` remain available. Support requests do not automatically authorize refunds.
+Live purchases must be tested by the operator using their own Telegram account. Automated deployment validation does not spend Stars. Premium is 75 Telegram Stars for 30 days; Noct Stars packages use the existing catalog. Bot `/terms` and `/paysupport` remain available. Support requests do not automatically authorize refunds.

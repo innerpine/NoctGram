@@ -164,7 +164,7 @@ void test(
       async () => {
         const key = crypto.randomUUID(),
           o = await create('premium30', { key, amountMinor: 1 });
-        assert.equal(o.amountMinor, 650);
+        assert.equal(o.amountMinor, 75);
         assert.equal(o.units, 30);
         assert.equal((await create('premium30', { key })).id, o.id);
         await assert.rejects(create('stars100', { key }), /другой/);

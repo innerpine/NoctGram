@@ -1,5 +1,5 @@
 [
-  {"id":"premium30","product":"premium","units":30,"title":"Noct Premium · 30 дней","xtr":650,"rub":149},
+  {"id":"premium30","product":"premium","units":30,"title":"Noct Premium · 30 дней","xtr":75,"rub":149},
   {"id":"stars100","product":"stars","units":100,"title":"100 Noct Stars","xtr":19,"rub":19},
   {"id":"stars150","product":"stars","units":150,"title":"150 Noct Stars","xtr":25,"rub":25},
   {"id":"stars250","product":"stars","units":250,"title":"250 Noct Stars","xtr":39,"rub":39},

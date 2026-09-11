@@ -1,6 +1,6 @@
 # NoctGram · Telegram bot
 
-Покупки Noct Stars и Noct Premium за Telegram Stars. Premium действует 30 дней и стоит 650 Telegram Stars. Crypto Pay доступен отдельно на сайте: Premium 149 ₽. Все пакеты, настройки и ограничения описаны в [COMMERCE.md](../COMMERCE.md).
+Покупки Noct Stars и Noct Premium за Telegram Stars. Premium действует 30 дней и стоит 75 Telegram Stars. Crypto Pay доступен отдельно на сайте: Premium 149 ₽. Все пакеты, настройки и ограничения описаны в [COMMERCE.md](../COMMERCE.md).
 
 Запуск из корня: `npm run dev`, затем `npm run dev:bot`. Привязка аккаунта: сайт → Noct Stars → Telegram. После привязки повторный `/start` открывает новую панель.
 

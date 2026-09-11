@@ -39,6 +39,7 @@ export function PurchaseButton({
   onPaid: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const premium = catalog.find((item) => item.id === 'premium30')!;
   return (
     <>
       <button className="primary purchase-open" onClick={() => setOpen(true)}>
@@ -49,7 +50,7 @@ export function PurchaseButton({
         )}{' '}
         {product === 'stars'
           ? 'Пополнить Stars'
-          : 'Premium · 149 ₽ / 650 Telegram Stars'}
+          : `Premium · ${premium.rub} ₽ / ${premium.xtr} Telegram Stars`}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="purchase-dialog">

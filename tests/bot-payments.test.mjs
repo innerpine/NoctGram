@@ -17,12 +17,11 @@ void test('refund normalization uses receiver direction and same charge ID, neve
     invoice_payload: id,
   };
   assert.equal(
-    normalizeStarTransaction({ id: 'charge', amount: 650, source: user })
-      .refund,
+    normalizeStarTransaction({ id: 'charge', amount: 75, source: user }).refund,
     false,
   );
   assert.equal(
-    normalizeStarTransaction({ id: 'charge', amount: 650, receiver: user })
+    normalizeStarTransaction({ id: 'charge', amount: 75, receiver: user })
       .refund,
     true,
   );
@@ -37,7 +36,7 @@ void test('refund normalization uses receiver direction and same charge ID, neve
   assert.equal(
     normalizeStarTransaction({
       id: 'charge',
-      amount: 650,
+      amount: 75,
       nanostar_amount: 3,
       source: user,
     }).review,
@@ -61,7 +60,7 @@ void test('pre-checkout only validates and answers; it cannot credit', async () 
         from: { id: 123 },
         invoice_payload: id,
         currency: 'XTR',
-        total_amount: 650,
+        total_amount: 75,
       },
     },
   );
@@ -85,8 +84,8 @@ void test('paid receipt survives restart and provider replay; scan skips gifts a
       assert.equal(m, 'getStarTransactions');
       return {
         transactions: [
-          { id: 'charge', amount: 650, source: user },
-          { id: 'charge', amount: 650, receiver: user },
+          { id: 'charge', amount: 75, source: user },
+          { id: 'charge', amount: 75, receiver: user },
         ],
       };
     },
@@ -107,7 +106,7 @@ void test('paid receipt survives restart and provider replay; scan skips gifts a
     [false, true],
   );
 });
-void test('paid shop offers Telegram Stars only and Premium is650 for30days', async (t) => {
+void test('paid shop offers Telegram Stars only and Premium is75 for30days', async (t) => {
   const store = new BotStore(':memory:', 1);
   t.after(() => store.close());
   const sent = [];
@@ -129,7 +128,7 @@ void test('paid shop offers Telegram Stars only and Premium is650 for30days', as
     { linked: true, testMode: false, profile: { handle: 'alice' }, balance: 0 },
   );
   assert.match(sent[0].text, /30 дней/);
-  assert.match(sent[0].text, /650 Telegram Stars/);
+  assert.match(sent[0].text, /75 Telegram Stars/);
   assert.doesNotMatch(JSON.stringify(sent), /crypt|149 ₽/i);
   assert.equal(
     sent[0].reply_markup.inline_keyboard[0][0].callback_data,
@@ -176,7 +175,7 @@ function paidFixture(
       if (body.action === 'status') return state;
       if (body.action === 'paymentHistory')
         return {
-          orders: [{ id, sku: 'premium30', amountMinor: 650, fulfilledAt: 1 }],
+          orders: [{ id, sku: 'premium30', amountMinor: 75, fulfilledAt: 1 }],
         };
       if (body.action === 'paymentReceipt')
         return { status: 'paid', product: 'premium', id };
@@ -263,7 +262,7 @@ void test('paid menu rebuilds both message and buttons after Telegram rejects cu
       .flat()
       .every((button) => !button.icon_custom_emoji_id),
   );
-  assert.match(f.calls[1].body.text, /650 Telegram Stars/);
+  assert.match(f.calls[1].body.text, /75 Telegram Stars/);
 });
 
 void test('paid navigation updates the optional pinned balance', async (t) => {
@@ -284,7 +283,7 @@ void test('paid receipt notice uses shared design and provider replay does not d
       from: { id: 123 },
       successful_payment: {
         currency: 'XTR',
-        total_amount: 650,
+        total_amount: 75,
         invoice_payload: id,
         telegram_payment_charge_id: 'receipt-fixture',
       },
