@@ -155,7 +155,21 @@ export async function GET(req: Request) {
     }
     if (action === 'profile') {
       let id = s.get('id') || me;
-      if (s.has('handle')) {
+      if (s.has('ref')) {
+        // Public URLs resolve usernames first; old links containing internal IDs
+        // remain readable. Internal API calls using `id` keep exact ID semantics.
+        const ref = s.get('ref') || '';
+        if (!ref || ref.length > 100)
+          throw new ApiError(404, 'Профиль не найден');
+        const handle = ref.replace(/^@/, '').toLowerCase();
+        const row = /^[a-z0-9_]{4,24}$/.test(handle)
+          ? await d
+              .prepare('SELECT userId FROM handles WHERE handle=?')
+              .bind(handle)
+              .first<{ userId: string }>()
+          : null;
+        id = row?.userId || ref;
+      } else if (s.has('handle')) {
         const handle = (s.get('handle') || '').replace(/^@/, '').toLowerCase();
         if (!/^[a-z0-9_]{4,24}$/.test(handle))
           throw new ApiError(404, 'Профиль не найден');

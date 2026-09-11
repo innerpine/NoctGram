@@ -72,8 +72,12 @@ export async function switchAccount(body: Record<string, unknown>) {
     )
     .first();
   if (!updated) throw new ApiError(401, 'Сессия завершена. Войдите снова.');
+  const profile = await db()
+    .prepare('SELECT handle FROM handles WHERE userId=? AND main=1')
+    .bind(target)
+    .first<{ handle: string }>();
   return Response.json({
-    redirectTo: '/?profile=' + encodeURIComponent(target),
+    redirectTo: '/?profile=' + encodeURIComponent(profile?.handle || target),
   });
 }
 

@@ -74,7 +74,11 @@ try {
     );
   }
   assert.equal(api.profileHref({ id: 'user:a&b' }), '/?profile=user%3Aa%26b');
-  assert.equal(api.profileHref({ handle: 'invoker' }), '/?handle=invoker');
+  assert.equal(api.profileHref({ handle: 'invoker' }), '/?profile=invoker');
+  assert.equal(
+    api.profileHref({ id: 'local_seedy', handle: '@Invoker' }),
+    '/?profile=invoker',
+  );
   const link = api.ProfileLink({
     target: { id: 'recipient-id' },
     children: 'Recipient',

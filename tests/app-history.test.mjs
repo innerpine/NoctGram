@@ -192,8 +192,8 @@ void test('URLs restore app sections, profile tabs, selected chats and legacy de
   ];
   for (const route of routes)
     assert.equal(
-      appRouteKey(appRouteFromURL(appRouteHref(route), 'me')),
-      appRouteKey(route),
+      appRouteHref(appRouteFromURL(appRouteHref(route), 'me')),
+      appRouteHref(route),
     );
   assert.equal(
     appRouteHref(appRouteFromURL('/?gifts=1', 'me')),
@@ -208,6 +208,59 @@ void test('URLs restore app sections, profile tabs, selected chats and legacy de
     appRouteHref(appRouteFromURL('/?profile=one&tab=invalid', 'me')),
     '/?profile=one',
   );
+});
+
+void test('profile URLs use the resolved primary handle and retain legacy links, tabs and Back', async () => {
+  assert.equal(
+    appRouteHref({
+      page: 'profile',
+      profileId: 'local_seedy',
+      handle: 'invoker',
+    }),
+    '/?profile=invoker',
+  );
+  assert.equal(
+    appRouteFromURL('/?profile=invoker', 'me').profileRef,
+    'invoker',
+  );
+  assert.equal(
+    appRouteFromURL('/?profile=email_123456789012345678901234567890', 'me')
+      .profileRef,
+    'email_123456789012345678901234567890',
+  );
+  for (const url of [
+    '/?profile=local_seedy&tab=gifts',
+    '/?handle=butterfly&tab=gifts',
+    '/?profile=invoker&tab=gifts',
+  ]) {
+    const f = fixture(url, async (route) =>
+      route.page === 'profile'
+        ? {
+            ...route,
+            profileId: 'local_seedy',
+            profileRef: '',
+            handle: 'invoker',
+          }
+        : route,
+    );
+    await f.controller.ready;
+    assert.equal(f.host.location.search, '?profile=invoker&tab=gifts');
+    assert.equal(f.entries.length, 2, 'Canonicalization replaces the entry');
+    await f.controller.navigate({ page: 'messages', peerId: 'preview_friend' });
+    f.pop(-1);
+    await tick();
+    assert.equal(f.ui.profileId, 'local_seedy');
+    assert.equal(f.host.location.search, '?profile=invoker&tab=gifts');
+    const length = f.entries.length;
+    f.observe({ ...f.ui, handle: 'new_primary' });
+    assert.equal(f.host.location.search, '?profile=new_primary&tab=gifts');
+    assert.equal(
+      f.entries.length,
+      length,
+      'A renamed primary handle does not add a history entry',
+    );
+    f.controller.dispose();
+  }
 });
 
 void test('messages → profiles → gift tab restores in both directions without resetting browser history', async () => {

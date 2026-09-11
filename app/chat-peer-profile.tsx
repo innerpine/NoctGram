@@ -470,14 +470,14 @@ function PeerProfileBody({
                 </div>
                 <div className="peer-profile-identity">
                   <ProfileLink
-                    target={{ id: peer.id }}
+                    target={{ id: peer.id, handle: peer.handle }}
                     className="peer-profile-avatar"
                     aria-label={'Открыть профиль: ' + identity.name}
                   >
                     <Avatar person={identity} size={86} eager />
                   </ProfileLink>
                   <h2>
-                    <ProfileLink target={{ id: peer.id }}>
+                    <ProfileLink target={{ id: peer.id, handle: peer.handle }}>
                       <DisplayName person={identity} />
                     </ProfileLink>
                   </h2>
@@ -501,7 +501,10 @@ function PeerProfileBody({
                   <button className="secondary" onClick={onClose}>
                     <MessageCircle size={17} /> В чат
                   </button>
-                  <ProfileLink className="secondary" target={{ id: peer.id }}>
+                  <ProfileLink
+                    className="secondary"
+                    target={{ id: peer.id, handle: peer.handle }}
+                  >
                     Полный профиль <ArrowUpRight size={17} />
                   </ProfileLink>
                 </div>

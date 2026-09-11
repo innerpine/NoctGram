@@ -19,6 +19,7 @@ const appPaths = new Set(['/', '/music', '/music/services']);
 export type AppRoute = {
   page: string;
   profileId?: string;
+  profileRef?: string;
   handle?: string;
   peerId?: string;
   roomId?: string;
@@ -40,8 +41,14 @@ export function normalizeAppRoute(input: AppRoute): AppRoute {
     return {
       page,
       profileId: text(input.profileId),
+      ...(!input.profileId && input.profileRef
+        ? { profileRef: text(input.profileRef) }
+        : {}),
       ...(input.boost ? { boost: true } : {}),
-      handle: input.profileId ? '' : text(input.handle, 24).toLowerCase(),
+      handle: text(input.handle, 25)
+        .replace(/^@/, '')
+        .slice(0, 24)
+        .toLowerCase(),
       profileTab: ['posts', 'media', 'gifts'].includes(input.profileTab || '')
         ? input.profileTab
         : 'posts',
@@ -82,10 +89,13 @@ export function appRouteFromURL(href: string, owner: string): AppRoute {
   )
     return normalizeAppRoute({
       page: 'profile',
+      profileRef: params.get('boost') || params.get('profile') || '',
       profileId:
-        params.get('boost') ||
-        params.get('profile') ||
-        (params.get('gifts') === '1' ? owner : ''),
+        !params.get('boost') &&
+        !params.get('profile') &&
+        params.get('gifts') === '1'
+          ? owner
+          : '',
       ...(params.get('boost') ? { boost: true } : {}),
       handle: params.get('handle') || '',
       profileTab:
@@ -123,9 +133,11 @@ export function appRouteHref(input: AppRoute) {
     params = new URLSearchParams();
   let path = '/';
   if (route.page === 'profile') {
-    if (route.profileId)
-      params.set(route.boost ? 'boost' : 'profile', route.profileId);
-    else if (route.handle) params.set('handle', route.handle);
+    if (route.handle || route.profileId || route.profileRef)
+      params.set(
+        route.boost ? 'boost' : 'profile',
+        route.handle || route.profileId || route.profileRef!,
+      );
     else params.set('page', 'profile');
     if (route.profileTab !== 'posts') params.set('tab', route.profileTab!);
   } else if (route.page === 'messages') {
@@ -301,8 +313,15 @@ export function createAppHistory(
       }
       if (key === appRouteKey(active)) return;
       const typing = active.page === 'search' && observed.page === 'search';
+      const renamedProfile =
+        active.page === 'profile' &&
+        observed.page === 'profile' &&
+        !!active.profileId &&
+        active.profileId === observed.profileId &&
+        active.profileTab === observed.profileTab &&
+        active.boost === observed.boost;
       active = observed;
-      write(typing ? 'replace' : 'push', active);
+      write(typing || renamedProfile ? 'replace' : 'push', active);
     },
     dispose() {
       disposed = true;

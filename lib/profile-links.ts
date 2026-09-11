@@ -1,14 +1,15 @@
 export const PROFILE_NAVIGATE = 'noctgram:profile-navigate';
 export type ProfileTarget =
-  | { id: string; handle?: never }
+  | { id: string; handle?: string }
   | { handle: string; id?: never };
 export type ProfileNavigation = ProfileTarget & { onNavigated?: () => void };
 export function profileHref(target: ProfileTarget) {
   return (
     '/?' +
-    new URLSearchParams(
-      target.id ? { profile: target.id } : { handle: target.handle || '' },
-    )
+    new URLSearchParams({
+      profile:
+        target.handle?.replace(/^@/, '').toLowerCase() || target.id || '',
+    })
   );
 }
 export function mentionParts(

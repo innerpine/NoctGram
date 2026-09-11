@@ -251,7 +251,10 @@ export const PostCard = memo(function PostCard({
             )}
           </span>
           <span className="post-author-meta">
-            <ProfileLink target={{ id: p.userId }} className="meta handle">
+            <ProfileLink
+              target={{ id: p.userId, handle: p.handle }}
+              className="meta handle"
+            >
               @{p.handle}
             </ProfileLink>
             <span className="meta-dot" />

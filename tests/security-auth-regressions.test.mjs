@@ -943,6 +943,43 @@ await check(
   },
 );
 await check(
+  'Public profile references resolve primary and extra handles, with exact legacy ID fallback',
+  async () => {
+    const reader = freshPerson('reader'),
+      target = freshPerson('url_target'),
+      other = freshPerson('other');
+    env.NOCT_AUTH_MODE = 'hybrid';
+    const get = async (query) =>
+      socialRoute.GET(makeRequest(reader, '?action=profile&' + query));
+    for (const ref of [
+      target,
+      target + '_handle',
+      (target + '_handle').toUpperCase(),
+    ]) {
+      const response = await get('ref=' + encodeURIComponent(ref));
+      assert.equal(response.status, 200);
+      const profile = await response.json();
+      assert.equal(profile.id, target);
+      assert.equal(profile.handle, target + '_handle');
+    }
+    sql
+      .prepare('INSERT INTO handles(handle,userId,main) VALUES(?,?,0)')
+      .run('public_alias', target);
+    assert.equal(
+      (await (await get('ref=public_alias')).json()).handle,
+      target + '_handle',
+    );
+    assert.equal((await (await get('handle=public_alias')).json()).id, target);
+    assert.equal((await get('ref=missing_profile')).status, 404);
+    // A username matching somebody else's internal ID must still resolve as a username.
+    sql
+      .prepare('INSERT INTO handles(handle,userId,main) VALUES(?,?,0)')
+      .run(target, other);
+    assert.equal((await (await get('ref=' + target)).json()).id, other);
+    assert.equal((await (await get('id=' + target)).json()).id, target);
+  },
+);
+await check(
   'All synthetic mutations preserve full-schema foreign keys',
   async () => {
     assert.equal(sql.prepare('PRAGMA foreign_key_check').all().length, 0);

@@ -949,6 +949,7 @@ export default function Noctgram({
     page,
     musicTab,
     profileId: profile?.id,
+    handle: profile?.handle,
     profileTab,
     peerId: roomTarget && page === 'messages' ? undefined : peer?.id,
     ...(page === 'messages' && roomTarget ? roomTarget : {}),
@@ -1002,13 +1003,18 @@ export default function Noctgram({
       let conversationSnapshot: ChatSnapshot | undefined;
       let fetchedConversation = false;
       if (next.page === 'profile') {
-        const id = next.profileId || (!next.handle ? myId : '');
+        const id =
+          next.profileId || (!next.handle && !next.profileRef ? myId : '');
         person = id === myId ? me : id ? cache.profiles.get(id) || null : null;
         person ??= await request<Profile>(
           '?' +
             new URLSearchParams({
               action: 'profile',
-              ...(id ? { id } : { handle: next.handle || '' }),
+              ...(id
+                ? { id }
+                : next.profileRef
+                  ? { ref: next.profileRef }
+                  : { handle: next.handle || '' }),
             }),
         );
         if (
@@ -1026,6 +1032,7 @@ export default function Noctgram({
         next = {
           page: 'profile',
           profileId: person.id,
+          handle: person.handle,
           ...(next.boost && person.kind === 'channel' && !person.blocked
             ? { boost: true }
             : {}),
@@ -1146,13 +1153,25 @@ export default function Noctgram({
       page,
       musicTab,
       profileId: viewedId,
+      handle: profile?.id === viewedId ? profile?.handle || '' : '',
       profileTab,
       peerId: roomTarget && page === 'messages' ? undefined : peer?.id,
       ...(page === 'messages' && roomTarget ? roomTarget : {}),
       mode,
       query,
     });
-  }, [page, viewedId, profileTab, peer?.id, mode, query, musicTab, roomTarget]);
+  }, [
+    page,
+    viewedId,
+    profile?.id,
+    profile?.handle,
+    profileTab,
+    peer?.id,
+    mode,
+    query,
+    musicTab,
+    roomTarget,
+  ]);
   const profileView = page === 'profile' ? viewedId : '';
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
