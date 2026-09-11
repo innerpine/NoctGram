@@ -404,7 +404,7 @@ export function ChatConversation({
         }}
       >
         {!visibleMessages.length && (
-          <p className="chat-empty-history">Здесь начинается ваш разговор.</p>
+          <p className="chat-empty-history">Сообщений пока нет.</p>
         )}
         {visibleMessages.map((message) => (
           <ChatMessage

@@ -42,7 +42,7 @@ export async function viewer(allowIncomplete = false) {
         )
         .bind(
           user.userId,
-          user.fullName || 'Ночной житель',
+          user.fullName || 'Пользователь',
           Date.now(),
           user.source === 'access' ? 0 : 1,
         ),
@@ -76,7 +76,7 @@ export function seed() {
     .batch([
       d
         .prepare(
-          "INSERT OR IGNORE INTO users (id,name,bio,created) VALUES ('noctgram','Noctgram','Обновления и жизнь Noctgram. Место для тех, кто на своей волне.',?)",
+          "INSERT OR IGNORE INTO users (id,name,bio,created) VALUES ('noctgram','Noctgram','Новости и обновления Noctgram.',?)",
         )
         .bind(1788609600000),
       d.prepare(
@@ -89,7 +89,7 @@ export function seed() {
         .bind(
           'welcome',
           'noctgram',
-          'У каждого времени суток есть своё настроение. У этой ночи теперь есть своё место.\n\nДелись мыслями, фотографиями и моментами. Начинай разговоры и находи своих. Добро пожаловать в Noctgram ☾',
+          'Добро пожаловать в Noctgram. Здесь публикуем новости сервиса и обновления.',
           '[]',
           1788609600000,
         ),

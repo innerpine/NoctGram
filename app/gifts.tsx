@@ -248,7 +248,7 @@ function SendGiftForm({
               ? 'Подарок отправлен'
               : selected
                 ? selected.name
-                : 'Сделай день теплее'}
+                : 'Выберите подарок'}
           </DialogTitle>
           <DialogDescription>
             {sent
@@ -584,7 +584,7 @@ export function ProfileGifts({
           <h3>Здесь будут подарки</h3>
           <p>
             {own
-              ? 'Маленькие знаки внимания от твоих людей.'
+              ? 'Полученные подарки.'
               : 'Стань первым, кто подарит что-нибудь приятное.'}
           </p>
         </div>

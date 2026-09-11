@@ -62,7 +62,7 @@ export const metadata: Metadata = {
   },
   icons: { icon: '/assets/noctgram-logo.png' },
   description:
-    'Публикации, фотографии, опросы и личные диалоги. Твоё пространство в Noctgram.',
+    'Noctgram — публикации, фотографии, музыка и личные сообщения.',
 };
 export default function RootLayout({
   children,

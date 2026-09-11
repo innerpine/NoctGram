@@ -17,7 +17,7 @@ const { outputFiles } = await build({
       name: 'post-surroundings',
       setup(build) {
         build.onResolve(
-          { filter: /^(react(?:\/.*)?|lucide-react)$/ },
+          { filter: /^(react(?:-dom)?(?:\/.*)?|lucide-react)$/ },
           ({ path }) => ({
             path: pathToFileURL(require.resolve(path)).href,
             external: true,

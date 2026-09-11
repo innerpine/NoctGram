@@ -99,7 +99,7 @@ export function ChatThemeMenu({
           overlayClassName="chat-theme-overlay"
         >
           <div className="chat-theme-heading">
-            <DialogTitle>Настроение диалога</DialogTitle>
+            <DialogTitle>Оформление чата</DialogTitle>
             <DialogDescription>
               Твой цвет для ваших разговоров.
             </DialogDescription>

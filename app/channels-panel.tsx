@@ -218,7 +218,7 @@ export function ChannelsPanel({
         <Empty>
           <Megaphone size={26} />
           <strong>
-            {query ? 'Каналы не найдены' : 'Здесь начинается твой канал'}
+            {query ? 'Каналы не найдены' : 'Каналов пока нет'}
           </strong>
           <p>Создай канал и публикуй от его имени.</p>
         </Empty>

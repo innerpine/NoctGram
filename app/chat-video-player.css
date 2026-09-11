@@ -1,3 +1,17 @@
+.chat-video-mount {
+  width: min(100%, calc(360px * var(--video-aspect, 1.77778)));
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+.chat-video-mount[data-expanded='true'] {
+  aspect-ratio: var(--video-aspect, 16 / 9);
+  border-radius: 14px;
+  background: #ffffff08;
+}
+.chat-video-host {
+  width: 100%;
+  min-width: 0;
+}
 .chat-video-player {
   --video-accent: var(--chat-accent, var(--profile-first, #d0b8ed));
   position: relative;
@@ -5,7 +19,7 @@
   width: 100%;
   min-width: 0;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 14px;
   background: #09090c;
   color: #fff;
   outline: none;
@@ -17,14 +31,15 @@
   display: block;
   width: 100%;
   max-height: 360px;
-  min-height: 160px;
+  min-height: 120px;
   object-fit: contain;
   border: 0;
   border-radius: 0;
   cursor: pointer;
 }
 .chat-video-player button,
-.chat-video-player a {
+.chat-video-player a,
+.chat-video-player select {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
@@ -37,30 +52,28 @@
   touch-action: manipulation;
 }
 /* Global button press transforms must never move a media control. */
-.chat-video-player button:active:not(:disabled) {
-  transform: none;
+.chat-video-player button:is(:hover, :active, :focus):not(:disabled) {
+  transform: none !important;
 }
 .chat-video-player :is(button, a, input):focus-visible,
 .chat-video-player:focus-visible {
   outline: 2px solid var(--video-accent);
   outline-offset: -2px;
 }
-.chat-video-player .chat-video-center {
+.chat-video-player .chat-video-center,
+.chat-video-player .chat-video-loading {
   position: absolute;
-  inset: 0 0 64px;
+  inset: 0;
   margin: auto;
   z-index: 2;
-  width: 60px;
-  height: 60px;
+  width: 56px;
+  height: 56px;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: #18171cc9;
+  background: #0008;
   color: #fff;
-  box-shadow:
-    0 6px 28px #0004,
-    inset 0 0 0 1px #ffffff40;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(8px);
   transition:
     background 160ms,
     box-shadow 160ms;
@@ -71,7 +84,12 @@
 .chat-video-player button.chat-video-center:active {
   background: #51445be6;
 }
-output.chat-video-center {
+.chat-video-center[data-hidden='true'] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.chat-video-loading {
   pointer-events: none;
 }
 .chat-video-center > .lucide-play {
@@ -84,8 +102,8 @@ output.chat-video-center {
   z-index: 3;
   width: 36px;
   height: 36px;
-  border-radius: 12px;
-  background: #18171ca8;
+  border-radius: 50%;
+  background: #0006;
   backdrop-filter: blur(12px);
   box-shadow: inset 0 0 0 1px #ffffff1a;
   transition:
@@ -102,8 +120,8 @@ output.chat-video-center {
   inset: auto 0 0;
   z-index: 3;
   pointer-events: none;
-  padding: 28px 10px 7px;
-  background: linear-gradient(transparent, #08080dcc 45%, #08080de8);
+  padding: 24px 8px 4px;
+  background: linear-gradient(transparent, #0008 45%, #000b);
   transition: opacity 180ms;
 }
 .chat-video-controls > * {
@@ -118,32 +136,32 @@ output.chat-video-center {
 .chat-video-control-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
 }
 .chat-video-control-row button {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   background: transparent;
 }
 .chat-video-control-row button:hover {
   background: #ffffff1a;
 }
 .chat-video-control-row .chat-video-toggle {
-  color: var(--video-accent);
+  color: #fff;
 }
 .chat-video-time {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   color: #fff;
   text-shadow: 0 1px 4px #0008;
 }
 .chat-video-time > span {
-  color: #c4becb;
+  color: #ffffffa6;
 }
 .chat-video-player input[type='range'] {
   display: block;
@@ -157,7 +175,7 @@ output.chat-video-center {
 }
 .chat-video-player .chat-video-seek {
   width: 100%;
-  height: 28px;
+  height: 20px;
   background: linear-gradient(
       to right,
       var(--video-accent) var(--video-progress),
@@ -165,13 +183,13 @@ output.chat-video-center {
       #ffffff70 var(--video-buffered),
       #ffffff30 var(--video-buffered)
     )
-    center / 100% 4px no-repeat;
+    center / 100% 3px no-repeat;
   border-radius: 4px;
 }
 .chat-video-player input[type='range']::-webkit-slider-thumb {
   appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   border: 0;
   background: #fff;
@@ -200,7 +218,7 @@ output.chat-video-center {
 .chat-video-volume-popup {
   position: absolute;
   bottom: 100%;
-  right: -6px;
+  left: 0;
   width: 116px;
   padding: 8px 12px;
   border-radius: 12px;
@@ -218,6 +236,21 @@ output.chat-video-center {
   height: 28px;
   background: linear-gradient(#ffffff70, #ffffff70) center / 100% 4px no-repeat;
   border-radius: 3px;
+}
+.chat-video-player .chat-video-speed {
+  width: 44px;
+  height: 32px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  background: transparent;
+  appearance: none;
+  outline-offset: -2px;
+}
+.chat-video-speed option {
+  background: #202024;
+  color: white;
 }
 .chat-video-error {
   position: absolute;
@@ -238,37 +271,40 @@ output.chat-video-center {
   align-self: start;
   grid-column: 1 / -1;
 }
+.media-grid > .chat-video-mount {
+  width: min(100%, calc(420px * var(--video-aspect, 1.77778)));
+}
 .media-grid .chat-video-player > video {
   max-height: 420px;
   object-fit: contain;
   border: 0;
 }
 .noct-video-backdrop[data-slot='dialog-overlay'] {
-  background: #08070da8;
-  backdrop-filter: blur(18px) saturate(0.75);
+  background: #08080ca8 !important;
+  backdrop-filter: blur(20px) saturate(0.7);
 }
 .noct-video-viewer[data-slot='dialog-content'][data-layout='centered'] {
   width: min(
-    940px,
-    calc(100vw - 64px),
-    max(260px, calc(min(66dvh, 620px) * var(--video-aspect, 1.77778)))
+    1040px,
+    calc(100vw - 80px),
+    max(280px, calc(min(72dvh, 740px) * var(--video-aspect, 1.77778)))
   );
   max-width: none;
   max-height: calc(100dvh - 64px);
   padding: 0;
   gap: 0;
-  border: 1px solid #ffffff24;
-  border-radius: 22px;
+  border: 0;
+  border-radius: 14px;
   overflow: hidden;
-  background: #141318;
+  background: #101012;
   box-shadow: 0 24px 100px #0008;
 }
 .noct-video-viewer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 10px 12px 10px 20px;
+  gap: 16px;
+  padding: 6px 8px 6px 16px;
 }
 .noct-video-viewer-header [data-slot='dialog-title'] {
   overflow: hidden;
@@ -283,8 +319,8 @@ output.chat-video-center {
   width: 40px;
   height: 40px;
   flex: 0 0 auto;
-  border-radius: 12px;
-  background: #ffffff09;
+  border-radius: 50%;
+  background: transparent;
   color: #eeeaf4;
 }
 .noct-video-viewer .chat-video-player {
@@ -294,11 +330,18 @@ output.chat-video-center {
   aspect-ratio: var(--video-aspect, 16 / 9);
   height: auto;
   min-height: 0;
-  max-height: min(66dvh, 620px);
+  max-height: min(72dvh, 740px);
   object-fit: contain;
 }
 .chat-video-player[data-viewer='true']:not(:fullscreen) .chat-video-controls {
-  padding: 40px 20px 12px;
+  padding: 36px 12px 8px;
+}
+.chat-video-player[data-viewer='true'] .chat-video-control-row button {
+  width: 36px;
+  height: 36px;
+}
+.chat-video-player[data-viewer='true'] .chat-video-time {
+  font-size: 13px;
 }
 .chat-video-player:fullscreen {
   width: 100vw;
@@ -316,17 +359,25 @@ output.chat-video-center {
   margin: 0 auto;
   padding: 36px 20px max(16px, env(safe-area-inset-bottom));
 }
-@container chat-video (max-width: 260px) {
-  .chat-video-time > span {
+@container chat-video (max-width: 280px) {
+  .chat-video-player:not([data-viewer='true']) .chat-video-time > span {
     display: none;
   }
   .chat-video-control-row {
-    gap: 2px;
+    gap: 0;
+  }
+  .chat-video-player:not([data-viewer='true']) .chat-video-speed {
+    display: none !important;
+  }
+}
+@container chat-video (max-width: 400px) {
+  .chat-video-pip {
+    display: none !important;
   }
 }
 @media (pointer: coarse) {
   .chat-video-control-row button {
-    width: 40px;
+    width: 36px;
     height: 40px;
   }
   .chat-video-player .chat-video-seek {

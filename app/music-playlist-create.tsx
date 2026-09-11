@@ -142,7 +142,7 @@ export function MusicPlaylistCreate({
                 <input
                   id="create-playlist-name"
                   ref={nameInput}
-                  placeholder="Например, после полуночи"
+                  placeholder="Название плейлиста"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   maxLength={80}

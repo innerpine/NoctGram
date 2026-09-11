@@ -268,7 +268,7 @@ export function NotificationsBell({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="noct-dialog">
           <DialogTitle>Уведомления</DialogTitle>
-          <DialogDescription>Важное от твоих людей.</DialogDescription>
+          <DialogDescription>Ответы, реакции и подписки.</DialogDescription>
           <PushSettings />
           {error && (
             <p className="realtime-error" role="alert">

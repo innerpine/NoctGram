@@ -31,17 +31,17 @@ const { outputFiles } = await build({
         build.onResolve(
           {
             filter:
-              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog)$/,
+              /^(react(?:\/jsx-runtime|-dom)?|lucide-react|@\/components\/ui\/dialog)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
         build.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({
           contents:
             path === 'react'
-              ? `export const useState=globalThis.__videoState; export const useRef=value=>useState({current:value})[0]; export const useEffect=effect=>globalThis.__videoEffects.push(effect);`
+              ? `export const useState=globalThis.__videoState; export const useRef=value=>useState({current:value})[0]; export const useEffect=effect=>globalThis.__videoEffects.push(effect); export const useLayoutEffect=useEffect; export const useCallback=fn=>fn;`
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
-                : 'export const Dialog="Dialog", DialogContent="DialogContent", DialogTitle="DialogTitle", Expand="Expand", X="X", Download="Download", LoaderCircle="LoaderCircle", Maximize="Maximize", Minimize="Minimize", Pause="Pause", Play="Play", RotateCcw="RotateCcw", Volume2="Volume2", VolumeX="VolumeX";',
+                : 'export const createPortal=children=>children; export const Dialog="Dialog", DialogContent="DialogContent", DialogTitle="DialogTitle", Expand="Expand", X="X", Download="Download", LoaderCircle="LoaderCircle", Maximize="Maximize", Minimize="Minimize", Pause="Pause", Play="Play", RotateCcw="RotateCcw", Volume2="Volume2", VolumeX="VolumeX", PictureInPicture2="PictureInPicture2";',
         }));
       },
     },
@@ -202,6 +202,46 @@ try {
     target: { value: '0.35' },
   });
   assert.equal(media.volume, 0.35);
+  render();
+  find('select', 'Скорость видео').props.onChange({ target: { value: '1.5' } });
+  assert.equal(media.playbackRate, 1.5);
+  const scrub = find('input', 'Перемотка видео');
+  scrub.props.onPointerDown({
+    currentTarget: { setPointerCapture() {} },
+    pointerId: 1,
+  });
+  assert.equal(media.paused, true, 'Dragging pauses playback');
+  scrub.props.onChange({ target: { value: '65' } });
+  assert.equal(
+    media.currentTime,
+    65,
+    'Dragging updates the actual video frame before release',
+  );
+  scrub.props.onPointerUp({ currentTarget: { value: '65' } });
+  await flush();
+  assert.equal(
+    media.paused,
+    false,
+    'Releasing the seek bar resumes a playing clip',
+  );
+  media.pause();
+  render();
+  const pausedScrub = find('input', 'Перемотка видео');
+  pausedScrub.props.onPointerDown({
+    currentTarget: { setPointerCapture() {} },
+    pointerId: 2,
+  });
+  pausedScrub.props.onChange({ target: { value: '30' } });
+  pausedScrub.props.onLostPointerCapture({ currentTarget: { value: '30' } });
+  assert.equal(media.currentTime, 30);
+  assert.equal(
+    media.paused,
+    true,
+    'A paused clip remains paused after seeking',
+  );
+  render();
+  find('button', 'Воспроизвести видео').props.onClick();
+  await flush();
   render();
   tree.props.onPointerMove();
   [...timers.values()].at(-1)();

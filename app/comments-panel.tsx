@@ -276,7 +276,7 @@ export function CommentsPanel({
           !error && (
             <Empty>
               <strong>Пока без комментариев</strong>
-              <p>Поделись мыслью первым.</p>
+              <p>Комментариев пока нет.</p>
             </Empty>
           )
         )}
@@ -315,7 +315,7 @@ export function CommentsPanel({
           <textarea
             ref={emojiField}
             aria-label="Комментарий"
-            placeholder="Добавить мысль…"
+            placeholder="Написать комментарий…"
             maxLength={2000}
             value={text}
             disabled={readOnly || sending}

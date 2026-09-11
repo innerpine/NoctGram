@@ -128,7 +128,7 @@ export function ProfileDesign({
           <DisplayName person={preview} />
         </h3>
         <span className="meta">@{me.handle}</span>
-        <p>{me.bio || 'Твоё маленькое пространство большой ночи.'}</p>
+        <p>{me.bio || 'Описание профиля'}</p>
       </div>
       <form
         onSubmit={(event) => {

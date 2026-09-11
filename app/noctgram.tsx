@@ -2200,8 +2200,8 @@ export default function Noctgram({
           {guest && (
             <div className="welcome-banner">
               <div>
-                <strong>Свои люди. Твои мысли.</strong>
-                <span>Войди, чтобы стать частью Noctgram.</span>
+                <strong>Публикации, музыка и сообщения.</strong>
+                <span>Войдите или создайте аккаунт.</span>
               </div>
               <a href="/login" target="_top" className="primary">
                 Войти <ArrowUpRight size={14} />
@@ -2452,7 +2452,7 @@ export default function Noctgram({
                   {profile.bio ? (
                     <MentionText text={profile.bio} />
                   ) : profile.id === me?.id ? (
-                    'Расскажи о себе — пусть свои тебя узнают.'
+                    'Добавьте описание профиля.'
                   ) : (
                     'Пока без описания.'
                   )}
@@ -2671,10 +2671,10 @@ export default function Noctgram({
                     : page === 'saved'
                       ? 'Сохраняй публикации, чтобы вернуться к ним позже.'
                       : page === 'profile'
-                        ? 'Здесь пока тихо. Каждая история с чего-то начинается.'
+                        ? 'Публикаций пока нет.'
                         : mode === 'following'
                           ? 'Подпишись на интересных людей — их публикации появятся здесь.'
-                          : 'Поделись первой мыслью.'}
+                          : 'Публикаций пока нет.'}
                 </Empty>
               )}
               {displayMore && (
@@ -2696,7 +2696,7 @@ export default function Noctgram({
                 <Moon size={13} />
                 {publicationLoading
                   ? 'Загружаем публикации…'
-                  : 'Ты на одной волне с ночью'}
+                  : 'Noctgram'}
               </div>
             </div>
           )}
@@ -3098,7 +3098,7 @@ export default function Noctgram({
                 }
               }}
             >
-              Найти своих <ArrowUpRight size={15} />
+              Найти пользователей <ArrowUpRight size={15} />
             </button>
           </section>
           <div className="aside-footer">
@@ -3226,7 +3226,7 @@ export default function Noctgram({
                 edit: 'Редактировать профиль',
                 support: 'Поддержать автора',
                 comments: 'Комментарии',
-                people: 'Найти своих',
+                people: 'Найти пользователей',
                 report: 'Пожаловаться',
                 reportMessage: 'Жалоба на сообщение',
                 moderateContent: 'Удалить публикацию',
@@ -3241,15 +3241,15 @@ export default function Noctgram({
             {
               (
                 {
-                  signin: 'Публикуй, общайся и сохраняй важное.',
+                  signin: 'Войдите или создайте аккаунт.',
                   settings:
                     'Профиль, оформление, приватность, музыка, уведомления и доступ.',
-                  premium: 'Больше способов быть собой. В разработке.',
-                  edit: 'Профиль и твоё личное пространство.',
+                  premium: 'Оформление профиля и дополнительные функции.',
+                  edit: 'Данные и оформление профиля.',
                   reportMessage:
                     'Модератор получит только это сообщение и причину жалобы.',
                   support: 'Благодарность за публикацию в Noct Stars.',
-                  comments: 'Каждая мысль может стать началом разговора.',
+                  comments: 'Комментарии к публикации.',
                   people: 'Поиск по имени или @юзернейму.',
                   moderateContent:
                     'Укажи причину удаления. Решение будет записано в историю модерации.',

@@ -309,7 +309,7 @@ export function StoriesBar({
           </button>
         ))}
         {loaded && !groups.length && (
-          <p className="meta">Моменты, которые останутся на 24 часа.</p>
+          <p className="meta">Историй пока нет.</p>
         )}
       </div>
       {error && !open && !creating && (
@@ -370,7 +370,7 @@ export function StoriesBar({
                   )}
                 </>
               ) : (
-                <span>Твой момент</span>
+                <span>Ваша история</span>
               )}
               <textarea
                 value={text}

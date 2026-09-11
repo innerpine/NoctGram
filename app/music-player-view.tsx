@@ -764,7 +764,7 @@ export function MusicPlayerView(p: Props) {
                   title={
                     dockOpen
                       ? 'Скрыть текст справа'
-                      : 'Текст справа — слушай и общайся'
+                      : 'Показать текст справа'
                   }
                   aria-pressed={dockOpen}
                   aria-expanded={dockVisible}

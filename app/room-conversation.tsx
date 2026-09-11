@@ -609,7 +609,7 @@ export function RoomConversation({
                 <h3>
                   {room.kind === 'secret'
                     ? 'Только между вами'
-                    : 'Здесь начинается ваша группа'}
+                    : 'Сообщений пока нет.'}
                 </h3>
                 <p>
                   {room.kind === 'secret'

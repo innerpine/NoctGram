@@ -106,7 +106,7 @@ export function ChatCreateMenu({
           </span>
           <span className="room-menu-copy">
             <strong>Новая группа</strong>
-            <small>Место для своих</small>
+            <small>Групповой чат</small>
           </span>
           <ArrowRight
             size={14}
@@ -369,7 +369,7 @@ export function CreateGroupDialog({
           <div>
             <DialogTitle>Новая группа</DialogTitle>
             <DialogDescription>
-              Собери своих в одном разговоре.
+              Выберите участников группы.
             </DialogDescription>
           </div>
         </div>
@@ -383,7 +383,7 @@ export function CreateGroupDialog({
             <Input
               id={`${id}-name`}
               className="room-input"
-              placeholder="Например, После полуночи"
+              placeholder="Название группы"
               value={name}
               maxLength={100}
               disabled={mutation.locked}

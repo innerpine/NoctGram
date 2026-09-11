@@ -6,12 +6,15 @@
 /* eslint-disable react/react-compiler, jsx-a11y/media-has-caption */
 import {
   useEffect,
+  useCallback,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
   type ReactNode,
   type RefObject,
 } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Download,
   LoaderCircle,
@@ -24,6 +27,7 @@ import {
   VolumeX,
   Expand,
   X,
+  PictureInPicture2,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { formatMusicTime } from '@/lib/music-links';
@@ -33,7 +37,6 @@ import {
   toggleVideoFullscreen,
   type FullscreenVideo,
   claimVideoPlayback,
-  captureVideoPlayback,
   restoreVideoPosition,
   type VideoPlayback,
 } from '@/lib/chat-video';
@@ -57,48 +60,76 @@ export function ChatVideoPlayer(props: PlayerProps) {
   return <VideoWithViewer key={props.src} {...props} />;
 }
 function VideoWithViewer(props: PlayerProps) {
-  const inline = useRef<FullscreenVideo | null>(null);
-  const viewer = useRef<FullscreenVideo | null>(null);
+  const media = useRef<FullscreenVideo | null>(null);
+  const inlineSlot = useRef<HTMLDivElement | null>(null);
+  const viewerSlot = useRef<HTMLDivElement | null>(null);
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
-  const [snapshot, setSnapshot] = useState<VideoPlayback | null>(null);
   const [accent, setAccent] = useState('#d0b8ed');
   const [aspect, setAspect] = useState(16 / 9);
+  useEffect(() => {
+    const element = document.createElement('div');
+    element.className = 'chat-video-host';
+    setHost(element);
+  }, []);
+  // The portal target never changes: expanding keeps the same video, buffer and
+  // controls. Moving a mounted subtree must not create a second media session.
+  const placePlayer = useCallback(
+    (slot: HTMLDivElement | null) => {
+      if (!host || !slot || host.parentElement === slot) return;
+      const video = media.current;
+      const playing = video && !video.paused && !video.ended;
+      const destination = slot as HTMLDivElement & {
+        moveBefore?: (node: Node, child: Node | null) => void;
+      };
+      if (host.isConnected && destination.moveBefore)
+        destination.moveBefore(host, null);
+      else slot.appendChild(host);
+      // Older browsers pause media when reparenting; resume only an active clip.
+      if (playing && video.paused) void video.play().catch(() => {});
+    },
+    [host],
+  );
+  useLayoutEffect(() => {
+    placePlayer(open ? viewerSlot.current : inlineSlot.current);
+  }, [open, placePlayer]);
   function expand() {
-    if (!inline.current) return;
-    setSnapshot(captureVideoPlayback(inline.current));
-    setAspect(inline.current.videoWidth / inline.current.videoHeight || 16 / 9);
+    if (!media.current) return;
     setAccent(
-      getComputedStyle(inline.current.parentElement!)
+      getComputedStyle(media.current.parentElement!)
         .getPropertyValue('--video-accent')
         .trim(),
     );
-    inline.current.pause();
     setOpen(true);
   }
   function close() {
-    if (inline.current && viewer.current) {
-      const playback =
-        viewer.current.readyState >= 1
-          ? captureVideoPlayback(viewer.current)
-          : snapshot;
-      viewer.current.pause();
-      if (playback) {
-        restoreVideoPosition(inline.current, playback);
-        if (playback.playing) void inline.current.play().catch(() => {});
-      }
-    }
     setOpen(false);
   }
+  const player = (
+    <VideoPlayer
+      {...props}
+      viewer={open}
+      mediaRef={media}
+      onAspectRatio={setAspect}
+      onExpand={open ? undefined : expand}
+    />
+  );
   return (
     <>
-      <VideoPlayer {...props} mediaRef={inline} onExpand={expand} />
+      <div
+        className="chat-video-mount"
+        data-expanded={open}
+        style={{ '--video-aspect': aspect } as CSSProperties}
+        ref={inlineSlot}
+        tabIndex={-1}
+      >
+        {!host && player}
+      </div>
+      {host && createPortal(player, host)}
       <Dialog
         open={open}
         onOpenChange={(next) => {
           if (!next) close();
-        }}
-        onOpenChangeComplete={(next) => {
-          if (!next) setSnapshot(null);
         }}
       >
         <DialogContent
@@ -111,6 +142,10 @@ function VideoWithViewer(props: PlayerProps) {
           }
           overlayClassName="noct-video-backdrop"
           showCloseButton={false}
+          initialFocus={false}
+          finalFocus={() => media.current?.parentElement ?? inlineSlot.current}
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
         >
           <div className="noct-video-viewer-header">
             <DialogTitle>{props.name}</DialogTitle>
@@ -118,15 +153,14 @@ function VideoWithViewer(props: PlayerProps) {
               <X size={20} />
             </button>
           </div>
-          {snapshot && (
-            <VideoPlayer
-              src={props.src}
-              name={props.name}
-              viewer
-              mediaRef={viewer}
-              initialPlayback={snapshot}
-            />
-          )}
+          <div
+            ref={(slot) => {
+              viewerSlot.current = slot;
+              // Base UI can mount its portal after the parent's layout effect.
+              if (slot && open) placePlayer(slot);
+            }}
+            className="noct-video-viewer-slot"
+          />
         </DialogContent>
       </Dialog>
     </>
@@ -141,11 +175,13 @@ export function VideoPlayer({
   mediaRef,
   initialPlayback,
   onExpand,
+  onAspectRatio,
 }: PlayerProps & {
   viewer?: boolean;
   mediaRef?: RefObject<FullscreenVideo | null>;
   initialPlayback?: VideoPlayback;
   onExpand?: () => void;
+  onAspectRatio?: (aspect: number) => void;
 }) {
   const root = useRef<HTMLDivElement>(null),
     video = useRef<FullscreenVideo>(null);
@@ -163,6 +199,8 @@ export function VideoPlayer({
   const [error, setError] = useState(''),
     [fullscreen, setFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState('');
+  const [rate, setRate] = useState(1);
+  const [pipAvailable, setPipAvailable] = useState(false);
   const playing = !state.paused;
   function stopHideTimer() {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -194,6 +232,7 @@ export function VideoPlayer({
     const element = video.current,
       container = root.current;
     if (mediaRef) mediaRef.current = element;
+    setPipAvailable(!!container?.ownerDocument.pictureInPictureEnabled);
     sync();
     const updateFullscreen = () =>
       setFullscreen(
@@ -276,6 +315,17 @@ export function VideoPlayer({
     if (resumeAfterSeek.current && video.current?.paused) void togglePlay();
     resumeAfterSeek.current = false;
   }
+  async function togglePictureInPicture() {
+    const element = video.current;
+    if (!element) return;
+    try {
+      if (element.ownerDocument.pictureInPictureElement === element)
+        await element.ownerDocument.exitPictureInPicture();
+      else await element.requestPictureInPicture();
+    } catch {
+      setFullscreenError('Не удалось открыть видео в отдельном окне.');
+    }
+  }
   async function toggleFullscreen() {
     if (!root.current || !video.current) return;
     setFullscreenError('');
@@ -295,6 +345,12 @@ export function VideoPlayer({
     sync();
     showControls();
   }
+  function activateSurface() {
+    if (onExpand) {
+      onExpand();
+      if (video.current?.paused) void togglePlay();
+    } else void togglePlay();
+  }
   const position = seekPreview ?? state.position;
   const percent = state.duration ? (position / state.duration) * 100 : 0;
   const buffered = state.duration ? (state.buffered / state.duration) * 100 : 0;
@@ -313,11 +369,20 @@ export function VideoPlayer({
       }
       data-flush={flush}
       data-viewer={viewer}
+      data-playing={playing}
+      data-buffering={buffering}
       tabIndex={0}
       role="group"
       aria-label={'Видеоплеер: ' + name}
       onPointerMove={showControls}
       onPointerDown={showControls}
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        if (event.target !== video.current) return;
+        if (onExpand) onExpand();
+        else void toggleFullscreen();
+      }}
       onFocusCapture={() => {
         stopHideTimer();
         setVisible(true);
@@ -360,13 +425,24 @@ export function VideoPlayer({
             playing
           )
             showControls();
-          else void togglePlay();
+          else activateSurface();
         }}
-        onLoadedMetadata={sync}
+        onLoadedMetadata={() => {
+          sync();
+          const element = video.current;
+          if (element?.videoWidth && element.videoHeight)
+            onAspectRatio?.(element.videoWidth / element.videoHeight);
+        }}
         onDurationChange={sync}
         onTimeUpdate={sync}
         onProgress={sync}
         onVolumeChange={sync}
+        onRateChange={() => setRate(video.current?.playbackRate || 1)}
+        onSeeking={() => setBuffering(true)}
+        onSeeked={() => {
+          setBuffering(false);
+          sync();
+        }}
         onPlay={() => {
           if (video.current) claimVideoPlayback(video.current);
           sync();
@@ -402,7 +478,7 @@ export function VideoPlayer({
           showControls();
         }}
       />
-      {metadata}
+      {!viewer && metadata}
       <a
         className="chat-video-save"
         href={src + (src.includes('?') ? '&' : '?') + 'download=1'}
@@ -412,26 +488,26 @@ export function VideoPlayer({
       >
         <Download size={16} />
       </a>
-      {buffering && playing ? (
-        <output className="chat-video-center" aria-label="Загрузка видео">
+      {buffering && playing && (
+        <output className="chat-video-loading" aria-label="Загрузка видео">
           <LoaderCircle size={25} className="spin" />
         </output>
-      ) : (
-        (!playing || error) && (
-          <button
-            type="button"
-            className="chat-video-center"
-            aria-label={error ? 'Повторить загрузку видео' : playLabel}
-            onClick={() => void togglePlay()}
-          >
-            {state.ended || error ? (
-              <RotateCcw size={24} />
-            ) : (
-              <Play size={25} fill="currentColor" />
-            )}
-          </button>
-        )
       )}
+      <button
+        type="button"
+        className="chat-video-center"
+        data-hidden={playing && !error}
+        tabIndex={playing && !error ? -1 : 0}
+        aria-hidden={playing && !error}
+        aria-label={error ? 'Повторить загрузку видео' : playLabel}
+        onClick={activateSurface}
+      >
+        {state.ended || error ? (
+          <RotateCcw size={24} />
+        ) : (
+          <Play size={25} fill="currentColor" />
+        )}
+      </button>
       {(error || fullscreenError) && (
         <div className="chat-video-error" role="alert">
           {error || fullscreenError}
@@ -483,8 +559,9 @@ export function VideoPlayer({
             finishSeek(event.currentTarget.value)
           }
           onChange={(event) => {
-            if (scrubbing.current) setSeekPreview(Number(event.target.value));
-            else seek(Number(event.target.value));
+            const next = Number(event.target.value);
+            if (scrubbing.current) setSeekPreview(next);
+            seek(next);
           }}
         />
         <div className="chat-video-control-row">
@@ -500,10 +577,6 @@ export function VideoPlayer({
               <Play size={17} fill="currentColor" />
             )}
           </button>
-          <span className="chat-video-time" aria-label="Время видео">
-            {formatMusicTime(position * 1000)}
-            <span> / {formatMusicTime(state.duration * 1000)}</span>
-          </span>
           <div className="chat-video-volume">
             <button
               type="button"
@@ -541,6 +614,37 @@ export function VideoPlayer({
               />
             </div>
           </div>
+          <span className="chat-video-time" aria-label="Время видео">
+            {formatMusicTime(position * 1000)}
+            <span> / {formatMusicTime(state.duration * 1000)}</span>
+          </span>
+          <select
+            className="chat-video-speed"
+            aria-label="Скорость видео"
+            value={rate}
+            onChange={(event) => {
+              if (video.current)
+                video.current.playbackRate = Number(event.target.value);
+              setRate(Number(event.target.value));
+              showControls();
+            }}
+          >
+            {[0.5, 0.75, 1, 1.25, 1.5, 2].map((value) => (
+              <option key={value} value={value}>
+                {value}×
+              </option>
+            ))}
+          </select>
+          {viewer && pipAvailable && (
+            <button
+              type="button"
+              className="chat-video-pip"
+              aria-label="Картинка в картинке"
+              onClick={() => void togglePictureInPicture()}
+            >
+              <PictureInPicture2 size={18} />
+            </button>
+          )}
           <button
             type="button"
             aria-label={
