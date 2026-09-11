@@ -44,6 +44,7 @@ import './account-management.css';
 import './staff-panel.css';
 import './channel-boosts.css';
 import './viewport.css';
+import './settings.css';
 import { MusicProvider } from './music-provider';
 import { APP_HISTORY_BOOTSTRAP } from '@/lib/app-history-bootstrap';
 export const viewport: Viewport = {

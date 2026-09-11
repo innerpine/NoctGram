@@ -1,5 +1,5 @@
 'use client';
-import { DisplayName, AnimationPreference } from './profile-identity';
+import { DisplayName } from './profile-identity';
 import { ProfileLink } from './profile-link';
 /* Async effects load private settings and cancel stale search results. */
 /* eslint-disable react/react-compiler */
@@ -18,8 +18,6 @@ import {
 import { Select } from '@base-ui/react/select';
 import { Switch } from '@base-ui/react/switch';
 import { request, type Person } from '@/lib/client';
-import { PushSettings } from './notifications';
-import { MusicActivitySettings } from './music-activity';
 import { Avatar } from './post-card';
 import { PresenceSettings } from './presence-settings';
 
@@ -120,7 +118,7 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
     void perform(
       async () => {
         await request('', { action: 'blockUser', id: person.id, value });
-        // Keep unsaved content/message preferences while updating the block list.
+        // Refresh the block list without replacing the content/message preferences.
         const r = await request<Settings>('?action=privacy');
         setSettings((s) => s && { ...s, blocked: r.blocked });
         setReload((n) => n + 1);
@@ -129,6 +127,19 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
         ? 'Пользователь добавлен в чёрный список'
         : 'Пользователь разблокирован',
     );
+  const savePreference = (
+    patch: Partial<Pick<Settings, 'hideAdult' | 'messagePolicy'>>,
+  ) => {
+    if (!settings) return;
+    void perform(async () => {
+      await request('', {
+        action: 'privacy',
+        hideAdult: patch.hideAdult ?? settings.hideAdult,
+        messagePolicy: patch.messagePolicy ?? settings.messagePolicy,
+      });
+      setSettings((previous) => previous && { ...previous, ...patch });
+    }, 'Настройки сохранены');
+  };
   return (
     <div className="privacy-panel">
       {error && (
@@ -142,22 +153,7 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
       {settings && (
         <div className="privacy-content">
           <PresenceSettings onChanged={onChanged} />
-          <MusicActivitySettings />
-          <PushSettings />
-          <AnimationPreference />
-          <form
-            className="edit-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void perform(async () => {
-                await request('', {
-                  action: 'privacy',
-                  hideAdult: settings.hideAdult,
-                  messagePolicy: settings.messagePolicy,
-                });
-              }, 'Настройки приватности сохранены');
-            }}
-          >
+          <div className="edit-form">
             <fieldset disabled={busy} className="edit-fields">
               <section className="privacy-section">
                 <h3>
@@ -175,8 +171,7 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
                     value={settings.messagePolicy}
                     disabled={busy}
                     onValueChange={(value) => {
-                      if (value)
-                        setSettings({ ...settings, messagePolicy: value });
+                      if (value) savePreference({ messagePolicy: value });
                     }}
                   >
                     <Select.Trigger
@@ -261,7 +256,7 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
                     checked={settings.hideAdult}
                     disabled={busy}
                     onCheckedChange={(checked) =>
-                      setSettings({ ...settings, hideAdult: checked })
+                      savePreference({ hideAdult: checked })
                     }
                   >
                     <Switch.Thumb className="privacy-switch-thumb">
@@ -270,21 +265,17 @@ export function PrivacyPanel({ onChanged }: { onChanged: () => void }) {
                   </Switch.Root>
                 </label>
               </section>
-              <button className="primary" disabled={busy}>
-                {busy ? 'Сохраняем…' : 'Сохранить приватность'}
-              </button>
             </fieldset>
-          </form>
+          </div>
           <section className="privacy-section">
             <h3>
               <Ban size={17} /> Чёрный список{' '}
               <span className="meta">{settings.blocked.length}</span>
             </h3>
             <p className="meta">
-              Скроем публикации и комментарии этих людей, включая посты их
-              каналов. Личные сообщения в обе стороны и подписки будут
-              отключены. После разблокировки подписки нужно восстановить
-              вручную.
+              Публикации, комментарии и каналы этих людей скрыты. Сообщения и
+              подписки в обе стороны отключены. После разблокировки подписки
+              нужно восстановить вручную.
             </p>
             <label className="privacy-search">
               <Search size={16} />

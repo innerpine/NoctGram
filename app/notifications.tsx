@@ -3,7 +3,8 @@ import { DisplayName } from './profile-identity';
 import { reconcileSnapshot } from '@/lib/reconcile-snapshot';
 import { ProfileLink } from './profile-link';
 /* eslint-disable react/react-compiler */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Switch } from '@base-ui/react/switch';
 import {
   Bell,
   BellRing,
@@ -39,7 +40,8 @@ async function worker() {
   await navigator.serviceWorker.ready;
   return reg;
 }
-export function PushSettings() {
+export function PushSettings({ compact = false }: { compact?: boolean }) {
+  const id = useId();
   const [config, setConfig] = useState<{
       publicKey: string | null;
       enabled: boolean;
@@ -126,30 +128,60 @@ export function PushSettings() {
   }
   return (
     <section className="push-settings">
-      <div className="row">
-        <BellRing size={19} />
-        <strong>Push-уведомления</strong>
-      </div>
-      <p className="meta">
-        Сообщения, аудиозвонки и посты твоих подписок — даже когда вкладка
-        закрыта.
-      </p>
-      <button
-        className="secondary"
-        disabled={
-          busy ||
-          !config ||
-          (!config.enabled && (!supported || !config.publicKey))
-        }
-        onClick={() => void toggle()}
-      >
-        {config?.enabled ? <Check size={16} /> : <Bell size={16} />}{' '}
-        {busy
-          ? 'Подключаем…'
-          : config?.enabled
-            ? 'Выключить на этом устройстве'
-            : 'Включить на этом устройстве'}
-      </button>
+      {compact ? (
+        <div className="push-setting-row">
+          <span>
+            <label htmlFor={id}>
+              <strong id={id + '-label'}>Уведомления на этом устройстве</strong>
+            </label>
+            <small id={id + '-note'}>
+              Сообщения, звонки и новые публикации — даже когда вкладка закрыта.
+            </small>
+          </span>
+          <Switch.Root
+            id={id}
+            className="privacy-switch push-switch"
+            aria-labelledby={id + '-label'}
+            aria-describedby={id + '-note'}
+            checked={!!config?.enabled}
+            disabled={
+              busy ||
+              !config ||
+              (!config.enabled && (!supported || !config.publicKey))
+            }
+            onCheckedChange={() => void toggle()}
+          >
+            <Switch.Thumb className="privacy-switch-thumb" />
+          </Switch.Root>
+        </div>
+      ) : (
+        <>
+          <div className="row">
+            <BellRing size={19} />
+            <strong>Push-уведомления</strong>
+          </div>
+          <p className="meta">
+            Сообщения, аудиозвонки и посты твоих подписок — даже когда вкладка
+            закрыта.
+          </p>
+          <button
+            className="secondary"
+            disabled={
+              busy ||
+              !config ||
+              (!config.enabled && (!supported || !config.publicKey))
+            }
+            onClick={() => void toggle()}
+          >
+            {config?.enabled ? <Check size={16} /> : <Bell size={16} />}{' '}
+            {busy
+              ? 'Подключаем…'
+              : config?.enabled
+                ? 'Выключить на этом устройстве'
+                : 'Включить на этом устройстве'}
+          </button>
+        </>
+      )}
       {!supported ? (
         <p className="meta">
           Нужен браузер с поддержкой push и HTTPS или localhost. На iPhone

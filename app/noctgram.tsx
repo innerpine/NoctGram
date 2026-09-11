@@ -14,6 +14,7 @@ import type { RoomDetail } from '@/lib/rooms-types';
 import { ensureKey } from '@/lib/secret-crypto';
 import { AccountPanel } from './account-panel';
 import { AccountSwitcher } from './account-switcher';
+import { SettingsPanel, type SettingsSection } from './settings-panel';
 import { VerifiedProfile } from './profile-identity';
 import { ChannelBoosts } from './channel-boosts';
 /* Auth routes require top-level links; private R2 images must keep session cookies.
@@ -213,6 +214,8 @@ export default function Noctgram({
     open: boolean;
   } | null>(null);
   const pendingBoostOpen = useRef<string | null>(null);
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSection>('profile');
   const [editTab, setEditTab] = useState<
       'profile' | 'privacy' | 'design' | 'account'
     >('profile'),
@@ -1978,7 +1981,10 @@ export default function Noctgram({
                   className="account-settings-button"
                   aria-label="Настройки мессенджера"
                   title="Настройки"
-                  onClick={() => setModal('settings')}
+                  onClick={() => {
+                    setSettingsSection('profile');
+                    setModal('settings');
+                  }}
                 >
                   <Settings size={20} />
                 </button>
@@ -2312,7 +2318,10 @@ export default function Noctgram({
                           className="icon-button"
                           aria-label="Настройки мессенджера"
                           title="Настройки"
-                          onClick={() => setModal('settings')}
+                          onClick={() => {
+                            setSettingsSection('profile');
+                            setModal('settings');
+                          }}
                         >
                           <Settings size={20} />
                         </button>
@@ -2431,7 +2440,10 @@ export default function Noctgram({
                     own={profile.id === me?.id}
                     onSettings={
                       profile.id === me?.id
-                        ? () => setModal('settings')
+                        ? () => {
+                            setSettingsSection('music');
+                            setModal('settings');
+                          }
                         : undefined
                     }
                   />
@@ -3194,13 +3206,15 @@ export default function Noctgram({
         <DialogContent
           className={
             'noct-dialog ' +
-            (modal === 'edit'
-              ? 'profile-editor-dialog'
-              : modal === 'comments'
-                ? 'comments-dialog'
-                : modal === 'followers' || modal === 'following'
-                  ? 'connections-dialog'
-                  : '')
+            (modal === 'settings'
+              ? 'settings-dialog'
+              : modal === 'edit'
+                ? 'profile-editor-dialog'
+                : modal === 'comments'
+                  ? 'comments-dialog'
+                  : modal === 'followers' || modal === 'following'
+                    ? 'connections-dialog'
+                    : '')
           }
         >
           <DialogTitle>
@@ -3221,12 +3235,15 @@ export default function Noctgram({
               } as Record<string, string>
             )[modal] || 'Noctgram'}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription
+            className={modal === 'settings' ? 'sr-only' : undefined}
+          >
             {
               (
                 {
                   signin: 'Публикуй, общайся и сохраняй важное.',
-                  settings: 'Активность, уведомления и личное пространство.',
+                  settings:
+                    'Профиль, оформление, приватность, музыка, уведомления и доступ.',
                   premium: 'Больше способов быть собой. В разработке.',
                   edit: 'Профиль и твоё личное пространство.',
                   reportMessage:
@@ -3254,17 +3271,22 @@ export default function Noctgram({
             </a>
           )}
           {modal === 'settings' && me && (
-            <>
-              <AccountSwitcher userId={me.id} />
-              <PrivacyPanel
-                onChanged={() => {
-                  setPrivacyVersion((value) => value + 1);
-                  void latestRefresh.current();
-                  void loadThreads().catch(() => {});
-                  if (peer) void loadMessages().catch(() => {});
-                }}
-              />
-            </>
+            <SettingsPanel
+              key={me.id}
+              me={me}
+              initialSection={settingsSection}
+              onEdit={(tab) => edit(tab, true)}
+              onMusicServices={() => {
+                setModal('');
+                navigate('music-services');
+              }}
+              onChanged={() => {
+                setPrivacyVersion((value) => value + 1);
+                void latestRefresh.current();
+                void loadThreads().catch(() => {});
+                if (peer) void loadMessages().catch(() => {});
+              }}
+            />
           )}
           {modal === 'edit' && editTarget && (
             <div

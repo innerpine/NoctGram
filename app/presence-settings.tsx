@@ -282,25 +282,27 @@ export function PresenceSettings({ onChanged }: { onChanged: () => void }) {
                 </div>
               )}
             </div>
-            <div className="presence-actions">
-              <button
-                type="button"
-                className="secondary"
-                disabled={!dirty}
-                onClick={() => {
-                  setSettings(original.current);
-                  setPicker(false);
-                  setQuery('');
-                  setError('');
-                  setNotice('');
-                }}
-              >
-                Отмена
-              </button>
-              <button className="primary" disabled={!dirty}>
-                {busy ? 'Сохраняем…' : 'Сохранить статус'}
-              </button>
-            </div>
+            {dirty && (
+              <div className="presence-actions">
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={!dirty}
+                  onClick={() => {
+                    setSettings(original.current);
+                    setPicker(false);
+                    setQuery('');
+                    setError('');
+                    setNotice('');
+                  }}
+                >
+                  Отмена
+                </button>
+                <button className="primary" disabled={!dirty}>
+                  {busy ? 'Сохраняем…' : 'Сохранить статус'}
+                </button>
+              </div>
+            )}
           </fieldset>
         </form>
       )}
