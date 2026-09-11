@@ -50,6 +50,37 @@ await test('www redirects to HTTPS apex while retaining path and query', async (
   );
 });
 
+await test('HTTP public links redirect before loading the app or assets', async () => {
+  const env = {
+    ...settings,
+    ASSETS: {
+      fetch() {
+        throw Error('An insecure request must not load assets');
+      },
+    },
+  };
+  for (const hostname of ['noctgram.com', 'www.noctgram.com']) {
+    for (const path of ['/', '/?profile=invoker', '/music?tab=library']) {
+      const response = await worker.fetch(
+        new Request(`http://${hostname}${path}`),
+        env,
+        {},
+      );
+      assert.equal(response.status, 308);
+      assert.equal(response.headers.get('location'), `https://noctgram.com${path}`);
+    }
+  }
+});
+
+await test('HTTPS public links and local HTTP development do not redirect', async () => {
+  for (const url of ['https://noctgram.com/', 'http://localhost:8791/']) {
+    const response = await worker.fetch(new Request(url), settings, {});
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('location'), null);
+    assert.equal((await response.json()).url, url);
+  }
+});
+
 await test('public entry fails closed before serving assets or application on invalid configuration', async () => {
   for (const change of [
     { NOCT_AUTH_MODE: 'hybrid' },

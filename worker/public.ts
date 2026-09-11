@@ -39,7 +39,10 @@ function configured(env: PublicSettings) {
 const publicWorker = {
   async fetch(request: Request, env: PublicSettings, ctx: ExecutionContext) {
     const url = new URL(request.url);
-    if (url.hostname === 'www.noctgram.com') {
+    if (
+      url.hostname === 'www.noctgram.com' ||
+      (url.hostname === 'noctgram.com' && url.protocol === 'http:')
+    ) {
       url.hostname = 'noctgram.com';
       url.protocol = 'https:';
       return Response.redirect(url.toString(), 308);
