@@ -141,7 +141,7 @@ const first = purchase({ amount: 1 });
 const receipt = await api.sendGift('alice', first, now);
 assert.equal(
   receipt.balance,
-  9975,
+  9925,
   'Price comes from the server catalog, never the client',
 );
 assert.equal(
@@ -160,7 +160,7 @@ const outgoing = (await api.readConversation('alice', 'bob'))[0];
 assert.deepEqual(outgoing.gift, {
   id: receipt.id,
   giftId: 'toy_bear',
-  price: 25,
+  price: 75,
   message: 'Спасибо тебе!',
 });
 assert.equal(
@@ -223,7 +223,7 @@ assert.equal(
 await Promise.all(
   Array.from({ length: 8 }, () => api.sendGift('alice', first, now)),
 );
-assert.equal(await api.balance('alice'), 9975);
+assert.equal(await api.balance('alice'), 9925);
 assert.equal(count('received_gifts'), 1);
 assert.equal(count('notifications'), 1);
 assert.equal(
@@ -342,7 +342,7 @@ assert.equal(
 assert.equal(count('received_gifts'), rollbackGifts);
 assert.equal(count('messages'), rollbackMessages);
 sqlite.exec(
-  "INSERT INTO star_transfers(id,recipient,amount,kind,created) VALUES('grant:poor','poor',25,'grant',1)",
+  "INSERT INTO star_transfers(id,recipient,amount,kind,created) VALUES('grant:poor','poor',75,'grant',1)",
 );
 const racing = await Promise.allSettled([
   api.sendGift('poor', purchase()),

@@ -8,9 +8,14 @@ export type GiftDefinition = {
 function collection(
   price: number,
   color: string,
-  entries: [string, string][],
+  entries: [string, string, number?][],
 ): GiftDefinition[] {
-  return entries.map(([id, name]) => ({ id, name, price, color }));
+  return entries.map(([id, name, itemPrice = price]) => ({
+    id,
+    name,
+    price: itemPrice,
+    color,
+  }));
 }
 
 // Noct Stars prices belong to our catalog, independently of Telegram resale prices.
@@ -30,45 +35,45 @@ export const GIFT_CATALOG: readonly GiftDefinition[] = [
     ['gift_5168043875654172773', 'Кубок'],
     ['gift_5170521118301225164', 'Бриллиант'],
   ]),
-  { id: 'toy_bear', name: 'Мишка', price: 25, color: '#daa27a' },
-  { id: 'trapped_heart', name: 'Сердце', price: 25, color: '#ec839e' },
-  { id: 'eternal_rose', name: 'Роза', price: 50, color: '#db6e87' },
+  { id: 'toy_bear', name: 'Мишка', price: 75, color: '#daa27a' },
+  { id: 'trapped_heart', name: 'Сердце', price: 100, color: '#ec839e' },
   { id: 'homemade_cake', name: 'Торт', price: 50, color: '#d2a5eb' },
+  { id: 'eternal_rose', name: 'Роза', price: 250, color: '#db6e87' },
   ...collection(250, '#d1be92', [
-    ['durovs_figurine', 'Статуэтка Дурова'],
-    ['plush_pepe', 'Плюшевый Пепе'],
+    ['durovs_figurine', 'Статуэтка Дурова', 350],
+    ['plush_pepe', 'Плюшевый Пепе', 1000],
   ]),
   ...collection(100, '#9bb8d9', [
-    ['scared_cat', 'Пугливый кот'],
+    ['scared_cat', 'Пугливый кот', 200],
     ['joyful_bundle', 'Свёрток счастья'],
-    ['ionic_dryer', 'Фен'],
-    ['mighty_arm', 'Могучая рука'],
-    ['ion_gem', 'Ионный кристалл'],
-    ['love_potion', 'Приворотное зелье'],
+    ['ionic_dryer', 'Фен', 150],
+    ['mighty_arm', 'Могучая рука', 250],
+    ['ion_gem', 'Ионный кристалл', 450],
+    ['love_potion', 'Приворотное зелье', 250],
     ['chill_flame', 'Холодное пламя'],
     ['loot_bag', 'Мешок сокровищ'],
-    ['swiss_watch', 'Швейцарские часы'],
+    ['swiss_watch', 'Швейцарские часы', 450],
     ['perfume_bottle', 'Флакон духов'],
     ['heart_pendant', 'Подвеска-сердце'],
     ['moon_pendant', 'Лунный кулон'],
-    ['nail_bracelet', 'Браслет-гвоздь'],
-    ['bonded_ring', 'Парные кольца'],
-    ['gem_signet', 'Перстень с камнем'],
-    ['redo', 'REDO'],
+    ['nail_bracelet', 'Браслет-гвоздь', 150],
+    ['bonded_ring', 'Парные кольца', 250],
+    ['gem_signet', 'Перстень с камнем', 350],
+    ['redo', 'REDO', 750],
   ]),
   ...collection(50, '#c4a2d9', [
     ['lush_bouquet', 'Пышный букет'],
     ['pretty_posy', 'Нежный букет'],
     ['sakura_flower', 'Цветок сакуры'],
-    ['bow_tie', 'Галстук-бабочка'],
+    ['bow_tie', 'Галстук-бабочка', 250],
     ['santa_hat', 'Шапка Санты'],
-    ['fresh_socks', 'Носочки'],
-    ['love_candle', 'Свеча любви'],
+    ['fresh_socks', 'Носочки', 500],
+    ['love_candle', 'Свеча любви', 150],
     ['bday_candle', 'Именинная свеча'],
-    ['input_key', 'Клавиша'],
-    ['berry_box', 'Коробочка ягод'],
+    ['input_key', 'Клавиша', 250],
+    ['berry_box', 'Коробочка ягод', 150],
   ]),
-  ...collection(25, '#e6aeae', [['bunny_muffin', 'Кекс-зайчик']]),
+  ...collection(75, '#e6aeae', [['bunny_muffin', 'Кекс-зайчик']]),
 ];
 
 // Display old receipts without making retired gifts purchasable again.
