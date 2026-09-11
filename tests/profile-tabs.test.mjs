@@ -210,8 +210,8 @@ try {
         if (gifts.length) assert.equal(gifts[0].props.own, own);
         assert.equal(
           all(tree, 'ChannelTools').length,
-          own && tab === 'posts' ? 1 : 0,
-          'Scheduled posts belong only to the owner’s posts tab',
+          0,
+          'Personal profiles do not expose removed scheduling tools',
         );
         const currentTabs = all(tree, 'Tabs').find(
           (node) => node.props.value === tab,
@@ -220,6 +220,30 @@ try {
       }
     }
   }
+  const channelOwner = account('channel-owner');
+  states.set(1, channelOwner);
+  states.set(2, {
+    ...account('managed-channel'),
+    kind: 'channel',
+    ownerId: channelOwner.id,
+    canPublish: true,
+    canManageMembers: true,
+  });
+  const channelTabs = all(render(), 'Tabs').find((node) =>
+    all(node, 'TabsTrigger').some((item) => item.props.value === 'posts'),
+  );
+  channelTabs.props.onValueChange('posts');
+  assert.equal(
+    all(render(), 'ChannelTools').length,
+    1,
+    'Channel team management stays available',
+  );
+  channelTabs.props.onValueChange('media');
+  assert.equal(
+    all(render(), 'ChannelTools').length,
+    0,
+    'Channel tools stay out of the media tab',
+  );
   console.log(
     'Profile tabs passed: both accounts, own/other profiles, repeated gifts/media/posts switches, unique sibling keys and publication tools.',
   );

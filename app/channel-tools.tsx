@@ -3,7 +3,7 @@ import { DisplayName } from './profile-identity';
 import { ProfileLink } from './profile-link';
 /* eslint-disable react/react-compiler */
 import { useEffect, useRef, useState } from 'react';
-import { Clock3, UsersRound, Trash2, Check, Search } from 'lucide-react';
+import { UsersRound, Trash2, Check, Search } from 'lucide-react';
 import { Select } from '@base-ui/react/select';
 import {
   Dialog,
@@ -11,25 +11,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { request, type Person, type Profile, type Post } from '@/lib/client';
+import { request, type Person, type Profile } from '@/lib/client';
 import { Avatar } from './post-card';
-export function localDate(value = Date.now() + 3600000) {
-  const date = new Date(value);
-  return new Date(value - date.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 16);
-}
-export function ChannelTools({
-  profile,
-  revision = 0,
-}: {
-  profile: Profile;
-  revision?: number;
-}) {
-  const [panel, setPanel] = useState(''),
-    [open, setOpen] = useState(false),
+export function ChannelTools({ profile }: { profile: Profile }) {
+  const [open, setOpen] = useState(false),
     [members, setMembers] = useState<(Person & { role: string })[]>([]),
-    [queue, setQueue] = useState<(Post & { publisherHandle: string })[]>([]),
     [query, setQuery] = useState(''),
     [found, setFound] = useState<Person[]>([]),
     [busy, setBusy] = useState(false),
@@ -40,17 +26,12 @@ export function ChannelTools({
     if (!open) return;
     let live = true;
     setError('');
-    request<unknown>(
-      '?action=' +
-        (panel === 'team' ? 'channelTeam' : 'scheduled') +
-        '&id=' +
-        encodeURIComponent(profile.id),
+    request<{ members: typeof members }>(
+      '?action=channelTeam&id=' + encodeURIComponent(profile.id),
     )
       .then((r) => {
         if (!live) return;
-        if (panel === 'team')
-          setMembers((r as { members: typeof members }).members);
-        else setQueue(r as typeof queue);
+        setMembers(r.members);
       })
       .catch((e) => {
         if (live) setError(e.message);
@@ -58,9 +39,9 @@ export function ChannelTools({
     return () => {
       live = false;
     };
-  }, [open, panel, profile.id, version, revision]);
+  }, [open, profile.id, version]);
   useEffect(() => {
-    if (!open || panel !== 'team' || !query.trim()) {
+    if (!open || !query.trim()) {
       setFound([]);
       return;
     }
@@ -78,7 +59,7 @@ export function ChannelTools({
       live = false;
       clearTimeout(t);
     };
-  }, [query, open, panel, profile.ownerId]);
+  }, [query, open, profile.ownerId]);
   async function mutate(body: object) {
     if (lock.current) return;
     lock.current = true;
@@ -101,21 +82,13 @@ export function ChannelTools({
       id: p.id,
       role: value,
     });
-  const launch = (v: string) => {
-    setPanel(v);
-    setOpen(true);
-  };
+  if (profile.kind !== 'channel') return null;
   return (
     <>
       <div className="channel-tools">
-        <button className="secondary" onClick={() => launch('queue')}>
-          <Clock3 size={15} /> Отложенные
+        <button className="secondary" onClick={() => setOpen(true)}>
+          <UsersRound size={15} /> Команда канала
         </button>
-        {profile.kind === 'channel' && (
-          <button className="secondary" onClick={() => launch('team')}>
-            <UsersRound size={15} /> Команда канала
-          </button>
-        )}
         {profile.channelRole && profile.channelRole !== 'owner' && (
           <small className="meta">
             {profile.channelRole === 'admin' ? 'Администратор' : 'Редактор'}
@@ -124,240 +97,140 @@ export function ChannelTools({
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="noct-dialog">
-          <DialogTitle>
-            {panel === 'team' ? 'Команда канала' : 'Отложенные публикации'}
-          </DialogTitle>
+          <DialogTitle>Команда канала</DialogTitle>
           <DialogDescription>
-            {panel === 'team'
-              ? 'Администратор редактирует канал и управляет постами. Редактор публикует и управляет своей очередью. Назначать роли может владелец.'
-              : 'Публикации появятся по времени сервера, даже если ты закроешь Noctgram. Время указано в часовом поясе твоего устройства.'}
+            Администратор редактирует канал и управляет публикациями. Редактор
+            публикует и изменяет свои посты. Назначать роли может владелец.
           </DialogDescription>
           {error && (
             <p className="realtime-error" role="alert">
               {error}
             </p>
           )}
-          {panel === 'team' ? (
-            <div className="realtime-form">
-              <p className="meta">Владелец канала сохраняет полный доступ.</p>
-              {members.map((p) => (
-                <div className="realtime-person" key={p.id}>
-                  <ProfileLink
-                    target={{ id: p.id }}
-                    aria-label={'Профиль ' + p.name}
-                  >
-                    <Avatar person={p} size={36} />
+          <div className="realtime-form">
+            <p className="meta">Владелец канала сохраняет полный доступ.</p>
+            {members.map((p) => (
+              <div className="realtime-person" key={p.id}>
+                <ProfileLink
+                  target={{ id: p.id }}
+                  aria-label={'Профиль ' + p.name}
+                >
+                  <Avatar person={p} size={36} />
+                </ProfileLink>
+                <span>
+                  <ProfileLink target={{ id: p.id }}>
+                    <DisplayName person={p} />
                   </ProfileLink>
-                  <span>
-                    <ProfileLink target={{ id: p.id }}>
-                      <DisplayName person={p} />
-                    </ProfileLink>
-                    <small>
-                      <ProfileLink target={{ id: p.id }}>
-                        @{p.handle}
-                      </ProfileLink>
-                    </small>
-                  </span>
-                  <span className="grow" />
-                  {profile.canManageMembers ? (
-                    <>
-                      <Select.Root
-                        value={p.role}
-                        onValueChange={(v) => {
-                          if (v) role(p, v);
-                        }}
-                        disabled={busy}
-                      >
-                        <Select.Trigger className="secondary">
-                          {p.role === 'admin' ? 'Администратор' : 'Редактор'}
-                        </Select.Trigger>
-                        <Select.Portal>
-                          <Select.Positioner
-                            sideOffset={5}
-                            className="privacy-select-positioner"
-                          >
-                            <Select.Popup className="privacy-select-popup">
-                              {[
-                                ['admin', 'Администратор'],
-                                ['editor', 'Редактор'],
-                              ].map(([v, label]) => (
-                                <Select.Item
-                                  className="privacy-select-item"
-                                  key={v}
-                                  value={v}
-                                >
-                                  <Select.ItemText>{label}</Select.ItemText>
-                                  <Select.ItemIndicator>
-                                    <Check size={15} />
-                                  </Select.ItemIndicator>
-                                </Select.Item>
-                              ))}
-                            </Select.Popup>
-                          </Select.Positioner>
-                        </Select.Portal>
-                      </Select.Root>
-                      <button
-                        className="icon-button"
-                        aria-label={'Убрать ' + p.name + ' из команды'}
-                        disabled={busy}
-                        onClick={() => role(p, 'remove')}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </>
-                  ) : (
-                    <small>
-                      {p.role === 'admin' ? 'Администратор' : 'Редактор'}
-                    </small>
-                  )}
-                </div>
-              ))}
-              {!members.length && (
-                <p className="meta">В команде пока только владелец.</p>
-              )}
-              {profile.canManageMembers && (
-                <>
-                  <label className="realtime-search">
-                    <Search size={16} />
-                    <input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Найти участника по имени или @юзернейму"
-                      aria-label="Найти участника"
-                    />
-                  </label>
-                  {found
-                    .filter((p) => !members.some((m) => m.id === p.id))
-                    .map((p) => (
-                      <div key={p.id} className="realtime-person">
-                        <ProfileLink
-                          target={{ id: p.id }}
-                          aria-label={'Профиль ' + p.name}
+                  <small>
+                    <ProfileLink target={{ id: p.id }}>@{p.handle}</ProfileLink>
+                  </small>
+                </span>
+                <span className="grow" />
+                {profile.canManageMembers ? (
+                  <>
+                    <Select.Root
+                      value={p.role}
+                      onValueChange={(v) => {
+                        if (v) role(p, v);
+                      }}
+                      disabled={busy}
+                    >
+                      <Select.Trigger className="secondary">
+                        {p.role === 'admin' ? 'Администратор' : 'Редактор'}
+                      </Select.Trigger>
+                      <Select.Portal>
+                        <Select.Positioner
+                          sideOffset={5}
+                          className="privacy-select-positioner"
                         >
-                          <Avatar person={p} size={32} />
-                        </ProfileLink>
-                        <span>
-                          <ProfileLink target={{ id: p.id }}>
-                            <DisplayName person={p} />
-                          </ProfileLink>
-                          <small>
-                            <ProfileLink target={{ id: p.id }}>
-                              @{p.handle}
-                            </ProfileLink>
-                          </small>
-                        </span>
-                        <span className="grow" />
-                        <button
-                          className="secondary"
-                          disabled={busy}
-                          onClick={() => role(p, 'editor')}
-                        >
-                          Добавить редактора
-                        </button>
-                      </div>
-                    ))}
-                  <p className="meta">
-                    При удалении участника его будущие публикации отменяются.
-                    Опубликованные посты сохраняются.
-                  </p>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="schedule-list">
-              {queue.length ? (
-                queue.map((p) => (
-                  <ScheduledRow
-                    key={p.id}
-                    post={p}
-                    busy={busy}
-                    onSave={(at) =>
-                      void mutate({
-                        action: 'reschedule',
-                        id: p.id,
-                        publishAt: at,
-                      })
-                    }
-                    onCancel={() =>
-                      void mutate({ action: 'cancelScheduled', id: p.id })
-                    }
+                          <Select.Popup className="privacy-select-popup">
+                            {[
+                              ['admin', 'Администратор'],
+                              ['editor', 'Редактор'],
+                            ].map(([v, label]) => (
+                              <Select.Item
+                                className="privacy-select-item"
+                                key={v}
+                                value={v}
+                              >
+                                <Select.ItemText>{label}</Select.ItemText>
+                                <Select.ItemIndicator>
+                                  <Check size={15} />
+                                </Select.ItemIndicator>
+                              </Select.Item>
+                            ))}
+                          </Select.Popup>
+                        </Select.Positioner>
+                      </Select.Portal>
+                    </Select.Root>
+                    <button
+                      className="icon-button"
+                      aria-label={'Убрать ' + p.name + ' из команды'}
+                      disabled={busy}
+                      onClick={() => role(p, 'remove')}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </>
+                ) : (
+                  <small>
+                    {p.role === 'admin' ? 'Администратор' : 'Редактор'}
+                  </small>
+                )}
+              </div>
+            ))}
+            {!members.length && (
+              <p className="meta">В команде пока только владелец.</p>
+            )}
+            {profile.canManageMembers && (
+              <>
+                <label className="realtime-search">
+                  <Search size={16} />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Найти участника по имени или @юзернейму"
+                    aria-label="Найти участника"
                   />
-                ))
-              ) : (
-                <p className="realtime-empty">
-                  В очереди пока пусто. Нажми на часы в редакторе публикации.
+                </label>
+                {found
+                  .filter((p) => !members.some((m) => m.id === p.id))
+                  .map((p) => (
+                    <div key={p.id} className="realtime-person">
+                      <ProfileLink
+                        target={{ id: p.id }}
+                        aria-label={'Профиль ' + p.name}
+                      >
+                        <Avatar person={p} size={32} />
+                      </ProfileLink>
+                      <span>
+                        <ProfileLink target={{ id: p.id }}>
+                          <DisplayName person={p} />
+                        </ProfileLink>
+                        <small>
+                          <ProfileLink target={{ id: p.id }}>
+                            @{p.handle}
+                          </ProfileLink>
+                        </small>
+                      </span>
+                      <span className="grow" />
+                      <button
+                        className="secondary"
+                        disabled={busy}
+                        onClick={() => role(p, 'editor')}
+                      >
+                        Добавить редактора
+                      </button>
+                    </div>
+                  ))}
+                <p className="meta">
+                  Удалённый участник потеряет доступ к управлению каналом.
                 </p>
-              )}
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-function ScheduledRow({
-  post,
-  busy,
-  onSave,
-  onCancel,
-}: {
-  post: Post & { publisherHandle: string };
-  busy: boolean;
-  onSave: (at: number) => void;
-  onCancel: () => void;
-}) {
-  const [date, setDate] = useState(localDate(post.publishAt)),
-    [editing, setEditing] = useState(false);
-  return (
-    <article className="scheduled-row">
-      <div className="row">
-        <Clock3 size={16} />
-        <strong>{new Date(post.publishAt!).toLocaleString('ru-RU')}</strong>
-      </div>
-      <p>{post.text || post.code || 'Медиапубликация'}</p>
-      <small className="meta">
-        {post.media.length > 0 ? `${post.media.length} вложений · ` : ''}
-        {post.poll.length > 0 ? 'Опрос · ' : ''}@{post.publisherHandle}
-      </small>
-      {post.cancelledAt ? (
-        <p className="meta">Отменена</p>
-      ) : (
-        <>
-          <div className="row">
-            <button
-              className="secondary"
-              disabled={busy}
-              onClick={() => setEditing((v) => !v)}
-            >
-              Перенести
-            </button>
-            <button className="text-button" disabled={busy} onClick={onCancel}>
-              Отменить публикацию
-            </button>
-          </div>
-          {editing && (
-            <form
-              className="row"
-              onSubmit={(e) => {
-                e.preventDefault();
-                onSave(new Date(date).getTime());
-              }}
-            >
-              <input
-                required
-                type="datetime-local"
-                min={localDate(Date.now() + 60000)}
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                aria-label="Новое время публикации"
-              />
-              <button className="primary" disabled={busy}>
-                Сохранить
-              </button>
-            </form>
-          )}
-        </>
-      )}
-    </article>
   );
 }

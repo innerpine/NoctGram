@@ -5,8 +5,6 @@
 }
 .realtime-form input,
 .realtime-form textarea,
-.scheduled-row input,
-.schedule-editor input,
 .realtime-search input {
   background: #19191c;
   color: var(--text, #eee);
@@ -20,8 +18,6 @@
 }
 .realtime-form input:focus-visible,
 .realtime-form textarea:focus-visible,
-.scheduled-row input:focus-visible,
-.schedule-editor input:focus-visible,
 .realtime-search input:focus-visible {
   border-color: #a390d5;
   box-shadow: 0 0 0 3px #a390d51a;
@@ -69,53 +65,6 @@
 }
 .channel-tools .secondary {
   font-size: 12px;
-}
-.schedule-editor {
-  margin: 12px 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 12px;
-  border: 1px solid #36313f;
-  border-radius: 12px;
-  background: #a390d509;
-  font-size: 13px;
-}
-.schedule-editor label {
-  display: grid;
-  gap: 7px;
-  flex: 1;
-  min-width: 180px;
-}
-.schedule-list {
-  display: grid;
-  gap: 12px;
-}
-.scheduled-row {
-  border: 1px solid #2b2b30;
-  background: #141417;
-  border-radius: 16px;
-  padding: 16px;
-  display: grid;
-  gap: 12px;
-}
-.scheduled-row p {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  max-height: 140px;
-  overflow: auto;
-  font-size: 14px;
-}
-.scheduled-row strong {
-  font-size: 13px;
-}
-.scheduled-row .row {
-  flex-wrap: wrap;
-}
-.scheduled-row input {
-  flex: 1;
-  min-width: 170px;
 }
 .realtime-person .secondary {
   white-space: nowrap;
@@ -366,76 +315,6 @@
   margin: 0;
   padding: 12px;
 }
-.push-settings {
-  padding: 16px;
-  border: 1px solid #323037;
-  background: linear-gradient(130deg, #201c29, #151417);
-  border-radius: 16px;
-  display: grid;
-  gap: 11px;
-}
-.push-settings p {
-  font-size: 12px;
-  line-height: 1.6;
-}
-.push-settings strong {
-  font-size: 14px;
-}
-.push-settings .secondary {
-  justify-self: start;
-}
-.notifications-bell {
-  position: relative;
-}
-.notifications-bell i {
-  position: absolute;
-  top: -1px;
-  right: -3px;
-  border-radius: 7px;
-  background: #ad96d8;
-  color: #131018;
-  font-size: 9px;
-  padding: 2px 4px;
-  font-style: normal;
-  font-weight: 700;
-}
-.notification-list {
-  display: grid;
-  gap: 4px;
-}
-.notification-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-align: left;
-  padding: 14px 8px;
-  border-radius: 12px;
-  width: 100%;
-}
-.notification-row:hover,
-.notification-row.unread {
-  background: #ffffff05;
-}
-.notification-copy {
-  flex: 1;
-  min-width: 0;
-}
-.notification-row strong {
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-.notification-row small {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: #96939d;
-  margin-top: 4px;
-}
-.notification-row time {
-  font-size: 11px;
-  color: #77737f;
-}
 .call-dialog.noct-dialog {
   text-align: center;
   display: flex;
@@ -539,9 +418,6 @@
   }
   .channel-tools {
     padding: 10px 14px;
-  }
-  .schedule-editor {
-    gap: 8px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

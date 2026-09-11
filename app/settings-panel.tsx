@@ -5,7 +5,6 @@ import {
   Palette,
   Shield,
   Music2,
-  Bell,
   KeyRound,
   Pencil,
   ChevronRight,
@@ -19,14 +18,12 @@ import { AccountSwitcher } from './account-switcher';
 import { AccountPanel } from './account-panel';
 import { PrivacyPanel } from './privacy-panel';
 import { MusicActivitySettings } from './music-activity';
-import { PushSettings } from './notifications';
 
 const sections = [
   { id: 'profile', label: 'Профиль', icon: UserRound },
   { id: 'appearance', label: 'Оформление', icon: Palette },
   { id: 'privacy', label: 'Приватность', icon: Shield },
   { id: 'music', label: 'Музыка', icon: Music2 },
-  { id: 'notifications', label: 'Уведомления', icon: Bell },
   { id: 'access', label: 'Доступ', icon: KeyRound },
 ] as const;
 export type SettingsSection = (typeof sections)[number]['id'];
@@ -141,7 +138,6 @@ export function SettingsPanel({
                   </button>
                 </>
               )}
-              {id === 'notifications' && <PushSettings compact />}
               {id === 'access' && <AccountPanel />}
             </>
           )}

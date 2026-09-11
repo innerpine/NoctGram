@@ -32,7 +32,7 @@
 .settings-navigation[data-slot='tabs-list'] {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   width: auto;
   height: auto;
   margin: 0 20px;
@@ -237,8 +237,7 @@
   padding-top: 12px;
 }
 .settings-page .privacy-toggle .privacy-switch,
-.settings-page .appearance-switch .privacy-switch,
-.settings-page .push-switch {
+.settings-page .appearance-switch .privacy-switch {
   display: inline-flex;
   align-items: center;
   position: relative;
@@ -252,8 +251,7 @@
   box-shadow: none;
   border-radius: 999px;
 }
-.settings-page .privacy-switch[data-checked],
-.settings-page .push-switch[data-checked] {
+.settings-page .privacy-switch[data-checked] {
   background: #f0f0f3;
 }
 .settings-page .privacy-switch-thumb {
@@ -381,34 +379,6 @@
   [data-checked]
   > [data-slot='switch-thumb'] {
   background: #17171a;
-}
-.settings-page .push-settings {
-  padding: 0;
-  margin: 0;
-  border: 0;
-  background: none;
-  box-shadow: none;
-}
-.settings-page .push-setting-row {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 8px 0 20px;
-  border-bottom: 1px solid var(--settings-line);
-}
-.settings-page .push-setting-row > span {
-  flex: 1;
-}
-.settings-page .push-setting-row strong {
-  font-size: 14px;
-  font-weight: 500;
-}
-.settings-page .push-setting-row small {
-  display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--settings-muted);
 }
 .settings-page .account-panel {
   gap: 20px;

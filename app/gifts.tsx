@@ -252,7 +252,7 @@ function SendGiftForm({
           </DialogTitle>
           <DialogDescription>
             {sent
-              ? `${recipient.name} получит его в уведомлениях`
+              ? `${recipient.name} получит подарок в переписке`
               : `Подарок для ${recipient.name}`}
           </DialogDescription>
         </div>

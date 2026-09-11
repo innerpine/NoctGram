@@ -27,10 +27,9 @@ import { createChatSnapshots, type ChatSnapshot } from '@/lib/chat-snapshots';
 import { createPageTransition } from '@/lib/page-transition';
 import { createProfileCoverCache } from '@/lib/profile-cover-cache';
 import { flushSync } from 'react-dom';
-import { ChannelTools, localDate } from './channel-tools';
-import { NotificationsBell } from './notifications';
+import { ChannelTools } from './channel-tools';
 import { useAudioCalls } from './audio-calls';
-import { Clock3, Phone } from 'lucide-react';
+import { Phone } from 'lucide-react';
 import { PrivacyPanel } from './privacy-panel';
 import { MusicPanel } from './music-panel';
 import { MusicServices } from './music-services';
@@ -303,8 +302,6 @@ export default function Noctgram({
     peer: string;
     value: ChatThemeState;
   } | null>(null);
-  const [scheduledAt, setScheduledAt] = useState(''),
-    [scheduleVersion, setScheduleVersion] = useState(0);
   const [musicTab, setMusicTab] = useState('playlists');
   const [postsKey, setPostsKey] = useState('');
   const snapshots = useRef(createFeedSnapshots());
@@ -1258,7 +1255,6 @@ export default function Noctgram({
           code: code || '',
           codeLang,
           adult,
-          publishAt: scheduledAt ? new Date(scheduledAt).getTime() : 0,
         });
       } catch (error) {
         setPublishError(
@@ -1275,13 +1271,7 @@ export default function Noctgram({
       setCode(null);
       setCodeLang('text');
       setAdult(false);
-      setScheduledAt('');
-      setScheduleVersion((v) => v + 1);
-      notify(
-        scheduledAt
-          ? 'Публикация добавлена в очередь'
-          : 'Публикация появилась в ленте',
-      );
+      notify('Публикация появилась в ленте');
       const results = await Promise.allSettled([
         latestRefresh.current(),
         request<Profile>('?action=profile&id=' + encodeURIComponent(publisher)),
@@ -1298,9 +1288,7 @@ export default function Noctgram({
         (results[0].status === 'fulfilled' && results[0].value === false)
       )
         notify(
-          scheduledAt
-            ? 'Публикация добавлена в очередь, но обновить данные не удалось. Обнови страницу.'
-            : 'Пост опубликован, но обновить данные не удалось. Обнови страницу.',
+          'Пост опубликован, но обновить данные не удалось. Обнови страницу.',
         );
     });
   };
@@ -1639,29 +1627,6 @@ export default function Noctgram({
           />
         </div>
       )}
-      {scheduledAt && (
-        <div className="schedule-editor">
-          <Clock3 size={18} />
-          <label>
-            Когда опубликовать
-            <input
-              type="datetime-local"
-              required
-              min={localDate(Date.now() + 60000)}
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-            />
-          </label>
-          <button
-            className="icon-button"
-            aria-label="Опубликовать без задержки"
-            onClick={() => setScheduledAt('')}
-          >
-            <X size={17} />
-          </button>
-          <small className="meta">Время на этом устройстве</small>
-        </div>
-      )}
       <EmojiPreview text={draft} />
       <div className="toolbar">
         <EmojiPicker
@@ -1671,17 +1636,6 @@ export default function Noctgram({
           field={draftRef}
           disabled={uploading}
         />
-        <button
-          title="Отложить публикацию"
-          aria-label="Отложить публикацию"
-          aria-pressed={!!scheduledAt}
-          className={scheduledAt ? 'selected' : ''}
-          onClick={() => {
-            if (auth()) setScheduledAt((v) => (v ? '' : localDate()));
-          }}
-        >
-          <Clock3 size={19} />
-        </button>
         <input
           ref={fileRef}
           className="hidden"
@@ -1750,13 +1704,7 @@ export default function Noctgram({
           }
           onClick={publish}
         >
-          {busy ? (
-            <LoaderCircle size={14} className="spin" />
-          ) : scheduledAt ? (
-            'Отложить'
-          ) : (
-            'Опубликовать'
-          )}
+          {busy ? <LoaderCircle size={14} className="spin" /> : 'Опубликовать'}
           <ArrowUpRight size={14} />
         </button>
       </div>
@@ -2048,39 +1996,6 @@ export default function Noctgram({
                 <ShieldCheck size={20} />
               </button>
             )}
-            <button
-              className="icon-button header-stars"
-              onClick={() => navigate('stars')}
-              aria-label="Открыть Noct Stars"
-            >
-              <StarsIcon size={25} />
-            </button>
-            {me && (
-              <NotificationsBell
-                me={me.id}
-                onGift={() => {
-                  navigate('profile');
-                  setProfileTab('gifts');
-                }}
-                onPost={(id) => {
-                  void request<Post>(
-                    '?action=post&id=' + encodeURIComponent(id),
-                  )
-                    .then((p) => {
-                      setCommentPost(p);
-                      setModal('comments');
-                    })
-                    .catch((e) => notify(e.message));
-                }}
-                onChat={(id) => {
-                  void request<Profile>(
-                    '?action=profile&id=' + encodeURIComponent(id),
-                  )
-                    .then(openChat)
-                    .catch((e) => notify(e.message));
-                }}
-              />
-            )}
             {page !== 'premium' && (
               <span
                 className="page-loading-indicator"
@@ -2212,9 +2127,6 @@ export default function Noctgram({
             <StoriesBar me={me} readOnly={readOnly} active={page === 'feed'} />
           )}
           {page === 'feed' && composer}
-          {page === 'feed' && me && !readOnly && (
-            <ChannelTools profile={me} revision={scheduleVersion} />
-          )}
         </div>
         {page === 'search' && (
           <div className="stream-intro search-intro">
@@ -2573,13 +2485,13 @@ export default function Noctgram({
               />
             )}
             {profilePublisher &&
+              profile.kind === 'channel' &&
               !readOnly &&
               !channelRestricted &&
               profileTab === 'posts' && (
                 <ChannelTools
                   key={'publishing:' + profile.id}
                   profile={profile}
-                  revision={scheduleVersion}
                 />
               )}
             {profilePublisher &&
@@ -2694,9 +2606,7 @@ export default function Noctgram({
               )}
               <div className="feed-end">
                 <Moon size={13} />
-                {publicationLoading
-                  ? 'Загружаем публикации…'
-                  : 'Noctgram'}
+                {publicationLoading ? 'Загружаем публикации…' : 'Noctgram'}
               </div>
             </div>
           )}
@@ -3243,7 +3153,7 @@ export default function Noctgram({
                 {
                   signin: 'Войдите или создайте аккаунт.',
                   settings:
-                    'Профиль, оформление, приватность, музыка, уведомления и доступ.',
+                    'Профиль, оформление, приватность, музыка и доступ.',
                   premium: 'Оформление профиля и дополнительные функции.',
                   edit: 'Данные и оформление профиля.',
                   reportMessage:
