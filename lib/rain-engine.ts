@@ -8,8 +8,8 @@ type Drop = {
   depth: number;
 };
 
-// All surfaces share one clock. Geometry is read only after layout changes,
-// never inside the drawing loop. Opaque cards and padded safe areas protect UI.
+// All surfaces share one clock. Layout/scroll events coalesce into one geometry
+// refresh before painting; idle frames reuse cached padded safe areas.
 const safeSelector = [
   '[data-rain-safe]',
   'header',
@@ -119,13 +119,17 @@ class RainSurface {
   private height = 0;
   private drops: Drop[] = [];
   private safe: Rect[] = [];
+  private elements: HTMLElement[] = [];
+  private elementsDirty = true;
+  private geometryDirty = true;
   private measured = false;
   private disposed = false;
   private painted = false;
-  private last = 0;
-  private measureTimer: ReturnType<typeof setTimeout> | undefined;
+  private last: number | undefined;
+  private nextFrame = 0;
   private readonly host: HTMLElement;
   private readonly root: HTMLElement;
+  private readonly scrollRoot: HTMLElement | Document;
   private readonly context: CanvasRenderingContext2D;
   private readonly interval: number;
   private readonly limit: number;
@@ -134,7 +138,7 @@ class RainSurface {
   private readonly intersection: IntersectionObserver;
 
   get ready() {
-    return this.visible && this.measured;
+    return this.visible && (this.measured || this.geometryDirty);
   }
 
   constructor(
@@ -146,8 +150,9 @@ class RainSurface {
     this.context = context;
     this.host = scope === 'site' ? document.body : canvas.parentElement!;
     this.root = this.host;
+    this.scrollRoot = scope === 'site' ? document : this.root;
     const compact = matchMedia('(pointer: coarse)').matches;
-    this.interval = 1000 / (compact ? 20 : 30);
+    this.interval = 1000 / (compact ? 30 : 60);
     this.limit = scope === 'dock' ? 24 : compact ? 40 : 90;
     this.resize = new ResizeObserver(this.invalidate);
     this.resize.observe(canvas);
@@ -167,7 +172,7 @@ class RainSurface {
     });
     this.intersection.observe(canvas);
     window.addEventListener('resize', this.invalidate, { passive: true });
-    this.root.addEventListener('scroll', this.invalidate, {
+    this.scrollRoot.addEventListener('scroll', this.geometryChanged, {
       capture: true,
       passive: true,
     });
@@ -179,12 +184,16 @@ class RainSurface {
 
   invalidate = () => {
     if (this.disposed) return;
-    // Hide during scrolling/layout changes so stale holes cannot cross text.
-    this.measured = false;
-    this.clear();
-    if (this.measureTimer !== undefined) clearTimeout(this.measureTimer);
-    if (document.hidden || !this.visible || motion?.matches) return;
-    this.measureTimer = setTimeout(this.measure, 100);
+    this.elementsDirty = true;
+    this.geometryChanged();
+  };
+
+  private geometryChanged = () => {
+    if (this.disposed) return;
+    // Keep particles and the clock running while refreshing masks on the next
+    // paint. Scrolling must not erase the canvas or restart the animation.
+    this.geometryDirty = true;
+    wake();
   };
 
   private layoutTransitionEnded = (event: TransitionEvent) => {
@@ -198,9 +207,12 @@ class RainSurface {
 
   private measure = () => {
     if (this.disposed) return;
-    this.measureTimer = undefined;
+    this.geometryDirty = false;
     const box = this.canvas.getBoundingClientRect();
-    if (!box.width || !box.height || !this.visible || !allowed()) return;
+    if (!box.width || !box.height || !this.visible || !allowed()) {
+      this.measured = false;
+      return;
+    }
     const changed = this.width !== box.width || this.height !== box.height;
     this.width = box.width;
     this.height = box.height;
@@ -223,13 +235,17 @@ class RainSurface {
       0,
       0,
     );
+    if (this.elementsDirty) {
+      this.elements = [
+        ...this.root.querySelectorAll<HTMLElement>(safeSelector),
+      ].filter((element) => {
+        const parent = element.parentElement?.closest(safeSelector);
+        return !parent || parent === this.host || !this.host.contains(parent);
+      });
+      this.elementsDirty = false;
+    }
     this.safe = [];
-    for (const element of this.root.querySelectorAll<HTMLElement>(
-      safeSelector,
-    )) {
-      const parent = element.parentElement?.closest(safeSelector);
-      if (parent && parent !== this.host && this.host.contains(parent))
-        continue;
+    for (const element of this.elements) {
       const rect = element.getBoundingClientRect();
       if (
         !rect.width ||
@@ -260,21 +276,27 @@ class RainSurface {
         depth: index % 3,
       }));
     }
-    this.last = 0;
     this.measured = true;
-    wake();
   };
 
   clear() {
     if (this.painted) this.context.clearRect(0, 0, this.width, this.height);
     this.painted = false;
-    this.last = 0;
+    this.last = undefined;
+    this.nextFrame = 0;
   }
   draw(now: number) {
-    if (!this.measured || now - this.last < this.interval) return;
-    const seconds = this.last
-      ? Math.min((now - this.last) / 1000, 0.08)
-      : this.interval / 1000;
+    if (now + 0.5 < this.nextFrame) return;
+    if (this.geometryDirty) this.measure();
+    if (!this.measured) return;
+    // Preserve the cadence across fractional/jittered RAF timestamps instead
+    // of resetting the deadline to each frame and accidentally skipping one.
+    this.nextFrame =
+      (this.nextFrame && now - this.nextFrame < this.interval
+        ? this.nextFrame
+        : now) + this.interval;
+    const seconds =
+      this.last === undefined ? 0 : Math.min((now - this.last) / 1000, 0.08);
     this.last = now;
     const context = this.context;
     context.clearRect(0, 0, this.width, this.height);
@@ -308,12 +330,11 @@ class RainSurface {
   dispose() {
     this.disposed = true;
     unregister(this);
-    if (this.measureTimer !== undefined) clearTimeout(this.measureTimer);
     this.resize.disconnect();
     this.mutations.disconnect();
     this.intersection.disconnect();
     window.removeEventListener('resize', this.invalidate);
-    this.root.removeEventListener('scroll', this.invalidate, true);
+    this.scrollRoot.removeEventListener('scroll', this.geometryChanged, true);
     this.root.removeEventListener('transitionend', this.layoutTransitionEnded);
     document.fonts?.removeEventListener('loadingdone', this.invalidate);
     this.clear();

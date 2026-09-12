@@ -53,7 +53,9 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
     observers = [],
     disposals = [];
   let sequence = 0,
-    geometryReads = 0;
+    geometryReads = 0,
+    queries = 0;
+  t.mock.method(Math, 'random', () => 0.5);
   class Observer {
     disconnected = false;
     constructor(callback) {
@@ -75,22 +77,26 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
   });
   const body = new Events();
   body.contains = () => true;
-  body.querySelectorAll = () => [
-    {
-      parentElement: null,
-      getBoundingClientRect() {
-        geometryReads++;
-        return {
-          left: 100,
-          top: 80,
-          right: 300,
-          bottom: 140,
-          width: 200,
-          height: 60,
-        };
+  const safeBox = {
+    left: 100,
+    top: 80,
+    right: 300,
+    bottom: 140,
+    width: 200,
+    height: 60,
+  };
+  body.querySelectorAll = () => {
+    queries++;
+    return [
+      {
+        parentElement: null,
+        getBoundingClientRect() {
+          geometryReads++;
+          return safeBox;
+        },
       },
-    },
-  ];
+    ];
+  };
   const document = Object.assign(new Events(), {
     body,
     hidden: false,
@@ -204,6 +210,8 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
     document,
     motion,
     storage,
+    safeBox,
+    queries: () => queries,
     reads: () => geometryReads,
   };
 }
@@ -235,17 +243,19 @@ await test('rain modes select only their surfaces and malformed settings stay bo
     );
 });
 
-await test('desktop clock is shared, capped, protects content, and never reads layout per frame', (t) => {
+await test('desktop clock paints at 60 FPS, is shared, protects content, and caches idle layout', (t) => {
   const f = fixture(t),
     site = f.layer(),
     dock = f.layer('dock', 320, 800);
   f.flush();
+  f.step(0);
+  site.operations.length = dock.operations.length = 0;
   const reads = f.reads();
   assert.equal(f.frames.size, 1);
   for (let i = 1; i <= 60; i++) f.step((i * 1000) / 60);
   assert.equal(f.reads(), reads);
-  assert.ok(site.strokes() > 30 && site.strokes() <= 90);
-  assert.ok(dock.strokes() > 0 && dock.strokes() <= 90);
+  assert.equal(site.strokes(), 180);
+  assert.equal(dock.strokes(), 180);
   assert.ok(
     site.operations.some(
       (operation) =>
@@ -255,7 +265,7 @@ await test('desktop clock is shared, capped, protects content, and never reads l
     'Text/button rectangle stays clear, with padding',
   );
   assert.ok(
-    site.operations.filter(([name]) => name === 'lineTo').length <= 90 * 30,
+    site.operations.filter(([name]) => name === 'lineTo').length <= 90 * 60,
   );
   assert.equal(f.frames.size, 1);
 });
@@ -298,7 +308,7 @@ await test('hidden tabs, reduced motion, and closed surfaces stop drawing and re
   assert.equal(layer.canvas.width * layer.canvas.height, 0);
 });
 
-await test('full player pauses background rain and scrolling waits for fresh safe geometry', (t) => {
+await test('full player pauses background rain until it closes', (t) => {
   const f = fixture(t),
     site = f.layer();
   f.flush();
@@ -312,25 +322,114 @@ await test('full player pauses background rain and scrolling waits for fresh saf
   full.dispose();
   f.step(600);
   assert.ok(site.strokes() > before);
-  f.document.body.emit('scroll');
-  const stopped = site.strokes();
-  f.step(700);
-  assert.equal(site.strokes(), stopped);
-  assert.equal(f.frames.size, 0);
-  f.flush();
-  f.step(800);
-  assert.ok(site.strokes() > stopped);
+});
+
+await test('continuous document/nested scrolling updates masks without blanking or restarting rain', (t) => {
+  const f = fixture(t),
+    site = f.layer(),
+    dock = f.layer('dock', 320, 800);
+  // Offscreen elements must remain in the cache so scrolling them into view is safe.
+  f.safeBox.top = 1000;
+  f.safeBox.bottom = 1060;
+  f.step(0);
+  const queries = f.queries();
+  const firstY = site.operations.find(([name]) => name === 'moveTo')[2];
+  for (let i = 1; i <= 60; i++) {
+    site.operations.length = dock.operations.length = 0;
+    f.safeBox.top = 200 - i;
+    f.safeBox.bottom = f.safeBox.top + 60;
+    const reads = f.reads();
+    for (let event = 0; event < 4; event++) {
+      f.document.emit('scroll');
+      dock.host.emit('scroll');
+    }
+    assert.equal(
+      site.operations.length + dock.operations.length,
+      0,
+      'Scroll never erases the painted frame',
+    );
+    assert.equal(
+      f.reads(),
+      reads,
+      'Events coalesce without synchronous layout reads',
+    );
+    f.step((i * 1000) / 60);
+    assert.equal(site.strokes(), 3);
+    assert.equal(dock.strokes(), 3);
+    assert.equal(f.frames.size, 1);
+    assert.equal(
+      f.reads() - reads,
+      4,
+      'One mask refresh per surface per paint',
+    );
+    assert.equal(f.queries(), queries, 'Scrolling reuses the element list');
+    assert.ok(
+      site.operations.some(
+        (operation) =>
+          JSON.stringify(operation) ===
+          JSON.stringify(['clearRect', 92, f.safeBox.top - 7, 216, 74]),
+      ),
+    );
+    const y = site.operations.find(([name]) => name === 'moveTo')[2];
+    assert.ok(
+      Math.abs(y - firstY - (245 * i) / 60) < 0.001,
+      'Particles keep moving at the same speed',
+    );
+  }
+  // New feed content refreshes masks on the next frame, without an erase/restart.
+  site.operations.length = 0;
+  f.observers[1].callback();
+  assert.equal(site.operations.length, 0);
+  f.step(1017);
+  assert.equal(site.strokes(), 3);
+  assert.ok(f.queries() > queries);
+});
+
+await test('fractional RAF timing stays smooth on 60 Hz and caps high-refresh displays', (t) => {
+  const f = fixture(t),
+    layer = f.layer('site', 1440, 1600);
+  f.step(0);
+  let previousY = layer.operations.find(([name]) => name === 'moveTo')[2];
+  let previousTime = 0;
+  for (let i = 1; i <= 120; i++) {
+    layer.operations.length = 0;
+    const now = (i * 1000) / 60 + (i % 2 ? -0.2 : 0.2);
+    f.step(now);
+    assert.equal(
+      layer.strokes(),
+      3,
+      'Small RAF jitter must not skip alternate frames',
+    );
+    const y = layer.operations.find(([name]) => name === 'moveTo')[2];
+    assert.ok(
+      Math.abs(y - previousY - (245 * (now - previousTime)) / 1000) < 0.001,
+    );
+    previousY = y;
+    previousTime = now;
+  }
+  let paints = 0;
+  for (let i = 1; i <= 144; i++) {
+    layer.operations.length = 0;
+    f.step(previousTime + (i * 1000) / 144);
+    if (layer.strokes()) paints++;
+  }
+  assert.ok(
+    paints >= 59 && paints <= 61,
+    `144 Hz display produced ${paints} paints`,
+  );
 });
 
 await test('mobile density and frame rate are lower and 4K bitmap memory stays bounded', (t) => {
   const f = fixture(t, { coarse: true }),
     layer = f.layer('site', 3840, 2160);
   f.flush();
+  f.step(0);
+  layer.operations.length = 0;
   assert.ok(layer.canvas.width * layer.canvas.height <= 1_202_500);
   for (let i = 1; i <= 60; i++) f.step((i * 1000) / 60);
-  assert.ok(layer.strokes() > 0 && layer.strokes() <= 60);
+  assert.equal(layer.strokes(), 90);
   assert.ok(
-    layer.operations.filter(([name]) => name === 'lineTo').length <= 40 * 20,
+    layer.operations.filter(([name]) => name === 'lineTo').length <= 40 * 30,
   );
 });
 
