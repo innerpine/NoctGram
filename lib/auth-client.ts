@@ -1,6 +1,7 @@
 export type AuthStatus = {
   emailEnabled: boolean;
   sitesEnabled: boolean;
+  signupPremiumDays?: number;
   user: {
     id: string;
     name: string;
@@ -8,6 +9,7 @@ export type AuthStatus = {
     avatar: string;
     onboardingComplete: boolean;
     email: string | null;
+    welcomePremiumExpiresAt?: number | null;
   } | null;
   challenge: {
     email: string;

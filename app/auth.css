@@ -109,6 +109,27 @@
   font-size: 14px;
   line-height: 1.6;
 }
+.auth-premium-gift {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #b8a8ed30;
+  border-radius: 12px;
+  background: #b8a8ed08;
+  color: #a9a5b7;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.auth-premium-gift > :first-child {
+  flex-shrink: 0;
+}
+.auth-premium-gift strong {
+  display: block;
+  color: #e3ddf5;
+  font-size: 14px;
+  font-weight: 500;
+}
 .auth-divider {
   display: flex;
   align-items: center;

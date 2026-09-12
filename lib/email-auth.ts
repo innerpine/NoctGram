@@ -34,6 +34,9 @@ type Challenge = {
   created: number;
   expiresAt: number;
 };
+function signupPremiumDays() {
+  return setting('NOCT_SIGNUP_PREMIUM') === '1' ? 3 : 0;
+}
 export class RateError extends ApiError {
   constructor(public retryAfter: number) {
     super(
@@ -118,15 +121,16 @@ export async function authStatus(req: Request) {
   const person = me
     ? await db()
         .prepare(
-          'SELECT u.id,u.name,u.avatar,u.onboardingComplete,h.handle FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE u.id=?',
+          "SELECT u.id,u.name,u.avatar,u.onboardingComplete,h.handle,pe.expiresAt AS welcomePremiumExpiresAt FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 LEFT JOIN premium_entitlements pe ON pe.userId=u.id AND pe.source='welcome' AND pe.revokedAt=0 AND pe.startsAt<=? AND pe.expiresAt>? WHERE u.id=?",
         )
-        .bind(me)
+        .bind(Date.now(), Date.now(), me)
         .first<{
           id: string;
           name: string;
           avatar: string;
           onboardingComplete: number;
           handle: string;
+          welcomePremiumExpiresAt: number | null;
         }>()
     : null;
   const linked = me
@@ -139,6 +143,7 @@ export async function authStatus(req: Request) {
   return {
     emailEnabled: !!emailConfig(),
     sitesEnabled: sitesAuthEnabled(),
+    signupPremiumDays: emailConfig() ? signupPremiumDays() : 0,
     user: person
       ? {
           id: person.id,
@@ -147,6 +152,7 @@ export async function authStatus(req: Request) {
           avatar: person.avatar,
           onboardingComplete: !!person.onboardingComplete,
           email: linked?.email || null,
+          welcomePremiumExpiresAt: person.welcomePremiumExpiresAt || null,
         }
       : null,
     challenge:
@@ -249,14 +255,17 @@ async function bindEmail(
     return existingUser;
   }
   const id = 'email_' + crypto.randomUUID(),
-    handle = 'user_' + crypto.randomUUID().replaceAll('-', '').slice(0, 16);
+    handle = 'user_' + crypto.randomUUID().replaceAll('-', '').slice(0, 16),
+    now = Date.now(),
+    startsAt = Math.floor(now / 1000) * 1000,
+    bonusDays = signupPremiumDays();
   // Conditional inserts in one transaction prevent duplicate accounts on concurrent verification.
   await d.batch([
     d
       .prepare(
         "INSERT INTO users(id,name,created,onboardingComplete) SELECT ?,'Новый пользователь',?,0 WHERE NOT EXISTS(SELECT 1 FROM auth_identities WHERE subject=?)",
       )
-      .bind(id, Date.now(), subject),
+      .bind(id, now, subject),
     d
       .prepare(
         'INSERT INTO handles(handle,userId,main) SELECT ?,?,1 WHERE EXISTS(SELECT 1 FROM users WHERE id=?)',
@@ -266,7 +275,18 @@ async function bindEmail(
       .prepare(
         'INSERT INTO auth_identities(subject,userId,email,created) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM users WHERE id=?)',
       )
-      .bind(subject, id, email, Date.now(), id),
+      .bind(subject, id, email, now, id),
+    // This runs in the account-creation transaction, for its newly generated ID
+    // only. Existing accounts, linking and concurrent verification cannot renew it.
+    ...(bonusDays
+      ? [
+          d
+            .prepare(
+              "INSERT INTO premium_entitlements(userId,startsAt,expiresAt,source,created) SELECT id,?,?,'welcome',? FROM users WHERE id=? AND created=? AND kind='person' AND deletedAt=0 ON CONFLICT(userId) DO NOTHING",
+            )
+            .bind(startsAt, startsAt + bonusDays * 86400000, now, id, now),
+        ]
+      : []),
   ]);
   const result = await d
     .prepare('SELECT userId FROM auth_identities WHERE subject=?')

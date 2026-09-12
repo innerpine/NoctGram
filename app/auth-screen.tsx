@@ -16,6 +16,7 @@ import {
   InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { NoctLogo } from './stars-icon';
+import { PremiumIcon } from './premium-icon';
 import {
   authRequest,
   AuthRequestError,
@@ -260,6 +261,15 @@ export function EmailLogin() {
               аватарку.
             </p>
           )}
+          {!link && !!status.signupPremiumDays && (
+            <div className="auth-premium-gift">
+              <PremiumIcon size={23} />
+              <span>
+                <strong>3 дня Noct Premium в подарок</strong>Новым пользователям
+                после регистрации.
+              </span>
+            </div>
+          )}
           {!link && (
             <a href="/recover" className="auth-text-button">
               Нет доступа к почте?
@@ -379,6 +389,7 @@ export function EmailLogin() {
 
 export function WelcomeProfile() {
   const [ready, setReady] = useState(false),
+    [premiumExpiresAt, setPremiumExpiresAt] = useState<number | null>(null),
     [name, setName] = useState(''),
     [handle, setHandle] = useState(''),
     [avatar, setAvatar] = useState(''),
@@ -394,6 +405,7 @@ export function WelcomeProfile() {
         if (!live) return;
         if (!r.user) return window.location.replace('/login');
         if (r.user.onboardingComplete) return window.location.replace('/');
+        setPremiumExpiresAt(r.user.welcomePremiumExpiresAt || null);
         setReady(true);
       })
       .catch((e) => {
@@ -456,6 +468,22 @@ export function WelcomeProfile() {
             <Check size={14} /> Почта подтверждена
           </div>
           <h1>Как вас представить?</h1>
+          {!!premiumExpiresAt && (
+            <div className="auth-premium-gift">
+              <PremiumIcon size={23} />
+              <span>
+                <strong>Noct Premium уже активен</strong>Подарок за регистрацию
+                — до{' '}
+                {new Date(premiumExpiresAt).toLocaleString('ru-RU', {
+                  day: 'numeric',
+                  month: 'long',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+                .
+              </span>
+            </div>
+          )}
           <p className="auth-description">
             Добавьте немного себя. Всё это можно изменить в профиле.
           </p>
