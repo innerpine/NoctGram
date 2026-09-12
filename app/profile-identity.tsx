@@ -13,6 +13,7 @@ import { Switch } from '@base-ui/react/switch';
 import type { Appearance } from '@/lib/appearance';
 import { themeFor, chromeTempo, hasProfileDesign } from '@/lib/appearance';
 import { NoctLogo } from './stars-icon';
+import { GratitudeBadge } from './gratitude-badge';
 
 type Identity = Appearance & { name: string; avatar?: string };
 const motionEvent = 'noct:avatar-motion';
@@ -126,6 +127,7 @@ export function DisplayName({ person }: { person: Identity }) {
       >
         {person.name}
       </span>
+      {person.gratitude ? <GratitudeBadge /> : null}
       <PremiumBadge person={person} />
     </span>
   );

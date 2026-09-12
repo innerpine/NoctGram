@@ -384,7 +384,13 @@ for (const actor of ['ordinary', 'moderator'])
         ),
         (e) => e.status === 403,
       );
-      for (const kind of ['stars', 'premium', 'verified', 'moderator']) {
+      for (const kind of [
+        'stars',
+        'premium',
+        'verified',
+        'gratitude',
+        'moderator',
+      ]) {
         assert.equal(
           (await f.post(f.body({ kind, amount: 1 }), actor)).status,
           403,
@@ -393,7 +399,7 @@ for (const actor of ['ordinary', 'moderator'])
       assert.equal(f.count('admin_events'), 0);
     },
   );
-for (const kind of ['stars', 'premium', 'moderator'])
+for (const kind of ['stars', 'premium', 'gratitude', 'moderator'])
   scenario(`channel cannot receive ${kind}`, async (f) => {
     assert.equal(
       (await f.post(f.body({ target: 'channel_a', kind, amount: 1 }))).status,
@@ -418,6 +424,8 @@ scenario(
       { kind: 'premium', amount: 0 },
       { kind: 'premium', amount: 366 },
       { kind: 'verified', amount: 2 },
+      { kind: 'gratitude', amount: 2 },
+      { kind: 'gratitude', amount: -1 },
       { kind: 'moderator', amount: -1 },
       { requestId: 'not-a-request-id' },
       { kind: 'administrator' },
@@ -635,6 +643,85 @@ scenario(
     assert.equal(f.count('admin_events'), 4);
   },
 );
+scenario(
+  'gratitude grant, replay and removal are audited without granting privileges',
+  async (f) => {
+    const input = f.body({ kind: 'gratitude', amount: 1 });
+    assert.equal(
+      f.sql.prepare('SELECT COUNT(*) AS n FROM users WHERE gratitude<>0').get()
+        .n,
+      0,
+    );
+    assert.equal((await f.post(input)).status, 200);
+    assert.equal((await f.post(input)).body.replayed, true);
+    const identity = f.sql
+      .prepare(
+        `SELECT ${f.premium.appearanceColumns('u')} FROM users u WHERE u.id='user_a'`,
+      )
+      .get();
+    assert.equal(identity.gratitude, 1);
+    assert.equal(f.premium.appearanceFrom(identity).gratitude, 1);
+    assert.equal(identity.verified, 0);
+    assert.equal(identity.premium, 0);
+    assert.equal(await f.admin.isAdministrator('user_a'), false);
+    assert.equal(await f.access.isModerator('user_a'), false);
+    assert.equal(f.count('star_transfers'), 0);
+    assert.equal(f.count('admin_events'), 1);
+    const result = await f.admin.administrationGet(
+      'administration',
+      new URLSearchParams({ q: 'h_user_a' }),
+      OWNER,
+    );
+    const data = await result.json();
+    assert.equal(data.people.find((p) => p.id === 'user_a').gratitude, 1);
+    assert.equal(data.events[0].action, 'gratitude');
+    // An independent official verification survives removal of the gratitude sign.
+    f.sql.prepare("UPDATE users SET verified=1 WHERE id='user_a'").run();
+    assert.equal(
+      (await f.post(f.body({ kind: 'gratitude', amount: 0 }))).status,
+      200,
+    );
+    const removed = f.sql
+      .prepare("SELECT gratitude,verified FROM users WHERE id='user_a'")
+      .get();
+    assert.equal(removed.gratitude, 0);
+    assert.equal(removed.verified, 1);
+    assert.equal(f.count('admin_events'), 2);
+  },
+);
+scenario(
+  'gratitude is not granted if administrator rights change before commit',
+  async (f) => {
+    f.hooks.beforeBatch = () =>
+      f.sql.prepare('DELETE FROM administrators WHERE userId=?').run(OWNER);
+    assert.equal(
+      (await f.post(f.body({ kind: 'gratitude', amount: 1 }))).status,
+      409,
+    );
+    assert.equal(
+      f.sql.prepare("SELECT gratitude FROM users WHERE id='user_a'").get()
+        .gratitude,
+      0,
+    );
+    assert.equal(f.count('admin_events'), 0);
+  },
+);
+scenario('gratitude and its audit event roll back together', async (f) => {
+  f.hooks.beforeStatement = (text) => {
+    if (text.includes('INSERT INTO admin_events'))
+      throw new Error('Audit write failed');
+  };
+  await assert.rejects(
+    f.post(f.body({ kind: 'gratitude', amount: 1 })),
+    /Audit write failed/,
+  );
+  assert.equal(
+    f.sql.prepare("SELECT gratitude FROM users WHERE id='user_a'").get()
+      .gratitude,
+    0,
+  );
+  assert.equal(f.count('admin_events'), 0);
+});
 scenario(
   'moderator grant/revoke changes real role gates but never creates administrators',
   async (f) => {

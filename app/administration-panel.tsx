@@ -9,6 +9,7 @@ import {
   Star,
   Sparkles,
   BadgeCheck,
+  Gem,
   History,
   Check,
   ArrowUpRight,
@@ -17,6 +18,7 @@ import {
 import { request, type Person } from '@/lib/client';
 import { Avatar, DisplayName } from './profile-identity';
 import { StaffSelect } from './staff-select';
+import { GratitudeBadge, GratitudeProfile } from './gratitude-badge';
 type AdminPerson = Person & {
   administrator: number;
   moderator: number;
@@ -34,6 +36,7 @@ const actions = [
   { value: 'stars', label: 'Выдать Stars', icon: Star },
   { value: 'premium', label: 'Выдать Premium', icon: Sparkles },
   { value: 'verified', label: 'Верификация', icon: BadgeCheck },
+  { value: 'gratitude', label: 'Знак благодарности', icon: Gem },
   { value: 'moderator', label: 'Роль модератора', icon: ShieldCheck },
 ];
 function roleLabel(person: AdminPerson) {
@@ -124,10 +127,15 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
           { value: '1', label: 'Подтвердить аккаунт' },
           { value: '0', label: 'Снять верификацию' },
         ]
-      : [
-          { value: '1', label: 'Назначить модератором' },
-          { value: '0', label: 'Снять роль модератора' },
-        ];
+      : kind === 'gratitude'
+        ? [
+            { value: '1', label: 'Выдать знак' },
+            { value: '0', label: 'Снять знак' },
+          ]
+        : [
+            { value: '1', label: 'Назначить модератором' },
+            { value: '0', label: 'Снять роль модератора' },
+          ];
   const ActionIcon = actions.find((a) => a.value === kind)?.icon || ShieldCheck;
   const submitLabel =
     kind === 'stars'
@@ -143,7 +151,7 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
         </span>
         <div>
           <h3>Администрирование</h3>
-          <p>Stars, Premium и полномочия пользователей</p>
+          <p>Stars, Premium, знаки и полномочия пользователей</p>
         </div>
         <button
           className="icon-button"
@@ -281,6 +289,19 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
                 />
               )}
             </div>
+            {kind === 'gratitude' && (
+              <div className="admin-gratitude-preview">
+                <div className="admin-gratitude-caption">
+                  <span>Предпросмотр знака</span>
+                  <span>{selected.gratitude ? 'Выдан' : 'Не выдан'}</span>
+                </div>
+                <div className="admin-gratitude-name">
+                  <span>{selected.name}</span>
+                  <GratitudeBadge />
+                </div>
+                <GratitudeProfile person={{ gratitude: true }} />
+              </div>
+            )}
             <label className="account-field">
               <span className="staff-field-caption">
                 Причина <small>{reason.length}/500</small>
@@ -296,7 +317,9 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
                     ? 'Например, награда за помощь в тестировании'
                     : kind === 'verified'
                       ? 'Например, подтверждён официальный аккаунт автора'
-                      : 'Например, назначение в команду модерации'
+                      : kind === 'gratitude'
+                        ? 'За что благодарим или почему снимаем знак'
+                        : 'Например, назначение в команду модерации'
                 }
               />
             </label>
@@ -313,7 +336,9 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
                       ? `Premium для @${selected.handle} будет продлён на ${amount} дн.`
                       : kind === 'verified'
                         ? `${amount === '1' ? 'Подтвердить' : 'Снять подтверждение'} @${selected.handle}.`
-                        : `${amount === '1' ? 'Назначить модератором' : 'Снять роль модератора у'} @${selected.handle}.`}
+                        : kind === 'gratitude'
+                          ? `${amount === '1' ? 'Выдать знак «С благодарностью» пользователю' : 'Снять знак «С благодарностью» у'} @${selected.handle}.`
+                          : `${amount === '1' ? 'Назначить модератором' : 'Снять роль модератора у'} @${selected.handle}.`}
                 </p>
               </div>
             </div>

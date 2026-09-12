@@ -64,6 +64,7 @@ const { outputFiles } = await build({
           ({ path, kind, importer }) =>
             kind === 'entry-point' ||
             path === 'react/jsx-runtime' ||
+            path === './gratitude-badge' ||
             !importer
               .replaceAll('\\', '/')
               .endsWith('/app/chat-peer-profile.tsx')

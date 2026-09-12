@@ -213,7 +213,7 @@ export async function deleteAccount(
       .bind(me, me, ...args),
     d
       .prepare(
-        `UPDATE users SET name='Удалённый аккаунт',bio='',avatar='',cover='',verified=0,lastSeen=0,onboardingComplete=0,deletedAt=?,sessionsRevokedAt=? WHERE (id=? OR ownerId=?) AND ${gate}`,
+        `UPDATE users SET name='Удалённый аккаунт',bio='',avatar='',cover='',verified=0,gratitude=0,lastSeen=0,onboardingComplete=0,deletedAt=?,sessionsRevokedAt=? WHERE (id=? OR ownerId=?) AND ${gate}`,
       )
       .bind(now, now, me, me, ...args),
   );

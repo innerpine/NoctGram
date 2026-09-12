@@ -29,6 +29,7 @@ export const users = sqliteTable('users', {
   onboardingComplete: integer().notNull().default(1),
   kind: text().notNull().default('person'),
   verified: integer().notNull().default(0),
+  gratitude: integer().notNull().default(0),
   deletedAt: integer().notNull().default(0),
   sessionsRevokedAt: integer().notNull().default(0),
   ownerId: text().references((): AnySQLiteColumn => users.id),

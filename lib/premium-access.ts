@@ -16,11 +16,12 @@ export function appearanceColumns(alias: string) {
   const level = channelLevel(alias);
   const field = (column: string, fallback: string, required = 1) =>
     `COALESCE((SELECT pa.${column} FROM profile_appearance pa WHERE pa.userId=${alias}.id AND (${active} OR (${alias}.kind='channel' AND ${level}>=${required}))),${fallback})`;
-  return `${alias}.verified AS verified,${active} AS premium,${level} AS boostLevel,${field('theme', "'iris'")} AS profileTheme,${field('nameGradient', '0', 2)} AS nameGradient,${field('ringText', "''", 4)} AS ringText,${field('chromeFlow', '0', 3)} AS chromeFlow,${field('chromeTempo', '11', 3)} AS chromeTempo,${field('avatarMotion', "''", 5)} AS avatarMotion,${field('avatarMotionType', "''", 5)} AS avatarMotionType`;
+  return `${alias}.verified AS verified,${alias}.gratitude AS gratitude,${active} AS premium,${level} AS boostLevel,${field('theme', "'iris'")} AS profileTheme,${field('nameGradient', '0', 2)} AS nameGradient,${field('ringText', "''", 4)} AS ringText,${field('chromeFlow', '0', 3)} AS chromeFlow,${field('chromeTempo', '11', 3)} AS chromeTempo,${field('avatarMotion', "''", 5)} AS avatarMotion,${field('avatarMotionType', "''", 5)} AS avatarMotionType`;
 }
 export function appearanceFrom(row: Record<string, unknown>) {
   return {
     verified: row.verified,
+    gratitude: row.gratitude,
     premium: row.premium,
     boostLevel: row.boostLevel,
     profileTheme: row.profileTheme,

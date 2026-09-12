@@ -58,7 +58,9 @@ export async function administrationPost(
   const requestId = clean(b.requestId, 36, true);
   if (!/^[a-f0-9-]{36}$/.test(requestId))
     throw new ApiError(400, 'Обновите форму и повторите.');
-  if (!['stars', 'premium', 'verified', 'moderator'].includes(kind))
+  if (
+    !['stars', 'premium', 'verified', 'gratitude', 'moderator'].includes(kind)
+  )
     throw new ApiError(400, 'Неизвестное действие.');
   const amount = Number(b.amount);
   if (
@@ -84,6 +86,8 @@ export async function administrationPost(
     .bind(target)
     .first<{ kind: string }>();
   if (!user) throw new ApiError(404, 'Аккаунт не найден.');
+  if (kind === 'gratitude' && user.kind !== 'person')
+    throw new ApiError(400, 'Знак благодарности выдаётся личному аккаунту.');
   if (['stars', 'premium'].includes(kind) && user.kind !== 'person')
     throw new ApiError(
       400,
@@ -141,6 +145,10 @@ export async function administrationPost(
   else if (kind === 'verified')
     grant = d
       .prepare(`UPDATE users SET verified=? WHERE id=? AND ${gate}`)
+      .bind(amount, target, id, me, target);
+  else if (kind === 'gratitude')
+    grant = d
+      .prepare(`UPDATE users SET gratitude=? WHERE id=? AND ${gate}`)
       .bind(amount, target, id, me, target);
   else if (amount)
     grant = d

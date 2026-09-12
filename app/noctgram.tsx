@@ -16,6 +16,7 @@ import { AccountPanel } from './account-panel';
 import { AccountSwitcher } from './account-switcher';
 import { SettingsPanel, type SettingsSection } from './settings-panel';
 import { VerifiedProfile } from './profile-identity';
+import { GratitudeProfile } from './gratitude-badge';
 import { ChannelBoosts } from './channel-boosts';
 /* Auth routes require top-level links; private R2 images must keep session cookies.
    Async subscription effects intentionally set loading state; no React compiler is enabled. */
@@ -1450,6 +1451,7 @@ export default function Noctgram({
     setProfile((current) => (current?.id === updated.id ? updated : current));
     const appearance = {
       verified: updated.verified,
+      gratitude: updated.gratitude,
       premium: updated.premium,
       boostLevel: updated.boostLevel,
       profileTheme: updated.profileTheme,
@@ -2463,6 +2465,7 @@ export default function Noctgram({
                     onProfile={(id) => void openProfile(id)}
                   />
                 )}
+                <GratitudeProfile person={profile} />
                 <VerifiedProfile person={profile} />
               </div>
             </ProfileSurface>
