@@ -38,7 +38,7 @@ import {
 } from '@/lib/chat-library';
 import { giftDefinition, type ReceivedGift } from '@/lib/gift-catalog';
 import { Avatar, DisplayName, appearanceStyle } from './profile-identity';
-import { GratitudeProfile } from './gratitude-badge';
+import { ProfileRecognitions } from './profile-recognitions';
 import { GiftAnimation } from './gift-animation';
 import { ChatEmojiText } from './chat-emoji-text';
 import { ProfileLink } from './profile-link';
@@ -548,7 +548,7 @@ function PeerProfileBody({
                     информацию…
                   </output>
                 )}
-                <GratitudeProfile person={identity} />
+                <ProfileRecognitions person={identity} compact />
                 {feedback('profile')}
               </div>
               <div className="peer-chat-stats">

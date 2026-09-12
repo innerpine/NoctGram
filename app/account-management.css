@@ -12,22 +12,38 @@
   mask: url('/assets/noct-verified.png') center/contain no-repeat;
   mask-mode: luminance;
 }
+.profile-recognitions {
+  border-top: 1px solid #ffffff10;
+  margin: 18px -20px -20px;
+  background: #ffffff02;
+  border-radius: 0 0 19px 19px;
+  overflow: hidden;
+}
 .profile-verification {
   display: flex;
   align-items: center;
   gap: 10px;
-  border-top: 1px solid #ffffff10;
-  margin: 18px -20px -20px;
   padding: 13px 20px;
-  background: #ffffff02;
   font-size: 12px;
   line-height: 1.5;
   color: #c9c9ce;
-  border-radius: 0 0 19px 19px;
+  text-align: left;
 }
-.profile-verification .noct-verified-badge {
+.profile-verification + .profile-verification {
+  border-top: 1px solid #ffffff10;
+}
+.profile-verification .noct-verified-badge,
+.profile-verification .noct-gratitude-badge {
   width: 23px;
   height: 23px;
+}
+.profile-recognitions-compact {
+  margin: 18px 0 0;
+  border-radius: 0;
+}
+.profile-recognitions-compact .profile-verification {
+  padding-left: 0;
+  padding-right: 0;
 }
 .account-panel,
 .administration-panel {
@@ -316,9 +332,11 @@
   }
 }
 @media (max-width: 500px) {
-  .profile-verification {
+  .profile-recognitions:not(.profile-recognitions-compact) {
     margin-left: -18px;
     margin-right: -18px;
+  }
+  .profile-verification {
     padding-left: 18px;
     padding-right: 18px;
     font-size: 11px;

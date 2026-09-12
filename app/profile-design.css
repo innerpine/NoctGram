@@ -22,35 +22,6 @@
   vertical-align: middle;
   object-fit: contain;
 }
-.profile-gratitude {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 18px;
-  padding: 14px 16px;
-  border: 1px solid #85e8cf30;
-  border-radius: 14px;
-  background: linear-gradient(115deg, #85e8cf0d, #85e8cf02);
-  color: var(--text, #ededf0);
-  text-align: left;
-}
-.profile-gratitude .noct-gratitude-badge {
-  width: 28px;
-  height: 28px;
-}
-.profile-gratitude strong {
-  display: block;
-  color: #a6efda;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-.profile-gratitude p {
-  margin: 4px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--muted, #a2a2ac);
-}
 .admin-gratitude-preview {
   padding: 16px;
   border: 1px solid #ffffff12;

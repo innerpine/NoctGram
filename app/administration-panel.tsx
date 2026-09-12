@@ -18,7 +18,8 @@ import {
 import { request, type Person } from '@/lib/client';
 import { Avatar, DisplayName } from './profile-identity';
 import { StaffSelect } from './staff-select';
-import { GratitudeBadge, GratitudeProfile } from './gratitude-badge';
+import { GratitudeBadge } from './gratitude-badge';
+import { ProfileRecognitions } from './profile-recognitions';
 type AdminPerson = Person & {
   administrator: number;
   moderator: number;
@@ -299,7 +300,10 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
                   <span>{selected.name}</span>
                   <GratitudeBadge />
                 </div>
-                <GratitudeProfile person={{ gratitude: true }} />
+                <ProfileRecognitions
+                  person={{ ...selected, gratitude: true }}
+                  compact
+                />
               </div>
             )}
             <label className="account-field">

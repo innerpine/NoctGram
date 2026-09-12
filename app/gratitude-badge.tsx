@@ -21,12 +21,9 @@ export function GratitudeBadge() {
 
 export function GratitudeProfile({ person }: { person: Appearance }) {
   return person.gratitude ? (
-    <div className="profile-gratitude">
+    <div className="profile-verification profile-gratitude">
       <GratitudeBadge />
-      <div>
-        <strong>{gratitudeLabel}</strong>
-        <p>{gratitudeDescription}</p>
-      </div>
+      <span>{gratitudeDescription}</span>
     </div>
   ) : null;
 }
