@@ -52,6 +52,7 @@ const storage = await import(
   compile('lib/upload-storage.ts', {
     './storage': storageModule,
     './api-error': errorModule,
+    './avatar-variants': compile('lib/avatar-variants.ts'),
   })
 );
 const bodies = await import(
@@ -156,6 +157,10 @@ function fixture() {
         return objects.has(id) ? { size: objects.get(id) } : null;
       },
       async delete(id) {
+        if (Array.isArray(id)) {
+          for (const objectKey of id) await this.delete(objectKey);
+          return;
+        }
         deleteCalls.push(id);
         await Promise.resolve();
         if (ctx.onDelete) await ctx.onDelete(id);
@@ -504,10 +509,15 @@ test('GC preserves every dormant content/profile/evidence reference and deletes 
         "INSERT INTO account_restrictions(userId,eventId,mode,reason,created) VALUES('alice','block','blocked','fixture',?)",
       )
       .run(now);
+    const previewKeys = [96, 192, 384].map(
+      (size) => `avatars/v1/orphan/${size}.webp`,
+    );
+    previewKeys.forEach((key) => ctx.objects.set(key, 100));
     const result = await storage.cleanUploads();
     assert.equal(result.removed, 1);
     assert.equal(ctx.has('orphan'), false);
     assert.equal(ctx.objects.has('orphan'), false);
+    previewKeys.forEach((key) => assert.equal(ctx.objects.has(key), false));
     for (const id of [...kept, 'recent']) {
       assert.equal(ctx.has(id), true, id);
       assert.equal(ctx.objects.has(id), true, id);

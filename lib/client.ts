@@ -193,11 +193,16 @@ export async function request<T>(query: string, body?: unknown): Promise<T> {
     );
   return data;
 }
-export async function upload(file: File): Promise<Media> {
+export async function upload(file: File, purpose?: 'avatar'): Promise<Media> {
   if (file.size > 25 * 1024 * 1024)
     throw new Error('Максимальный размер файла — 25 МБ');
   const data = new FormData();
   data.set('file', file);
+  if (purpose === 'avatar') {
+    const { prepareAvatar } = await import('./prepare-avatar');
+    for (const preview of await prepareAvatar(file))
+      data.set(`avatar${preview.size}`, preview.file);
+  }
   const r = await fetch('/api/upload', { method: 'POST', body: data });
   const body = await readApiJson<Media>(r, 'Не удалось загрузить файл');
   if (!r.ok && ['ACCOUNT_BLOCKED', 'READ_ONLY'].includes(body.code || ''))

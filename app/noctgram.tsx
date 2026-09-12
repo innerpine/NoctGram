@@ -7,16 +7,16 @@ import {
   CreateGroupDialog,
   SelectSecretPeerDialog,
 } from './chat-create-menu';
-import { RoomConversation } from './room-conversation';
+
 import { useRoomList, RoomThreadRow, PublicRoomSearch } from './room-list';
 import { roomAction, type RoomTarget } from '@/lib/rooms-client';
 import type { RoomDetail } from '@/lib/rooms-types';
 import { ensureKey } from '@/lib/secret-crypto';
-import { AccountPanel } from './account-panel';
+
 import { AccountSwitcher } from './account-switcher';
-import { SettingsPanel, type SettingsSection } from './settings-panel';
+import type { SettingsSection } from './settings-panel';
 import { ProfileRecognitions } from './profile-recognitions';
-import { ChannelBoosts } from './channel-boosts';
+
 /* Auth routes require top-level links; private R2 images must keep session cookies.
    Async subscription effects intentionally set loading state; no React compiler is enabled. */
 /* eslint-disable next/no-img-element, next/no-html-link-for-pages, react/react-compiler */
@@ -27,12 +27,10 @@ import { createChatSnapshots, type ChatSnapshot } from '@/lib/chat-snapshots';
 import { createPageTransition } from '@/lib/page-transition';
 import { createProfileCoverCache } from '@/lib/profile-cover-cache';
 import { flushSync } from 'react-dom';
-import { ChannelTools } from './channel-tools';
+
 import { useAudioCalls } from './audio-calls';
 import { Phone } from 'lucide-react';
-import { PrivacyPanel } from './privacy-panel';
-import { MusicPanel } from './music-panel';
-import { MusicServices } from './music-services';
+
 import { MusicAccountGuard } from './music-provider';
 import { MusicActivityStatus } from './music-activity';
 import { Settings } from 'lucide-react';
@@ -40,6 +38,7 @@ import { Music2 } from 'lucide-react';
 import { Ban } from 'lucide-react';
 import {
   type CSSProperties,
+  type ComponentProps,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -97,21 +96,20 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import { Avatar, Empty, PostCard, PostSkeleton } from './post-card';
-import { CommentsPanel } from './comments-panel';
+
 import { ContentDecisionForm } from './content-decision-form';
-import { ProfileDesign } from './profile-design';
+
 import { ProfileSurface } from './profile-surface';
 import { EditorPane } from './editor-pane';
 import { DisplayName, ProfileAvatar } from './profile-identity';
-import { PremiumPanel } from './premium-panel';
+
 import { PremiumIcon } from './premium-icon';
 import { NavBorderBeam } from './nav-border-beam';
 import { StarsIcon, NoctLogo } from './stars-icon';
-import { StarsPanel, SupportPanel } from './stars-panel';
+
 import { SendGiftButton, ProfileGifts } from './gifts';
 import { ChatThemeMenu } from './chat-theme-menu';
-import { ChatConversation } from './chat-conversation';
-import { ChatPeerProfile } from './chat-peer-profile';
+
 import {
   chatTheme,
   DEFAULT_CHAT_THEME,
@@ -120,15 +118,15 @@ import {
 import { ChatEmojiText } from './chat-emoji-text';
 import { MentionText } from './profile-link';
 import { PROFILE_NAVIGATE, type ProfileNavigation } from '@/lib/profile-links';
-import { ChannelsPanel } from './channels-panel';
+
 import { NoctMascot } from './noct-mascot';
-import { ConnectionsPanel } from './connections-panel';
+
 import {
   BlockedAccount,
   ReadOnlyNotice,
   SuspendedProfile,
 } from './account-states';
-import { ModerationPanel } from './moderation-panel';
+
 import { SignOutButton } from './sign-out-button';
 import {
   request,
@@ -140,6 +138,72 @@ import {
   type Post,
   type Message,
 } from '@/lib/client';
+
+import { deferredPanel } from './deferred-panel';
+const AccountPanel = deferredPanel<object>(() =>
+  import('./account-panel').then((m) => ({ default: m.AccountPanel })),
+);
+const SettingsPanel = deferredPanel<
+  ComponentProps<typeof import('./settings-panel').SettingsPanel>
+>(() => import('./settings-panel').then((m) => ({ default: m.SettingsPanel })));
+const ChannelBoosts = deferredPanel<
+  ComponentProps<typeof import('./channel-boosts').ChannelBoosts>
+>(() => import('./channel-boosts').then((m) => ({ default: m.ChannelBoosts })));
+const ChannelTools = deferredPanel<
+  ComponentProps<typeof import('./channel-tools').ChannelTools>
+>(() => import('./channel-tools').then((m) => ({ default: m.ChannelTools })));
+const PrivacyPanel = deferredPanel<
+  ComponentProps<typeof import('./privacy-panel').PrivacyPanel>
+>(() => import('./privacy-panel').then((m) => ({ default: m.PrivacyPanel })));
+const MusicPanel = deferredPanel<
+  ComponentProps<typeof import('./music-panel').MusicPanel>
+>(() => import('./music-panel').then((m) => ({ default: m.MusicPanel })));
+const MusicServices = deferredPanel<
+  ComponentProps<typeof import('./music-services').MusicServices>
+>(() => import('./music-services').then((m) => ({ default: m.MusicServices })));
+const CommentsPanel = deferredPanel<
+  ComponentProps<typeof import('./comments-panel').CommentsPanel>
+>(() => import('./comments-panel').then((m) => ({ default: m.CommentsPanel })));
+const ProfileDesign = deferredPanel<
+  ComponentProps<typeof import('./profile-design').ProfileDesign>
+>(() => import('./profile-design').then((m) => ({ default: m.ProfileDesign })));
+const PremiumPanel = deferredPanel<
+  ComponentProps<typeof import('./premium-panel').PremiumPanel>
+>(() => import('./premium-panel').then((m) => ({ default: m.PremiumPanel })));
+const StarsPanel = deferredPanel<
+  ComponentProps<typeof import('./stars-panel').StarsPanel>
+>(() => import('./stars-panel').then((m) => ({ default: m.StarsPanel })));
+const SupportPanel = deferredPanel<
+  ComponentProps<typeof import('./stars-panel').SupportPanel>
+>(() => import('./stars-panel').then((m) => ({ default: m.SupportPanel })));
+const ChatConversation = deferredPanel<
+  ComponentProps<typeof import('./chat-conversation').ChatConversation>
+>(() =>
+  import('./chat-conversation').then((m) => ({ default: m.ChatConversation })),
+);
+const ChatPeerProfile = deferredPanel<
+  ComponentProps<typeof import('./chat-peer-profile').ChatPeerProfile>
+>(() =>
+  import('./chat-peer-profile').then((m) => ({ default: m.ChatPeerProfile })),
+);
+const ChannelsPanel = deferredPanel<
+  ComponentProps<typeof import('./channels-panel').ChannelsPanel>
+>(() => import('./channels-panel').then((m) => ({ default: m.ChannelsPanel })));
+const ConnectionsPanel = deferredPanel<
+  ComponentProps<typeof import('./connections-panel').ConnectionsPanel>
+>(() =>
+  import('./connections-panel').then((m) => ({ default: m.ConnectionsPanel })),
+);
+const ModerationPanel = deferredPanel<
+  ComponentProps<typeof import('./moderation-panel').ModerationPanel>
+>(() =>
+  import('./moderation-panel').then((m) => ({ default: m.ModerationPanel })),
+);
+const RoomConversation = deferredPanel<
+  ComponentProps<typeof import('./room-conversation').RoomConversation>
+>(() =>
+  import('./room-conversation').then((m) => ({ default: m.RoomConversation })),
+);
 
 async function requestChatSnapshot(
   peer: string,
@@ -438,6 +502,7 @@ export default function Noctgram({
       setBusy(false);
     }
   };
+  const bootstrapFeed = useRef('');
   const bootstrap = useCallback(async () => {
     setLoading(true);
     setLoadError('');
@@ -445,6 +510,7 @@ export default function Noctgram({
       const r = await request<{ me: Profile; people: Person[]; posts: Post[] }>(
         '?action=bootstrap',
       );
+      bootstrapFeed.current = feedKey(r.me.id, 'feed', 'all', '');
       setMe(r.me);
       setProfile(r.me);
       setPeople(r.people);
@@ -639,6 +705,8 @@ export default function Noctgram({
     latestRefresh.current = refresh;
   }, [refresh]);
   useEffect(() => {
+    const preparedFeed = bootstrapFeed.current;
+    if (myId) bootstrapFeed.current = '';
     if (
       !myId ||
       accountBlocked ||
@@ -666,6 +734,10 @@ export default function Noctgram({
     }
     setLoadError('');
     if (page === 'profile' && profileTab === 'gifts') {
+      setLoading(false);
+      return;
+    }
+    if (preparedFeed === publicationKey) {
       setLoading(false);
       return;
     }
@@ -2506,9 +2578,16 @@ export default function Noctgram({
                 userId={profile.id}
                 own={profile.id === me.id}
                 ownerName={profile.name}
-                selfGift={profile.id === me.id ? (
-                  <SendGiftButton recipient={profile} senderId={me.id} disabled={readOnly || busy} showLabel />
-                ) : undefined}
+                selfGift={
+                  profile.id === me.id ? (
+                    <SendGiftButton
+                      recipient={profile}
+                      senderId={me.id}
+                      disabled={readOnly || busy}
+                      showLabel
+                    />
+                  ) : undefined
+                }
               />
             )}
             {profilePublisher &&
@@ -3340,7 +3419,7 @@ export default function Noctgram({
                             const f = e.target.files?.[0];
                             if (!f) return;
                             setUploading(true);
-                            void upload(f)
+                            void upload(f, 'avatar')
                               .then((m) => setEditAvatar(m.url!))
                               .catch((e) => notify(e.message))
                               .finally(() => setUploading(false));

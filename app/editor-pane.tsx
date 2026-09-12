@@ -2,7 +2,7 @@
 /* eslint-disable react/react-compiler */
 import { useEffect, useState, type ReactNode } from 'react';
 
-/** Keep unsaved form state; hide inactive previews after their exit completes. */
+/** Load a tab on its first visit, then keep its draft across tab changes. */
 export function EditorPane({
   active,
   children,
@@ -11,8 +11,10 @@ export function EditorPane({
   children: ReactNode;
 }) {
   const [present, setPresent] = useState(active);
+  const [visited, setVisited] = useState(active);
   useEffect(() => {
     if (active) {
+      setVisited(true);
       setPresent(true);
       return;
     }
@@ -31,7 +33,7 @@ export function EditorPane({
       inert={!active || undefined}
       aria-hidden={!active}
     >
-      {children}
+      {(active || visited) && children}
     </div>
   );
 }

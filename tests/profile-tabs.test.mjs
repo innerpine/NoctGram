@@ -116,19 +116,22 @@ try {
                   : [...(imports.get(path) || [])]
                       .map((name) => {
                         const value =
-                          name === 'welcome'
-                            ? '[]'
-                            : name === 'hasProfileDesign'
-                              ? '()=>false'
-                              : name === 'useRoomList'
-                                ? '()=>({rooms:[],error:"",refresh:async()=>{}})'
-                                : ['appearanceStyle', 'useAudioCalls'].includes(
-                                      name,
-                                    )
-                                  ? '()=>({})'
-                                  : name === 'localDate'
-                                    ? '()=>"2026-09-08T12:00"'
-                                    : JSON.stringify(name);
+                          name === 'deferredPanel'
+                            ? '(loader)=>loader.toString().match(/default:\\s*m\\.(\\w+)/)[1]'
+                            : name === 'welcome'
+                              ? '[]'
+                              : name === 'hasProfileDesign'
+                                ? '()=>false'
+                                : name === 'useRoomList'
+                                  ? '()=>({rooms:[],error:"",refresh:async()=>{}})'
+                                  : [
+                                        'appearanceStyle',
+                                        'useAudioCalls',
+                                      ].includes(name)
+                                    ? '()=>({})'
+                                    : name === 'localDate'
+                                      ? '()=>"2026-09-08T12:00"'
+                                      : JSON.stringify(name);
                         return `export const ${name}=${value};`;
                       })
                       .join('\n'),
@@ -211,7 +214,11 @@ try {
         if (gifts.length) {
           assert.equal(gifts[0].props.own, own);
           const selfGift = gifts[0].props.selfGift;
-          assert.equal(!!selfGift, own, 'Only the current account has the self-gift action');
+          assert.equal(
+            !!selfGift,
+            own,
+            'Only the current account has the self-gift action',
+          );
           if (selfGift) {
             assert.equal(selfGift.type, 'SendGiftButton');
             assert.equal(selfGift.props.senderId, me.id);

@@ -544,7 +544,7 @@ export function WelcomeProfile() {
                   return setError('Аватарка должна быть меньше 5 МБ.');
                 setUploading(true);
                 setError('');
-                void upload(file)
+                void upload(file, 'avatar')
                   .then((m) => setAvatar(m.url!))
                   .catch((e) => setError(e.message))
                   .finally(() => setUploading(false));

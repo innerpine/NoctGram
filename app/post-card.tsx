@@ -1,4 +1,5 @@
 'use client';
+import { observePostVisibility } from '@/lib/element-visibility';
 /* Authenticated user media remains a normal browser request. User uploads do not have generated caption tracks. */
 /* eslint-disable next/no-img-element, jsx-a11y/media-has-caption */
 import {
@@ -174,20 +175,14 @@ export const PostCard = memo(function PostCard({
           });
         }, 1000);
     };
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        visible = entry.isIntersecting && entry.intersectionRatio >= 0.5;
-        schedule();
-      },
-      { threshold: [0, 0.5] },
-    );
-    observer.observe(article.current);
-    document.addEventListener('visibilitychange', schedule);
+    const stopObserving = observePostVisibility(article.current, (inView) => {
+      visible = inView;
+      schedule();
+    });
     return () => {
       live = false;
       clearTimeout(pending);
-      observer.disconnect();
-      document.removeEventListener('visibilitychange', schedule);
+      stopObserving();
     };
   }, [me, mine, p.id, onView]);
   const lock = useRef(false),

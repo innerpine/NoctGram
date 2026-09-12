@@ -2,6 +2,7 @@
 import type { Profile } from './client';
 import { readProfileBackground } from './profile-background';
 import { preloadImagePalette } from './use-image-palette';
+import { avatarSource } from './avatar-variants';
 
 // Cache only image preparation, never private profile/presence responses.
 const images = new Map<string, Promise<void>>();
@@ -36,10 +37,14 @@ function preloadImage(url: string) {
 export async function prepareProfileVisuals(person: Profile) {
   const background = readProfileBackground(person.profileBackground);
   const paletteImage = person.cover || person.avatar;
+  const density =
+    typeof window === 'undefined' ? 2 : window.devicePixelRatio || 1;
+  const avatar = avatarSource(
+    person.avatar,
+    density <= 1 ? 96 : density <= 2 ? 192 : 384,
+  );
   await Promise.all([
-    ...[...new Set([person.cover, person.avatar].filter(Boolean))].map(
-      preloadImage,
-    ),
+    ...[...new Set([person.cover, avatar].filter(Boolean))].map(preloadImage),
     person.premium && background.mode === 'cover' && paletteImage
       ? preloadImagePalette(paletteImage)
       : undefined,

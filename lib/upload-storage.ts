@@ -1,5 +1,6 @@
 import { db, bucket } from './storage';
 import { ApiError } from './api-error';
+import { uploadObjectKeys } from './avatar-variants';
 export const STORAGE_BYTES = 512 * 1024 * 1024;
 export const STORAGE_FILES = 500;
 // Unknown legacy sizes conservatively consume the former per-file maximum until HEAD fills them.
@@ -21,7 +22,11 @@ export async function queueStorageDeletion(objectKey: string) {
     .bind(objectKey, Date.now())
     .run();
 }
-export async function reserveUpload(id: string, me: string, file: File) {
+export async function reserveUpload(
+  id: string,
+  me: string,
+  file: Pick<File, 'name' | 'type' | 'size'>,
+) {
   const accepted = await db()
     .prepare(`INSERT INTO uploads(id,userId,type,name,bytes,state,created)
     SELECT ?,?,?,?,?,'uploading',? WHERE
@@ -114,7 +119,7 @@ export async function cleanUploads() {
   for (const row of rows.results) {
     // Database triggers reject any new attachment after the atomic deleting claim.
     try {
-      await bucket().delete(row.id);
+      await bucket().delete(uploadObjectKeys(row.id));
       await d
         .prepare("DELETE FROM uploads WHERE id=? AND state='deleting'")
         .bind(row.id)

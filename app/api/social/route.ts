@@ -109,16 +109,20 @@ export async function GET(req: Request) {
     const feature = await featureGet(action, s, me);
     if (feature) return feature;
     if (action === 'bootstrap') {
-      const people = await d
-        .prepare(
-          `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=u.id) as followed FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND u.kind='person' AND u.id<>? ORDER BY u.created DESC LIMIT 15`,
-        )
-        .bind(me, me, me)
-        .all();
+      const [people, account, posts] = await Promise.all([
+        d
+          .prepare(
+            `SELECT u.id,u.name,u.avatar,${appearanceColumns('u')},h.handle,EXISTS(SELECT 1 FROM follows WHERE follower=? AND following=u.id) as followed FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND u.kind='person' AND u.id<>? ORDER BY u.created DESC LIMIT 15`,
+          )
+          .bind(me, me, me)
+          .all(),
+        profile(me, me),
+        feed(me, 'all', '', '', Date.now() + 1),
+      ]);
       return Response.json({
-        me: await profile(me, me),
+        me: account,
         people: people.results,
-        posts: await feed(me, 'all', '', '', Date.now() + 1),
+        posts,
       });
     }
     if (action === 'post') {

@@ -3,6 +3,12 @@ import { bucket, db, viewer, ApiError, failure } from '@/lib/server';
 import { readMultipart } from '@/lib/request-body';
 import { reserveUpload } from '@/lib/upload-storage';
 import { rateLimit } from '@/lib/rate-limit';
+import {
+  avatarSizes,
+  avatarVariantKey,
+  avatarVariantLimit,
+  validAvatarVariant,
+} from '@/lib/avatar-variants';
 export async function POST(req: Request) {
   try {
     const origin = req.headers.get('origin');
@@ -17,7 +23,11 @@ export async function POST(req: Request) {
       .first<{ onboardingComplete: number }>();
     const pending = !account?.onboardingComplete;
     const max = (pending ? 5 : 25) * 1024 * 1024;
-    const form = await readMultipart(req, max + 16384);
+    const form = await readMultipart(
+      req,
+      max + avatarSizes.length * avatarVariantLimit + 16384,
+      ['file', ...avatarSizes.map((size) => `avatar${size}`)],
+    );
     const file = form.get('file');
     if (!(file instanceof File) || !file.size || file.size > max)
       throw new ApiError(
@@ -59,12 +69,42 @@ export async function POST(req: Request) {
                 : new TextDecoder().decode(u.slice(4, 8)) === 'ftyp';
     if (!valid)
       throw new ApiError(400, 'Содержимое файла не соответствует формату');
+    const variants: {
+      size: (typeof avatarSizes)[number];
+      bytes: ArrayBuffer;
+    }[] = [];
+    for (const size of avatarSizes) {
+      const preview = form.get(`avatar${size}`);
+      if (preview === null) continue;
+      if (
+        !file.type.startsWith('image/') ||
+        !(preview instanceof File) ||
+        preview.type !== 'image/webp' ||
+        preview.size > avatarVariantLimit
+      )
+        throw new ApiError(400, 'Некорректное превью аватара');
+      const bytes = await preview.arrayBuffer();
+      if (!validAvatarVariant(new Uint8Array(bytes), size))
+        throw new ApiError(400, 'Некорректное превью аватара');
+      variants.push({ size, bytes });
+    }
     const id = crypto.randomUUID();
-    await reserveUpload(id, me, file);
+    await reserveUpload(id, me, {
+      name: file.name,
+      type: file.type,
+      size: file.size + variants.reduce((n, v) => n + v.bytes.byteLength, 0),
+    });
     try {
       await bucket(me).put(id, bytes, {
         httpMetadata: { contentType: file.type },
       });
+      await Promise.all(
+        variants.map((v) =>
+          bucket(me).put(avatarVariantKey(id, v.size), v.bytes, {
+            httpMetadata: { contentType: 'image/webp' },
+          }),
+        ),
+      );
       const stored = await db()
         .prepare(
           "UPDATE uploads SET state='ready' WHERE id=? AND state='uploading'",

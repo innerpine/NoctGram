@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  memo,
   type CSSProperties,
 } from 'react';
 import { Switch } from '@base-ui/react/switch';
@@ -14,6 +15,8 @@ import type { Appearance } from '@/lib/appearance';
 import { themeFor, chromeTempo, hasProfileDesign } from '@/lib/appearance';
 import { NoctLogo } from './stars-icon';
 import { GratitudeBadge } from './gratitude-badge';
+import { avatarSource, avatarSources } from '@/lib/avatar-variants';
+import { observeElementVisibility } from '@/lib/element-visibility';
 
 type Identity = Appearance & { name: string; avatar?: string };
 const motionEvent = 'noct:avatar-motion';
@@ -153,112 +156,149 @@ export function VerifiedProfile({ person }: { person: Appearance }) {
     </div>
   ) : null;
 }
-export function Avatar({
-  person,
-  size = 40,
-  eager = false,
-}: {
-  person: Identity;
-  size?: number;
-  eager?: boolean;
-}) {
-  const enabled = useMotion();
-  const root = useRef<HTMLSpanElement>(null);
-  const [visible, setVisible] = useState(false),
-    [failed, setFailed] = useState('');
-  const motion = hasProfileDesign(person) && enabled && !!person.avatarMotion;
-  const chrome = hasProfileDesign(person) && !!person.chromeFlow;
-  const observe = enabled && (motion || chrome);
-  useEffect(() => {
-    if (!observe || !root.current) {
-      setVisible(false);
-      return;
-    }
-    let inView = false;
-    const update = () => setVisible(inView && !document.hidden);
-    const observer = new IntersectionObserver(([entry]) => {
-      inView = entry.isIntersecting;
-      update();
-    });
-    observer.observe(root.current);
-    document.addEventListener('visibilitychange', update);
-    return () => {
-      observer.disconnect();
-      document.removeEventListener('visibilitychange', update);
-    };
-  }, [observe]);
-  const words = person.name.trim().split(/\s+/);
-  const initials =
-    words.length > 1
-      ? words[0].slice(0, 1) + words[words.length - 1].slice(0, 1)
-      : person.name.slice(0, 2);
-  const playing = motion && visible && failed !== person.avatarMotion;
-  const content =
-    playing && person.avatarMotionType?.startsWith('video/') ? (
-      <video
-        key={person.avatarMotion}
-        src={person.avatarMotion}
-        poster={person.avatar}
-        muted
-        loop
-        autoPlay
-        playsInline
-        preload="metadata"
-        onError={() => setFailed(person.avatarMotion!)}
-      />
-    ) : playing ? (
-      <img
-        src={person.avatarMotion}
-        alt=""
-        onError={() => setFailed(person.avatarMotion!)}
-      />
-    ) : person.avatar ? (
-      <img
-        src={person.avatar}
-        alt=""
-        loading={eager ? 'eager' : 'lazy'}
-        decoding={eager ? 'sync' : 'async'}
-      />
-    ) : person.name === 'Noctgram' ? (
-      <NoctLogo size={size * 1.08} />
-    ) : (
-      initials.toUpperCase()
-    );
-  const tempo = Math.min(
-    chromeTempo.max,
-    Math.max(chromeTempo.min, person.chromeTempo || chromeTempo.default),
-  );
-  return (
-    <span
-      ref={root}
-      className={'avatar' + (chrome ? ' chrome-avatar' : '')}
-      style={
-        {
-          ...appearanceStyle(person),
-          width: size,
-          height: size,
-          fontSize: size / 2.8,
-          '--chrome-tempo': `${tempo}s`,
-        } as CSSProperties
+export const Avatar = memo(
+  function Avatar({
+    person,
+    size = 40,
+    eager = false,
+  }: {
+    person: Identity;
+    size?: number;
+    eager?: boolean;
+  }) {
+    const enabled = useMotion();
+    const root = useRef<HTMLSpanElement>(null);
+    const video = useRef<HTMLVideoElement>(null);
+    const [started, setStarted] = useState('');
+    const [visible, setVisible] = useState(false),
+      [failed, setFailed] = useState('');
+    const motion = hasProfileDesign(person) && enabled && !!person.avatarMotion;
+    const chrome = hasProfileDesign(person) && !!person.chromeFlow;
+    const observe = enabled && (motion || chrome);
+    useEffect(() => {
+      if (!observe || !root.current) {
+        setVisible(false);
+        return;
       }
-      aria-hidden="true"
-    >
-      {chrome ? (
-        <>
-          <span className="avatar-face">{content}</span>
-          <span
-            className="chrome-flow-frame"
-            style={{
-              animationPlayState: enabled && visible ? 'running' : 'paused',
-            }}
-          />
-        </>
+      return observeElementVisibility(root.current, setVisible);
+    }, [observe]);
+    const words = person.name.trim().split(/\s+/);
+    const initials =
+      words.length > 1
+        ? words[0].slice(0, 1) + words[words.length - 1].slice(0, 1)
+        : person.name.slice(0, 2);
+    const playing = motion && visible && failed !== person.avatarMotion;
+    const videoMotion = motion && person.avatarMotionType?.startsWith('video/');
+    useEffect(() => {
+      if (playing && videoMotion) setStarted(person.avatarMotion!);
+    }, [playing, videoMotion, person.avatarMotion]);
+    useEffect(() => {
+      const element = video.current;
+      if (!element) return;
+      if (playing) void element.play().catch(() => {});
+      else element.pause();
+    }, [playing, started]);
+    useEffect(() => {
+      if (playing || !started) return;
+      // Keep the decoder during a brief scroll reversal, then release offscreen
+      // videos so a long feed cannot accumulate every previously seen decoder.
+      const timer = window.setTimeout(() => setStarted(''), 10000);
+      return () => window.clearTimeout(timer);
+    }, [playing, started]);
+    const content =
+      playing && !videoMotion ? (
+        <img
+          src={person.avatarMotion}
+          alt=""
+          onError={() => setFailed(person.avatarMotion!)}
+        />
+      ) : person.avatar ? (
+        <img
+          src={avatarSource(person.avatar, size > 96 ? 384 : 96)}
+          srcSet={avatarSources(person.avatar)}
+          sizes={`${size}px`}
+          width={size}
+          height={size}
+          alt=""
+          loading={eager ? 'eager' : 'lazy'}
+          decoding="async"
+        />
+      ) : person.name === 'Noctgram' ? (
+        <NoctLogo size={size * 1.08} />
       ) : (
-        content
-      )}
-    </span>
-  );
-}
+        initials.toUpperCase()
+      );
+    const tempo = Math.min(
+      chromeTempo.max,
+      Math.max(chromeTempo.min, person.chromeTempo || chromeTempo.default),
+    );
+    const face = (
+      <>
+        {content}
+        {videoMotion && started === person.avatarMotion && (
+          <video
+            ref={video}
+            className="avatar-motion-layer"
+            key={person.avatarMotion}
+            src={person.avatarMotion}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            style={{ visibility: playing ? 'visible' : 'hidden' }}
+            onError={() => setFailed(person.avatarMotion!)}
+          />
+        )}
+      </>
+    );
+    return (
+      <span
+        ref={root}
+        className={'avatar' + (chrome ? ' chrome-avatar' : '')}
+        style={
+          {
+            ...appearanceStyle(person),
+            width: size,
+            height: size,
+            fontSize: size / 2.8,
+            '--chrome-tempo': `${tempo}s`,
+          } as CSSProperties
+        }
+        aria-hidden="true"
+      >
+        {chrome ? (
+          <>
+            <span className="avatar-face">{face}</span>
+            <span
+              className="chrome-flow-frame"
+              style={{
+                animationPlayState: enabled && visible ? 'running' : 'paused',
+              }}
+            />
+          </>
+        ) : (
+          face
+        )}
+      </span>
+    );
+  },
+  (a, b) =>
+    a.size === b.size &&
+    a.eager === b.eager &&
+    (
+      [
+        'name',
+        'avatar',
+        'premium',
+        'boostLevel',
+        'profileTheme',
+        'chromeFlow',
+        'chromeTempo',
+        'avatarMotion',
+        'avatarMotionType',
+      ] as const
+    ).every((key) => a.person[key] === b.person[key]),
+);
 export function ProfileAvatar({
   person,
   size = 96,
@@ -269,8 +309,15 @@ export function ProfileAvatar({
   const id = useId().replace(/:/g, '');
   const enabled = useMotion();
   const text = hasProfileDesign(person) ? person.ringText?.trim() : '';
+  const ringRoot = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!enabled || !text || !ringRoot.current) return;
+    return observeElementVisibility(ringRoot.current, setVisible);
+  }, [enabled, text]);
   return (
     <span
+      ref={ringRoot}
       className={
         'avatar profile-identity-avatar' +
         (text ? ' has-text-ring' : '') +
@@ -286,7 +333,9 @@ export function ProfileAvatar({
           className="profile-text-ring"
           viewBox="0 0 144 144"
           aria-hidden="true"
-          style={{ animationPlayState: enabled ? 'running' : 'paused' }}
+          style={{
+            animationPlayState: enabled && visible ? 'running' : 'paused',
+          }}
         >
           <defs>
             <path

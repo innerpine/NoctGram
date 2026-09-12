@@ -30,10 +30,10 @@ export async function assertMediaRead(
   }
   const publicRef = await d
     .prepare(`SELECT 1 FROM users u WHERE (u.avatar=? OR u.cover=?) AND ${visibleAccount('u')}
-    UNION SELECT 1 FROM profile_appearance pa JOIN users u ON u.id=pa.userId WHERE pa.avatarMotion=? AND ${animatedAvatarActive('u')} AND ${visibleAccount('u')}
-    UNION SELECT 1 FROM posts p JOIN users u ON u.id=p.userId WHERE ${published('p')} AND ${visibleAccount('u')}
+    UNION ALL SELECT 1 FROM profile_appearance pa JOIN users u ON u.id=pa.userId WHERE pa.avatarMotion=? AND ${animatedAvatarActive('u')} AND ${visibleAccount('u')}
+    UNION ALL SELECT 1 FROM posts p JOIN users u ON u.id=p.userId WHERE ${published('p')} AND ${visibleAccount('u')}
       AND EXISTS(SELECT 1 FROM json_each(p.media) m WHERE json_extract(m.value,'$.id')=?)
-    UNION SELECT 1 FROM stories s JOIN users u ON u.id=s.userId WHERE s.mediaId=? AND s.deletedAt=0 AND s.expiresAt>${sqlNow} AND ${visibleAccount('u')} LIMIT 1`)
+    UNION ALL SELECT 1 FROM stories s JOIN users u ON u.id=s.userId WHERE s.mediaId=? AND s.deletedAt=0 AND s.expiresAt>${sqlNow} AND ${visibleAccount('u')} LIMIT 1`)
     .bind(url, url, url, id, id)
     .first();
   if (publicRef) return;

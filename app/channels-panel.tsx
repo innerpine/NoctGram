@@ -120,7 +120,7 @@ export function ChannelsPanel({
                     if (!file) return;
                     setBusy(true);
                     try {
-                      const m = await upload(file);
+                      const m = await upload(file, 'avatar');
                       setAvatar(m.url!);
                     } catch (e) {
                       setError((e as Error).message);
@@ -217,9 +217,7 @@ export function ChannelsPanel({
       {!loading && !channels.length && !creating && (
         <Empty>
           <Megaphone size={26} />
-          <strong>
-            {query ? 'Каналы не найдены' : 'Каналов пока нет'}
-          </strong>
+          <strong>{query ? 'Каналы не найдены' : 'Каналов пока нет'}</strong>
           <p>Создай канал и публикуй от его имени.</p>
         </Empty>
       )}

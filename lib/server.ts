@@ -183,6 +183,19 @@ export async function profile(id: string, me: string) {
   }
   const own = id === me;
   const rights = user.kind === 'channel' ? await channelRights(id, me) : null;
+  const ownDetails = own
+    ? await Promise.all([
+        restriction(me),
+        isModerator(me),
+        isAdministrator(me),
+        d
+          .prepare(
+            'SELECT a.id,a.eventId,a.status,a.text,a.reviewNote,a.created FROM moderation_appeals a WHERE a.userId=? ORDER BY a.created DESC LIMIT 1',
+          )
+          .bind(me)
+          .first(),
+      ])
+    : null;
   return {
     ...user,
     ...rights,
@@ -190,15 +203,10 @@ export async function profile(id: string, me: string) {
     ...(rights?.canPublish ? { restriction: await restriction(id) } : {}),
     ...(own
       ? {
-          restriction: await restriction(me),
-          canModerate: await isModerator(me),
-          canAdmin: await isAdministrator(me),
-          appeal: await d
-            .prepare(
-              'SELECT a.id,a.eventId,a.status,a.text,a.reviewNote,a.created FROM moderation_appeals a WHERE a.userId=? ORDER BY a.created DESC LIMIT 1',
-            )
-            .bind(me)
-            .first(),
+          restriction: ownDetails![0],
+          canModerate: ownDetails![1],
+          canAdmin: ownDetails![2],
+          appeal: ownDetails![3],
         }
       : {}),
   };

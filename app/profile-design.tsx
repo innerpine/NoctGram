@@ -364,7 +364,7 @@ export function ProfileDesign({
                       throw new Error('Выбери GIF, MP4 или WebM до 10 МБ');
                     const still = await avatarPoster(file);
                     const media = await upload(file);
-                    const frame = await upload(still);
+                    const frame = await upload(still, 'avatar');
                     setMotion(media.url!);
                     setMotionType(media.type);
                     setPoster(frame.url!);

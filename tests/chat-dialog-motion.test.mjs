@@ -132,8 +132,14 @@ void test('editor panes retain form state, finish their exit and cancel hiding o
     globalThis.window = oldWindow;
   });
   const form = { type: 'form', props: { draft: 'keep' } },
-    props = { active: true, children: form };
+    props = { active: false, children: form };
   const pane = mount(t, EditorPane, props);
+  assert.equal(
+    pane.render().props.children,
+    false,
+    'Unvisited tabs must not mount their forms or request private data',
+  );
+  props.active = true;
   assert.equal(pane.render().props.hidden, false);
   props.active = false;
   let tree = pane.render();
