@@ -1927,7 +1927,6 @@ export default function Noctgram({
             >
               <StarsIcon size={23} />
               <span>Noct Stars</span>
-              <span className="badge">тест</span>
             </AppLink>
           </div>
           {me ? (
