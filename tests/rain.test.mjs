@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { createRequire } from 'node:module';
+import { runInNewContext } from 'node:vm';
 
 const require = createRequire(import.meta.url);
 const { outputFiles } = await build({
@@ -15,6 +16,7 @@ const { outputFiles } = await build({
   write: false,
   platform: 'node',
   format: 'cjs',
+  define: { 'import.meta.url': '"file:///rain-painter.ts"' },
 });
 const compiled = { exports: {} };
 // Run the actual local engine with deterministic browser clocks and canvas recording.
@@ -32,6 +34,14 @@ const {
   defaultRainOptions,
   readRainOptions,
 } = compiled.exports;
+const workerBuild = await build({
+  entryPoints: ['lib/rain-worker.ts'],
+  bundle: true,
+  write: false,
+  platform: 'browser',
+  format: 'iife',
+});
+const workerSource = workerBuild.outputFiles[0].text;
 
 class Events {
   listeners = new Map();
@@ -53,7 +63,15 @@ class Events {
   }
 }
 
-function fixture(t, { coarse = false, reduced = false } = {}) {
+function fixture(
+  t,
+  {
+    coarse = false,
+    reduced = false,
+    worker = false,
+    workerSupported = true,
+  } = {},
+) {
   const frames = new Map(),
     timers = new Map(),
     observers = [],
@@ -62,6 +80,57 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
     geometryReads = 0,
     queries = 0;
   t.mock.method(Math, 'random', () => 0.5);
+  const workers = [];
+  class Offscreen {
+    constructor(width, height) {
+      this.width = width;
+      this.height = height;
+    }
+    getContext() {
+      return {};
+    }
+  }
+  class TestWorker {
+    messages = [];
+    outbox = [];
+    frames = new Map();
+    terminated = false;
+    constructor() {
+      workers.push(this);
+      this.events = new Events();
+      runInNewContext(workerSource, {
+        Math,
+        OffscreenCanvas: Offscreen,
+        addEventListener: (...args) => this.events.addEventListener(...args),
+        postMessage: (message) => this.outbox.push(message),
+        requestAnimationFrame: workerSupported
+          ? (callback) => {
+              this.frames.set(++sequence, callback);
+              return sequence;
+            }
+          : undefined,
+        cancelAnimationFrame: (id) => this.frames.delete(id),
+      });
+    }
+    postMessage(message) {
+      assert.equal(this.terminated, false);
+      this.messages.push(message);
+      this.events.emit('message', { data: message });
+    }
+    async deliver() {
+      for (const data of this.outbox.splice(0)) this.onmessage?.({ data });
+      await Promise.resolve();
+    }
+    step(now) {
+      const callbacks = [...this.frames.values()];
+      this.frames.clear();
+      callbacks.forEach((callback) => callback(now));
+    }
+    terminate() {
+      this.terminated = true;
+      this.frames.clear();
+    }
+  }
   class Observer {
     disconnected = false;
     constructor(callback) {
@@ -71,6 +140,7 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
     observe(target) {
       this.target = target;
     }
+    unobserve() {}
     disconnect() {
       this.disconnected = true;
     }
@@ -91,17 +161,18 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
     width: 200,
     height: 60,
   };
+  const safeElement = {
+    nodeType: 1,
+    parentElement: null,
+    getBoundingClientRect() {
+      geometryReads++;
+      return safeBox;
+    },
+  };
+  body.nodeType = 1;
   body.querySelectorAll = () => {
     queries++;
-    return [
-      {
-        parentElement: null,
-        getBoundingClientRect() {
-          geometryReads++;
-          return safeBox;
-        },
-      },
-    ];
+    return [safeElement];
   };
   const document = Object.assign(new Events(), {
     body,
@@ -132,6 +203,8 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
       getItem: (key) => storage.get(key) || null,
       setItem: (key, value) => storage.set(key, value),
     },
+    Worker: worker ? TestWorker : undefined,
+    OffscreenCanvas: worker ? Offscreen : undefined,
   };
   const before = Object.fromEntries(
     Object.keys(globals).map((key) => [
@@ -162,7 +235,7 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
     frames.clear();
     callbacks.forEach((callback) => callback(now));
   };
-  function layer(scope = 'site', width = 1440, height = 900) {
+  function layer(scope = 'site', width = 1440, height = 900, recovery) {
     const operations = [];
     const context = Object.fromEntries(
       [
@@ -178,17 +251,40 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
       contains: () => true,
       querySelectorAll: body.querySelectorAll,
     });
+    let transferred = false,
+      failures = 0;
     const canvas = {
       width: 300,
       height: 150,
       parentElement: host,
-      getContext: () => context,
+      getContext: () => {
+        assert.equal(
+          transferred,
+          false,
+          'Transferred canvas cannot acquire a main-thread context',
+        );
+        return context;
+      },
+      transferControlToOffscreen() {
+        assert.equal(transferred, false);
+        transferred = true;
+        return { width: 300, height: 150, getContext: () => context };
+      },
       getBoundingClientRect() {
         geometryReads++;
         return { left: 0, top: 0, right: width, bottom: height, width, height };
       },
     };
-    const cleanup = attachRain(canvas, scope);
+    const cleanup = attachRain(
+      canvas,
+      scope,
+      recovery || {
+        forceMain: false,
+        failed: () => {
+          failures++;
+        },
+      },
+    );
     let disposed = false;
     const dispose = () => {
       if (!disposed) {
@@ -204,6 +300,8 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
       context,
       update: cleanup.update,
       dispose,
+      transferred: () => transferred,
+      failures: () => failures,
       strokes: () => operations.filter(([name]) => name === 'stroke').length,
     };
   }
@@ -219,6 +317,8 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
     motion,
     storage,
     safeBox,
+    safeElement,
+    workers,
     queries: () => queries,
     reads: () => geometryReads,
   };
@@ -422,7 +522,7 @@ await test('continuous document/nested scrolling updates masks without blanking 
   }
   // New feed content refreshes masks on the next frame, without an erase/restart.
   site.operations.length = 0;
-  f.observers[1].callback();
+  f.observers[1].callback([{ type: 'childList', target: f.document.body }]);
   assert.equal(site.operations.length, 0);
   f.step(1017);
   assert.equal(site.strokes(), 3);
@@ -562,6 +662,196 @@ for (const coarse of [false, true]) {
     assert.ok(layer.canvas.width * layer.canvas.height <= 1_202_500);
   });
 }
+
+await test('player text updates do not rescan protected content; resize and new posts still refresh masks', (t) => {
+  const f = fixture(t),
+    layer = f.layer();
+  f.step(0);
+  const reads = f.reads(),
+    queries = f.queries();
+  const text = { nodeType: 1, parentElement: f.safeElement };
+  for (let i = 1; i <= 120; i++) {
+    f.observers[1].callback([{ type: 'childList', target: text }]);
+    f.observers[1].callback([{ type: 'attributes', target: text }]);
+    f.step((i * 1000) / 60);
+  }
+  assert.equal(f.reads(), reads);
+  assert.equal(f.queries(), queries);
+  f.safeBox.height = 100;
+  f.observers[0].callback([{ target: f.safeElement }]);
+  f.step(2020);
+  assert.equal(f.queries(), queries, 'Resize reuses tracked elements');
+  assert.ok(
+    layer.operations.some(
+      (op) =>
+        JSON.stringify(op) === JSON.stringify(['clearRect', 92, 73, 216, 114]),
+    ),
+  );
+  f.observers[1].callback([{ type: 'childList', target: f.document.body }]);
+  f.step(2040);
+  assert.equal(f.queries(), queries + 1);
+});
+
+await test('one worker animates both surfaces while the main-thread frame clock is stopped', async (t) => {
+  const f = fixture(t, { worker: true }),
+    site = f.layer(),
+    dock = f.layer('dock', 320, 800);
+  assert.equal(f.workers.length, 1);
+  f.step(0);
+  await f.workers[0].deliver();
+  const worker = f.workers[0];
+  assert.equal(site.transferred(), true);
+  assert.equal(dock.transferred(), true);
+  assert.equal(
+    f.frames.size,
+    0,
+    'No continuous main-thread animation callback',
+  );
+  assert.equal(worker.frames.size, 1, 'One independent worker clock');
+  const reads = f.reads(),
+    messages = worker.messages.length;
+  worker.step(0);
+  site.operations.length = dock.operations.length = 0;
+  // The main clock deliberately receives no ticks, simulating a busy UI.
+  for (let i = 1; i <= 60; i++) worker.step((i * 1000) / 60);
+  assert.equal(site.strokes(), 180);
+  assert.equal(dock.strokes(), 180);
+  assert.equal(f.reads(), reads);
+  assert.equal(
+    worker.messages.length,
+    messages,
+    'No per-frame message traffic',
+  );
+  site.update({ ...defaultRainOptions, fps: 120, intensity: 200 });
+  site.operations.length = 0;
+  for (let i = 1; i <= 120; i++) worker.step(1000 + (i * 1000) / 120);
+  assert.equal(site.strokes(), 360);
+  f.safeBox.top = 120;
+  f.document.emit('scroll');
+  f.step(2001);
+  assert.equal(f.frames.size, 0);
+  worker.step(2010);
+  assert.ok(
+    site.operations.some(
+      (op) =>
+        JSON.stringify(op) === JSON.stringify(['clearRect', 92, 113, 216, 74]),
+    ),
+  );
+});
+
+await test('worker surfaces pause for full player, hidden tabs and reduced motion, then release the worker', async (t) => {
+  const f = fixture(t, { worker: true }),
+    site = f.layer();
+  f.step(0);
+  await f.workers[0].deliver();
+  const worker = f.workers[0];
+  worker.step(0);
+  const full = f.layer('full');
+  await Promise.resolve();
+  f.step(20);
+  const before = site.strokes();
+  worker.step(20);
+  worker.step(40);
+  assert.equal(site.strokes(), before);
+  assert.ok(full.strokes() > 0);
+  full.dispose();
+  worker.step(60);
+  assert.ok(site.strokes() > before);
+  f.document.hidden = true;
+  f.document.emit('visibilitychange');
+  assert.equal(worker.frames.size, 0);
+  assert.equal(f.frames.size, 0);
+  f.document.hidden = false;
+  f.document.emit('visibilitychange');
+  f.step(80);
+  assert.equal(worker.frames.size, 1);
+  f.motion.matches = true;
+  f.motion.emit('change');
+  assert.equal(worker.frames.size, 0);
+  site.dispose();
+  assert.equal(worker.terminated, true);
+  assert.equal(f.timers.size, 0);
+});
+
+await test('unsupported worker falls back before transferring the canvas', async (t) => {
+  const f = fixture(t, { worker: true, workerSupported: false }),
+    layer = f.layer();
+  f.step(0);
+  await f.workers[0].deliver();
+  assert.equal(layer.transferred(), false);
+  assert.equal(f.workers[0].terminated, true);
+  f.step(20);
+  assert.ok(layer.strokes() > 0);
+});
+
+await test('startup timeout and disposal before worker readiness do not leave a blank or leaked renderer', async (t) => {
+  const f = fixture(t, { worker: true }),
+    layer = f.layer();
+  f.step(0);
+  f.flush(); // worker handshake never arrived
+  f.step(20);
+  assert.equal(layer.transferred(), false);
+  assert.ok(layer.strokes() > 0);
+  layer.dispose();
+  const pending = f.layer();
+  const worker = f.workers.at(-1);
+  pending.dispose();
+  await worker.deliver();
+  assert.equal(pending.transferred(), false);
+  assert.equal(worker.terminated, true);
+  assert.equal(f.frames.size, 0);
+  assert.equal(f.timers.size, 0);
+});
+
+await test('failure after transfer requests a fresh canvas and recovers with the same preferences', async (t) => {
+  const f = fixture(t, { worker: true }),
+    layer = f.layer();
+  f.step(0);
+  await f.workers[0].deliver();
+  f.workers[0].onerror();
+  assert.equal(layer.failures(), 1);
+  layer.dispose();
+  const replacement = f.layer('site', 1440, 900, {
+    forceMain: true,
+    failed: () => assert.fail('Fallback failed'),
+  });
+  replacement.update({ ...defaultRainOptions, fps: 120, intensity: 25 });
+  f.step(100);
+  assert.equal(
+    f.workers.length,
+    1,
+    'Recovery must not enter a worker restart loop',
+  );
+  assert.equal(
+    replacement.operations.filter(([name]) => name === 'lineTo').length,
+    22,
+  );
+});
+
+await test('a development refresh recovers instead of reusing an already transferred canvas', async (t) => {
+  const f = fixture(t, { worker: true }),
+    first = f.layer();
+  f.step(0);
+  await f.workers[0].deliver();
+  first.dispose();
+  let replacements = 0;
+  const refreshed = attachRain(first.canvas, 'site', {
+    forceMain: false,
+    failed: () => {
+      replacements++;
+    },
+  });
+  try {
+    await f.workers.at(-1).deliver();
+    assert.equal(
+      replacements,
+      1,
+      'A fresh React canvas is requested after a transferred-canvas error',
+    );
+  } finally {
+    refreshed();
+  }
+});
 
 await test('device preferences persist and unsupported canvas does not break the page', (t) => {
   const f = fixture(t, { reduced: true });
