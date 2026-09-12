@@ -184,6 +184,8 @@ function fixture(t) {
     'lib/gifts.ts',
     'lib/gift-collectibles.ts',
     'lib/gift-upgrades.ts',
+    'lib/gift-conversions.ts',
+    'lib/gift-conversion-policy.ts',
     'lib/gift-upgrade-catalog.ts',
     'lib/gift-upgrade-data.json',
     'lib/gift-upgrade-eligibility.json',

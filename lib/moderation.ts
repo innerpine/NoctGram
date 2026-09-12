@@ -74,6 +74,12 @@ export async function moderationGet(
         [me],
         'receiptId',
       ],
+      [
+        'giftConversions',
+        'SELECT c.* FROM gift_conversions c JOIN received_gifts g ON g.id=c.receiptId WHERE g.recipient=? AND c.receiptId>? ORDER BY c.receiptId LIMIT 100',
+        [me],
+        'receiptId',
+      ],
     ] as const;
     const data: Record<string, unknown> = {
       exportedAt: new Date().toISOString(),

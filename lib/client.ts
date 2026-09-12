@@ -122,6 +122,7 @@ export type Message = {
     price: number;
     message: string;
     collectible?: import('./gift-collectibles').GiftCollectible | null;
+    converted?: boolean;
   };
 };
 export const welcome: Post[] = [

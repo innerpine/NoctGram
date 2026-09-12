@@ -12,6 +12,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Send,
+  Gift,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, Empty, Stamp } from './post-card';
@@ -262,7 +263,13 @@ export function StarsPanel({
         {!wallet && loading && <p className="meta">Загружаем баланс…</p>}
         {rows.map((t) => (
           <div className="star-transaction" key={t.id}>
-            {['admin_grant', 'purchase', 'purchase_refund'].includes(t.kind) ? (
+            {t.kind === 'gift_conversion' ? (
+              <span className="transaction-grant" aria-hidden="true">
+                <Gift size={23} />
+              </span>
+            ) : ['admin_grant', 'purchase', 'purchase_refund'].includes(
+                t.kind,
+              ) ? (
               <span className="transaction-grant">
                 <StarsIcon size={26} />
               </span>
@@ -289,7 +296,9 @@ export function StarsPanel({
             )}
             <div>
               <strong>
-                {t.kind === 'gift_upgrade' ? (
+                {t.kind === 'gift_conversion' ? (
+                  'Продажа подарка'
+                ) : t.kind === 'gift_upgrade' ? (
                   'Улучшение подарка'
                 ) : t.kind === 'purchase' ? (
                   'Покупка Noct Stars'
@@ -310,27 +319,29 @@ export function StarsPanel({
                 )}
               </strong>
               <span>
-                {t.kind === 'gift_upgrade'
-                  ? (giftDefinition(t.giftId)?.name ||
-                      'Коллекционный подарок') +
-                    (t.giftNumber ? ' #' + t.giftNumber : '')
-                  : t.kind === 'purchase'
-                    ? 'Оплата подтверждена'
-                    : t.kind === 'purchase_refund'
-                      ? 'Сумма возвращена через платёжный сервис'
-                      : t.kind === 'gift'
-                        ? 'Подарок «' +
-                          (giftDefinition(t.giftId)?.name || 'Подарок') +
-                          '»'
-                        : t.kind === 'admin_grant'
-                          ? 'Начислено администратором'
-                          : t.kind === 'telegram_test'
-                            ? 'Тестовые звёзды · без оплаты'
-                            : t.kind === 'grant'
-                              ? 'Стартовые звёзды'
-                              : t.sender === me.id
-                                ? 'Поддержка автора'
-                                : 'Поддержали твою публикацию'}
+                {t.kind === 'gift_conversion'
+                  ? giftDefinition(t.giftId)?.name || 'Подарок'
+                  : t.kind === 'gift_upgrade'
+                    ? (giftDefinition(t.giftId)?.name ||
+                        'Коллекционный подарок') +
+                      (t.giftNumber ? ' #' + t.giftNumber : '')
+                    : t.kind === 'purchase'
+                      ? 'Оплата подтверждена'
+                      : t.kind === 'purchase_refund'
+                        ? 'Сумма возвращена через платёжный сервис'
+                        : t.kind === 'gift'
+                          ? 'Подарок «' +
+                            (giftDefinition(t.giftId)?.name || 'Подарок') +
+                            '»'
+                          : t.kind === 'admin_grant'
+                            ? 'Начислено администратором'
+                            : t.kind === 'telegram_test'
+                              ? 'Тестовые звёзды · без оплаты'
+                              : t.kind === 'grant'
+                                ? 'Стартовые звёзды'
+                                : t.sender === me.id
+                                  ? 'Поддержка автора'
+                                  : 'Поддержали твою публикацию'}
               </span>
               <Stamp time={t.created} />
             </div>

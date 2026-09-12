@@ -207,4 +207,5 @@ export type ReceivedGift = {
   senderAvatar: string;
   senderHandle: string;
   collectible?: GiftCollectible | null;
+  converted?: { amount: number; created: number } | null;
 };

@@ -57,7 +57,8 @@ export async function readConversation(
         CASE json_extract(rp.media,'$[0].kind') WHEN 'image' THEN 'Фото' WHEN 'video' THEN 'Видео' ELSE json_extract(rp.media,'$[0].name') END ELSE 'Сообщение' END AS replyText,
       g.id AS receiptId,g.giftId AS giftType,g.message AS giftMessage,t.amount AS giftPrice,
       gc.family AS collectibleFamily,gc.number AS collectibleNumber,gc.attributes AS collectibleAttributes,
-      gc.keepOriginal AS collectibleKeepOriginal,gc.created AS collectibleCreated
+      gc.keepOriginal AS collectibleKeepOriginal,gc.created AS collectibleCreated,
+      EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=g.id) AS giftConverted
     FROM chosen m
     LEFT JOIN message_pins p ON p.messageId=m.id
     LEFT JOIN messages rp ON rp.id=m.replyTo AND ${messagePair('rp', 'm.sender', 'm.recipient')} AND ${messageVisible('rp', '(SELECT me FROM scope)')}
@@ -74,6 +75,7 @@ export async function readConversation(
         giftType: string | null;
         giftMessage: string | null;
         giftPrice: number | null;
+        giftConverted: number;
         collectibleFamily: string | null;
         collectibleNumber: number;
         collectibleAttributes: string | null;
@@ -92,6 +94,7 @@ export async function readConversation(
       giftType,
       giftMessage,
       giftPrice,
+      giftConverted,
       collectibleFamily,
       collectibleNumber,
       collectibleAttributes,
@@ -125,11 +128,17 @@ export async function readConversation(
               giftId: giftType,
               message: giftMessage || '',
               price: giftPrice,
-              collectible: collectibleFamily && collectibleAttributes ? {
-                ...JSON.parse(collectibleAttributes), family: collectibleFamily,
-                number: collectibleNumber, keepOriginal: collectibleKeepOriginal === 1,
-                upgradedAt: collectibleCreated,
-              } : null,
+              ...(giftConverted ? { converted: true } : {}),
+              collectible:
+                collectibleFamily && collectibleAttributes
+                  ? {
+                      ...JSON.parse(collectibleAttributes),
+                      family: collectibleFamily,
+                      number: collectibleNumber,
+                      keepOriginal: collectibleKeepOriginal === 1,
+                      upgradedAt: collectibleCreated,
+                    }
+                  : null,
             },
           }
         : {}),

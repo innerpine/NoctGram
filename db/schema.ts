@@ -376,6 +376,28 @@ export const giftUpgrades = sqliteTable(
   ],
 );
 
+// Conversion receipts preserve one immutable credit per sold ordinary gift.
+export const giftConversions = sqliteTable(
+  'gift_conversions',
+  {
+    receiptId: text()
+      .primaryKey()
+      .references(() => receivedGifts.id, { onDelete: 'cascade' }),
+    transferId: text()
+      .notNull()
+      .references(() => starTransfers.id),
+    amount: integer().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    uniqueIndex('gift_conversion_payment').on(t.transferId),
+    check(
+      'gift_conversion_positive',
+      sql`typeof(${t.amount}) = 'integer' AND ${t.amount} > 0`,
+    ),
+  ],
+);
+
 // Moderators are granted by an owner-controlled database operation, never signup.
 export const moderators = sqliteTable('moderators', {
   userId: text()

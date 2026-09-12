@@ -120,6 +120,7 @@ export async function listGifts(
     FROM received_gifts g JOIN users u ON u.id=g.sender LEFT JOIN handles h ON h.userId=u.id AND h.main=1
     LEFT JOIN gift_upgrades c ON c.receiptId=g.id
     WHERE g.recipient=? AND (g.hidden=0 OR g.recipient=?)
+      AND NOT EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=g.id)
       AND (c.receiptId IS NOT NULL OR (${visibleAccount('u')} AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker IN (?,g.recipient) AND blocked=u.id) OR(blocker=u.id AND blocked IN (?,g.recipient)))))
       AND (?='' OR g.id=? OR ('collectible:'||c.family||':'||c.number)=?)
       AND (?='' OR (g.created,g.id)<(SELECT bg.created,bg.id FROM received_gifts bg LEFT JOIN gift_upgrades bc ON bc.receiptId=bg.id WHERE (bg.id=? OR ('collectible:'||bc.family||':'||bc.number)=?) AND bg.recipient=?))
@@ -210,7 +211,9 @@ export async function giftVisibility(
   if (typeof body.hidden !== 'boolean')
     throw new ApiError(400, 'Укажи видимость подарка');
   const result = await db()
-    .prepare('UPDATE received_gifts SET hidden=? WHERE id=? AND recipient=?')
+    .prepare(
+      'UPDATE received_gifts SET hidden=? WHERE id=? AND recipient=? AND NOT EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=received_gifts.id)',
+    )
     .bind(Number(body.hidden), id, me)
     .run();
   if (!result.meta.changes) throw new ApiError(404, 'Подарок не найден');
