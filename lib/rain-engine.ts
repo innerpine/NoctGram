@@ -1,4 +1,13 @@
+import {
+  defaultRainOptions,
+  readRainOptions,
+  type RainOptions,
+} from './rain-options';
+
 export type RainScope = 'site' | 'full' | 'dock';
+export type RainHandle = (() => void) & {
+  update: (options: RainOptions) => void;
+};
 type Rect = { x: number; y: number; width: number; height: number };
 type Drop = {
   x: number;
@@ -131,7 +140,9 @@ class RainSurface {
   private readonly root: HTMLElement;
   private readonly scrollRoot: HTMLElement | Document;
   private readonly context: CanvasRenderingContext2D;
-  private readonly interval: number;
+  private interval: number;
+  private options = defaultRainOptions;
+  private readonly compact: boolean;
   private readonly limit: number;
   private readonly resize: ResizeObserver;
   private readonly mutations: MutationObserver;
@@ -151,9 +162,9 @@ class RainSurface {
     this.host = scope === 'site' ? document.body : canvas.parentElement!;
     this.root = this.host;
     this.scrollRoot = scope === 'site' ? document : this.root;
-    const compact = matchMedia('(pointer: coarse)').matches;
-    this.interval = 1000 / (compact ? 30 : 60);
-    this.limit = scope === 'dock' ? 24 : compact ? 40 : 90;
+    this.compact = matchMedia('(pointer: coarse)').matches;
+    this.interval = 1000 / (this.compact ? 30 : 60);
+    this.limit = scope === 'dock' ? 24 : this.compact ? 40 : 90;
     this.resize = new ResizeObserver(this.invalidate);
     this.resize.observe(canvas);
     this.resize.observe(this.host);
@@ -180,6 +191,39 @@ class RainSurface {
     document.fonts?.addEventListener('loadingdone', this.invalidate);
     this.invalidate();
     register(this);
+  }
+
+  update = (options: RainOptions) => {
+    if (this.disposed) return;
+    this.options = readRainOptions(options);
+    const fps =
+      this.options.fps === 'auto' ? (this.compact ? 30 : 60) : this.options.fps;
+    const interval = 1000 / fps;
+    if (interval !== this.interval) {
+      this.interval = interval;
+      this.nextFrame = this.last === undefined ? 0 : this.last + interval;
+    }
+    this.syncDrops();
+    wake();
+  };
+
+  private syncDrops() {
+    if (!this.width || !this.height) return;
+    const base = Math.min(
+      this.limit,
+      Math.max(12, Math.round((this.width * this.height) / 15000)),
+    );
+    const count = Math.round((base * this.options.intensity) / 100);
+    // Preserve existing particles when changing density; sliders must not restart rain.
+    if (this.drops.length > count) this.drops.length = count;
+    while (this.drops.length < count)
+      this.drops.push({
+        x: Math.random() * this.width,
+        y: Math.random() * this.height,
+        speed: 150 + Math.random() * 190,
+        length: 18 + Math.random() * 24,
+        depth: this.drops.length % 3,
+      });
   }
 
   invalidate = () => {
@@ -213,7 +257,16 @@ class RainSurface {
       this.measured = false;
       return;
     }
-    const changed = this.width !== box.width || this.height !== box.height;
+    if (
+      this.width &&
+      this.height &&
+      (this.width !== box.width || this.height !== box.height)
+    ) {
+      for (const drop of this.drops) {
+        drop.x *= box.width / this.width;
+        drop.y *= box.height / this.height;
+      }
+    }
     this.width = box.width;
     this.height = box.height;
     // Bound the backing bitmap on Retina/4K displays instead of multiplying by DPR.
@@ -263,19 +316,7 @@ class RainSurface {
         height: rect.height + 14,
       });
     }
-    if (changed || !this.drops.length) {
-      const count = Math.min(
-        this.limit,
-        Math.max(12, Math.round((this.width * this.height) / 15000)),
-      );
-      this.drops = Array.from({ length: count }, (_, index) => ({
-        x: Math.random() * this.width,
-        y: Math.random() * this.height,
-        speed: 150 + Math.random() * 190,
-        length: 18 + Math.random() * 24,
-        depth: index % 3,
-      }));
-    }
+    this.syncDrops();
     this.measured = true;
   };
 
@@ -300,18 +341,20 @@ class RainSurface {
     this.last = now;
     const context = this.context;
     context.clearRect(0, 0, this.width, this.height);
+    context.globalAlpha = this.options.brightness / 150;
     for (let depth = 0; depth < 3; depth++) {
       context.beginPath();
       context.strokeStyle = [
-        'rgba(181,197,219,.20)',
-        'rgba(205,218,235,.32)',
-        'rgba(225,235,248,.46)',
+        'rgba(181,197,219,.30)',
+        'rgba(205,218,235,.48)',
+        'rgba(225,235,248,.69)',
       ][depth];
       context.lineWidth = depth === 2 ? 1.4 : 1;
       for (const drop of this.drops) {
         if (drop.depth !== depth) continue;
-        drop.y += drop.speed * seconds;
-        drop.x -= drop.speed * seconds * 0.075;
+        const distance = (drop.speed * seconds * this.options.speed) / 100;
+        drop.y += distance;
+        drop.x -= distance * 0.075;
         if (drop.y > this.height + drop.length) {
           drop.y = -drop.length;
           drop.x = Math.random() * this.width;
@@ -342,18 +385,22 @@ class RainSurface {
   }
 }
 
-export function attachRain(canvas: HTMLCanvasElement, scope: RainScope) {
+export function attachRain(
+  canvas: HTMLCanvasElement,
+  scope: RainScope,
+): RainHandle {
+  const noop = () => {};
   if (
     !window.ResizeObserver ||
     !window.IntersectionObserver ||
     !window.MutationObserver
   )
-    return () => {};
+    return Object.assign(noop, { update: noop });
   try {
     const layer = new RainSurface(canvas, scope);
-    return () => layer.dispose();
+    return Object.assign(() => layer.dispose(), { update: layer.update });
   } catch {
     // Decoration must never prevent opening a page on a restricted browser.
-    return () => {};
+    return Object.assign(noop, { update: noop });
   }
 }

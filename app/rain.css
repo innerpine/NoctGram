@@ -107,6 +107,80 @@ body {
 .rain-preference-note {
   margin: 14px 0 0;
 }
+.rain-tuning {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #ffffff14;
+}
+.rain-fps-row,
+.rain-range-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #e5e5eb;
+  font-size: 13px;
+}
+.rain-fps-row select {
+  width: 106px;
+  flex-shrink: 0;
+  min-height: 38px;
+  border: 1px solid #ffffff26;
+  border-radius: 10px;
+  padding: 7px 10px;
+  background: #1b1b1f;
+  color: #f4f4f6;
+  color-scheme: dark;
+  font: inherit;
+  cursor: pointer;
+}
+.rain-fps-row select:focus-visible,
+.rain-reset:focus-visible {
+  outline: 2px solid #d4d4d4;
+  outline-offset: 3px;
+}
+.rain-control-hint {
+  margin: 8px 0 0;
+  color: #92929e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.rain-range {
+  margin-top: 20px;
+}
+.rain-range-label output {
+  color: #c8c8d0;
+  font-variant-numeric: tabular-nums;
+}
+.rain-range [data-slot='slider'] {
+  padding: 14px 0;
+}
+.rain-range [data-slot='slider-track'] {
+  height: 4px;
+  background: #ffffff1c;
+}
+.rain-range [data-slot='slider-range'] {
+  background: #d4d4df;
+}
+.rain-reset {
+  min-height: 36px;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid #ffffff20;
+  border-radius: 9px;
+  background: transparent;
+  color: #c8c8d0;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rain-reset:hover:not(:disabled) {
+  background: #ffffff0a;
+  color: #fff;
+}
+.rain-reset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 .rain-settings-compact {
   margin: 6px 0 4px;
   padding-top: 16px;

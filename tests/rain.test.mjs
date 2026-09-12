@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { outputFiles } = await build({
   stdin: {
-    contents: `export * from './lib/rain-engine'; export * from './lib/rain-preference';`,
+    contents: `export * from './lib/rain-engine'; export * from './lib/rain-preference'; export * from './lib/rain-options';`,
     resolveDir: process.cwd(),
     loader: 'ts',
   },
@@ -24,8 +24,14 @@ new Function('require', 'module', 'exports', outputFiles[0].text)(
   compiled,
   compiled.exports,
 );
-const { attachRain, readRainPreference, rainEnabled, saveRainPreference } =
-  compiled.exports;
+const {
+  attachRain,
+  readRainPreference,
+  rainEnabled,
+  saveRainPreference,
+  defaultRainOptions,
+  readRainOptions,
+} = compiled.exports;
 
 class Events {
   listeners = new Map();
@@ -195,6 +201,8 @@ function fixture(t, { coarse = false, reduced = false } = {}) {
       canvas,
       host,
       operations,
+      context,
+      update: cleanup.update,
       dispose,
       strokes: () => operations.filter(([name]) => name === 'stroke').length,
     };
@@ -226,6 +234,7 @@ await test('rain modes select only their surfaces and malformed settings stay bo
     { mode: 'all', player: 'invalid' },
   ])
     assert.deepEqual(readRainPreference(input), {
+      ...defaultRainOptions,
       mode: 'site',
       player: 'full-and-dock',
     });
@@ -241,6 +250,41 @@ await test('rain modes select only their surfaces and malformed settings stay bo
       scopes.map((scope) => rainEnabled({ mode, player }, scope)),
       expected,
     );
+});
+
+await test('new rain controls migrate old preferences and bound invalid stored values', () => {
+  assert.deepEqual(readRainPreference({ mode: 'player', player: 'full' }), {
+    ...defaultRainOptions,
+    mode: 'player',
+    player: 'full',
+  });
+  assert.deepEqual(
+    readRainOptions({ fps: 240, intensity: 1e6, speed: -20, brightness: NaN }),
+    {
+      fps: 'auto',
+      intensity: 200,
+      speed: 50,
+      brightness: 100,
+    },
+  );
+  assert.deepEqual(
+    readRainOptions({
+      fps: '120',
+      intensity: '100',
+      speed: Infinity,
+      brightness: null,
+    }),
+    defaultRainOptions,
+  );
+  assert.deepEqual(
+    readRainOptions({ fps: 120, intensity: 0, speed: 164, brightness: 999 }),
+    {
+      fps: 120,
+      intensity: 25,
+      speed: 165,
+      brightness: 150,
+    },
+  );
 });
 
 await test('desktop clock paints at 60 FPS, is shared, protects content, and caches idle layout', (t) => {
@@ -433,13 +477,127 @@ await test('mobile density and frame rate are lower and 4K bitmap memory stays b
   );
 });
 
+for (const fps of [30, 60, 90, 120]) {
+  await test(`selected ${fps} FPS controls actual drawing on a high-refresh clock`, (t) => {
+    const f = fixture(t),
+      layer = f.layer();
+    layer.update({ ...defaultRainOptions, fps });
+    f.step(0);
+    layer.operations.length = 0;
+    for (let i = 1; i <= 240; i++) f.step((i * 1000) / 240);
+    assert.equal(layer.strokes(), fps * 3);
+    assert.equal(f.frames.size, 1);
+  });
+}
+
+await test('120 FPS respects a 60 Hz screen and an explicit mobile choice overrides auto', (t) => {
+  const f = fixture(t, { coarse: true }),
+    layer = f.layer();
+  layer.update({ ...defaultRainOptions, fps: 120 });
+  f.step(0);
+  layer.operations.length = 0;
+  for (let i = 1; i <= 60; i++) f.step((i * 1000) / 60);
+  assert.equal(layer.strokes(), 60 * 3);
+  assert.equal(
+    layer.operations.filter(([name]) => name === 'lineTo').length,
+    40 * 60,
+  );
+});
+
+await test('live tuning preserves particle positions and updates density, speed and brightness without a restart', (t) => {
+  const f = fixture(t),
+    layer = f.layer();
+  f.step(0);
+  f.step(1000 / 60);
+  const previousY = layer.operations.filter(
+    ([name]) => name === 'moveTo',
+  )[86][2];
+  const reads = f.reads(),
+    observers = f.observers.length;
+  layer.operations.length = 0;
+  layer.update({ fps: 120, intensity: 200, speed: 150, brightness: 150 });
+  assert.equal(
+    layer.operations.length,
+    0,
+    'Changing a slider does not clear the bitmap',
+  );
+  f.step(25);
+  assert.equal(f.observers.length, observers, 'No new renderer or observers');
+  assert.equal(f.reads(), reads, 'Tuning does not rescan the page');
+  assert.equal(
+    layer.operations.filter(([name]) => name === 'lineTo').length,
+    172,
+  );
+  assert.equal(layer.context.globalAlpha, 1);
+  const y = layer.operations.find(([name]) => name === 'moveTo')[2];
+  assert.ok(
+    Math.abs(y - previousY - ((245 * (25 - 1000 / 60)) / 1000) * 1.5) < 0.001,
+  );
+  layer.operations.length = 0;
+  layer.update({ ...defaultRainOptions, intensity: 25, brightness: 25 });
+  f.step(42);
+  assert.equal(
+    layer.operations.filter(([name]) => name === 'lineTo').length,
+    22,
+  );
+  assert.equal(layer.context.globalAlpha, 1 / 6);
+});
+
+for (const coarse of [false, true]) {
+  await test(`maximum intensity keeps ${coarse ? 'mobile' : 'desktop'} particle and bitmap budgets bounded`, (t) => {
+    const f = fixture(t, { coarse }),
+      layer = f.layer('site', 3840, 2160),
+      dock = f.layer('dock', 1000, 1000);
+    layer.update({ ...defaultRainOptions, fps: 120, intensity: 10000 });
+    dock.update({ ...defaultRainOptions, intensity: 10000 });
+    f.step(0);
+    assert.equal(
+      layer.operations.filter(([name]) => name === 'lineTo').length,
+      coarse ? 80 : 180,
+    );
+    assert.equal(
+      dock.operations.filter(([name]) => name === 'lineTo').length,
+      48,
+    );
+    assert.ok(layer.canvas.width * layer.canvas.height <= 1_202_500);
+  });
+}
+
 await test('device preferences persist and unsupported canvas does not break the page', (t) => {
   const f = fixture(t, { reduced: true });
-  saveRainPreference({ mode: 'player', player: 'full' });
+  saveRainPreference({
+    mode: 'player',
+    player: 'full',
+    fps: 120,
+    intensity: 175,
+    speed: 80,
+    brightness: 125,
+  });
   assert.deepEqual(JSON.parse(f.storage.get('noctgram:rain')), {
     mode: 'player',
     player: 'full',
+    fps: 120,
+    intensity: 175,
+    speed: 80,
+    brightness: 125,
   });
+  saveRainPreference({ mode: 'off' });
+  saveRainPreference({ mode: 'player' });
+  assert.equal(
+    JSON.parse(f.storage.get('noctgram:rain')).fps,
+    120,
+    'Off/on retains tuning',
+  );
+  saveRainPreference(defaultRainOptions);
+  assert.deepEqual(
+    JSON.parse(f.storage.get('noctgram:rain')),
+    {
+      ...defaultRainOptions,
+      mode: 'player',
+      player: 'full',
+    },
+    'Reset restores tuning without changing the selected surfaces',
+  );
   globalThis.localStorage.setItem = () => {
     throw new Error('Storage blocked');
   };

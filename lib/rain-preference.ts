@@ -1,17 +1,24 @@
 'use client';
 import { useSyncExternalStore } from 'react';
+import {
+  defaultRainOptions,
+  readRainOptions,
+  type RainOptions,
+} from './rain-options';
 
-export type RainPreference = {
+export type RainPreference = RainOptions & {
   mode: 'site' | 'player' | 'off';
   player: 'full-and-dock' | 'full';
 };
 export const defaultRainPreference: RainPreference = {
+  ...defaultRainOptions,
   mode: 'site',
   player: 'full-and-dock',
 };
 export function readRainPreference(value: unknown): RainPreference {
   const input = value as Partial<RainPreference> | null;
   return {
+    ...readRainOptions(value),
     mode:
       input?.mode === 'off' || input?.mode === 'player' ? input.mode : 'site',
     player: input?.player === 'full' ? 'full' : 'full-and-dock',
