@@ -55,13 +55,16 @@ export async function readConversation(
       m.replyTo,rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
       CASE WHEN rp.text<>'' THEN substr(rp.text,1,240) WHEN json_array_length(rp.media)>0 THEN
         CASE json_extract(rp.media,'$[0].kind') WHEN 'image' THEN 'Фото' WHEN 'video' THEN 'Видео' ELSE json_extract(rp.media,'$[0].name') END ELSE 'Сообщение' END AS replyText,
-      g.id AS receiptId,g.giftId AS giftType,g.message AS giftMessage,t.amount AS giftPrice
+      g.id AS receiptId,g.giftId AS giftType,g.message AS giftMessage,t.amount AS giftPrice,
+      gc.family AS collectibleFamily,gc.number AS collectibleNumber,gc.attributes AS collectibleAttributes,
+      gc.keepOriginal AS collectibleKeepOriginal,gc.created AS collectibleCreated
     FROM chosen m
     LEFT JOIN message_pins p ON p.messageId=m.id
     LEFT JOIN messages rp ON rp.id=m.replyTo AND ${messagePair('rp', 'm.sender', 'm.recipient')} AND ${messageVisible('rp', '(SELECT me FROM scope)')}
     LEFT JOIN users ru ON ru.id=rp.sender
     LEFT JOIN received_gifts g ON g.id=m.giftReceiptId AND g.sender=m.sender AND g.recipient=m.recipient
     LEFT JOIN star_transfers t ON t.id=g.transferId AND t.kind='gift' AND t.sender=g.sender
+    LEFT JOIN gift_upgrades gc ON gc.receiptId=g.id
     ORDER BY m.created,m.id`)
     .bind(me, peer, focus.slice(0, 250))
     .all<
@@ -71,6 +74,11 @@ export async function readConversation(
         giftType: string | null;
         giftMessage: string | null;
         giftPrice: number | null;
+        collectibleFamily: string | null;
+        collectibleNumber: number;
+        collectibleAttributes: string | null;
+        collectibleKeepOriginal: number;
+        collectibleCreated: number;
         replyTo: string | null;
         replyId: string | null;
         replySender: string | null;
@@ -84,6 +92,11 @@ export async function readConversation(
       giftType,
       giftMessage,
       giftPrice,
+      collectibleFamily,
+      collectibleNumber,
+      collectibleAttributes,
+      collectibleKeepOriginal,
+      collectibleCreated,
       media,
       replyTo,
       replyId,
@@ -112,6 +125,11 @@ export async function readConversation(
               giftId: giftType,
               message: giftMessage || '',
               price: giftPrice,
+              collectible: collectibleFamily && collectibleAttributes ? {
+                ...JSON.parse(collectibleAttributes), family: collectibleFamily,
+                number: collectibleNumber, keepOriginal: collectibleKeepOriginal === 1,
+                upgradedAt: collectibleCreated,
+              } : null,
             },
           }
         : {}),

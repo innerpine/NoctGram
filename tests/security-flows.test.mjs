@@ -182,6 +182,11 @@ function fixture(t) {
   const modules = new Map();
   const allowed = new Set([
     'lib/gifts.ts',
+    'lib/gift-collectibles.ts',
+    'lib/gift-upgrades.ts',
+    'lib/gift-upgrade-catalog.ts',
+    'lib/gift-upgrade-data.json',
+    'lib/gift-upgrade-eligibility.json',
     'lib/star-wallet.ts',
     'lib/gift-catalog.ts',
     'lib/notifications.ts',
@@ -281,6 +286,7 @@ function fixture(t) {
           declaration(file, 'featurePost'),
       );
     assert.ok(allowed.has(file), 'Unexpected dependency: ' + file);
+    if (file.endsWith('.json')) return { default: JSON.parse(source(file)) };
     return evaluate(file, source(file));
   }
   const calls = load('lib/calls.ts'),

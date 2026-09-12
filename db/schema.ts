@@ -348,6 +348,35 @@ export const receivedGifts = sqliteTable(
   ],
 );
 
+// Upgrade receipts are permanent. The owning account is the received gift's recipient.
+export const giftCollectionSequences = sqliteTable('gift_collection_sequences', {
+  family: text().primaryKey(),
+  lastNumber: integer().notNull(),
+});
+export const giftUpgrades = sqliteTable(
+  'gift_upgrades',
+  {
+    receiptId: text()
+      .primaryKey()
+      .references(() => receivedGifts.id, { onDelete: 'cascade' }),
+    transferId: text()
+      .notNull()
+      .references(() => starTransfers.id),
+    family: text().notNull(),
+    number: integer().notNull(),
+    attributes: text().notNull(),
+    keepOriginal: integer().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    uniqueIndex('gift_upgrade_payment').on(t.transferId),
+    uniqueIndex('gift_collection_number').on(t.family, t.number),
+    check('gift_upgrade_number_positive', sql`${t.number} > 0`),
+    check('gift_upgrade_original_bool', sql`${t.keepOriginal} IN (0, 1)`),
+    check('gift_upgrade_attributes_json', sql`json_valid(${t.attributes})`),
+  ],
+);
+
 // Moderators are granted by an owner-controlled database operation, never signup.
 export const moderators = sqliteTable('moderators', {
   userId: text()
@@ -437,6 +466,7 @@ export const adminEvents = sqliteTable(
     action: text().notNull(),
     amount: integer().notNull().default(0),
     reason: text().notNull(),
+    payload: text().notNull().default('{}'),
     created: integer().notNull(),
   },
   (t) => [index('admin_events_created').on(t.created)],

@@ -121,6 +121,7 @@ export type Message = {
     giftId: string;
     price: number;
     message: string;
+    collectible?: import('./gift-collectibles').GiftCollectible | null;
   };
 };
 export const welcome: Post[] = [
@@ -208,6 +209,7 @@ export async function upload(file: File): Promise<Media> {
 export type StarTransaction = Appearance & {
   actorId?: string | null;
   giftId?: string;
+  giftNumber?: number | null;
   id: string;
   sender: string | null;
   recipient: string;

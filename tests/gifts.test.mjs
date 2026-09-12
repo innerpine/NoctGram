@@ -158,6 +158,7 @@ assert.equal(
 );
 const outgoing = (await api.readConversation('alice', 'bob'))[0];
 assert.deepEqual(outgoing.gift, {
+  collectible: null,
   id: receipt.id,
   giftId: 'toy_bear',
   price: 75,
@@ -253,7 +254,6 @@ assert.equal(
 assert.equal(count('received_gifts'), 2);
 for (const extra of [
   { giftId: 'missing' },
-  { recipient: 'alice' },
   { message: 'x'.repeat(241) },
   { key: 'short' },
 ])

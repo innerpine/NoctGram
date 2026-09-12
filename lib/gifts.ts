@@ -5,6 +5,7 @@ import { messageAllowed } from './privacy';
 import { balance, ensureWallet } from './star-wallet';
 import { availableGiftDefinition, type ReceivedGift } from './gift-catalog';
 import { rateLimit, socialRateLimit } from './rate-limit';
+import { collectibleFromRow } from './gift-collectibles';
 
 const treasury = 'noctgram_gifts';
 function text(input: unknown, max: number, required = true) {
@@ -28,8 +29,6 @@ export async function sendGift(
   const message = text(body.message ?? '', 240, false);
   if (!/^[a-zA-Z0-9-]{16,80}$/.test(key))
     throw new ApiError(400, 'Некорректный запрос');
-  if (recipient === me)
-    throw new ApiError(400, 'Выбери друга, которому хочешь сделать подарок');
   const id = `gift:${me}:${key}`;
   const payload = JSON.stringify({ recipient, giftId: gift.id, message });
   const existing = await db()
@@ -41,9 +40,10 @@ export async function sendGift(
       409,
       'Этот запрос уже использован. Выбери подарок заново.',
     );
-  // A gift creates a chat message. Retries of a committed receipt create none.
+  // Self-gifts are profile purchases; gifts to others also create a message.
+  // Both consume the mutation budget; committed retries create no new work.
   if (!existing) {
-    await socialRateLimit(me, 'message');
+    await socialRateLimit(me, recipient === me ? 'unclassified' : 'message');
     await rateLimit('gifts', me, 10, 60);
     await rateLimit('gift-recipient', JSON.stringify([me, recipient]), 5, 60);
   }
@@ -52,8 +52,8 @@ export async function sendGift(
     db()
       .prepare(`INSERT INTO star_transfers(id,sender,recipient,postText,amount,kind,created)
       SELECT ?,s.id,?,?,?,'gift',? FROM users s,users r
-      WHERE s.id=? AND r.id=? AND s.id<>r.id AND s.kind='person' AND r.kind='person'
-        AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageAllowed}
+      WHERE s.id=? AND r.id=? AND s.kind='person' AND r.kind='person'
+        AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND (s.id=r.id OR (${messageAllowed}))
         AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=s.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
         AND ? <= (SELECT COALESCE(SUM(CASE WHEN recipient=s.id THEN amount ELSE -amount END),0) FROM star_transfers WHERE recipient=s.id OR sender=s.id)
       ON CONFLICT(id) DO NOTHING`)
@@ -65,12 +65,12 @@ export async function sendGift(
       .bind(gift.id, me, recipient, message, id, me, payload),
     db()
       .prepare(`INSERT INTO messages(id,sender,recipient,text,created,giftReceiptId)
-      SELECT 'gift-message:' || id,sender,recipient,?,created,id FROM received_gifts WHERE id=?
+      SELECT 'gift-message:' || id,sender,recipient,?,created,id FROM received_gifts WHERE id=? AND sender<>recipient
       ON CONFLICT(giftReceiptId) DO NOTHING`)
       .bind(`🎁 Подарок «${gift.name}»${message ? '\n' + message : ''}`, id),
     db()
       .prepare(`INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created)
-      SELECT id,recipient,sender,'gift',id,created FROM received_gifts WHERE id=?`)
+      SELECT id,recipient,sender,'gift',id,created FROM received_gifts WHERE id=? AND sender<>recipient`)
       .bind(id),
   ]);
   const receipt = await db()
@@ -113,17 +113,93 @@ export async function listGifts(
     .first();
   if (!person) throw new ApiError(404, 'Профиль недоступен');
   const rows = await db()
-    .prepare(`SELECT g.*,u.name AS senderName,u.avatar AS senderAvatar,COALESCE(h.handle,'') AS senderHandle
+    .prepare(`SELECT g.*,u.name AS senderName,u.avatar AS senderAvatar,COALESCE(h.handle,'') AS senderHandle,
+    (${visibleAccount('u')} AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker IN (?,g.recipient) AND blocked=u.id) OR(blocker=u.id AND blocked IN (?,g.recipient)))) AS senderVisible,
+    c.family AS collectibleFamily,c.number AS collectibleNumber,c.attributes AS collectibleAttributes,
+    c.keepOriginal AS collectibleKeepOriginal,c.created AS collectibleCreated
     FROM received_gifts g JOIN users u ON u.id=g.sender LEFT JOIN handles h ON h.userId=u.id AND h.main=1
-    WHERE g.recipient=? AND (g.hidden=0 OR g.recipient=?) AND ${visibleAccount('u')}
-      AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker IN (?,g.recipient) AND blocked=u.id) OR(blocker=u.id AND blocked IN (?,g.recipient)))
-      AND (?='' OR g.id=?) AND (?='' OR (g.created,g.id)<(SELECT created,id FROM received_gifts WHERE id=? AND recipient=?))
+    LEFT JOIN gift_upgrades c ON c.receiptId=g.id
+    WHERE g.recipient=? AND (g.hidden=0 OR g.recipient=?)
+      AND (c.receiptId IS NOT NULL OR (${visibleAccount('u')} AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker IN (?,g.recipient) AND blocked=u.id) OR(blocker=u.id AND blocked IN (?,g.recipient)))))
+      AND (?='' OR g.id=? OR ('collectible:'||c.family||':'||c.number)=?)
+      AND (?='' OR (g.created,g.id)<(SELECT bg.created,bg.id FROM received_gifts bg LEFT JOIN gift_upgrades bc ON bc.receiptId=bg.id WHERE (bg.id=? OR ('collectible:'||bc.family||':'||bc.number)=?) AND bg.recipient=?))
     ORDER BY g.created DESC,g.id DESC LIMIT 25`)
-    .bind(recipient, me, me, me, onlyId, onlyId, before, before, recipient)
-    .all<ReceivedGift>();
+    .bind(
+      me,
+      me,
+      recipient,
+      me,
+      me,
+      me,
+      onlyId,
+      onlyId,
+      onlyId,
+      before,
+      before,
+      before,
+      recipient,
+    )
+    .all<
+      ReceivedGift & {
+        transferId: string;
+        senderVisible: number;
+        collectibleFamily: string | null;
+        collectibleNumber: number;
+        collectibleAttributes: string | null;
+        collectibleKeepOriginal: number;
+        collectibleCreated: number;
+      }
+    >();
+  const publicId = (row: (typeof rows.results)[number]) =>
+    recipient !== me && row.collectibleFamily
+      ? `collectible:${row.collectibleFamily}:${row.collectibleNumber}`
+      : row.id;
   return {
-    gifts: rows.results.slice(0, 24),
-    next: rows.results.length > 24 ? rows.results[23].id : null,
+    gifts: rows.results.slice(0, 24).map((row) => {
+      const {
+        collectibleFamily,
+        collectibleNumber,
+        collectibleAttributes,
+        collectibleKeepOriginal,
+        collectibleCreated,
+        senderVisible,
+        transferId,
+        ...stored
+      } = row;
+      const gift = {
+        ...stored,
+        id: publicId(row),
+        ...(recipient === me ? { transferId } : {}),
+      };
+      const collectible =
+        collectibleFamily && collectibleAttributes
+          ? collectibleFromRow({
+              family: collectibleFamily,
+              number: collectibleNumber,
+              attributes: collectibleAttributes,
+              keepOriginal: collectibleKeepOriginal,
+              created: collectibleCreated,
+            })
+          : null;
+      // Original details remain in the private purchase receipt, but must not be
+      // exposed through a public collectible when the owner did not keep them.
+      if (
+        collectible &&
+        (!senderVisible || (!collectible.keepOriginal && recipient !== me))
+      )
+        return {
+          ...gift,
+          collectible,
+          sender: '',
+          senderName: '',
+          senderAvatar: '',
+          senderHandle: '',
+          message: '',
+          created: collectible.upgradedAt,
+        };
+      return { ...gift, collectible };
+    }),
+    next: rows.results.length > 24 ? publicId(rows.results[23]) : null,
   };
 }
 export async function giftVisibility(

@@ -281,6 +281,20 @@
       "when": 1789193570593,
       "tag": "0039_gratitude_badge",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1789193570594,
+      "tag": "0039_gift_upgrades",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1789193570595,
+      "tag": "0040_admin_gifts",
+      "breakpoints": true
     }
   ]
 }

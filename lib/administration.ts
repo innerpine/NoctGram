@@ -1,26 +1,21 @@
 import { db } from './storage';
 import { clean } from './server';
 import { ApiError } from './api-error';
-import { assertWritable } from './account-access';
+import { isAdministrator, requireAdministrator } from './administrator-access';
+import { adminGiftCatalog, grantCollectibleGifts } from './admin-gifts';
 import { appearanceColumns } from './premium-access';
 import { rateLimit } from './rate-limit';
 
-export async function isAdministrator(me: string) {
-  return !!(await db()
-    .prepare('SELECT userId FROM administrators WHERE userId=?')
-    .bind(me)
-    .first());
-}
-async function requireAdministrator(me: string) {
-  await assertWritable(me);
-  if (!(await isAdministrator(me)))
-    throw new ApiError(403, 'Доступно только администратору.');
-}
+export { isAdministrator } from './administrator-access';
 export async function administrationGet(
   action: string,
   s: URLSearchParams,
   me: string,
 ) {
+  if (action === 'adminGiftCatalog')
+    return Response.json(await adminGiftCatalog(me, s.get('giftId') || ''), {
+      headers: { 'Cache-Control': 'private, no-store' },
+    });
   if (action !== 'administration') return null;
   await requireAdministrator(me);
   const q = (s.get('q') || '').trim().replace(/^@/, '').slice(0, 80);
@@ -49,6 +44,10 @@ export async function administrationPost(
   b: Record<string, unknown>,
   me: string,
 ) {
+  if (action === 'adminGiftGrant')
+    return Response.json(await grantCollectibleGifts(me, b), {
+      headers: { 'Cache-Control': 'private, no-store' },
+    });
   if (action !== 'adminGrant') return null;
   await requireAdministrator(me);
   await rateLimit('admin-grant', me, 30, 60);
