@@ -556,6 +556,17 @@
 .received-gift {
   padding-bottom: 17px;
 }
+.profile-gifts-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+.gift-self-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
 .gift-from {
   display: block;
   max-width: 100%;

@@ -1,6 +1,12 @@
 'use client';
 /* eslint-disable react/react-compiler */
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import {
   ArrowLeft,
   Check,
@@ -26,10 +32,12 @@ import {
   type ReceivedGift,
 } from '@/lib/gift-catalog';
 import { GiftAnimation } from './gift-animation';
+import { GiftCollectibleArt } from './gift-collectible-art';
+import { GiftReceipt } from './gift-receipt';
 import { StarsIcon } from './stars-icon';
 import type { Person } from '@/lib/client';
 import { Avatar } from './profile-identity';
-import { ProfileLink, MentionText } from './profile-link';
+import { ProfileLink } from './profile-link';
 import { reconcileSnapshot } from '@/lib/reconcile-snapshot';
 
 async function api<T>(query = '', body?: object): Promise<T> {
@@ -92,20 +100,28 @@ export function SendGiftButton({
   recipient,
   senderId,
   disabled,
+  showLabel = false,
 }: {
   recipient: Person;
   senderId: string;
   disabled?: boolean;
+  showLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false),
     [session, setSession] = useState(0);
   const popup = useRef<HTMLDivElement>(null);
+  const label =
+    recipient.id === senderId ? 'Подарить себе' : 'Подарить подарок';
   return (
     <>
       <button
-        className="icon-button profile-gift-button"
-        aria-label="Подарить подарок"
-        title="Подарить подарок"
+        className={
+          showLabel
+            ? 'secondary gift-self-button'
+            : 'icon-button profile-gift-button'
+        }
+        aria-label={label}
+        title={label}
         disabled={disabled}
         onClick={() => {
           setSession((value) => value + 1);
@@ -113,6 +129,7 @@ export function SendGiftButton({
         }}
       >
         <Gift size={19} />
+        {showLabel && <span>{label}</span>}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
@@ -143,6 +160,7 @@ function SendGiftForm({
   onClose: () => void;
 }) {
   const draftKey = 'noctgram:gift-draft:' + senderId + ':' + recipient.id;
+  const self = senderId === recipient.id;
   const [initial] = useState(() => storedDraft(draftKey, recipient.id));
   const [catalog, setCatalog] = useState<GiftDefinition[]>([]),
     [balance, setBalance] = useState<number | null>(null);
@@ -245,15 +263,23 @@ function SendGiftForm({
         <div>
           <DialogTitle>
             {sent
-              ? 'Подарок отправлен'
+              ? self
+                ? 'Подарок твой'
+                : 'Подарок отправлен'
               : selected
                 ? selected.name
-                : 'Сделай день теплее'}
+                : self
+                  ? 'Подарок для себя'
+                  : 'Сделай день теплее'}
           </DialogTitle>
           <DialogDescription>
             {sent
-              ? `${recipient.name} получит его в уведомлениях`
-              : `Подарок для ${recipient.name}`}
+              ? self
+                ? 'Он уже появился во вкладке «Подарки» твоего профиля'
+                : `${recipient.name} получит его в уведомлениях`
+              : self
+                ? 'Выбери подарок — он появится в твоём профиле'
+                : `Подарок для ${recipient.name}`}
           </DialogDescription>
         </div>
         {!selected && (
@@ -394,7 +420,9 @@ function SendGiftForm({
                 ? 'Отправляем…'
                 : attempt.current
                   ? 'Проверить отправку'
-                  : 'Подарить'}
+                  : self
+                    ? 'Подарить себе'
+                    : 'Подарить'}
               <span>
                 <StarsIcon size={16} />
                 {selected.price}
@@ -414,9 +442,13 @@ type GiftPage = { gifts: ReceivedGift[]; next: string | null };
 export function ProfileGifts({
   userId,
   own,
+  ownerName,
+  selfGift,
 }: {
   userId: string;
   own: boolean;
+  ownerName?: string;
+  selfGift?: ReactNode;
 }) {
   const [page, setPage] = useState<GiftPage>({ gifts: [], next: null }),
     [loading, setLoading] = useState(true),
@@ -529,6 +561,9 @@ export function ProfileGifts({
   const definition = selected && giftDefinition(selected.giftId);
   return (
     <section className="profile-gifts" aria-label="Подарки в профиле">
+      {own && selfGift && (
+        <div className="profile-gifts-actions">{selfGift}</div>
+      )}
       {loading ? (
         <div className="gift-loading">
           <LoaderCircle className="spin" size={22} />
@@ -544,6 +579,7 @@ export function ProfileGifts({
                   className="gift-tile received-gift"
                   key={receipt.id}
                   style={color(gift)}
+                  data-collectible={!!receipt.collectible}
                 >
                   <button
                     className="gift-tile-open"
@@ -561,15 +597,31 @@ export function ProfileGifts({
                         aria-label="Скрыт из профиля"
                       />
                     )}
-                    <GiftAnimation id={gift.id} />
+                    {receipt.collectible ? (
+                      <GiftCollectibleArt
+                        family={gift.id}
+                        attributes={receipt.collectible}
+                      />
+                    ) : (
+                      <GiftAnimation id={gift.id} />
+                    )}
                     <strong>{gift.name}</strong>
+                    {receipt.collectible && (
+                      <span className="gift-number">
+                        #{receipt.collectible.number.toLocaleString('ru-RU')}
+                      </span>
+                    )}
                   </button>
-                  <span className="gift-from">
-                    от{' '}
-                    <ProfileLink target={{ id: receipt.sender }}>
-                      {receipt.senderName}
-                    </ProfileLink>
-                  </span>
+                  {!!receipt.sender &&
+                    (!receipt.collectible ||
+                      receipt.collectible.keepOriginal) && (
+                      <span className="gift-from">
+                        от{' '}
+                        <ProfileLink target={{ id: receipt.sender }}>
+                          {receipt.senderName}
+                        </ProfileLink>
+                      </span>
+                    )}
                 </div>
               )
             );
@@ -615,62 +667,51 @@ export function ProfileGifts({
           overlayClassName="gift-backdrop"
         >
           {selected && definition && (
-            <>
-              <DialogTitle>{definition.name}</DialogTitle>
-              <DialogDescription>
-                {own ? 'Твой подарок' : 'Подарок в профиле'}
-              </DialogDescription>
-              <div className="gift-preview" style={color(definition)}>
-                <div className="gift-preview-art">
-                  <GiftAnimation id={definition.id} />
-                </div>
-                <div className="gift-recipient">
-                  <ProfileLink target={{ id: selected.sender }}>
-                    <Avatar
-                      person={{
-                        name: selected.senderName,
-                        avatar: selected.senderAvatar,
-                      }}
-                      size={28}
-                    />
-                    <span>от {selected.senderName}</span>
-                  </ProfileLink>
-                </div>
-                {selected.message && (
-                  <p className="gift-caption">
-                    <MentionText text={selected.message} />
-                  </p>
-                )}
-                <time className="gift-date">
-                  {new Date(selected.created).toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </time>
-              </div>
-              {error && (
-                <p className="form-error" role="alert">
-                  {error}
-                </p>
-              )}
-              {own && (
-                <button
-                  className="secondary gift-visibility"
-                  disabled={busy}
-                  onClick={() => void visibility()}
-                >
-                  {busy ? (
-                    <LoaderCircle className="spin" size={17} />
-                  ) : selected.hidden ? (
-                    <Eye size={17} />
-                  ) : (
-                    <EyeOff size={17} />
+            <GiftReceipt
+              key={selected.id}
+              receipt={selected}
+              own={own}
+              ownerName={ownerName}
+              onUpdated={(collectible) => {
+                const id = selected.id;
+                setSelected((old) =>
+                  old?.id === id ? { ...old, collectible } : old,
+                );
+                setPage((old) => ({
+                  ...old,
+                  gifts: old.gifts.map((gift) =>
+                    gift.id === id ? { ...gift, collectible } : gift,
+                  ),
+                }));
+              }}
+              footer={
+                <>
+                  {error && (
+                    <p className="form-error" role="alert">
+                      {error}
+                    </p>
                   )}
-                  {selected.hidden ? 'Показать в профиле' : 'Скрыть из профиля'}
-                </button>
-              )}
-            </>
+                  {own && (
+                    <button
+                      className="secondary gift-visibility"
+                      disabled={busy}
+                      onClick={() => void visibility()}
+                    >
+                      {busy ? (
+                        <LoaderCircle className="spin" size={17} />
+                      ) : selected.hidden ? (
+                        <Eye size={17} />
+                      ) : (
+                        <EyeOff size={17} />
+                      )}
+                      {selected.hidden
+                        ? 'Показать в профиле'
+                        : 'Скрыть из профиля'}
+                    </button>
+                  )}
+                </>
+              }
+            />
           )}
         </DialogContent>
       </Dialog>

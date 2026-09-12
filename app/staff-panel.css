@@ -1,4 +1,92 @@
 /* Administration and moderation share controls; portal menus are scoped by class. */
+.admin-gift-form,
+.admin-gift-form > fieldset {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+.admin-gift-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+  gap: 20px;
+  padding: 14px;
+  border: 1px solid #ffffff12;
+  border-radius: 18px;
+  background: #ffffff03;
+  align-items: center;
+}
+.admin-gift-preview .gift-collectible-scene {
+  min-height: 220px;
+  border-radius: 13px;
+}
+.admin-gift-preview .gift-collectible-model {
+  width: 155px;
+  height: 155px;
+}
+.admin-gift-preview .gift-collectible-heading {
+  display: grid;
+  gap: 4px;
+}
+.admin-gift-preview .gift-collectible-heading strong {
+  font-size: 18px;
+}
+.admin-gift-preview .gift-collectible-heading span {
+  font-size: 12px;
+}
+.admin-gift-preview-copy {
+  min-width: 0;
+}
+.admin-gift-preview-copy .staff-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: normal;
+}
+.admin-gift-preview-copy p {
+  color: #eee8f5;
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 12px 0 8px;
+}
+.admin-gift-preview-copy small,
+.administration-panel .admin-gift-note {
+  color: #a9a2b5;
+  font-size: 12px;
+  line-height: 1.65;
+  margin: 0;
+}
+.admin-gift-checkbox {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  color: #e3dceb;
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.admin-gift-checkbox [data-slot='checkbox'] {
+  width: 20px;
+  height: 20px;
+  border-color: #ffffff40;
+  border-radius: 6px;
+}
+.admin-gift-journal-details {
+  display: block;
+  margin-top: 7px;
+  overflow-wrap: anywhere;
+  color: #c5b4e7;
+}
+@media (max-width: 500px) {
+  .admin-gift-preview {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .admin-gift-preview .gift-collectible-scene {
+    width: 100%;
+    max-width: 260px;
+    justify-self: center;
+  }
+}
 .moderation-panel {
   --staff-accent: #c5b4e7;
   --staff-border: #ffffff12;

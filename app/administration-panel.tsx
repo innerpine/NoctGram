@@ -13,10 +13,13 @@ import {
   Check,
   ArrowUpRight,
   RefreshCw,
+  Gift,
 } from 'lucide-react';
 import { request, type Person } from '@/lib/client';
 import { Avatar, DisplayName } from './profile-identity';
 import { StaffSelect } from './staff-select';
+import { AdminGiftForm } from './admin-gift-form';
+import { giftDefinition } from '@/lib/gift-catalog';
 type AdminPerson = Person & {
   administrator: number;
   moderator: number;
@@ -29,10 +32,12 @@ type Event = Person & {
   reason: string;
   created: number;
   actorName: string;
+  payload?: string;
 };
 const actions = [
   { value: 'stars', label: 'Выдать Stars', icon: Star },
   { value: 'premium', label: 'Выдать Premium', icon: Sparkles },
+  { value: 'collectible', label: 'Выдать подарки', icon: Gift },
   { value: 'verified', label: 'Верификация', icon: BadgeCheck },
   { value: 'moderator', label: 'Роль модератора', icon: ShieldCheck },
 ];
@@ -45,6 +50,21 @@ function roleLabel(person: AdminPerson) {
         ? 'Канал'
         : 'Пользователь';
 }
+function giftEventDetails(event: Event) {
+  try {
+    const p = JSON.parse(event.payload || '{}');
+    if (
+      !p.giftId ||
+      !Number.isSafeInteger(p.firstNumber) ||
+      !Number.isSafeInteger(p.count)
+    )
+      return '';
+    const last = p.firstNumber + p.count - 1;
+    return `${giftDefinition(p.giftId)?.name || p.giftId} · #${p.firstNumber}${last !== p.firstNumber ? '–#' + last : ''} · ${p.attributes?.model?.name || ''} / ${p.attributes?.backdrop?.name || ''} / ${p.attributes?.symbol?.name || ''}`;
+  } catch {
+    return '';
+  }
+}
 export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
   const [query, setQuery] = useState(''),
     [people, setPeople] = useState<AdminPerson[]>([]),
@@ -54,6 +74,7 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
     [amount, setAmount] = useState('1000'),
     [reason, setReason] = useState(''),
     [busy, setBusy] = useState(false),
+    [giftLocked, setGiftLocked] = useState(false),
     [error, setError] = useState(''),
     [notice, setNotice] = useState(''),
     [version, setVersion] = useState(0),
@@ -143,7 +164,7 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
         </span>
         <div>
           <h3>Администрирование</h3>
-          <p>Stars, Premium и полномочия пользователей</p>
+          <p>Stars, Premium, подарки и полномочия пользователей</p>
         </div>
         <button
           className="icon-button"
@@ -209,13 +230,14 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
           className="admin-grant-form"
           onSubmit={(e) => {
             e.preventDefault();
-            void submit();
+            if (kind !== 'collectible') void submit();
           }}
         >
           <fieldset disabled={busy}>
             <button
               type="button"
               className="account-text-button"
+              disabled={giftLocked}
               onClick={() => {
                 setSelected(null);
                 setNotice('');
@@ -249,7 +271,7 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
                     ? actions.filter((a) => a.value === 'verified')
                     : actions
                 }
-                disabled={busy}
+                disabled={busy || giftLocked}
                 onChange={(v) => {
                   setKind(v);
                   setAmount(
@@ -271,7 +293,7 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
                     onChange={(e) => setAmount(e.target.value)}
                   />
                 </label>
-              ) : (
+              ) : kind !== 'collectible' ? (
                 <StaffSelect
                   label="Состояние"
                   value={amount}
@@ -279,53 +301,68 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
                   onChange={setAmount}
                   disabled={busy}
                 />
-              )}
+              ) : null}
             </div>
-            <label className="account-field">
-              <span className="staff-field-caption">
-                Причина <small>{reason.length}/500</small>
-              </span>
-              <textarea
-                required
-                maxLength={500}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={3}
-                placeholder={
-                  kind === 'stars' || kind === 'premium'
-                    ? 'Например, награда за помощь в тестировании'
-                    : kind === 'verified'
-                      ? 'Например, подтверждён официальный аккаунт автора'
-                      : 'Например, назначение в команду модерации'
-                }
+            {kind === 'collectible' ? (
+              <AdminGiftForm
+                key={selected.id}
+                target={selected.id}
+                handle={selected.handle}
+                onLock={setGiftLocked}
+                onIssued={() => {
+                  setVersion((v) => v + 1);
+                  onChanged();
+                }}
               />
-            </label>
-            <div className="admin-grant-summary">
-              <span className="staff-summary-icon">
-                <ActionIcon size={20} />
-              </span>
-              <div>
-                <strong>После подтверждения</strong>
-                <p>
-                  {kind === 'stars'
-                    ? `@${selected.handle} получит ${Number(amount || 0).toLocaleString('ru-RU')} Stars.`
-                    : kind === 'premium'
-                      ? `Premium для @${selected.handle} будет продлён на ${amount} дн.`
-                      : kind === 'verified'
-                        ? `${amount === '1' ? 'Подтвердить' : 'Снять подтверждение'} @${selected.handle}.`
-                        : `${amount === '1' ? 'Назначить модератором' : 'Снять роль модератора у'} @${selected.handle}.`}
-                </p>
-              </div>
-            </div>
-            <div className="staff-form-footer">
-              <span>
-                <History size={14} /> Сохраним в журнале
-              </span>
-              <button className="primary" disabled={!reason.trim() || busy}>
-                <Check size={16} />
-                {busy ? 'Сохраняем…' : submitLabel}
-              </button>
-            </div>
+            ) : (
+              <>
+                <label className="account-field">
+                  <span className="staff-field-caption">
+                    Причина <small>{reason.length}/500</small>
+                  </span>
+                  <textarea
+                    required
+                    maxLength={500}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    rows={3}
+                    placeholder={
+                      kind === 'stars' || kind === 'premium'
+                        ? 'Например, награда за помощь в тестировании'
+                        : kind === 'verified'
+                          ? 'Например, подтверждён официальный аккаунт автора'
+                          : 'Например, назначение в команду модерации'
+                    }
+                  />
+                </label>
+                <div className="admin-grant-summary">
+                  <span className="staff-summary-icon">
+                    <ActionIcon size={20} />
+                  </span>
+                  <div>
+                    <strong>После подтверждения</strong>
+                    <p>
+                      {kind === 'stars'
+                        ? `@${selected.handle} получит ${Number(amount || 0).toLocaleString('ru-RU')} Stars.`
+                        : kind === 'premium'
+                          ? `Premium для @${selected.handle} будет продлён на ${amount} дн.`
+                          : kind === 'verified'
+                            ? `${amount === '1' ? 'Подтвердить' : 'Снять подтверждение'} @${selected.handle}.`
+                            : `${amount === '1' ? 'Назначить модератором' : 'Снять роль модератора у'} @${selected.handle}.`}
+                    </p>
+                  </div>
+                </div>
+                <div className="staff-form-footer">
+                  <span>
+                    <History size={14} /> Сохраним в журнале
+                  </span>
+                  <button className="primary" disabled={!reason.trim() || busy}>
+                    <Check size={16} />
+                    {busy ? 'Сохраняем…' : submitLabel}
+                  </button>
+                </div>
+              </>
+            )}
           </fieldset>
         </form>
       )}
@@ -344,9 +381,11 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
                   ? `+${e.amount.toLocaleString('ru-RU')}`
                   : e.action === 'premium'
                     ? `+${e.amount} дн.`
-                    : e.amount
-                      ? '· включено'
-                      : '· снято'}
+                    : e.action === 'collectible'
+                      ? `· ${e.amount} шт.`
+                      : e.amount
+                        ? '· включено'
+                        : '· снято'}
               </strong>
               <time>{new Date(e.created).toLocaleString('ru-RU')}</time>
             </div>
@@ -354,6 +393,11 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
               {e.actorName} → {e.handle ? '@' + e.handle : e.name}
             </p>
             <small>{e.reason}</small>
+            {e.action === 'collectible' && (
+              <small className="admin-gift-journal-details">
+                {giftEventDetails(e)}
+              </small>
+            )}
           </article>
         ))}
         {!events.length && (

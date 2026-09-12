@@ -2537,6 +2537,10 @@ export default function Noctgram({
                 key={'gifts:' + profile.id}
                 userId={profile.id}
                 own={profile.id === me.id}
+                ownerName={profile.name}
+                selfGift={profile.id === me.id ? (
+                  <SendGiftButton recipient={profile} senderId={me.id} disabled={readOnly || busy} showLabel />
+                ) : undefined}
               />
             )}
             {profilePublisher &&

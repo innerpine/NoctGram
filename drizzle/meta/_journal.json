@@ -267,6 +267,20 @@
       "when": 1789063481081,
       "tag": "0034_payment_checkout_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1789152630776,
+      "tag": "0039_gift_upgrades",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1789156057253,
+      "tag": "0040_admin_gifts",
+      "breakpoints": true
     }
   ]
 }

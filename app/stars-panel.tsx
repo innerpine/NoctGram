@@ -289,7 +289,9 @@ export function StarsPanel({
             )}
             <div>
               <strong>
-                {t.kind === 'purchase' ? (
+                {t.kind === 'gift_upgrade' ? (
+                  'Улучшение подарка'
+                ) : t.kind === 'purchase' ? (
                   'Покупка Noct Stars'
                 ) : t.kind === 'purchase_refund' ? (
                   'Возврат покупки'
@@ -308,23 +310,27 @@ export function StarsPanel({
                 )}
               </strong>
               <span>
-                {t.kind === 'purchase'
-                  ? 'Оплата подтверждена'
-                  : t.kind === 'purchase_refund'
-                    ? 'Сумма возвращена через платёжный сервис'
-                    : t.kind === 'gift'
-                      ? 'Подарок «' +
-                        (giftDefinition(t.giftId)?.name || 'Подарок') +
-                        '»'
-                      : t.kind === 'admin_grant'
-                        ? 'Начислено администратором'
-                        : t.kind === 'telegram_test'
-                          ? 'Тестовые звёзды · без оплаты'
-                          : t.kind === 'grant'
-                            ? 'Стартовые звёзды'
-                            : t.sender === me.id
-                              ? 'Поддержка автора'
-                              : 'Поддержали твою публикацию'}
+                {t.kind === 'gift_upgrade'
+                  ? (giftDefinition(t.giftId)?.name ||
+                      'Коллекционный подарок') +
+                    (t.giftNumber ? ' #' + t.giftNumber : '')
+                  : t.kind === 'purchase'
+                    ? 'Оплата подтверждена'
+                    : t.kind === 'purchase_refund'
+                      ? 'Сумма возвращена через платёжный сервис'
+                      : t.kind === 'gift'
+                        ? 'Подарок «' +
+                          (giftDefinition(t.giftId)?.name || 'Подарок') +
+                          '»'
+                        : t.kind === 'admin_grant'
+                          ? 'Начислено администратором'
+                          : t.kind === 'telegram_test'
+                            ? 'Тестовые звёзды · без оплаты'
+                            : t.kind === 'grant'
+                              ? 'Стартовые звёзды'
+                              : t.sender === me.id
+                                ? 'Поддержка автора'
+                                : 'Поддержали твою публикацию'}
               </span>
               <Stamp time={t.created} />
             </div>

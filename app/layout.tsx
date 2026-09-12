@@ -18,6 +18,7 @@ import './profile-design.css';
 import './telegram-stars.css';
 import './stars-topup.css';
 import './gifts.css';
+import './gift-upgrades.css';
 import './dialog-motion.css';
 import './music.css';
 import './music-charts.css';

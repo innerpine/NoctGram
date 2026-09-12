@@ -1,3 +1,5 @@
+import type { GiftCollectible } from './gift-collectibles';
+
 export type GiftDefinition = {
   id: string;
   name: string;
@@ -204,4 +206,5 @@ export type ReceivedGift = {
   senderName: string;
   senderAvatar: string;
   senderHandle: string;
+  collectible?: GiftCollectible | null;
 };

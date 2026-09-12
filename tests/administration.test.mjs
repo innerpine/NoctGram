@@ -202,6 +202,11 @@ function fixture(t) {
   const modules = new Map();
   const allowed = new Set([
     'lib/administration.ts',
+    'lib/administrator-access.ts',
+    'lib/admin-gifts.ts',
+    'lib/gift-catalog.ts',
+    'lib/gift-upgrade-catalog.ts',
+    'lib/gift-upgrade-data.json',
     'lib/account-access.ts',
     'lib/premium-access.ts',
     'lib/premium-predicate.ts',
@@ -277,7 +282,9 @@ function fixture(t) {
       allowed.has(file),
       `Unexpected dependency ${file}; add its real module or document the boundary.`,
     );
-    return evaluate(file, source(file));
+    return file.endsWith('.json')
+      ? { default: JSON.parse(source(file)) }
+      : evaluate(file, source(file));
   }
   const admin = load('lib/administration.ts');
   const access = load('lib/account-access.ts');

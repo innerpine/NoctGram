@@ -207,7 +207,17 @@ try {
           tab === 'gifts' ? 1 : 0,
           `${me.id}: ${tab} must replace the previous panel`,
         );
-        if (gifts.length) assert.equal(gifts[0].props.own, own);
+        if (gifts.length) {
+          assert.equal(gifts[0].props.own, own);
+          const selfGift = gifts[0].props.selfGift;
+          assert.equal(!!selfGift, own, 'Only the current account has the self-gift action');
+          if (selfGift) {
+            assert.equal(selfGift.type, 'SendGiftButton');
+            assert.equal(selfGift.props.senderId, me.id);
+            assert.equal(selfGift.props.recipient.id, me.id);
+            assert.equal(selfGift.props.showLabel, true);
+          }
+        }
         assert.equal(
           all(tree, 'ChannelTools').length,
           own && tab === 'posts' ? 1 : 0,

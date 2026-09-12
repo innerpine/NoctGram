@@ -79,6 +79,10 @@ function load(file) {
     override && existsSync(override) ? override : file,
     'utf8',
   );
+  if (path.extname(file) === '.json') {
+    loadedModule.exports = JSON.parse(source);
+    return loadedModule.exports;
+  }
   const output = ts.transpileModule(source, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2022,

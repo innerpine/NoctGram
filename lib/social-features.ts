@@ -110,7 +110,7 @@ export async function featureGet(
     const before = Number(s.get('before')) || Date.now() + 1;
     const rows = await d
       .prepare(
-        `WITH viewer AS(SELECT ? AS id) SELECT t.*,g.giftId,a.id AS actorId,COALESCE(a.name,'Noct Stars') AS name,COALESCE(a.avatar,'') AS avatar,${appearanceColumns('a')} FROM star_transfers t CROSS JOIN viewer v LEFT JOIN received_gifts g ON g.transferId=t.id LEFT JOIN users a ON a.id=CASE WHEN t.kind='gift' THEN g.recipient WHEN t.sender=v.id THEN t.recipient ELSE t.sender END WHERE (t.sender=v.id OR t.recipient=v.id) AND (t.created<? OR(t.created=? AND t.id<?)) ORDER BY t.created DESC,t.id DESC LIMIT 50`,
+        `WITH viewer AS(SELECT ? AS id) SELECT t.*,COALESCE(g.giftId,c.family) AS giftId,c.number AS giftNumber,a.id AS actorId,COALESCE(a.name,'Noct Stars') AS name,COALESCE(a.avatar,'') AS avatar,${appearanceColumns('a')} FROM star_transfers t CROSS JOIN viewer v LEFT JOIN received_gifts g ON g.transferId=t.id LEFT JOIN gift_upgrades c ON c.transferId=t.id LEFT JOIN users a ON a.id=CASE WHEN t.kind='gift_upgrade' THEN NULL WHEN t.kind='gift' THEN g.recipient WHEN t.sender=v.id THEN t.recipient ELSE t.sender END WHERE (t.sender=v.id OR t.recipient=v.id) AND (t.created<? OR(t.created=? AND t.id<?)) ORDER BY t.created DESC,t.id DESC LIMIT 50`,
       )
       .bind(me, before, before, s.get('beforeId') || '')
       .all();

@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "purpose": "Exact-file sanitization retaining Telegram-native baked property semantics. Delete only the seven listed x strings after validating original hashes and expected path values; retain a/k and all other data. Do not execute or resolve expression source. Reject other expression or external image fields.",
+  "rendererProof": [
+    {
+      "url": "https://github.com/TelegramMessenger/rlottie#supported-after-effects-features",
+      "fact": "Telegram rlottie marks Expressions unsupported."
+    },
+    {
+      "url": "https://github.com/TelegramMessenger/rlottie/blob/master/src/lottie/lottieparser.cpp#L2120",
+      "fact": "parseShapeProperty consumes k and skips all other property keys including x."
+    },
+    {
+      "url": "https://github.com/TelegramMessenger/rlottie/blob/master/src/lottie/lottieparser.cpp#L2177",
+      "fact": "parseProperty consumes k and skips other keys including x."
+    },
+    {
+      "url": "https://github.com/TelegramMessenger/rlottie/blob/master/src/lottie/lottieparser.cpp#L1505",
+      "fact": "Position parser consumes k; x is considered only for separated-position coordinates. Jamaica p is unseparated, so string x is skipped."
+    },
+    {
+      "url": "https://core.telegram.org/stickers#animation-requirements",
+      "fact": "Telegram animated-sticker requirements exclude expressions."
+    }
+  ],
+  "files": [
+    {
+      "file": "collectible-bunny_muffin-5c33073eddf7.tgs",
+      "sourceUrl": "https://cdn.changes.tg/gifts/models/Bunny%20Muffin/Lu%20Crystal.tgs",
+      "originalCompressedSha256": "b1a6730af2f641385b11f50e40ae381c0765d13cc3545665714b303e33319f92",
+      "originalDecompressedSha256": "a71bfe10a2b19fb791741aa571f3e6073c56823c7affc4c64c897f4cc0e29c45",
+      "originalCompressedBytes": 47531,
+      "originalDecompressedBytes": 501702,
+      "remove": [
+        {
+          "jsonPath": "$.layers[2].shapes[0].it[0].it[0].ks.x",
+          "path": [
+            "layers",
+            2,
+            "shapes",
+            0,
+            "it",
+            0,
+            "it",
+            0,
+            "ks",
+            "x"
+          ],
+          "expectedExpression": "var $bm_rt;\n$bm_rt = content('Group 2').content('Group 1').content('Path 1').path;",
+          "a": 1,
+          "bakedKeyframeCount": 32
+        },
+        {
+          "jsonPath": "$.layers[2].shapes[1].it[0].it[0].ks.x",
+          "path": [
+            "layers",
+            2,
+            "shapes",
+            1,
+            "it",
+            0,
+            "it",
+            0,
+            "ks",
+            "x"
+          ],
+          "expectedExpression": "var $bm_rt;\n$bm_rt = content('Group 2').content('Group 1').content('Path 1').path;",
+          "a": 1,
+          "bakedKeyframeCount": 32
+        }
+      ]
+    },
+    {
+      "file": "collectible-fresh_socks-11699c15e490.tgs",
+      "sourceUrl": "https://cdn.changes.tg/gifts/models/Fresh%20Socks/Black%20Panther.tgs",
+      "originalCompressedSha256": "e781c7f66ea1cc86f77362b4717c19f31993aa18a1c8fbdd818f6486f0f5dda9",
+      "originalDecompressedSha256": "5727560dc845963c51153c04309c7f121cf4ce9550480dc12f69412d7c1d7540",
+      "originalCompressedBytes": 51300,
+      "originalDecompressedBytes": 324031,
+      "remove": [
+        {
+          "jsonPath": "$.layers[1].shapes[15].it[0].ks.x",
+          "path": [
+            "layers",
+            1,
+            "shapes",
+            15,
+            "it",
+            0,
+            "ks",
+            "x"
+          ],
+          "expectedExpression": "var $bm_rt;\n$bm_rt = content('Shape 2').content('Path 1').path;",
+          "a": 1,
+          "bakedKeyframeCount": 21
+        }
+      ]
+    },
+    {
+      "file": "collectible-fresh_socks-777041fb3951.tgs",
+      "sourceUrl": "https://cdn.changes.tg/gifts/models/Fresh%20Socks/Garfield.tgs",
+      "originalCompressedSha256": "7951d59d9d651cc221a3e6acfdf5313eee747510fe362ed7e83a8e15310ce530",
+      "originalDecompressedSha256": "7012aa0e0ea8474cd0ec1ec7abfb48ae8db199063178302916333a911b12c460",
+      "originalCompressedBytes": 51286,
+      "originalDecompressedBytes": 326621,
+      "remove": [
+        {
+          "jsonPath": "$.layers[1].shapes[15].it[0].ks.x",
+          "path": [
+            "layers",
+            1,
+            "shapes",
+            15,
+            "it",
+            0,
+            "ks",
+            "x"
+          ],
+          "expectedExpression": "var $bm_rt;\n$bm_rt = content('Shape 2').content('Path 1').path;",
+          "a": 1,
+          "bakedKeyframeCount": 21
+        }
+      ]
+    },
+    {
+      "file": "collectible-ion_gem-42c298ba17fe.tgs",
+      "sourceUrl": "https://cdn.changes.tg/gifts/models/Ion%20Gem/Jamaica.tgs",
+      "originalCompressedSha256": "47968e8ca84a23909f7760721cec86bef961a537f33a5ac5a8914ea3ac3f2a4c",
+      "originalDecompressedSha256": "d92217b8ad1634a68eaa6ad6c9998addd363a3342a6c37e0f45c67f41e0a73be",
+      "originalCompressedBytes": 28181,
+      "originalDecompressedBytes": 378597,
+      "remove": [
+        {
+          "jsonPath": "$.assets[1].layers[0].ks.p.x",
+          "path": [
+            "assets",
+            1,
+            "layers",
+            0,
+            "ks",
+            "p",
+            "x"
+          ],
+          "expectedExpression": "var $bm_rt;\n$bm_rt = thisComp.layer('16').transform.position;",
+          "a": 0,
+          "bakedKeyframeCount": 0
+        }
+      ]
+    },
+    {
+      "file": "collectible-lush_bouquet-38ba21445431.tgs",
+      "sourceUrl": "https://cdn.changes.tg/gifts/models/Lush%20Bouquet/Cotton.tgs",
+      "originalCompressedSha256": "d1304317d42bd1b2eca87c04a711943f9a964e65106efba178a69b17e4fc3230",
+      "originalDecompressedSha256": "46e1107d28b8a7234169f252a5acdfc04413b2a9e7f91bb29db909be2f8dc86a",
+      "originalCompressedBytes": 60403,
+      "originalDecompressedBytes": 349036,
+      "remove": [
+        {
+          "jsonPath": "$.layers[48].shapes[1].it[0].ks.x",
+          "path": [
+            "layers",
+            48,
+            "shapes",
+            1,
+            "it",
+            0,
+            "ks",
+            "x"
+          ],
+          "expectedExpression": "var $bm_rt;\n$bm_rt = content('Group 4').content('Path 1').path;",
+          "a": 0,
+          "bakedKeyframeCount": 0
+        }
+      ]
+    },
+    {
+      "file": "collectible-swiss_watch-5e55cf3d99fa.tgs",
+      "sourceUrl": "https://cdn.changes.tg/gifts/models/Swiss%20Watch/The%20Original.tgs",
+      "originalCompressedSha256": "5507b3cef0da9adc5794eb4f80042a2747ebe29ef05c9fdbb59aa2f4158722e8",
+      "originalDecompressedSha256": "870b98cc971429dd0d2b81b0530de181d4cc6564c426456af87d7ecc75661840",
+      "originalCompressedBytes": 20580,
+      "originalDecompressedBytes": 184572,
+      "remove": [
+        {
+          "jsonPath": "$.layers[12].shapes[2].it[0].it[0].it[1].c.x",
+          "path": [
+            "layers",
+            12,
+            "shapes",
+            2,
+            "it",
+            0,
+            "it",
+            0,
+            "it",
+            1,
+            "c",
+            "x"
+          ],
+          "expectedExpression": "var $bm_rt;\n$bm_rt = thisComp.layer('NULL ').effect('Color Control6322')('Color');",
+          "a": 0,
+          "bakedKeyframeCount": 0
+        }
+      ]
+    }
+  ]
+}

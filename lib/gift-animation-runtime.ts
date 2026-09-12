@@ -53,12 +53,17 @@ function dataFor(id: string) {
     : null;
   const asset = emoji
     ? '/assets/emoji/' + emoji.id + '.json'
-    : '/assets/gifts/' + encodeURIComponent(id) + '.json';
+    : '/assets/gifts/' + encodeURIComponent(id) + (id.startsWith('collectible-') ? '.tgs' : '.json');
   const promise: Promise<object> = fetch(asset, {
     signal: AbortSignal.timeout(15000),
   })
-    .then((response) => {
+    .then(async (response) => {
       if (!response.ok) throw new Error('Gift animation unavailable');
+      if (id.startsWith('collectible-')) {
+        if (!response.body) throw new Error('Missing collectible animation');
+        const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
+        return new Response(stream).json() as Promise<object>;
+      }
       return response.json() as Promise<object>;
     })
     .catch((error) => {

@@ -1,18 +1,16 @@
 'use client';
 import { useState, type CSSProperties } from 'react';
 import { Check, CheckCheck, Gift } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { giftDefinition } from '@/lib/gift-catalog';
 import type { Message, Person } from '@/lib/client';
 import { GiftAnimation } from './gift-animation';
 import { Avatar, DisplayName } from './profile-identity';
 import { ProfileLink, MentionText } from './profile-link';
 import { StarsIcon } from './stars-icon';
+import { GiftReceipt } from './gift-receipt';
+import { GiftCollectibleArt } from './gift-collectible-art';
+import type { GiftCollectible } from '@/lib/gift-collectibles';
 
 export function ChatGift({
   message,
@@ -28,11 +26,13 @@ export function ChatGift({
   onAvatar: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [upgraded, setUpgraded] = useState<GiftCollectible | null>(null);
   const gift = message.gift && giftDefinition(message.gift.giftId);
   if (!gift || !message.gift) return null;
   const outgoing = message.sender === me.id;
   const sender = outgoing ? me : peer;
   const recipient = outgoing ? peer : me;
+  const collectible = upgraded || message.gift.collectible;
   const style = { '--gift-color': gift.color } as CSSProperties;
   const time = new Date(message.created).toLocaleTimeString('ru-RU', {
     hour: '2-digit',
@@ -60,8 +60,17 @@ export function ChatGift({
         </span>
       </div>
       <div className="chat-gift-card">
-        <GiftAnimation id={gift.id} />
+        {collectible ? (
+          <GiftCollectibleArt family={gift.id} attributes={collectible} />
+        ) : (
+          <GiftAnimation id={gift.id} />
+        )}
         <h3>{gift.name}</h3>
+        {collectible && (
+          <span className="gift-number">
+            #{collectible.number.toLocaleString('ru-RU')}
+          </span>
+        )}
         <div className="chat-gift-person">
           <span>{outgoing ? 'для' : 'от'}</span>
           <button
@@ -100,65 +109,54 @@ export function ChatGift({
           className="noct-dialog gift-dialog chat-gift-dialog"
           overlayClassName="gift-backdrop"
         >
-          <DialogTitle>{gift.name}</DialogTitle>
-          <DialogDescription>
-            {outgoing ? 'Ваш подарок' : 'Подарок для вас'}
-          </DialogDescription>
-          <div className="gift-preview" style={style}>
-            <div className="gift-preview-art">
-              <GiftAnimation id={gift.id} />
-            </div>
-            <div className="chat-gift-details">
-              <div>
-                <span>От кого</span>
-                <span>
-                  <ProfileLink target={{ id: sender.id }}>
-                    <Avatar person={sender} size={25} />
-                    <DisplayName person={sender} />
-                  </ProfileLink>
-                </span>
-              </div>
-              <div>
-                <span>Кому</span>
-                <span>
-                  <ProfileLink target={{ id: recipient.id }}>
-                    <Avatar person={recipient} size={25} />
-                    <DisplayName person={recipient} />
-                  </ProfileLink>
-                </span>
-              </div>
-              <div>
-                <span>Стоимость</span>
-                <span>
-                  <StarsIcon size={16} />
-                  {message.gift.price} Noct Stars
-                </span>
-              </div>
-            </div>
-            {message.gift.message && (
-              <p className="gift-caption">
-                <MentionText text={message.gift.message} />
-              </p>
-            )}
-            <time className="gift-date">
-              {new Date(message.created).toLocaleString('ru-RU', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </time>
-          </div>
-          <button
-            className="secondary gift-visibility"
-            onClick={() => {
-              setOpen(false);
-              onProfile(recipient.id);
+          <GiftReceipt
+            own={!outgoing}
+            ownerName={recipient.name}
+            onUpdated={setUpgraded}
+            receipt={{
+              id: message.gift.id,
+              giftId: gift.id,
+              sender: sender.id,
+              recipient: recipient.id,
+              message: message.gift.message,
+              created: message.created,
+              hidden: 0,
+              senderName: sender.name,
+              senderAvatar: sender.avatar,
+              senderHandle: sender.handle,
+              collectible,
             }}
-          >
-            {outgoing ? 'Профиль получателя' : 'Мои подарки'}
-          </button>
+            footer={
+              <>
+                {!collectible && (
+                  <div className="chat-gift-details">
+                    <div>
+                      <span>Кому</span>
+                      <ProfileLink target={{ id: recipient.id }}>
+                        <DisplayName person={recipient} />
+                      </ProfileLink>
+                    </div>
+                    <div>
+                      <span>Стоимость</span>
+                      <span>
+                        <StarsIcon size={16} />
+                        {message.gift.price} Noct Stars
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <button
+                  className="secondary gift-visibility"
+                  onClick={() => {
+                    setOpen(false);
+                    onProfile(recipient.id);
+                  }}
+                >
+                  {outgoing ? 'Профиль получателя' : 'Мои подарки'}
+                </button>
+              </>
+            }
+          />
         </DialogContent>
       </Dialog>
     </article>
