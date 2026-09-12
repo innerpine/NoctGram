@@ -49,9 +49,11 @@ import {
 } from 'react';
 import {
   createAppHistory,
+  appRouteHref,
   type AppRoute,
   type PreparedRoute,
 } from '@/lib/app-history';
+import { AppLink } from './app-link';
 import {
   Moon,
   Home,
@@ -744,6 +746,13 @@ export default function Noctgram({
       notify((e as Error).message);
     }
   };
+  const navigationHref = (page: string) =>
+    appRouteHref({
+      page,
+      ...(page === 'profile' ? { profileId: me?.id, handle: me?.handle } : {}),
+      ...(page === 'music' ? { musicTab } : {}),
+      ...(page === 'feed' ? { mode } : {}),
+    });
   const navigate = (v: string) => {
     if (
       ['profile', 'saved', 'messages', 'channels', 'stars'].includes(v) &&
@@ -1846,12 +1855,16 @@ export default function Noctgram({
     >
       {audioCalls.panel}
       <aside className="sidebar">
-        <button className="brand" onClick={() => navigate('feed')}>
+        <AppLink
+          className="brand"
+          href={navigationHref('feed')}
+          onNavigate={() => navigate('feed')}
+        >
           <span className="brand-icon">
             <NoctLogo size={40} />
           </span>
           noctgram<span className="alpha">α</span>
-        </button>
+        </AppLink>
         <nav aria-label="Главное меню">
           {[
             ['feed', 'Лента', Home],
@@ -1867,13 +1880,14 @@ export default function Noctgram({
               (id === 'music' && page === 'music-services') ||
               (id === 'profile' && page === 'saved');
             return (
-              <button
+              <AppLink
                 key={String(id)}
                 className={selected ? 'active' : ''}
                 aria-current={selected ? 'page' : undefined}
                 aria-label={String(label)}
                 aria-busy={(id === 'profile' && !!openingProfile) || undefined}
-                onClick={() => navigate(String(id))}
+                href={navigationHref(String(id))}
+                onNavigate={() => navigate(String(id))}
               >
                 <NavIcon size={21} />
                 <span>{String(label)}</span>
@@ -1883,40 +1897,46 @@ export default function Noctgram({
                   </span>
                 )}
                 {selected && <i />}
-              </button>
+              </AppLink>
             );
           })}
         </nav>
         <div className="sidebar-bottom">
           <div className="premium-nav-shell">
             <NavBorderBeam />
-            <button
+            <AppLink
               className="premium-nav"
-              onClick={() => navigate('premium')}
+              href={navigationHref('premium')}
+              onNavigate={() => navigate('premium')}
               aria-label="Открыть Noct Premium"
               aria-current={page === 'premium' ? 'page' : undefined}
             >
               <PremiumIcon size={23} />
               <span>Noct Premium</span>
               <span className="badge">{me?.premium ? 'активен' : 'новое'}</span>
-            </button>
+            </AppLink>
           </div>
           <div className="premium-nav-shell stars-nav-shell">
             <NavBorderBeam stars />
-            <button
+            <AppLink
               className="premium-nav"
               aria-label="Открыть Noct Stars"
-              onClick={() => navigate('stars')}
+              href={navigationHref('stars')}
+              onNavigate={() => navigate('stars')}
             >
               <StarsIcon size={23} />
               <span>Noct Stars</span>
               <span className="badge">тест</span>
-            </button>
+            </AppLink>
           </div>
           {me ? (
             <>
               <div className="sidebar-account-row">
-                <button className="account" onClick={() => navigate('profile')}>
+                <AppLink
+                  className="account"
+                  href={navigationHref('profile')}
+                  onNavigate={() => navigate('profile')}
+                >
                   <Avatar person={me} />
                   <span>
                     <strong>
@@ -1924,7 +1944,7 @@ export default function Noctgram({
                     </strong>
                     <small>@{me.handle}</small>
                   </span>
-                </button>
+                </AppLink>
                 <button
                   className="account-settings-button"
                   aria-label="Настройки мессенджера"
@@ -1987,14 +2007,15 @@ export default function Noctgram({
             </h1>
             <span className="grow" />
             {me?.canModerate && (
-              <button
+              <AppLink
                 className="icon-button"
                 title="Модерация"
                 aria-label="Открыть модерацию"
-                onClick={() => navigate('moderation')}
+                href={navigationHref('moderation')}
+                onNavigate={() => navigate('moderation')}
               >
                 <ShieldCheck size={20} />
-              </button>
+              </AppLink>
             )}
             {page !== 'premium' && (
               <span
@@ -2008,13 +2029,14 @@ export default function Noctgram({
                 />
               </span>
             )}
-            <button
+            <AppLink
               className="icon-button"
               aria-label="Найти в Noctgram"
-              onClick={() => navigate('search')}
+              href={navigationHref('search')}
+              onNavigate={() => navigate('search')}
             >
               <Search size={20} />
-            </button>
+            </AppLink>
             <button
               className="icon-button"
               aria-label="Обновить"
@@ -2030,13 +2052,13 @@ export default function Noctgram({
           </header>
         )}
         {page === 'saved' && (
-          <button
-            type="button"
+          <AppLink
             className="text-button saved-back"
-            onClick={() => navigate('profile')}
+            href={navigationHref('profile')}
+            onNavigate={() => navigate('profile')}
           >
             <ArrowLeft size={17} aria-hidden="true" /> В профиль
-          </button>
+          </AppLink>
         )}
         {loadError && (
           <div className="error-banner" role="alert">
@@ -2190,13 +2212,14 @@ export default function Noctgram({
                     : undefined
                 }
               >
-                <button
+                <AppLink
                   className="back-button"
                   aria-label="Вернуться в ленту"
-                  onClick={() => navigate('feed')}
+                  href={navigationHref('feed')}
+                  onNavigate={() => navigate('feed')}
                 >
                   <ArrowLeft size={18} />
-                </button>
+                </AppLink>
                 {profileEditable && (
                   <button
                     className="cover-edit"
@@ -2410,15 +2433,15 @@ export default function Noctgram({
                   </span>
                 </div>
                 {profile.id === me?.id && (
-                  <button
-                    type="button"
+                  <AppLink
                     className="profile-saved-link"
-                    onClick={() => navigate('saved')}
+                    href={navigationHref('saved')}
+                    onNavigate={() => navigate('saved')}
                   >
                     <Bookmark size={19} aria-hidden="true" />
                     <span>Сохранённое</span>
                     <ChevronRight size={17} aria-hidden="true" />
-                  </button>
+                  </AppLink>
                 )}
                 {profile.kind === 'channel' && me && (
                   <ChannelBoosts
@@ -2933,10 +2956,11 @@ export default function Noctgram({
               </p>
             )}
             {topics.map(({ tag, count }) => (
-              <button
+              <AppLink
                 className="topic"
                 key={tag}
-                onClick={() => {
+                href={appRouteHref({ page: 'search', query: tag })}
+                onNavigate={() => {
                   setPage('search');
                   setQuery(tag);
                 }}
@@ -2953,14 +2977,15 @@ export default function Noctgram({
                       : 'публикаций'}
                 </span>
                 <ArrowUpRight size={14} />
-              </button>
+              </AppLink>
             ))}
-            <button
+            <AppLink
               className="side-card-footer"
-              onClick={() => navigate('search')}
+              href={navigationHref('search')}
+              onNavigate={() => navigate('search')}
             >
               Открыть поиск <ArrowUpRight size={15} />
-            </button>
+            </AppLink>
           </section>
           <section className="side-card people-card">
             <h2>Кого читать</h2>
@@ -2976,7 +3001,14 @@ export default function Noctgram({
                 ]
             ).map((person) => (
               <div className="suggest" key={person.id}>
-                <button onClick={() => void openProfile(person.id)}>
+                <AppLink
+                  href={appRouteHref({
+                    page: 'profile',
+                    profileId: person.id,
+                    handle: person.handle,
+                  })}
+                  onNavigate={() => void openProfile(person.id)}
+                >
                   <Avatar person={person} size={36} />
                   <span>
                     <strong>
@@ -2984,7 +3016,7 @@ export default function Noctgram({
                     </strong>
                     <small>@{person.handle}</small>
                   </span>
-                </button>
+                </AppLink>
                 <button
                   className="follow-small"
                   disabled={busy || readOnly}

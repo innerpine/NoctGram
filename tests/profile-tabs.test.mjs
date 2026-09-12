@@ -102,6 +102,7 @@ try {
               '@/lib/feed-snapshots',
               '@/lib/chat-snapshots',
               '@/lib/profile-cover-cache',
+              '@/lib/app-history',
             ].includes(path)
               ? undefined
               : { path, namespace: 'boundary' },
@@ -329,14 +330,15 @@ try {
     states.set(2, me);
     states.set(4, [{ id: 'old-feed', author: me }]);
     states.set(9, false);
-    const searchButton = all(render(), 'button').find(
+    const searchLink = all(render(), 'AppLink').find(
       (node) => node.props['aria-label'] === 'Поиск',
     );
     const originalTimer = globalThis.setTimeout;
     try {
       globalThis.setTimeout = () =>
         assert.fail('Search navigation must not queue a delayed autofocus');
-      searchButton.props.onClick();
+      assert.equal(searchLink.props.href, '/?page=search');
+      searchLink.props.onNavigate();
     } finally {
       globalThis.setTimeout = originalTimer;
     }
@@ -379,9 +381,9 @@ try {
       'Typing cannot restart the entrance or steal the input caret',
     );
     assert.equal(focusCalls.length, 1);
-    all(render(), 'button')
+    all(render(), 'AppLink')
       .find((node) => node.props['aria-label'] === 'Сообщения')
-      .props.onClick();
+      .props.onNavigate();
     render();
     pendingLayouts.forEach((effect) => effect());
     assert.equal(

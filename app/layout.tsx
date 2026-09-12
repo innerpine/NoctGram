@@ -60,9 +60,20 @@ export const metadata: Metadata = {
     title: 'Noctgram',
     statusBarStyle: 'black-translucent',
   },
-  icons: { icon: '/assets/noctgram-logo.png' },
-  description:
-    'Noctgram — публикации, фотографии, музыка и личные сообщения.',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '16x16 32x32 48x48', type: 'image/x-icon' },
+      ...[16, 32, 48].map((size) => ({
+        url: `/favicon-${size}.png`,
+        sizes: `${size}x${size}`,
+        type: 'image/png',
+      })),
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  description: 'Noctgram — публикации, фотографии, музыка и личные сообщения.',
 };
 export default function RootLayout({
   children,

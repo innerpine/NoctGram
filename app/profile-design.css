@@ -45,8 +45,8 @@
     var(--profile-first),
     var(--profile-second)
   );
-  mask: url('/assets/noct-premium.png') center / contain no-repeat;
-  -webkit-mask: url('/assets/noct-premium.png') center / contain no-repeat;
+  mask: url('/assets/noct-premium-96.webp') center / contain no-repeat;
+  -webkit-mask: url('/assets/noct-premium-96.webp') center / contain no-repeat;
 }
 .avatar > video {
   width: 100%;

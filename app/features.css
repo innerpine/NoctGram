@@ -681,12 +681,12 @@
   .support-post {
     font-size: 11px;
   }
-  .sidebar nav button {
+  .sidebar nav a {
     min-width: 0;
     width: auto;
     flex: 1;
   }
-  .sidebar nav button span {
+  .sidebar nav a span {
     font-size: 9px;
   }
 }
@@ -710,7 +710,9 @@
   color: inherit;
   font: inherit;
   text-align: left;
-  transition: color 180ms, background-color 180ms;
+  transition:
+    color 180ms,
+    background-color 180ms;
 }
 .profile-stat-button:hover {
   color: #fff;
@@ -801,16 +803,32 @@
   padding-block: 20px;
 }
 @keyframes connections-enter {
-  from { opacity: 0; transform: translateY(12px) scale(.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 @keyframes connections-leave {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to { opacity: 0; transform: translateY(8px) scale(.98); }
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
 }
 @media (max-width: 500px) {
-  .profile-stat-button { font-size: 12px; }
-  .connection-person { padding-inline: 4px; }
+  .profile-stat-button {
+    font-size: 12px;
+  }
+  .connection-person {
+    padding-inline: 4px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .noct-dialog.connections-dialog[data-open],

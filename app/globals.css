@@ -66,7 +66,8 @@ input,
 textarea {
   font: inherit;
 }
-button {
+button,
+.app-link {
   -webkit-appearance: none;
   appearance: none;
   cursor: pointer;
@@ -84,14 +85,16 @@ button {
   border-radius: 8px;
   font-weight: 500;
 }
-button:hover {
+button:hover,
+.app-link:hover {
   background: #ffffff0c;
 }
 button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-button:active:not(:disabled) {
+button:active:not(:disabled),
+.app-link:active {
   transform: scale(0.98);
 }
 button:focus-visible,
@@ -264,7 +267,7 @@ small {
   flex-direction: column;
   gap: 7px;
 }
-.sidebar nav button {
+.sidebar nav a {
   height: 48px;
   justify-content: flex-start;
   padding: 0 15px;
@@ -273,11 +276,11 @@ small {
   gap: 16px;
   border-radius: 12px;
 }
-.sidebar nav button.active {
+.sidebar nav a.active {
   color: #fff;
   background: #181818;
 }
-.sidebar nav button i {
+.sidebar nav a i {
   width: 4px;
   height: 4px;
   background: #fff;
@@ -807,7 +810,7 @@ small {
   gap: 6px;
   margin-bottom: 16px;
 }
-.suggest > button:first-child {
+.suggest > :is(button, a):first-child {
   justify-content: flex-start;
   gap: 9px;
   text-align: left;
@@ -1674,7 +1677,7 @@ small {
   .post-author .handle {
     max-width: 160px;
   }
-  .sidebar nav button {
+  .sidebar nav a {
     font-size: 14px;
   }
 }
@@ -1705,12 +1708,12 @@ small {
     width: 52px;
     gap: 12px;
   }
-  .sidebar nav button {
+  .sidebar nav a {
     justify-content: center;
     padding: 0;
   }
-  .sidebar nav button span,
-  .sidebar nav button i,
+  .sidebar nav a span,
+  .sidebar nav a i,
   .sidebar .new-post span,
   .sidebar .premium-nav span,
   .sidebar .account > span:last-child,
@@ -1809,21 +1812,21 @@ small {
     width: 100%;
     gap: 0;
   }
-  .sidebar nav button {
+  .sidebar nav a {
     width: 52px;
     height: 50px;
     flex-direction: column;
     gap: 4px;
     border-radius: 10px;
   }
-  .sidebar nav button span {
+  .sidebar nav a span {
     display: block;
     font-size: 8px;
   }
-  .sidebar nav button.active {
+  .sidebar nav a.active {
     background: #ffffff0c;
   }
-  .sidebar nav button svg {
+  .sidebar nav a svg {
     width: 19px;
     height: 19px;
   }

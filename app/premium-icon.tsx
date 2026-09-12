@@ -1,4 +1,4 @@
-/* The supplied PNG is shared by the badge and its animated particles. */
+/* Optimized sizes of the supplied artwork are shared by icons and particles. */
 /* eslint-disable next/no-img-element */
 import type { CSSProperties } from 'react';
 
@@ -13,7 +13,9 @@ export function PremiumIcon({
 }) {
   return (
     <img
-      src="/assets/noct-premium.png"
+      src="/assets/noct-premium-96.webp"
+      srcSet="/assets/noct-premium-48.webp 48w, /assets/noct-premium-96.webp 96w, /assets/noct-premium-192.webp 192w"
+      sizes={`${size}px`}
       alt=""
       aria-hidden="true"
       draggable={false}

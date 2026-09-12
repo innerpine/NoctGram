@@ -79,11 +79,11 @@ textarea::placeholder {
 .sidebar nav {
   gap: 4px;
 }
-.sidebar nav button {
+.sidebar nav a {
   font-size: 15px;
   color: #ffffff99;
 }
-.sidebar nav button.active {
+.sidebar nav a.active {
   background: #161616;
 }
 .sidebar-bottom {
@@ -1661,7 +1661,7 @@ textarea::placeholder {
     gap: 24px;
     padding-inline: 24px;
   }
-  .sidebar nav button {
+  .sidebar nav a {
     font-size: 15px;
   }
   .post-author .handle {
@@ -1680,7 +1680,7 @@ textarea::placeholder {
     width: 32px;
     height: 32px;
   }
-  .sidebar nav button {
+  .sidebar nav a {
     font-size: 0;
   }
   .premium-nav {
@@ -1701,7 +1701,7 @@ textarea::placeholder {
     font-size: 9px;
     padding: 0 3px;
   }
-  .sidebar nav button {
+  .sidebar nav a {
     position: relative;
   }
   .post {
@@ -1733,7 +1733,7 @@ textarea::placeholder {
     padding: 5px 8px calc(5px + env(safe-area-inset-bottom, 0px));
     background: rgba(8, 8, 8, 0.94);
   }
-  .sidebar nav button {
+  .sidebar nav a {
     font-size: 13px;
   }
   .sidebar nav .nav-unread {
@@ -1927,7 +1927,7 @@ textarea::placeholder {
   flex-shrink: 0;
   margin-left: 10px;
 }
-.sidebar nav button.active:has(.nav-unread) > i {
+.sidebar nav a.active:has(.nav-unread) > i {
   display: none;
 }
 
