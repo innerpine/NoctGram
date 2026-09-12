@@ -127,7 +127,7 @@ export function DisplayName({ person }: { person: Identity }) {
       >
         {person.name}
       </span>
-      {person.gratitude ? <GratitudeBadge /> : null}
+      {person.gratitude ? <GratitudeBadge person={person} /> : null}
       <PremiumBadge person={person} />
     </span>
   );

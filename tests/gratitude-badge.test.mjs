@@ -46,7 +46,7 @@ await test('gratitude only renders for awarded accounts and does not require Pre
     assert.equal(render(GratitudeProfile, person), '');
   }
   const person = { gratitude: 1, premium: 0 };
-  assert.match(render(DisplayName, person), /alt="С благодарностью"/);
+  assert.match(render(DisplayName, person), /aria-label="С благодарностью"/);
   assert.match(
     render(GratitudeProfile, person),
     /Особый знак благодарности от команды Noctgram/,

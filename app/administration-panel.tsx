@@ -298,7 +298,7 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
                 </div>
                 <div className="admin-gratitude-name">
                   <span>{selected.name}</span>
-                  <GratitudeBadge />
+                  <GratitudeBadge person={selected} />
                 </div>
                 <ProfileRecognitions
                   person={{ ...selected, gratitude: true }}
