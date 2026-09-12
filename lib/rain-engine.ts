@@ -256,7 +256,7 @@ class RainSurface {
         x: Math.random() * this.width,
         y: Math.random() * this.height,
         speed: 150 + Math.random() * 190,
-        length: 10 + Math.random() * 19,
+        length: 18 + Math.random() * 24,
         depth: index % 3,
       }));
     }
@@ -281,11 +281,11 @@ class RainSurface {
     for (let depth = 0; depth < 3; depth++) {
       context.beginPath();
       context.strokeStyle = [
-        'rgba(166,182,205,.075)',
-        'rgba(181,197,219,.12)',
-        'rgba(205,218,235,.18)',
+        'rgba(181,197,219,.20)',
+        'rgba(205,218,235,.32)',
+        'rgba(225,235,248,.46)',
       ][depth];
-      context.lineWidth = depth === 2 ? 1.15 : 0.75;
+      context.lineWidth = depth === 2 ? 1.4 : 1;
       for (const drop of this.drops) {
         if (drop.depth !== depth) continue;
         drop.y += drop.speed * seconds;
