@@ -60,6 +60,8 @@ import { useTrackLyrics, type LyricLookup } from '@/lib/use-track-lyrics';
 import { MusicSeekControl } from './music-seek-control';
 import { MusicFavorite } from './music-favorite';
 import { MusicReorderList } from './music-reorder-list';
+import { RainEffect } from './rain-effect';
+import { RainSettings } from './rain-settings';
 
 export type PlayerTrack = {
   url: string;
@@ -762,9 +764,7 @@ export function MusicPlayerView(p: Props) {
                   className="icon-button music-dock-toggle"
                   aria-label="Текст справа"
                   title={
-                    dockOpen
-                      ? 'Скрыть текст справа'
-                      : 'Показать текст справа'
+                    dockOpen ? 'Скрыть текст справа' : 'Показать текст справа'
                   }
                   aria-pressed={dockOpen}
                   aria-expanded={dockVisible}
@@ -862,6 +862,7 @@ export function MusicPlayerView(p: Props) {
         <div className="music-stage-atmosphere" aria-hidden="true">
           {artwork && <img key={artwork} src={artwork} alt="" />}
         </div>
+        <RainEffect scope="dock" active={dockVisible} />
         <header className="music-dock-header">
           <div>
             <span className="music-live-mark" aria-hidden="true">
@@ -991,6 +992,7 @@ export function MusicPlayerView(p: Props) {
             <div className="music-stage-atmosphere" aria-hidden="true">
               {artwork && <img key={artwork} src={artwork} alt="" />}
             </div>
+            <RainEffect scope="full" active={p.expanded} />
             <header className="music-stage-header">
               <DialogClose
                 className="music-stage-icon"
@@ -1291,6 +1293,7 @@ export function MusicPlayerView(p: Props) {
             >
               Сбросить настройки
             </button>
+            <RainSettings compact />
           </PopoverContent>
         </Popover>
       </Dialog>

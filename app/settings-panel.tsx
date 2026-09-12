@@ -18,6 +18,7 @@ import { AccountSwitcher } from './account-switcher';
 import { AccountPanel } from './account-panel';
 import { PrivacyPanel } from './privacy-panel';
 import { MusicActivitySettings } from './music-activity';
+import { RainSettings } from './rain-settings';
 
 const sections = [
   { id: 'profile', label: 'Профиль', icon: UserRound },
@@ -118,6 +119,7 @@ export function SettingsPanel({
                     <ChevronRight size={17} />
                   </button>
                   <AnimationPreference />
+                  <RainSettings />
                 </>
               )}
               {id === 'privacy' && <PrivacyPanel onChanged={onChanged} />}

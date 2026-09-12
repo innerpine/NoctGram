@@ -45,6 +45,8 @@ import './staff-panel.css';
 import './channel-boosts.css';
 import './viewport.css';
 import './settings.css';
+import './rain.css';
+import { RainEffect } from './rain-effect';
 import { MusicProvider } from './music-provider';
 import { APP_HISTORY_BOOTSTRAP } from '@/lib/app-history-bootstrap';
 export const viewport: Viewport = {
@@ -93,6 +95,7 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <RainEffect scope="site" />
         <MusicProvider>{children}</MusicProvider>
       </body>
     </html>

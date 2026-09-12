@@ -1,0 +1,130 @@
+body {
+  isolation: isolate;
+}
+.noct-rain {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+  contain: strict;
+}
+.noct-rain[data-rain-surface='site'] {
+  position: fixed;
+}
+.rain-settings {
+  min-width: 0;
+  margin: 22px 0 0;
+  padding: 0;
+  border: 0;
+}
+.rain-settings legend {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+.rain-settings legend svg {
+  color: #aaaab5;
+}
+.rain-mode-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.rain-mode-option {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+.rain-mode-option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+}
+.rain-mode-option > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 76px;
+  padding: 12px 6px;
+  border: 1px solid #ffffff18;
+  border-radius: 12px;
+  color: #a2a2ad;
+  font-size: 13px;
+  text-align: center;
+}
+.rain-mode-option input:checked + span {
+  background: #ffffff0e;
+  border-color: #ffffff70;
+  color: #f4f4f6;
+}
+.rain-mode-option input:focus-visible + span {
+  outline: 2px solid #d4d4d4;
+  outline-offset: 3px;
+}
+.rain-mode-option:hover > span {
+  border-color: #ffffff40;
+}
+.rain-dock-option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 0 0;
+}
+.rain-dock-option > label {
+  flex: 1;
+  min-width: 0;
+}
+.rain-dock-option strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+}
+.rain-dock-option small,
+.rain-preference-note {
+  color: #92929e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.rain-dock-option small {
+  margin-top: 4px;
+}
+.rain-dock-option [data-slot='switch'] {
+  flex-shrink: 0;
+}
+.rain-preference-note {
+  margin: 14px 0 0;
+}
+.rain-settings-compact {
+  margin: 6px 0 4px;
+  padding-top: 16px;
+  border-top: 1px solid #ffffff14;
+}
+.rain-settings-compact .rain-mode-options {
+  grid-template-columns: 1fr;
+  gap: 5px;
+}
+.rain-settings-compact .rain-mode-option > span {
+  flex-direction: row;
+  justify-content: flex-start;
+  min-height: 38px;
+  padding: 8px 11px;
+  gap: 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .noct-rain {
+    display: none;
+  }
+}
