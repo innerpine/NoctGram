@@ -2999,38 +2999,40 @@ export default function Noctgram({
                     handle: 'noctgram',
                   },
                 ]
-            ).map((person) => (
-              <div className="suggest" key={person.id}>
-                <AppLink
-                  href={appRouteHref({
-                    page: 'profile',
-                    profileId: person.id,
-                    handle: person.handle,
-                  })}
-                  onNavigate={() => void openProfile(person.id)}
-                >
-                  <Avatar person={person} size={36} />
-                  <span>
-                    <strong>
-                      <DisplayName person={person} />
-                    </strong>
-                    <small>@{person.handle}</small>
-                  </span>
-                </AppLink>
-                <button
-                  className="follow-small"
-                  disabled={busy || readOnly}
-                  aria-label={
-                    person.followed
-                      ? 'Отписаться от ' + person.name
-                      : 'Подписаться на ' + person.name
-                  }
-                  onClick={() => follow(person)}
-                >
-                  {person.followed ? <Check size={14} /> : 'Читать'}
-                </button>
-              </div>
-            ))}
+            )
+              .slice(0, 5)
+              .map((person) => (
+                <div className="suggest" key={person.id}>
+                  <AppLink
+                    href={appRouteHref({
+                      page: 'profile',
+                      profileId: person.id,
+                      handle: person.handle,
+                    })}
+                    onNavigate={() => void openProfile(person.id)}
+                  >
+                    <Avatar person={person} size={36} />
+                    <span>
+                      <strong>
+                        <DisplayName person={person} />
+                      </strong>
+                      <small>@{person.handle}</small>
+                    </span>
+                  </AppLink>
+                  <button
+                    className="follow-small"
+                    disabled={busy || readOnly}
+                    aria-label={
+                      person.followed
+                        ? 'Отписаться от ' + person.name
+                        : 'Подписаться на ' + person.name
+                    }
+                    onClick={() => follow(person)}
+                  >
+                    {person.followed ? <Check size={14} /> : 'Читать'}
+                  </button>
+                </div>
+              ))}
             <button
               className="side-card-footer"
               onClick={() => {
