@@ -635,6 +635,7 @@ export function RoomConversation({
             )}
             {room.messages.map((message) => {
               const self = message.sender === me.id;
+              const giveawayEvent = !!message.giveawayId && !message.deletedAt;
               const content = message.deletedAt
                 ? 'Сообщение удалено'
                 : room.kind === 'secret'
@@ -646,9 +647,13 @@ export function RoomConversation({
               return (
                 <div
                   key={message.id}
-                  className={'room-message ' + (self ? 'self' : 'other')}
+                  className={
+                    giveawayEvent
+                      ? 'room-giveaway-event'
+                      : 'room-message ' + (self ? 'self' : 'other')
+                  }
                 >
-                  {!self && room.kind === 'group' && (
+                  {!giveawayEvent && !self && room.kind === 'group' && (
                     <button
                       className="room-message-avatar"
                       aria-label={'Профиль ' + message.senderName}
@@ -665,10 +670,12 @@ export function RoomConversation({
                   )}
                   <div
                     className={
-                      'room-bubble' + (message.deletedAt ? ' deleted' : '')
+                      giveawayEvent
+                        ? 'room-giveaway-content'
+                        : 'room-bubble' + (message.deletedAt ? ' deleted' : '')
                     }
                   >
-                    {!self && room.kind === 'group' && (
+                    {!giveawayEvent && !self && room.kind === 'group' && (
                       <button
                         className="room-sender"
                         onClick={() => onProfile(message.sender)}
@@ -691,16 +698,38 @@ export function RoomConversation({
                     ) : (
                       <p><MentionText text={content} /></p>
                     )}
-                    <span className="room-message-time">
-                      {time(message.created)}
-                      {self && <Check size={12} />}
-                    </span>
+                    {giveawayEvent ? (
+                      <div className="room-giveaway-meta">
+                        <button
+                          className="room-giveaway-organizer"
+                          aria-label={'Организатор: ' + message.senderName}
+                          onClick={() => onProfile(message.sender)}
+                        >
+                          {message.senderName}
+                        </button>
+                        <span aria-hidden="true">·</span>
+                        <span className="room-message-time">
+                          <time dateTime={new Date(message.created).toISOString()}>
+                            {time(message.created)}
+                          </time>
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="room-message-time">
+                        {time(message.created)}
+                        {self && <Check size={12} />}
+                      </span>
+                    )}
                   </div>
                   {!message.deletedAt && (
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         className="room-message-more icon-button"
-                        aria-label="Действия с сообщением"
+                        aria-label={
+                          giveawayEvent
+                            ? 'Действия с розыгрышем'
+                            : 'Действия с сообщением'
+                        }
                       >
                         <MoreHorizontal size={16} />
                       </DropdownMenuTrigger>
