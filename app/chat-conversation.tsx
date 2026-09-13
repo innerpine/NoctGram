@@ -11,6 +11,7 @@ import {
 import { Forward, Trash2, X } from 'lucide-react';
 import type { Message, Person } from '@/lib/client';
 import { chatRequest } from '@/lib/chat-client';
+import type { ReactionEmoji } from '@/lib/message-reactions';
 import { chatOutbox, emptyOutbox, mergeOutgoing } from '@/lib/chat-outbox';
 import { messageSummary } from '@/lib/chat-message-display';
 import { createChatNavigator } from '@/lib/chat-navigation';
@@ -96,6 +97,10 @@ export function ChatConversation({
     () => new Set(messages.map((message) => message.id)),
   );
   const [replyFocus, setReplyFocus] = useState(0);
+  const [reactionPending, setReactionPending] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const reactionLocks = useRef(new Set<string>());
   const [profileId, setProfileId] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
   const openMiniProfile = useCallback((id: string) => {
@@ -335,6 +340,51 @@ export function ChatConversation({
     (message: Message) => onAction('pin', message),
     [onAction],
   );
+  const reactHandler = useRef<
+    (message: Message, emoji: ReactionEmoji | null) => Promise<void>
+  >(async () => {});
+  reactHandler.current = async (message, emoji) => {
+    if (
+      disabled ||
+      working ||
+      !canSend ||
+      reactionLocks.current.has(message.id) ||
+      !messages.some((item) => item.id === message.id)
+    )
+      return;
+    reactionLocks.current.add(message.id);
+    setReactionPending(new Set(reactionLocks.current));
+    try {
+      await chatRequest('/api/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'messageReaction',
+          expectedSender: me.id,
+          peer: peer.id,
+          id: message.id,
+          emoji,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (alive.current) await onRefresh();
+    } catch (error) {
+      if (alive.current)
+        notify(
+          error instanceof Error
+            ? error.message
+            : 'Не удалось поставить реакцию',
+        );
+    } finally {
+      reactionLocks.current.delete(message.id);
+      if (alive.current) setReactionPending(new Set(reactionLocks.current));
+    }
+  };
+  const onReact = useCallback(
+    (message: Message, emoji: ReactionEmoji | null) =>
+      reactHandler.current(message, emoji),
+    [],
+  );
   const finished = () => {
     if (operation?.type === 'delete') {
       removal.current?.remove(operation.messages);
@@ -414,6 +464,8 @@ export function ChatConversation({
                   : outgoing.find((entry) => entry.message.id === message.id)
               }
               onRetry={onRetry}
+              onReact={onReact}
+              reactionPending={reactionPending.has(message.id)}
               initial={initialMessages.has(message.id)}
               me={me}
               peer={peer}

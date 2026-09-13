@@ -45,11 +45,13 @@ export async function deleteMessages(
               `UPDATE messages SET deletedAt=? WHERE ${where} AND deletedAt=0`,
             )
             .bind(Date.now(), json, me, peer, peer, me, me),
-          db()
-            .prepare(
-              `DELETE FROM message_pins WHERE messageId IN (SELECT id FROM messages WHERE id IN (SELECT value FROM json_each(?)) AND deletedAt>0)`,
-            )
-            .bind(json),
+          ...['message_pins', 'message_reactions'].map((table) =>
+            db()
+              .prepare(
+                `DELETE FROM ${table} WHERE messageId IN (SELECT id FROM messages WHERE id IN (SELECT value FROM json_each(?)) AND deletedAt>0)`,
+              )
+              .bind(json),
+          ),
           db()
             .prepare(
               `DELETE FROM notifications WHERE EXISTS(SELECT 1 FROM messages m WHERE m.id IN (SELECT value FROM json_each(?)) AND m.deletedAt>0 AND ((notifications.kind='message' AND notifications.targetId=m.id) OR (notifications.kind='gift' AND notifications.targetId=m.giftReceiptId)))`,

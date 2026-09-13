@@ -107,6 +107,7 @@ export type Comment = Appearance & {
   } | null;
 };
 export type Message = {
+  reactions?: import('./message-reactions').MessageReaction[];
   id: string;
   sender: string;
   recipient: string;

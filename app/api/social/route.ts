@@ -64,6 +64,7 @@ import {
 import { featureGet, featurePost, canPublish } from '@/lib/social-features';
 import {
   readConversation,
+  reactToMessage,
   readUnreadMessageCount,
   pinMessage,
 } from '@/lib/chat-messages';
@@ -326,7 +327,7 @@ export async function POST(req: Request) {
     const d = db();
     const action = typeof b.action === 'string' ? b.action : '';
     if (
-      action === 'message' &&
+      ['message', 'messageReaction'].includes(action) &&
       b.expectedSender !== undefined &&
       b.expectedSender !== me
     )
@@ -383,6 +384,8 @@ export async function POST(req: Request) {
     if (action === 'view') await assertReadable(me);
     else await assertWritable(me);
     if (action === 'messagePin') return Response.json(await pinMessage(me, b));
+    if (action === 'messageReaction')
+      return Response.json(await reactToMessage(me, b));
     if (action === 'messageDelete')
       return Response.json(await deleteMessages(me, b));
     if (action === 'messageEdit')

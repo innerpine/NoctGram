@@ -1,5 +1,10 @@
 import { assertPremiumEmoji } from './premium-emoji-access';
 import { db } from './storage';
+import {
+  reactionSummarySql,
+  saveMessageReaction,
+} from './message-reactions-store';
+import { parseReactions } from './message-reactions';
 import { COMMUNITY_ROOM_ID } from './community-group';
 import { ApiError } from './api-error';
 import {
@@ -345,7 +350,9 @@ export async function readRoom(
     .all<Omit<RoomMember, 'publicKey'> & { publicKey: string }>();
   const messages = await viewerQuery(
     `SELECT msg.id,msg.roomId,msg.sender,u.name AS senderName,u.avatar AS senderAvatar,msg.text,msg.ciphertext,msg.replyTo,msg.created,msg.deletedAt,msg.giveawayId,
-    substr(rp.text,1,160) AS replyText,ru.name AS replyName,(msg.replyTo IS NOT NULL AND rp.id IS NULL) AS replyUnavailable
+    substr(rp.text,1,160) AS replyText,ru.name AS replyName,(msg.replyTo IS NOT NULL AND rp.id IS NULL) AS replyUnavailable,
+    CASE WHEN r.kind='group' AND msg.deletedAt=0 AND msg.ciphertext IS NULL
+      THEN ${reactionSummarySql('chat_room_message_reactions', 'msg.id', ':viewer')} ELSE '[]' END AS reactionData
     FROM chat_room_messages msg JOIN users u ON u.id=msg.sender JOIN chat_rooms r ON r.id=msg.roomId
     LEFT JOIN chat_room_messages rp ON rp.id=msg.replyTo AND rp.roomId=msg.roomId AND rp.deletedAt=0
     LEFT JOIN users ru ON ru.id=rp.sender
@@ -357,7 +364,7 @@ export async function readRoom(
       roomId,
       ...(cursor ? [cursor.created, cursor.created, cursor.id] : []),
     )
-    .all<RoomMessage>();
+    .all<RoomMessage & { reactionData: string }>();
   const permission = await viewerQuery(
     `SELECT 1 FROM chat_rooms r WHERE r.id=? AND ${canSend('r', ':viewer')}`,
     me,
@@ -373,12 +380,13 @@ export async function readRoom(
       ...m,
       publicKey: m.publicKey ? JSON.parse(m.publicKey) : null,
     })),
-    messages: page
-      .reverse()
-      .map((message) => ({
-        ...message,
-        replyUnavailable: !!message.replyUnavailable,
-      })),
+    messages: page.reverse().map(({ reactionData, ...message }) => ({
+      ...message,
+      replyUnavailable: !!message.replyUnavailable,
+      ...(row.kind === 'group'
+        ? { reactions: parseReactions(reactionData) }
+        : {}),
+    })),
     pageCursor: cursor ? btoa(JSON.stringify(cursor)) : null,
     canSend: !!permission,
     nextCursor:
@@ -592,6 +600,20 @@ export async function changeRoom(
   }
   const roomId = id(body.id);
   const row = await roomRow(me, roomId);
+  if (action === 'reaction') {
+    const messageId = id(body.messageId);
+    const gate = `EXISTS(SELECT 1 FROM chat_room_messages msg JOIN chat_rooms r ON r.id=msg.roomId,users a
+      WHERE msg.id=? AND r.id=? AND a.id=? AND r.kind='group' AND msg.deletedAt=0 AND msg.ciphertext IS NULL
+      AND ${access('r', 'a.id', true)} AND ${unblocked('a.id', 'msg.sender')})`;
+    return saveMessageReaction(
+      'chat_room_message_reactions',
+      messageId,
+      me,
+      body.emoji,
+      gate,
+      [messageId, roomId, me],
+    );
+  }
   if (action === 'archive') {
     if (typeof body.archived !== 'boolean')
       throw new ApiError(400, 'Некорректный запрос');
@@ -719,13 +741,18 @@ export async function changeRoom(
   }
   if (action === 'deleteMessage') {
     const messageId = id(body.messageId);
-    const result = await db()
-      .prepare(`UPDATE chat_room_messages SET text='',ciphertext=NULL,deletedAt=? WHERE id=? AND roomId=?
+    const result = await db().batch([
+      db()
+        .prepare(`UPDATE chat_room_messages SET text='',ciphertext=NULL,deletedAt=? WHERE id=? AND roomId=?
       AND EXISTS(SELECT 1 FROM chat_rooms r JOIN chat_room_members a ON a.roomId=r.id AND a.userId=? WHERE r.id=chat_room_messages.roomId
       AND ${access('r', 'a.userId', true)} AND (chat_room_messages.sender=a.userId OR (r.kind='group' AND a.role IN ('owner','admin'))))`)
-      .bind(now, messageId, roomId, me)
-      .run();
-    changed(result);
+        .bind(now, messageId, roomId, me),
+      db()
+        .prepare(`DELETE FROM chat_room_message_reactions WHERE messageId=? AND EXISTS(
+        SELECT 1 FROM chat_room_messages WHERE id=? AND roomId=? AND deletedAt>0)`)
+        .bind(messageId, messageId, roomId),
+    ]);
+    changed(result[0]);
     return { ok: true };
   }
   if (action === 'leave') {
@@ -907,6 +934,13 @@ export function groupRoomExportSections(
       JOIN chat_rooms r ON r.id=msg.roomId JOIN chat_room_members m ON m.roomId=r.id
       WHERE m.userId=? AND r.kind='group' AND msg.ciphertext IS NULL AND msg.deletedAt=0
       AND ${access('r', 'm.userId')} AND msg.id>? ORDER BY msg.id LIMIT 100`,
+    ],
+    [
+      'groupMessageReactions',
+      `SELECT reaction.messageId AS id,reaction.emoji,reaction.created,msg.roomId FROM chat_room_message_reactions reaction
+      JOIN chat_room_messages msg ON msg.id=reaction.messageId JOIN chat_rooms r ON r.id=msg.roomId
+      WHERE reaction.userId=? AND r.kind='group' AND msg.ciphertext IS NULL AND msg.deletedAt=0
+      AND ${access('r', 'reaction.userId')} AND msg.id>? ORDER BY msg.id LIMIT 100`,
     ],
   ] as const;
   return queries.map(([name, sql]) => ({

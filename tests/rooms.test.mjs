@@ -608,7 +608,7 @@ assert.equal(
 const exportSections = api.groupRoomExportSections('guest0');
 assert.deepEqual(
   exportSections.map((s) => s.name),
-  ['groups', 'groupMessages'],
+  ['groups', 'groupMessages', 'groupMessageReactions'],
 );
 const exportPage = await exportSections[1].page('');
 assert.equal(exportPage.rows.length, 100);

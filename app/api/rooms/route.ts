@@ -64,7 +64,9 @@ export async function POST(req: Request) {
     const me = await viewer();
     if (body.actor !== undefined && body.actor !== me)
       throw new ApiError(401, 'Аккаунт изменился. Откройте чат снова.');
-    if (body.action === 'read') await rateLimit('room-read', me, 300, 60);
+    if (body.action === 'reaction')
+      await rateLimit('room-reaction', me, 60, 60);
+    else if (body.action === 'read') await rateLimit('room-read', me, 300, 60);
     else if (body.action === 'send')
       await rateLimit('room-message', me, 40, 60);
     else if (body.action === 'create')

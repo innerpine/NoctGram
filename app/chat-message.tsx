@@ -1,5 +1,7 @@
 'use client';
 import { memo } from 'react';
+import { MessageReactions } from './message-reactions';
+import type { ReactionEmoji } from '@/lib/message-reactions';
 import { Check, CheckCheck, Clock3, RotateCcw } from 'lucide-react';
 import type { Message, Person } from '@/lib/client';
 import { ChatGift } from './chat-gift';
@@ -32,6 +34,8 @@ export const ChatMessage = memo(function ChatMessage({
   initial = false,
   delivery,
   onRetry,
+  onReact,
+  reactionPending = false,
 }: {
   message: Message;
   me: Person | null;
@@ -48,8 +52,18 @@ export const ChatMessage = memo(function ChatMessage({
   initial?: boolean;
   delivery?: OutgoingMessage;
   onRetry?: (id: string) => void;
+  onReact: (message: Message, emoji: ReactionEmoji | null) => Promise<void>;
+  reactionPending?: boolean;
 }) {
   const own = message.sender === me?.id;
+  const reactions = (
+    <MessageReactions
+      reactions={message.reactions}
+      disabled={disabled || !canSend || selecting || removing || !!delivery}
+      pending={reactionPending}
+      onReact={(emoji) => onReact(message, emoji)}
+    />
+  );
   const sender = own && me ? me : peer;
   const menuProps = {
     message,
@@ -122,6 +136,7 @@ export const ChatMessage = memo(function ChatMessage({
           peer={peer}
           onProfile={onProfile}
           onAvatar={onAvatar}
+          reactions={reactions}
         />
       </ChatMessageContext>
     );
@@ -203,6 +218,7 @@ export const ChatMessage = memo(function ChatMessage({
           <div className="chat-message-music" data-chat-menu-exempt>
             <MusicLinkCard text={message.text} />
           </div>
+          {reactions}
           {!mediaOnly && metadata}
           {delivery?.status === 'failed' && (
             <button

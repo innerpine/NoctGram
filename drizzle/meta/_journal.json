@@ -351,6 +351,13 @@
       "when": 1789323668636,
       "tag": "0049_playlist_repeat",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "6",
+      "when": 1789324495255,
+      "tag": "0050_message_reactions",
+      "breakpoints": true
     }
   ]
 }

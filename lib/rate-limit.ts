@@ -55,6 +55,10 @@ const rules: Record<string, [string, number, number]> = {
   boost: ['boost', 12, 60],
 };
 export async function socialRateLimit(me: string, action: string) {
+  if (action === 'messageReaction') {
+    await rateLimit('message-reaction', me, 60, 60);
+    return;
+  }
   // Heartbeats, read acknowledgments and ICE signaling do not create user content.
   if (
     ['callEnd', 'telegramUnlink', 'telegramCancel', 'pushUnsubscribe'].includes(
