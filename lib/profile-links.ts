@@ -54,11 +54,13 @@ export function profileTargetFromURL(
       return null;
     const key = keys[0],
       value = url.searchParams.get(key)!;
-    if (key === 'handle' || key === 'group') {
+    if (key === 'handle') {
+      if (!/^[a-z0-9_]{2,24}$/i.test(value)) return null;
+      return { handle: value.toLowerCase() };
+    }
+    if (key === 'group') {
       if (!/^[a-z0-9_]{4,24}$/i.test(value)) return null;
-      return key === 'handle'
-        ? { handle: value.toLowerCase() }
-        : { group: value.toLowerCase() };
+      return { group: value.toLowerCase() };
     }
     if (key === 'invite')
       return /^[a-f0-9]{64}$/.test(value) ? { invite: value } : null;
@@ -72,7 +74,7 @@ export function profileTargetFromURL(
 export type MentionPart = { text: string; handle?: string; href?: string };
 export function mentionParts(text: string): MentionPart[] {
   const pattern =
-    /https?:\/\/[^\s<>"\p{Cc}]+|(?<![\w/])\/\?(?:profile|handle|group|invite|room)=[^\s<>"\p{Cc}]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?<![\p{L}\p{N}_/@.+-])@[a-z0-9_]{4,24}(?![\p{L}\p{N}_])/giu;
+    /https?:\/\/[^\s<>"\p{Cc}]+|(?<![\w/])\/\?(?:profile|handle|group|invite|room)=[^\s<>"\p{Cc}]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?<![\p{L}\p{N}_/@.+-])@[a-z0-9_]{2,24}(?![\p{L}\p{N}_])/giu;
   const parts: MentionPart[] = [];
   let cursor = 0;
   for (const match of text.matchAll(pattern)) {

@@ -171,7 +171,7 @@ export async function GET(req: Request) {
         if (!ref || ref.length > 100)
           throw new ApiError(404, 'Профиль не найден');
         const handle = ref.replace(/^@/, '').toLowerCase();
-        const row = /^[a-z0-9_]{4,24}$/.test(handle)
+        const row = /^[a-z0-9_]{2,24}$/.test(handle)
           ? await d
               .prepare('SELECT userId FROM handles WHERE handle=?')
               .bind(handle)
@@ -180,7 +180,7 @@ export async function GET(req: Request) {
         id = row?.userId || ref;
       } else if (s.has('handle')) {
         const handle = (s.get('handle') || '').replace(/^@/, '').toLowerCase();
-        if (!/^[a-z0-9_]{4,24}$/.test(handle))
+        if (!/^[a-z0-9_]{2,24}$/.test(handle))
           throw new ApiError(404, 'Профиль не найден');
         const row = await d
           .prepare('SELECT userId FROM handles WHERE handle=?')

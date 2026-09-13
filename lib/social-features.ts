@@ -42,9 +42,12 @@ async function validImage(url: unknown, me: string, existing?: string) {
   }
   return value;
 }
-function handle(value: unknown) {
+function handle(value: unknown, assigned?: ReadonlySet<string>) {
   const name = clean(value, 25, true).replace(/^@/, '').toLowerCase();
-  if (!/^[a-z0-9_]{4,24}$/.test(name))
+  if (
+    !/^[a-z0-9_]{4,24}$/.test(name) &&
+    !(/^[a-z0-9_]{2,3}$/.test(name) && assigned?.has(name))
+  )
     throw new ApiError(400, 'Юзернейм: 4–24 латинские буквы, цифры или _');
   return name;
 }
@@ -213,11 +216,18 @@ export async function featurePost(
           400,
           'Можно сохранить основной и до четырёх дополнительных юзернеймов',
         );
+      // Individually granted short names can be retained, but never claimed
+      // through ordinary profile editing or moved from another account.
+      const existing = await d
+        .prepare('SELECT handle FROM handles WHERE userId=?')
+        .bind(target)
+        .all<{ handle: string }>();
+      const assigned = new Set(existing.results.map((row) => row.handle));
       const names = [
-        handle(b.mainHandle),
+        handle(b.mainHandle, assigned),
         ...b.extraHandles
           .filter((v) => typeof v === 'string' && v.trim())
-          .map(handle),
+          .map((value) => handle(value, assigned)),
       ];
       if (new Set(names).size !== names.length)
         throw new ApiError(400, 'Юзернеймы не должны повторяться');

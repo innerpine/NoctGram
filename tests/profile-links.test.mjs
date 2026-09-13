@@ -75,6 +75,22 @@ try {
   }
   assert.equal(api.profileHref({ id: 'user:a&b' }), '/?profile=user%3Aa%26b');
   assert.equal(api.profileHref({ handle: 'invoker' }), '/?profile=invoker');
+  assert.equal(api.profileHref({ handle: 'ez' }), '/?profile=ez');
+  assert.deepEqual(
+    api.profileTargetFromURL('/?handle=EZ', 'https://noctgram.test'),
+    { handle: 'ez' },
+  );
+  assert.equal(
+    api.profileTargetFromURL('/?group=ez', 'https://noctgram.test'),
+    null,
+  );
+  assert.deepEqual(
+    api
+      .mentionParts('@ez @EZ')
+      .filter((part) => part.handle)
+      .map((part) => part.handle),
+    ['ez', 'ez'],
+  );
   assert.equal(
     api.profileHref({ id: 'local_seedy', handle: '@Invoker' }),
     '/?profile=invoker',
