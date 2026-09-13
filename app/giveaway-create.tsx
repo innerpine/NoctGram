@@ -246,6 +246,7 @@ function GiveawayForm({
         <legend>Что разыгрываем</legend>
         <RadioGroup
           value={prize}
+          disabled={busy || pending}
           onValueChange={(value) => setPrize(value as 'stars' | 'premium')}
           className="giveaway-prize-options"
           aria-label="Приз"
@@ -257,11 +258,15 @@ function GiveawayForm({
             }
           >
             <StarsIcon size={30} />
-            <span>
+            <span className="giveaway-option-copy">
               <strong>Noct Stars</strong>
               <small>Звёзды на баланс</small>
             </span>
-            <RadioGroupItem id={id + '-prize-stars'} value="stars" />
+            <RadioGroupItem
+              className="giveaway-option-control"
+              id={id + '-prize-stars'}
+              value="stars"
+            />
           </label>
           <label
             htmlFor={id + '-prize-premium'}
@@ -270,14 +275,18 @@ function GiveawayForm({
             }
           >
             <PremiumIcon size={30} />
-            <span>
+            <span className="giveaway-option-copy">
               <strong>Noct Premium</strong>
               <small>
                 {GIVEAWAY_PREMIUM_DAYS} дней · {GIVEAWAY_PREMIUM_COST} Noct
                 Stars
               </small>
             </span>
-            <RadioGroupItem id={id + '-prize-premium'} value="premium" />
+            <RadioGroupItem
+              className="giveaway-option-control"
+              id={id + '-prize-premium'}
+              value="premium"
+            />
           </label>
         </RadioGroup>
         <div className="giveaway-fields">

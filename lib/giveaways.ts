@@ -31,9 +31,9 @@ const groupVisible = (r: string) =>
 function mayCreate(kind: string, target: string, actor: string) {
   const person = `EXISTS(SELECT 1 FROM users actor WHERE actor.id=${actor} AND ${writable('actor')})`;
   return kind === 'group'
-    ? `${person} AND EXISTS(SELECT 1 FROM chat_rooms r JOIN chat_room_members m ON m.roomId=r.id WHERE r.id=${target} AND ${groupVisible('r')} AND m.userId=${actor} AND m.status='active' AND m.role IN ('owner','admin') AND ${unblocked(actor, 'r.ownerId')})`
+    ? `${person} AND EXISTS(SELECT 1 FROM chat_rooms r JOIN chat_room_members m ON m.roomId=r.id WHERE r.id=${target} AND ${groupVisible('r')} AND m.userId=${actor} AND m.status='active' AND ${unblocked(actor, 'r.ownerId')})`
     : `${person} AND EXISTS(SELECT 1 FROM users c WHERE c.id=${target} AND ${channelVisible('c')}
-      AND (c.ownerId=${actor} OR EXISTS(SELECT 1 FROM channel_members cm WHERE cm.channelId=c.id AND cm.userId=${actor} AND cm.role='admin'))
+      AND c.ownerId=${actor}
       AND ${unblocked(actor, 'c.id')} AND ${unblocked(actor, 'c.ownerId')}
       AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId IN(c.id,c.ownerId) AND (ar.expiresAt IS NULL OR ar.expiresAt>${clock})))`;
 }
@@ -176,7 +176,9 @@ export async function createGiveaway(
   )
     throw rejected(
       403,
-      'Розыгрыши доступны владельцам и администраторам групп и каналов',
+      kind === 'group'
+        ? 'Для создания розыгрыша нужно быть участником группы без ограничений на отправку'
+        : 'Создать розыгрыш в канале может только его владелец',
     );
   await socialRateLimit(me, kind === 'channel' ? 'post' : 'message');
   await rateLimit('giveaways', me, 5, 3600);

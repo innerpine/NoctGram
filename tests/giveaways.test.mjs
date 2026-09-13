@@ -213,8 +213,8 @@ async function isolated(callback) {
 await test('atomic creation, rights, shared metadata and retry protection', async () =>
   isolated(async (f) => {
     await assert.rejects(
-      api.createGiveaway('member', f.body(), f.now),
-      /владельцам и администраторам/,
+      api.createGiveaway('guest', f.body(), f.now),
+      /участником группы/,
     );
     const body = f.body();
     const first = await api.createGiveaway('owner', body, f.now);
@@ -266,6 +266,96 @@ await test('atomic creation, rights, shared metadata and retry protection', asyn
           .run(f.now, first.giveaway.id),
       /GIVEAWAY_BINDING/,
     );
+  }));
+
+await test('ordinary group members fund Stars and Premium from their own wallet', async () => {
+  for (const prize of ['stars', 'premium']) {
+    await isolated(async (f) => {
+      const draft = f.body({ prize, winnerCount: 3 });
+      const cost = prize === 'premium' ? 1500 : 300;
+      const result = await api.createGiveaway('member', draft, f.now);
+      assert.equal(result.giveaway.creator, 'member');
+      assert.equal(result.balance, 10000 - cost);
+      assert.equal(f.wallet('owner'), 10000);
+      assert.equal(f.wallet('admin'), 10000);
+      const published = f.sql
+        .prepare('SELECT sender FROM chat_room_messages WHERE giveawayId=?')
+        .get(result.giveaway.id);
+      assert.equal(published.sender, 'member');
+      const retry = await api.createGiveaway('member', draft, f.now + 1);
+      assert.equal(retry.giveaway.id, result.giveaway.id);
+      assert.equal(retry.balance, 10000 - cost);
+      assert.equal(
+        f.sql
+          .prepare(
+            "SELECT COUNT(*) AS n FROM star_transfers WHERE kind='giveaway_debit'",
+          )
+          .get().n,
+        1,
+      );
+      await api.settleGiveaway(result.giveaway.id, result.giveaway.endsAt);
+      const completed = await api.getGiveaway(
+        'member',
+        result.giveaway.id,
+        result.giveaway.endsAt,
+      );
+      assert.deepEqual(completed.winners.map((winner) => winner.id).sort(), [
+        'admin',
+        'other',
+        'owner',
+      ]);
+      assert.equal(f.wallet('member'), 10000 - cost);
+    });
+  }
+});
+
+await test('membership and account restrictions still prevent group giveaway creation', async () => {
+  const scenarios = [
+    "UPDATE chat_room_members SET status='left' WHERE userId='member'",
+    "UPDATE chat_room_members SET status='banned' WHERE userId='member'",
+    "UPDATE users SET deletedAt=1 WHERE id='member'",
+    "UPDATE users SET onboardingComplete=0 WHERE id='member'",
+    "UPDATE chat_rooms SET deletedAt=1 WHERE id='group'",
+    "INSERT INTO user_blocks(blocker,blocked,created) VALUES('member','owner',1)",
+    "INSERT INTO user_blocks(blocker,blocked,created) VALUES('owner','member',1)",
+    ...['read_only', 'blocked'].map(
+      (mode) => `
+      INSERT INTO moderation_events(id,userId,moderatorId,mode,reason,created) VALUES('restriction','member','owner','${mode}','test',1);
+      INSERT INTO account_restrictions(userId,eventId,mode,reason,created) VALUES('member','restriction','${mode}','test',1);
+    `,
+    ),
+  ];
+  for (const scenario of scenarios) {
+    await isolated(async (f) => {
+      f.sql.exec(scenario);
+      await assert.rejects(
+        api.createGiveaway('member', f.body(), f.now),
+        (error) => error.status === 403 && error.code === 'GIVEAWAY_REJECTED',
+      );
+      assert.equal(f.wallet('member'), 10000);
+      assert.equal(
+        f.sql.prepare('SELECT COUNT(*) AS n FROM giveaways').get().n,
+        0,
+      );
+      assert.equal(
+        f.sql.prepare('SELECT COUNT(*) AS n FROM chat_room_messages').get().n,
+        0,
+      );
+    });
+  }
+});
+
+await test('demotion to ordinary member does not revoke group giveaway creation', async () =>
+  isolated(async (f) => {
+    f.beforeBatch((sql) =>
+      sql.exec(
+        "UPDATE chat_room_members SET role='member' WHERE userId='admin'",
+      ),
+    );
+    const result = await api.createGiveaway('admin', f.body(), f.now);
+    assert.equal(result.giveaway.creator, 'admin');
+    assert.equal(f.wallet('admin'), 9800);
+    assert.equal(f.wallet('owner'), 10000);
   }));
 
 await test('all real awards funded, creator excluded, duplicate jobs pay once', async () =>
@@ -419,14 +509,14 @@ await test('insufficient funds and revocation at commit cannot debit or publish'
     );
     f.beforeBatch((sql) =>
       sql.exec(
-        "UPDATE chat_room_members SET role='member' WHERE userId='admin'",
+        "UPDATE chat_room_members SET status='banned' WHERE userId='member'",
       ),
     );
     await assert.rejects(
-      api.createGiveaway('admin', f.body(), f.now),
+      api.createGiveaway('member', f.body(), f.now),
       /Не удалось/,
     );
-    assert.equal(f.wallet('admin'), 10000);
+    assert.equal(f.wallet('member'), 10000);
     assert.equal(
       f.sql.prepare('SELECT COUNT(*) AS n FROM giveaways').get().n,
       0,
@@ -443,7 +533,7 @@ await test('insufficient funds and revocation at commit cannot debit or publish'
       .run(f.now);
     await assert.rejects(
       api.createGiveaway('owner', f.body({ targetId: 'secret' }), f.now),
-      /владельцам и администраторам/,
+      /участником группы/,
     );
   }));
 
@@ -509,16 +599,41 @@ await test('blocked, deleted and incomplete accounts cannot win; empty target re
     );
   }));
 
-await test('channel administrators can pay; publisher-only role cannot create', async () =>
+await test('only the channel owner can create; administrators, editors and subscribers cannot', async () =>
   isolated(async (f) => {
+    for (const actor of ['member', 'admin']) {
+      for (const prize of ['stars', 'premium']) {
+        await assert.rejects(
+          api.createGiveaway(
+            actor,
+            f.body({ targetKind: 'channel', targetId: 'channel', prize }),
+            f.now,
+          ),
+          (error) =>
+            error.status === 403 && /только его владелец/.test(error.message),
+        );
+      }
+    }
+    assert.equal(f.wallet('member'), 10000);
+    assert.equal(f.wallet('admin'), 10000);
+    assert.equal(
+      f.sql.prepare('SELECT COUNT(*) AS n FROM giveaways').get().n,
+      0,
+    );
+    assert.equal(
+      f.sql
+        .prepare('SELECT COUNT(*) AS n FROM posts WHERE giveawayId IS NOT NULL')
+        .get().n,
+      0,
+    );
     const { giveaway } = await api.createGiveaway(
-      'admin',
+      'owner',
       f.body({ targetKind: 'channel', targetId: 'channel' }),
       f.now,
     );
-    assert.equal(giveaway.creator, 'admin');
-    assert.equal(f.wallet('owner'), 10000);
-    assert.equal(f.wallet('admin'), 9800);
+    assert.equal(giveaway.creator, 'owner');
+    assert.equal(f.wallet('owner'), 9800);
+    assert.equal(f.wallet('admin'), 10000);
     f.sql.exec("UPDATE channel_members SET role='editor' WHERE userId='admin'");
     await assert.rejects(
       api.createGiveaway(
@@ -526,7 +641,34 @@ await test('channel administrators can pay; publisher-only role cannot create', 
         f.body({ targetKind: 'channel', targetId: 'channel' }),
         f.now,
       ),
-      /владельцам и администраторам/,
+      /только его владелец/,
+    );
+  }));
+
+await test('channel ownership is rechecked inside the payment transaction', async () =>
+  isolated(async (f) => {
+    f.beforeBatch((sql) =>
+      sql.exec("UPDATE users SET ownerId='admin' WHERE id='channel'"),
+    );
+    await assert.rejects(
+      api.createGiveaway(
+        'owner',
+        f.body({ targetKind: 'channel', targetId: 'channel' }),
+        f.now,
+      ),
+      /Не удалось/,
+    );
+    assert.equal(f.wallet('owner'), 10000);
+    assert.equal(f.wallet('admin'), 10000);
+    assert.equal(
+      f.sql.prepare('SELECT COUNT(*) AS n FROM giveaways').get().n,
+      0,
+    );
+    assert.equal(
+      f.sql
+        .prepare('SELECT COUNT(*) AS n FROM posts WHERE giveawayId IS NOT NULL')
+        .get().n,
+      0,
     );
   }));
 
@@ -583,7 +725,7 @@ await test('committed receipt survives post-payment access loss and read-only re
 await test('only definitive rejected creation errors permit a fresh payment attempt', async () =>
   isolated(async (f) => {
     await assert.rejects(
-      api.createGiveaway('member', f.body(), f.now),
+      api.createGiveaway('guest', f.body(), f.now),
       (error) => error.code === 'GIVEAWAY_REJECTED',
     );
     await assert.rejects(

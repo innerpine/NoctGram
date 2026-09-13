@@ -106,7 +106,7 @@ await test(
         .run();
     await d
       .prepare(
-        "INSERT INTO star_transfers(id,recipient,amount,kind,created) VALUES('grant','owner',1000,'admin_grant',?)",
+        "INSERT INTO star_transfers(id,recipient,amount,kind,created) VALUES('grant','a',1000,'admin_grant',?)",
       )
       .bind(now)
       .run();
@@ -121,12 +121,32 @@ await test(
       endsAt: now + 3600000,
     };
     const concurrent = await Promise.allSettled([
-      api.createGiveaway('owner', draft, now),
-      api.createGiveaway('owner', { ...draft, key: crypto.randomUUID() }, now),
+      api.createGiveaway('a', draft, now),
+      api.createGiveaway('a', { ...draft, key: crypto.randomUUID() }, now),
     ]);
     assert.equal(concurrent.filter((r) => r.status === 'fulfilled').length, 1);
     const giveaway = concurrent.find((r) => r.status === 'fulfilled').value
       .giveaway;
+    assert.equal(giveaway.creator, 'a');
+    assert.equal(
+      (
+        await d
+          .prepare(
+            "SELECT sender FROM star_transfers WHERE kind='giveaway_debit'",
+          )
+          .first()
+      ).sender,
+      'a',
+    );
+    assert.equal(
+      (
+        await d
+          .prepare('SELECT sender FROM chat_room_messages WHERE giveawayId=?')
+          .bind(giveaway.id)
+          .first()
+      ).sender,
+      'a',
+    );
     const settlement = await Promise.all([
       api.settleGiveaway(giveaway.id, giveaway.endsAt),
       api.settleGiveaway(giveaway.id, giveaway.endsAt),
@@ -155,7 +175,7 @@ await test(
     const details = await api.getGiveaway('a', giveaway.id, giveaway.endsAt);
     assert.equal(details.winners.length, 2);
     assert.equal(new Set(details.winners.map((w) => w.id)).size, 2);
-    assert.ok(details.winners.every((w) => w.id !== 'owner'));
+    assert.ok(details.winners.every((w) => w.id !== 'a'));
     await d
       .prepare(
         "INSERT INTO users(id,name,kind,ownerId,created) VALUES('channel','Channel','channel','owner',?)",
@@ -165,6 +185,25 @@ await test(
     await d
       .prepare("INSERT INTO follows(follower,following) VALUES('a','channel')")
       .run();
+    await d
+      .prepare(
+        "INSERT INTO channel_members(channelId,userId,role,created) VALUES('channel','b','admin',?)",
+      )
+      .bind(now)
+      .run();
+    await assert.rejects(
+      api.createGiveaway(
+        'b',
+        {
+          ...draft,
+          key: crypto.randomUUID(),
+          targetKind: 'channel',
+          targetId: 'channel',
+        },
+        now,
+      ),
+      (error) => error.status === 403,
+    );
     await d
       .prepare(
         "INSERT INTO star_transfers(id,recipient,amount,kind,created) VALUES('extra','owner',1000,'admin_grant',?)",

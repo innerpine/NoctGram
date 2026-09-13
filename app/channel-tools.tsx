@@ -95,15 +95,17 @@ export function ChannelTools({
   return (
     <>
       <div className="channel-tools">
-        {profile.kind === 'channel' && profile.canManagePosts && actorId && (
-          <GiveawayCreateButton
-            targetKind="channel"
-            targetId={profile.id}
-            targetName={profile.name}
-            actorId={actorId}
-            onCreated={onCreated}
-          />
-        )}
+        {profile.kind === 'channel' &&
+          actorId &&
+          profile.ownerId === actorId && (
+            <GiveawayCreateButton
+              targetKind="channel"
+              targetId={profile.id}
+              targetName={profile.name}
+              actorId={actorId}
+              onCreated={onCreated}
+            />
+          )}
         <button className="secondary" onClick={() => setOpen(true)}>
           <UsersRound size={15} /> Команда канала
         </button>
