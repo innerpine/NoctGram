@@ -2,6 +2,7 @@ import { appearanceColumns } from '@/lib/premium-access';
 import { db, profile, clean, ApiError } from './server';
 import { accountExport } from './account-export';
 import { groupRoomExportSections } from './rooms';
+import { messageVisible } from './chat-access';
 import { rateLimit } from './rate-limit';
 import {
   restriction,
@@ -43,6 +44,14 @@ export async function moderationGet(
         'SELECT * FROM messages WHERE (sender=? OR recipient=?) AND deletedAt=0 AND id>? ORDER BY id LIMIT 100',
         [me, me],
         'id',
+      ],
+      [
+        'messageReactions',
+        `SELECT reaction.* FROM message_reactions reaction JOIN messages m ON m.id=reaction.messageId
+         WHERE reaction.userId=? AND (m.sender=reaction.userId OR m.recipient=reaction.userId)
+         AND ${messageVisible('m', 'reaction.userId')} AND reaction.messageId>? ORDER BY reaction.messageId LIMIT 100`,
+        [me],
+        'messageId',
       ],
       [
         'following',

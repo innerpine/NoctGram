@@ -164,6 +164,30 @@ void test(
       key: key(),
       text: 'A real D1 group message',
     });
+    const react = (emoji) =>
+      change('initial-0', {
+        action: 'reaction',
+        id: full.id,
+        messageId: message.id,
+        emoji,
+      });
+    await react('❤️');
+    await react('❤️');
+    assert.deepEqual(
+      (await api.readRoom('initial-0', full.id)).messages[0].reactions,
+      [{ emoji: '❤️', count: 1, own: true }],
+    );
+    await react('🔥');
+    assert.deepEqual(
+      (await api.readRoom('owner', full.id)).messages[0].reactions,
+      [{ emoji: '🔥', count: 1, own: false }],
+    );
+    await react(null);
+    await react(null);
+    assert.deepEqual(
+      (await api.readRoom('owner', full.id)).messages[0].reactions,
+      [],
+    );
     await change('initial-0', {
       action: 'send',
       id: full.id,

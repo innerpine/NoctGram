@@ -3,7 +3,12 @@ import type { Message } from './client';
 import { ApiError } from './api-error';
 import { messageAllowed } from './privacy';
 import { visibleAccount } from './account-access';
-import { messageVisible, messagePair } from './chat-access';
+import { messageVisible, messagePair, messageWritable } from './chat-access';
+import {
+  reactionSummarySql,
+  saveMessageReaction,
+} from './message-reactions-store';
+import { parseReactions } from './message-reactions';
 
 export async function readUnreadMessageCount(me: string): Promise<number> {
   // The navigation badge only displays up to 99+, without loading every peer's
@@ -51,6 +56,7 @@ export async function readConversation(
       SELECT a.copyId,src.id,src.sender,src.forwardSourceId,src.forwardedName
       FROM attribution a JOIN messages src ON src.id=a.forwardSourceId
     ) SELECT m.id,m.sender,m.recipient,m.text,m.media,m.created,m.read,m.editedAt,m.forwardedName,p.created AS pinnedAt,
+      ${reactionSummarySql('message_reactions', 'm.id', '(SELECT me FROM scope)')} AS reactionData,
       (SELECT a.sender FROM attribution a WHERE a.copyId=m.id AND a.forwardSourceId IS NULL AND a.forwardedName='' LIMIT 1) AS forwardedSender,
       m.replyTo,rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
       CASE WHEN rp.text<>'' THEN substr(rp.text,1,240) WHEN json_array_length(rp.media)>0 THEN
@@ -71,6 +77,7 @@ export async function readConversation(
     .all<
       Message & {
         media: string;
+        reactionData: string;
         receiptId: string | null;
         giftType: string | null;
         giftMessage: string | null;
@@ -101,6 +108,7 @@ export async function readConversation(
       collectibleKeepOriginal,
       collectibleCreated,
       media,
+      reactionData,
       replyTo,
       replyId,
       replySender,
@@ -109,6 +117,7 @@ export async function readConversation(
       ...message
     }) => ({
       ...message,
+      reactions: parseReactions(reactionData),
       attachments: JSON.parse(media),
       ...(replyTo
         ? {
@@ -144,6 +153,31 @@ export async function readConversation(
         : {}),
     }),
   );
+}
+
+export async function reactToMessage(
+  me: string,
+  body: Record<string, unknown>,
+) {
+  const { id, peer, emoji } = body;
+  if (
+    typeof id !== 'string' ||
+    !id ||
+    id.length > 250 ||
+    typeof peer !== 'string' ||
+    !peer ||
+    peer.length > 100 ||
+    peer === me
+  )
+    throw new ApiError(400, 'Выбери сообщение в диалоге');
+  const gate = `EXISTS(SELECT 1 FROM messages m,users s,users r WHERE m.id=? AND s.id=? AND r.id=?
+    AND ${messagePair('m', 's.id', 'r.id')} AND ${messageVisible('m', 's.id')}
+    AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageWritable('s.id')} AND ${messageAllowed})`;
+  return saveMessageReaction('message_reactions', id, me, emoji, gate, [
+    id,
+    me,
+    peer,
+  ]);
 }
 
 export async function pinMessage(me: string, body: Record<string, unknown>) {

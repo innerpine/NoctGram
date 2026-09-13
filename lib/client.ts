@@ -99,6 +99,7 @@ export type Comment = Appearance & {
   created: number;
 };
 export type Message = {
+  reactions?: import('./message-reactions').MessageReaction[];
   id: string;
   sender: string;
   recipient: string;

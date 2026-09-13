@@ -205,6 +205,48 @@ export const messages = sqliteTable(
     uniqueIndex('messages_gift_receipt').on(t.giftReceiptId),
   ],
 );
+export const messageReactions = sqliteTable(
+  'message_reactions',
+  {
+    messageId: text()
+      .notNull()
+      .references(() => messages.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    emoji: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.messageId, t.userId] }),
+    index('message_reactions_user').on(t.userId),
+    check(
+      'message_reactions_emoji',
+      sql`${t.emoji} IN ('👍','❤️','😂','🔥','🎉','🤯','😢','👎')`,
+    ),
+  ],
+);
+export const chatRoomMessageReactions = sqliteTable(
+  'chat_room_message_reactions',
+  {
+    messageId: text()
+      .notNull()
+      .references(() => chatRoomMessages.id, { onDelete: 'cascade' }),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    emoji: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.messageId, t.userId] }),
+    index('chat_room_message_reactions_user').on(t.userId),
+    check(
+      'chat_room_message_reactions_emoji',
+      sql`${t.emoji} IN ('👍','❤️','😂','🔥','🎉','🤯','😢','👎')`,
+    ),
+  ],
+);
 export const uploads = sqliteTable('uploads', {
   id: text().primaryKey(),
   userId: text()

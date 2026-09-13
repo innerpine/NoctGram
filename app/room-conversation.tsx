@@ -1,4 +1,6 @@
 'use client';
+import { MessageReactions } from './message-reactions';
+import type { ReactionEmoji } from '@/lib/message-reactions';
 import { EmojiPicker, EmojiPreview } from './premium-emoji';
 import { MentionText } from './profile-link';
 import { GiveawayCard } from './giveaway-card';
@@ -84,6 +86,10 @@ export function RoomConversation({
     [safety, setSafety] = useState(''),
     [secretError, setSecretError] = useState(''),
     [secretReady, setSecretReady] = useState(false);
+  const [reactionPending, setReactionPending] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const reactionLocks = useRef(new Set<string>());
   const [plaintext, setPlaintext] = useState<Record<string, string>>({}),
     [pending, setPending] = useState(false),
     [older, setOlder] = useState(false);
@@ -192,6 +198,37 @@ export function RoomConversation({
     onRoomsChanged,
   ]);
   const latestLoad = useRef(load);
+  const reactToMessage = async (
+    message: RoomMessage,
+    emoji: ReactionEmoji | null,
+  ) => {
+    if (
+      disabled ||
+      !room?.canSend ||
+      room.kind !== 'group' ||
+      message.deletedAt ||
+      reactionLocks.current.has(message.id)
+    )
+      return;
+    reactionLocks.current.add(message.id);
+    setReactionPending(new Set(reactionLocks.current));
+    setMutationError('');
+    try {
+      await roomAction({
+        actor: me.id,
+        action: 'reaction',
+        id: room.id,
+        messageId: message.id,
+        emoji,
+      });
+      if (alive.current) await load();
+    } catch (error) {
+      if (alive.current) setMutationError(reason(error));
+    } finally {
+      reactionLocks.current.delete(message.id);
+      if (alive.current) setReactionPending(new Set(reactionLocks.current));
+    }
+  };
   latestLoad.current = load;
   useEffect(() => {
     alive.current = true;
@@ -696,7 +733,17 @@ export function RoomConversation({
                     {message.giveawayId && !message.deletedAt ? (
                       <GiveawayCard id={message.giveawayId} viewerId={me.id} />
                     ) : (
-                      <p><MentionText text={content} /></p>
+                      <p>
+                        <MentionText text={content} />
+                      </p>
+                    )}
+                    {room.kind === 'group' && !message.deletedAt && (
+                      <MessageReactions
+                        reactions={message.reactions}
+                        disabled={disabled || !room.canSend || busy}
+                        pending={reactionPending.has(message.id)}
+                        onReact={(emoji) => reactToMessage(message, emoji)}
+                      />
                     )}
                     {giveawayEvent ? (
                       <div className="room-giveaway-meta">
@@ -709,7 +756,9 @@ export function RoomConversation({
                         </button>
                         <span aria-hidden="true">·</span>
                         <span className="room-message-time">
-                          <time dateTime={new Date(message.created).toISOString()}>
+                          <time
+                            dateTime={new Date(message.created).toISOString()}
+                          >
                             {time(message.created)}
                           </time>
                         </span>

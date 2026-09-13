@@ -150,6 +150,8 @@ export async function deleteAccount(
   ];
   // Evidence and the Stars ledger retain anonymous user IDs; no balance is recalculated by deletion.
   for (const table of [
+    'message_reactions',
+    'chat_room_message_reactions',
     'likes',
     'bookmarks',
     'votes',

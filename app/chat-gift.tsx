@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Check, CheckCheck, Gift } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { giftDefinition } from '@/lib/gift-catalog';
@@ -19,12 +19,14 @@ export function ChatGift({
   peer,
   onProfile,
   onAvatar,
+  reactions,
 }: {
   message: Message;
   me: Person;
   peer: Person;
   onProfile: (id: string) => void;
   onAvatar: (id: string) => void;
+  reactions?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [upgraded, setUpgraded] = useState<GiftCollectible | null>(null);
@@ -125,6 +127,7 @@ export function ChatGift({
           )}
         </div>
       </div>
+      {reactions}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           className="noct-dialog gift-dialog chat-gift-dialog"
