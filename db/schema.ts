@@ -148,6 +148,8 @@ export const comments = sqliteTable(
       .notNull()
       .references(() => users.id),
     text: text().notNull(),
+    // Keep the reference after deletion so replies can show an unavailable quote.
+    replyTo: text(),
     created: integer().notNull(),
   },
   (t) => [index('comments_post').on(t.postId, t.created)],
@@ -349,10 +351,13 @@ export const receivedGifts = sqliteTable(
 );
 
 // Upgrade receipts are permanent. The owning account is the received gift's recipient.
-export const giftCollectionSequences = sqliteTable('gift_collection_sequences', {
-  family: text().primaryKey(),
-  lastNumber: integer().notNull(),
-});
+export const giftCollectionSequences = sqliteTable(
+  'gift_collection_sequences',
+  {
+    family: text().primaryKey(),
+    lastNumber: integer().notNull(),
+  },
+);
 export const giftUpgrades = sqliteTable(
   'gift_upgrades',
   {

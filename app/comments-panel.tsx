@@ -13,6 +13,8 @@ import {
   RefreshCw,
   Flag,
   ShieldCheck,
+  Reply,
+  X,
 } from 'lucide-react';
 import { Avatar, Empty, Stamp } from './post-card';
 import { ContentDecisionForm } from './content-decision-form';
@@ -29,6 +31,7 @@ export function CommentsPanel({
   onChanged: () => void;
 }) {
   const [comments, setComments] = useState<Comment[]>([]),
+    [reply, setReply] = useState<Comment | null>(null),
     [text, setText] = useState(''),
     [loading, setLoading] = useState(true),
     [sending, setSending] = useState(false),
@@ -103,10 +106,12 @@ export function CommentsPanel({
         action: 'comment',
         id: post.id,
         text,
+        replyTo: reply?.id ?? null,
       });
       onChanged();
       if (live.current) {
         setText('');
+        setReply(null);
         setComments((old) =>
           old.some((c) => c.id === row.id) ? old : [...old, row],
         );
@@ -126,12 +131,33 @@ export function CommentsPanel({
       lock.current = false;
     }
   };
+  const forgetComment = (id: string) => {
+    setComments((rows) =>
+      rows
+        .filter((c) => c.id !== id)
+        .map((c) =>
+          c.reply?.id === id
+            ? {
+                ...c,
+                reply: {
+                  id,
+                  userId: '',
+                  name: '',
+                  text: '',
+                  unavailable: true,
+                },
+              }
+            : c,
+        ),
+    );
+    setReply((current) => (current?.id === id ? null : current));
+  };
   const remove = async (id: string) => {
     if (readOnly || deleting || loading || sending) return;
     setDeleting(id);
     try {
       await request('', { action: 'deleteComment', id });
-      if (live.current) setComments((rows) => rows.filter((c) => c.id !== id));
+      if (live.current) forgetComment(id);
       onChanged();
     } catch (e) {
       if (live.current) setError((e as Error).message);
@@ -210,9 +236,35 @@ export function CommentsPanel({
                   </button>
                 )}
               </div>
+              {c.reply && (
+                <div className="comment-quote">
+                  <Reply size={14} aria-hidden="true" />
+                  <div>
+                    <strong>
+                      {c.reply.unavailable
+                        ? 'Комментарий недоступен'
+                        : `Ответ · ${c.reply.name}`}
+                    </strong>
+                    {!c.reply.unavailable && <span>{c.reply.text}</span>}
+                  </div>
+                </div>
+              )}
               <p>
                 <MentionText text={c.text} />
               </p>
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="comment-reply-action"
+                  disabled={sending || !!deleting}
+                  onClick={() => {
+                    setReply(c);
+                    emojiField.current?.focus();
+                  }}
+                >
+                  Ответить
+                </button>
+              )}
               {c.userId !== me.id && !readOnly && (
                 <div className="comment-moderation-actions">
                   <button
@@ -251,7 +303,7 @@ export function CommentsPanel({
                   onCancel={() => setDecision(null)}
                   onDone={() => {
                     if (decision.action === 'remove') {
-                      setComments((old) => old.filter((r) => r.id !== c.id));
+                      forgetComment(c.id);
                       onChanged();
                     }
                     setNotice(
@@ -304,6 +356,24 @@ export function CommentsPanel({
       >
         <Avatar person={me} size={34} />
         <div className="comment-input">
+          {reply && (
+            <output className="comment-quote comment-reply-draft">
+              <Reply size={15} aria-hidden="true" />
+              <span className="comment-quote-content">
+                <strong>Ответ · {reply.name}</strong>
+                <span>{reply.text}</span>
+              </span>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Отменить ответ"
+                disabled={sending}
+                onClick={() => setReply(null)}
+              >
+                <X size={16} />
+              </button>
+            </output>
+          )}
           <EmojiPicker
             key={post.id}
             premium={!!me.premium}

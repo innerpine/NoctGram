@@ -96,6 +96,14 @@ export type Comment = Appearance & {
   handle: string;
   text: string;
   created: number;
+  replyTo?: string | null;
+  reply?: {
+    id: string;
+    userId: string;
+    name: string;
+    text: string;
+    unavailable: boolean;
+  } | null;
 };
 export type Message = {
   id: string;

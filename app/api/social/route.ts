@@ -1,4 +1,9 @@
 import { assertPremiumEmoji } from '@/lib/premium-emoji-access';
+import {
+  commentReplyTarget,
+  insertComment,
+  withCommentReplies,
+} from '@/lib/comment-replies';
 import { archiveDirectChat } from '@/lib/chat-archive';
 import { visibleLastSeen } from '@/lib/presence-privacy';
 import { telegramGet, telegramPost } from '@/lib/telegram';
@@ -222,20 +227,23 @@ export async function GET(req: Request) {
         return Response.json([]);
       await assertPostVisible(s.get('post') || '', me);
       return Response.json(
-        (
-          await d
-            .prepare(
-              `SELECT * FROM (SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND c.postId=? AND (c.created<? OR (c.created=? AND c.id<?)) ORDER BY c.created DESC,c.id DESC LIMIT 50) ORDER BY created,id`,
-            )
-            .bind(
-              me,
-              s.get('post') || '',
-              Number(s.get('before')) || Date.now() + 1,
-              Number(s.get('before')) || Date.now() + 1,
-              s.get('beforeId') || '',
-            )
-            .all()
-        ).results,
+        await withCommentReplies(
+          (
+            await d
+              .prepare(
+                `SELECT * FROM (SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND c.postId=? AND (c.created<? OR (c.created=? AND c.id<?)) ORDER BY c.created DESC,c.id DESC LIMIT 50) ORDER BY created,id`,
+              )
+              .bind(
+                me,
+                s.get('post') || '',
+                Number(s.get('before')) || Date.now() + 1,
+                Number(s.get('before')) || Date.now() + 1,
+                s.get('beforeId') || '',
+              )
+              .all<{ postId: string; replyTo: string | null }>()
+          ).results,
+          me,
+        ),
       );
     }
     if (action === 'threadsUnread')
@@ -602,19 +610,21 @@ export async function POST(req: Request) {
             .run();
       } else if (action === 'comment') {
         const commentId = crypto.randomUUID();
-        await d
+        await insertComment(
+          commentId,
+          id,
+          me,
+          clean(b.text, 2000, true),
+          commentReplyTarget(b.replyTo),
+        );
+        const row = await d
           .prepare(
-            'INSERT INTO comments (id,postId,userId,text,created) VALUES (?,?,?,?,?)',
+            `SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE c.id=?`,
           )
-          .bind(commentId, id, me, clean(b.text, 2000, true), Date.now())
-          .run();
+          .bind(commentId)
+          .first<{ postId: string; replyTo: string | null }>();
         return Response.json(
-          await d
-            .prepare(
-              `SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE c.id=?`,
-            )
-            .bind(commentId)
-            .first(),
+          row ? (await withCommentReplies([row], me))[0] : null,
         );
       } else {
         const options = JSON.parse(String(p.poll));

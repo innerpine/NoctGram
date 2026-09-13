@@ -94,6 +94,8 @@ await test(
         m.exports,
         m,
         async (url, init) => {
+          if (url === 'https://fixture.invalid/auth/v1/otp')
+            return Response.json({});
           assert.equal(url, 'https://fixture.invalid/auth/v1/verify');
           if (rejectProof) return Response.json({}, { status: 403 });
           const { email } = JSON.parse(init.body);
@@ -164,6 +166,54 @@ await test(
         .split(';')[0];
     }
     let newcomer, grant;
+    await t.test(
+      'email challenges distinguish browser context, expiry, attempts and another tab',
+      async () => {
+        requestHeaders = new Headers();
+        const missing = new Request('https://noctgram.example/api/auth/verify');
+        await assert.rejects(
+          auth.finishEmail(missing, { code: '123456' }),
+          (e) => e.code === 'CHALLENGE_MISSING',
+        );
+        const req = await challenge('clock@example.test');
+        requestHeaders = req.headers;
+        await assert.rejects(
+          auth.finishEmail(req, {
+            code: '123456',
+            email: 'other@example.test',
+          }),
+          (e) => e.code === 'CHALLENGE_CHANGED',
+        );
+        await d
+          .prepare('UPDATE auth_challenges SET attempts=5 WHERE email=?')
+          .bind('clock@example.test')
+          .run();
+        await assert.rejects(
+          auth.finishEmail(req, { code: '123456' }),
+          (e) => e.code === 'CODE_ATTEMPTS',
+        );
+        await d
+          .prepare(
+            'UPDATE auth_challenges SET attempts=0,expiresAt=1 WHERE email=?',
+          )
+          .bind('clock@example.test')
+          .run();
+        await assert.rejects(
+          auth.finishEmail(req, { code: '123456' }),
+          (e) => e.code === 'CODE_EXPIRED',
+        );
+        const startReq = new Request('https://noctgram.example/api/auth/start');
+        requestHeaders = startReq.headers;
+        const started = await auth.startEmail(startReq, {
+          email: 'Server-Clock@example.test',
+        });
+        const startedBody = await started.json();
+        assert.equal(startedBody.email, 'server-clock@example.test');
+        assert.ok(startedBody.serverTime <= Date.now());
+        assert.ok(startedBody.expiresAt - startedBody.serverTime > 290000);
+        assert.ok(started.headers.getSetCookie()[0].includes('HttpOnly'));
+      },
+    );
     await t.test(
       'new verified person receives exactly 72 hours and sees the expiry immediately',
       async () => {

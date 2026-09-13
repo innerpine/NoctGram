@@ -1,4 +1,5 @@
 export type AuthStatus = {
+  serverTime?: number;
   emailEnabled: boolean;
   sitesEnabled: boolean;
   signupPremiumDays?: number;

@@ -276,6 +276,8 @@
   box-shadow: 0 0 0 2px var(--profile-first);
 }
 .profile-text-ring {
+  user-select: none;
+  -webkit-user-select: none;
   position: absolute;
   inset: -23%;
   width: 146%;

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 const { outputFiles } = await build({
   stdin: {
-    contents: `export * from './lib/chat-editor-emoji'; export * from './lib/chat-emoji'; export { createEditor, $createParagraphNode, $createTextNode, $getRoot, $getSelection, $isRangeSelection, TextNode } from 'lexical';`,
+    contents: `export * from './lib/chat-editor-changes'; export * from './lib/chat-editor-emoji'; export * from './lib/chat-emoji'; export { createEditor, $createParagraphNode, $createTextNode, $getRoot, $getSelection, $isRangeSelection, TextNode } from 'lexical';`,
     resolveDir: process.cwd(),
   },
   bundle: true,
@@ -75,6 +75,56 @@ assert.ok(
 );
 assert.ok(api.appleEmojiUrl('1f923').includes('/apple/64/'));
 unregister();
+const changes = [],
+  limits = [];
+const cleanup = api.registerChatTextChanges(editor, {
+  change: (value) => changes.push(value),
+  limit: (reason) => limits.push(reason),
+});
+function replace(value, external = false) {
+  editor.update(
+    () => {
+      $getRoot()
+        .clear()
+        .append($createParagraphNode().append($createTextNode(value)));
+    },
+    { discrete: true, ...(external ? { tag: 'external-draft' } : {}) },
+  );
+}
+replace('x'.repeat(4100), true);
+for (let i = 0; i < 100; i++)
+  editor.update(
+    () => {
+      $getRoot()
+        .getFirstDescendant()
+        .select(i, i + 1);
+    },
+    { discrete: true },
+  );
+assert.equal(
+  changes.length,
+  0,
+  'Selection-only updates do not echo a draft into React',
+);
+assert.equal(
+  limits.length,
+  0,
+  'Selection of an old long draft never recursively restores state',
+);
+replace('x'.repeat(4099));
+assert.equal(
+  changes.at(-1).length,
+  4099,
+  'Oversized legacy drafts can be shortened',
+);
+replace('valid', true);
+replace('x'.repeat(4001));
+assert.deepEqual(limits, ['length'], 'Oversized paste rolls back exactly once');
+assert.equal(
+  editor.getEditorState().read(() => $getRoot().getTextContent()),
+  'valid',
+);
+cleanup();
 console.log(
   'Chat editor: lossless Unicode, atomic complex emoji, caret, serialization and high-resolution artwork passed.',
 );

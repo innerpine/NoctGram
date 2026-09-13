@@ -137,6 +137,27 @@ try {
     );
   }
   assert.equal(click({ button: 1 }).defaultPrevented, false);
+  target = null;
+  const selectedLink = {
+    ownerDocument: {
+      getSelection: () => ({ isCollapsed: false, containsNode: () => true }),
+    },
+  };
+  assert.equal(
+    click({ detail: 1, currentTarget: selectedLink }).defaultPrevented,
+    true,
+  );
+  assert.equal(
+    target,
+    null,
+    'Releasing a text selection must not navigate or close the profile',
+  );
+  click({ detail: 0, currentTarget: selectedLink });
+  assert.equal(
+    target.id,
+    'recipient-id',
+    'Keyboard activation remains available with selected text',
+  );
   console.log(
     'Profile links: exact targets, safe mentions, keyboard/browser modifiers, no reload, and scoped dialog close passed.',
   );

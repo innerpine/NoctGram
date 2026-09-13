@@ -24,6 +24,7 @@ import {
 } from '@/lib/auth-client';
 import { upload } from '@/lib/client';
 import { SignOutButton } from './sign-out-button';
+import { authCodeClock } from '@/lib/auth-code-clock';
 
 export function AuthFrame({ children }: { children: React.ReactNode }) {
   return (
@@ -48,6 +49,7 @@ export function EmailLogin() {
     [resendAt, setResendAt] = useState(0),
     [now, setNow] = useState(0);
   const lock = useRef(false);
+  const codeClock = useRef<() => number>(() => Date.now());
   useEffect(() => {
     let live = true;
     const linking =
@@ -58,6 +60,8 @@ export function EmailLogin() {
       .then((r) => {
         if (!live) return;
         setStatus(r);
+        codeClock.current = authCodeClock(r.serverTime ?? Date.now());
+        setNow(codeClock.current());
         if (r.challenge && r.challenge.link === linking) {
           setEmail(r.challenge.email);
           setExpiresAt(r.challenge.expiresAt);
@@ -74,7 +78,7 @@ export function EmailLogin() {
   }, []);
   useEffect(() => {
     if (!resendAt && !expiresAt) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const timer = setInterval(() => setNow(codeClock.current()), 1000);
     return () => clearInterval(timer);
   }, [resendAt, expiresAt]);
   const run = async (fn: () => Promise<void>) => {
@@ -87,7 +91,7 @@ export function EmailLogin() {
     } catch (e) {
       setError((e as Error).message);
       if (e instanceof AuthRequestError && e.retryAfter)
-        setResendAt(Date.now() + e.retryAfter * 1000);
+        setResendAt(codeClock.current() + e.retryAfter * 1000);
     } finally {
       lock.current = false;
       setBusy(false);
@@ -95,15 +99,18 @@ export function EmailLogin() {
   };
   const send = () =>
     run(async () => {
-      const r = await authRequest<{ expiresAt: number; resendAt: number }>(
-        'start',
-        { email: email.trim(), link },
-      );
-      setEmail(email.trim());
+      const r = await authRequest<{
+        serverTime?: number;
+        email?: string;
+        expiresAt: number;
+        resendAt: number;
+      }>('start', { email: email.trim(), link });
+      setEmail(r.email ?? email.trim().toLowerCase());
+      codeClock.current = authCodeClock(r.serverTime ?? Date.now());
       setCode('');
       setExpiresAt(r.expiresAt);
       setResendAt(r.resendAt);
-      setNow(Date.now());
+      setNow(codeClock.current());
       setStep('code');
     });
   const wait = Math.max(0, Math.ceil((resendAt - now) / 1000));
@@ -305,7 +312,7 @@ export function EmailLogin() {
               const r = await authRequest<{
                 linked: boolean;
                 redirectTo: string;
-              }>('verify', { code });
+              }>('verify', { code, email });
               if (r.linked) setStep('done');
               else window.location.replace(r.redirectTo);
             });
@@ -353,6 +360,10 @@ export function EmailLogin() {
             {expired
               ? 'Код истёк. Запросите новое письмо.'
               : 'Код действует 5 минут. Если письма нет, проверьте «Спам».'}
+          </p>
+          <p className="auth-footnote">
+            После повторной отправки введите код из самого нового письма.
+            Вернитесь с ним в этот браузер.
           </p>
           {error && (
             <p className="form-error" role="alert">

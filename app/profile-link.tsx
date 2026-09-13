@@ -33,6 +33,17 @@ export function ProfileLink({
           event.altKey
         )
           return;
+        const selection = event.currentTarget?.ownerDocument.getSelection();
+        if (
+          event.detail > 0 &&
+          selection &&
+          !selection.isCollapsed &&
+          selection.containsNode(event.currentTarget, true)
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         const navigation = new CustomEvent<ProfileNavigation>(
           PROFILE_NAVIGATE,
           {

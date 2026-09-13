@@ -141,6 +141,7 @@ export async function authStatus(req: Request) {
     : null;
   const pending = await challenge(req);
   return {
+    serverTime: Date.now(),
     emailEnabled: !!emailConfig(),
     sitesEnabled: sitesAuthEnabled(),
     signupPremiumDays: emailConfig() ? signupPremiumDays() : 0,
@@ -209,7 +210,12 @@ export async function startEmail(req: Request, b: Record<string, unknown>) {
   ]);
   await cleanup();
   return Response.json(
-    { expiresAt: now + CODE_SECONDS * 1000, resendAt: now + 60000 },
+    {
+      serverTime: Date.now(),
+      email,
+      expiresAt: now + CODE_SECONDS * 1000,
+      resendAt: now + 60000,
+    },
     {
       headers: {
         'Set-Cookie': authCookie(req, CHALLENGE_COOKIE, token, CODE_SECONDS),
@@ -302,12 +308,34 @@ export async function finishEmail(req: Request, b: Record<string, unknown>) {
   if (!/^\d{6}$/.test(code))
     throw new ApiError(400, 'Введите шесть цифр из письма.');
   await limit('verify-ip', clientIp(req), 60, 600);
-  const pending = await challenge(req);
-  if (!pending)
+  const pendingToken = cookieValue(req.headers.get('cookie'), CHALLENGE_COOKIE);
+  if (!/^[a-f0-9]{64}$/.test(pendingToken))
     throw new ApiError(
       400,
-      'Код истёк или попытки закончились. Запросите новый.',
+      'Откройте страницу в том же браузере, где запрашивали код, или запросите письмо здесь.',
+      'CHALLENGE_MISSING',
+    );
+  const pending = await db()
+    .prepare('SELECT * FROM auth_challenges WHERE tokenHash=?')
+    .bind(await tokenHash(pendingToken))
+    .first<Challenge>();
+  if (!pending || pending.expiresAt <= Date.now())
+    throw new ApiError(
+      400,
+      'Время входа истекло. Запросите новое письмо.',
       'CODE_EXPIRED',
+    );
+  if (pending.attempts >= 5)
+    throw new ApiError(
+      400,
+      'Попытки закончились. Запросите новый код.',
+      'CODE_ATTEMPTS',
+    );
+  if (b.email !== undefined && emailAddress(b.email) !== pending.email)
+    throw new ApiError(
+      409,
+      'В другой вкладке запрошен код для другой почты. Начните вход заново.',
+      'CHALLENGE_CHANGED',
     );
   const current = await identity();
   if (pending.linkUserId ? current?.userId !== pending.linkUserId : !!current)

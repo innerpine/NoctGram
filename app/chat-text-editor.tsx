@@ -4,7 +4,6 @@
 /* eslint-disable react/react-compiler, jsx-a11y/prefer-tag-over-role */
 import { useImperativeHandle, useLayoutEffect, useRef, type Ref } from 'react';
 import { registerPlainText } from '@lexical/plain-text';
-import { $restoreEditorState } from '@lexical/utils';
 import { createEmptyHistoryState, registerHistory } from '@lexical/history';
 import {
   $createLineBreakNode,
@@ -18,7 +17,6 @@ import {
   CLEAR_HISTORY_COMMAND,
   COMMAND_PRIORITY_HIGH,
   createEditor,
-  HISTORIC_TAG,
   HISTORY_PUSH_TAG,
   KEY_ENTER_COMMAND,
   PASTE_COMMAND,
@@ -28,7 +26,7 @@ import {
   type RangeSelection,
 } from 'lexical';
 import { ChatEmojiNode, $transformChatEmoji } from '@/lib/chat-editor-emoji';
-import { emojiParts } from '@/lib/premium-emoji';
+import { registerChatTextChanges } from '@/lib/chat-editor-changes';
 
 export type ChatTextEditorHandle = {
   focus: () => void;
@@ -96,7 +94,6 @@ export function ChatTextEditor(props: {
     [],
   );
   useLayoutEffect(() => {
-    let ready = false;
     const editor = createEditor({
       namespace: 'NoctgramChat',
       nodes: [ChatEmojiNode],
@@ -149,24 +146,10 @@ export function ChatTextEditor(props: {
         },
         COMMAND_PRIORITY_HIGH,
       ),
-      editor.registerUpdateListener(
-        ({ editorState, prevEditorState, tags }) => {
-          if (!ready) return;
-          const text = editorState.read(() => $getRoot().getTextContent());
-          const tooManyPremium =
-            emojiParts(text).filter((part) => part.emoji).length > 30;
-          if (text.length > 4000 || tooManyPremium) {
-            editor.update(() => $restoreEditorState(editor, prevEditorState), {
-              tag: HISTORIC_TAG,
-              discrete: true,
-            });
-            latest.current.onLimit?.(tooManyPremium ? 'premium' : 'length');
-            return;
-          }
-          if (!tags.has('external-draft') && text !== latest.current.value)
-            latest.current.onChange(text);
-        },
-      ),
+      registerChatTextChanges(editor, {
+        change: (text) => latest.current.onChange(text),
+        limit: (reason) => latest.current.onLimit?.(reason),
+      }),
     ];
     editor.setRootElement(root.current);
     editor.update(
@@ -176,7 +159,6 @@ export function ChatTextEditor(props: {
       },
       { tag: ['external-draft', SKIP_DOM_SELECTION_TAG], discrete: true },
     );
-    ready = true;
     editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined);
     return () => {
       cleanups.forEach((cleanup) => cleanup());

@@ -62,12 +62,24 @@ async function provider(path: string, body: unknown) {
     );
   }
   if (!response.ok) {
-    await response.body?.cancel();
+    // Only use the provider's machine-readable code; never echo its payload,
+    // which can contain account details. Invalid tokens also use otp_expired.
+    const error = (await response.json().catch(() => ({}))) as {
+      error_code?: string;
+    };
+    const invalid =
+      path === '/verify' &&
+      ['otp_expired', 'validation_failed'].includes(error.error_code || '');
     throw new ApiError(
       path === '/verify' && response.status < 500 ? 400 : 503,
       path === '/verify' && response.status < 500
-        ? 'Код неверный или уже истёк. Проверьте письмо или запросите новый.'
-        : 'Не удалось отправить письмо. Попробуйте позже.',
+        ? invalid
+          ? 'Код не подошёл. Введите шесть цифр из самого нового письма. Если код уже использован или прошло 5 минут, запросите новый.'
+          : 'Не удалось проверить код. Попробуйте ещё раз или запросите новое письмо.'
+        : path === '/verify'
+          ? 'Сервис проверки кода временно недоступен. Попробуйте ещё раз.'
+          : 'Не удалось отправить письмо. Попробуйте позже.',
+      invalid ? 'CODE_INVALID' : 'EMAIL_PROVIDER_ERROR',
     );
   }
   try {
