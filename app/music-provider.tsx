@@ -159,6 +159,28 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     volumeRef = useRef(volume);
   const tracker = useRef<MusicListenTracker | null>(null);
   const roomRef = useRef<MusicRoom | null>(null);
+  const [repeatOne, setRepeatOne] = useState(false);
+  const repeatOneRef = useRef(false);
+  useEffect(() => {
+    try {
+      repeatOneRef.current =
+        localStorage.getItem('noctgram:music-repeat') === 'one';
+      setRepeatOne(repeatOneRef.current);
+    } catch {
+      /* Playback also works without device storage. */
+    }
+  }, []);
+  const toggleRepeatOne = () => {
+    if (roomRef.current?.detail) return;
+    const value = !repeatOneRef.current;
+    repeatOneRef.current = value;
+    setRepeatOne(value);
+    try {
+      localStorage.setItem('noctgram:music-repeat', value ? 'one' : 'off');
+    } catch {
+      /* The current player still keeps the preference. */
+    }
+  };
   useEffect(
     () => () => {
       generation.current++;
@@ -461,6 +483,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
                 void roomRef.current.command('advance');
                 return;
               }
+              if (repeatOneRef.current) {
+                engine?.repeat();
+                return;
+              }
               const next = adjacentPlayable(
                 queueRef.current,
                 link.url,
@@ -468,7 +494,6 @@ export function MusicProvider({ children }: { children: ReactNode }) {
                 true,
               );
               if (next) play({ ...next, playback: 'spotify' });
-              else engine?.repeat();
             },
           },
         );
@@ -652,6 +677,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             void roomRef.current.command('advance');
             return;
           }
+          if (repeatOneRef.current) {
+            if (desired.current?.kind === 'playlist') w.skip(nativeIndex);
+            w.seekTo(0);
+            w.play();
+            return;
+          }
           if (desired.current?.kind === 'playlist') {
             if (nativeOrder.current) {
               const next = adjacentPlayable(
@@ -659,10 +690,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
                 soundUrl.current,
               );
               if (next) play(next);
-              else {
-                w.seekTo(0);
-                w.play();
-              }
+              else w.pause();
+              return;
+            }
+            if (nativeLength <= 1) {
+              w.pause();
               return;
             }
             if (nativeIndex + 1 >= nativeLength) {
@@ -677,11 +709,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             desired.current?.url || '',
           );
           if (next) play(next);
-          else {
-            // A single playable song repeats itself.
-            w.seekTo(0);
-            w.play();
-          }
+          else w.pause();
         });
         w.bind(sc.Widget.Events.ERROR, () => {
           if (!isCurrent()) return;
@@ -823,12 +851,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         void roomRef.current.command('advance');
         return;
       }
-      const next = adjacentPlayable(queueRef.current, link.url);
-      if (next) play(next);
-      else {
+      if (repeatOneRef.current) {
         element.currentTime = 0;
         attemptPlay();
+        return;
       }
+      const next = adjacentPlayable(queueRef.current, link.url);
+      if (next) play(next);
     };
     const seeking = () => tracker.current?.resetPosition();
     const blocked = () => {
@@ -986,12 +1015,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
               void roomRef.current.command('advance');
               return;
             }
-            const next = adjacentPlayable(queueRef.current, link.url);
-            if (next) play(next);
-            else {
+            if (repeatOneRef.current) {
               engine?.seek(0);
               engine?.resume();
+              return;
             }
+            const next = adjacentPlayable(queueRef.current, link.url);
+            if (next) play(next);
           },
         };
         const id = new URL(link.url).searchParams.get('v')!;
@@ -1388,6 +1418,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             onSelect={select}
             onReorder={reorderQueue}
             onToggle={togglePlayer}
+            repeatOne={repeatOne && !room.detail}
+            repeatDisabled={!!room.detail}
+            onRepeat={toggleRepeatOne}
             onSeek={seekPlayer}
             onVolume={changeVolume}
             onStop={stopPersonal}

@@ -24,6 +24,8 @@ import {
   PanelRightOpen,
   Pause,
   Play,
+  Repeat,
+  Repeat1,
   SkipBack,
   SkipForward,
   SlidersHorizontal,
@@ -91,6 +93,9 @@ type Props = {
   nextEnabled: boolean;
   playerRef: RefObject<HTMLElement | null>;
   onToggle: () => void;
+  repeatOne: boolean;
+  repeatDisabled?: boolean;
+  onRepeat: () => void;
   onPrevious: () => void;
   onNext: () => void;
   onSeek: (ms: number) => void;
@@ -648,6 +653,23 @@ export function MusicPlayerView(p: Props) {
         onClick={p.onNext}
       >
         <SkipForward size={21} />
+      </button>
+      <button
+        type="button"
+        className="icon-button music-repeat"
+        aria-label="Повтор одного трека"
+        aria-pressed={p.repeatOne}
+        title={
+          p.repeatDisabled
+            ? 'Повтор доступен при личном прослушивании'
+            : p.repeatOne
+              ? 'Выключить повтор трека'
+              : 'Повторять этот трек'
+        }
+        disabled={p.repeatDisabled}
+        onClick={p.onRepeat}
+      >
+        {p.repeatOne ? <Repeat1 size={19} /> : <Repeat size={19} />}
       </button>
     </div>
   );
