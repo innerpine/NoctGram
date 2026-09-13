@@ -1,9 +1,5 @@
 'use client';
-import {
-  useRef,
-  type ReactNode,
-  type MouseEvent as ReactMouseEvent,
-} from 'react';
+import { useRef, type ReactNode } from 'react';
 import {
   CheckSquare,
   Copy,
@@ -16,11 +12,19 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { Message } from '@/lib/client';
+import type { ReactionEmoji } from '@/lib/message-reactions';
+import {
+  MessageContextTrigger,
+  MessageContextContent,
+  preserveContextTarget,
+} from './message-context-menu';
+export {
+  preserveContextTarget,
+  chatHistoryContextMenu,
+} from './message-context-menu';
 import { isChatSelectionSurface } from '@/lib/chat-drag-selection';
 import {
   ContextMenu,
-  ContextMenuTrigger,
-  ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@/components/ui/context-menu';
@@ -42,26 +46,9 @@ export type ChatActionProps = {
   selected?: boolean;
   unconfirmed?: boolean;
   onAction: (action: ChatAction, message: Message) => void;
+  onReact?: (message: Message, emoji: ReactionEmoji | null) => Promise<void>;
+  reactionPending?: boolean;
 };
-// Portalled dialogs and media players own their context menu, even when their
-// React ancestry passes through a message. Never suppress native events there.
-export function preserveContextTarget(
-  target: EventTarget | null,
-  root: HTMLElement,
-) {
-  return (
-    !(target instanceof Element) ||
-    !root.contains(target) ||
-    !!target.closest('video,audio,iframe,[data-chat-menu-exempt]')
-  );
-}
-// Gaps between message rows are part of the chat too. Preserve native/player
-// menus on their own surfaces and never consume events from a React portal.
-export function chatHistoryContextMenu(event: ReactMouseEvent<HTMLElement>) {
-  if (preserveContextTarget(event.target, event.currentTarget)) return;
-  event.preventDefault();
-  event.stopPropagation();
-}
 function Items(props: ChatActionProps) {
   const Item = ContextMenuItem;
   const Separator = ContextMenuSeparator;
@@ -145,10 +132,7 @@ export function ChatMessageContext({
     !props.unconfirmed;
   return (
     <ContextMenu disabled={removing || props.unconfirmed}>
-      <ContextMenuTrigger
-        tabIndex={0}
-        aria-haspopup="menu"
-        aria-keyshortcuts="Shift+F10"
+      <MessageContextTrigger
         data-chat-message-id={props.unconfirmed ? undefined : props.message.id}
         data-chat-initial={initial || undefined}
         data-chat-removing={removing ? '' : undefined}
@@ -158,40 +142,6 @@ export function ChatMessageContext({
           'chat-message-shell select-text' +
           (props.selected ? ' is-selected' : '')
         }
-        onKeyDown={(event) => {
-          if (
-            (event.key !== 'ContextMenu' &&
-              !(event.shiftKey && event.key === 'F10')) ||
-            preserveContextTarget(event.target, event.currentTarget)
-          )
-            return;
-          event.preventDefault();
-          const surface =
-            event.currentTarget.querySelector('.bubble, .chat-gift-card') ||
-            event.currentTarget;
-          const rect = surface.getBoundingClientRect();
-          surface.dispatchEvent(
-            new MouseEvent('contextmenu', {
-              bubbles: true,
-              cancelable: true,
-              clientX: rect.left + rect.width / 2,
-              clientY: rect.top + rect.height / 2,
-            }),
-          );
-        }}
-        onContextMenu={(event) => {
-          if (preserveContextTarget(event.target, event.currentTarget)) {
-            event.preventBaseUIHandler();
-            // Base UI also prevents native menus in a document listener for
-            // targets inside its trigger; keep native media events out of it.
-            if (event.currentTarget.contains(event.target as Node))
-              event.stopPropagation();
-          }
-        }}
-        onTouchStart={(event) => {
-          if (preserveContextTarget(event.target, event.currentTarget))
-            event.preventBaseUIHandler();
-        }}
         onPointerDownCapture={(event) => {
           pointer.current =
             event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
@@ -275,10 +225,19 @@ export function ChatMessageContext({
           </button>
         )}
         {children}
-      </ContextMenuTrigger>
-      <ContextMenuContent className="chat-action-menu">
+      </MessageContextTrigger>
+      <MessageContextContent
+        reactions={props.message.reactions}
+        disabled={props.disabled || !props.canSend}
+        pending={props.reactionPending}
+        onReact={
+          !selecting && !removing && !props.unconfirmed && props.onReact
+            ? (emoji) => props.onReact!(props.message, emoji)
+            : undefined
+        }
+      >
         <Items {...props} />
-      </ContextMenuContent>
+      </MessageContextContent>
     </ContextMenu>
   );
 }

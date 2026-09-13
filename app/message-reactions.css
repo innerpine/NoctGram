@@ -7,8 +7,7 @@
   margin-top: 7px;
   max-width: 100%;
 }
-.message-reactions .message-reaction-chip,
-.message-reactions .message-reaction-add {
+.message-reactions .message-reaction-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -28,11 +27,6 @@
     background 120ms ease,
     border-color 120ms ease;
 }
-.message-reactions .message-reaction-add {
-  padding: 4px 7px;
-  color: #c3b7d4;
-  background: rgb(28 24 34 / 80%);
-}
 .message-reactions .message-reaction-chip[aria-pressed='true'] {
   border-color: #bb99e7;
   color: #fff;
@@ -50,58 +44,74 @@
 .message-reactions button:disabled {
   cursor: default;
 }
-.message-reactions button[aria-disabled='true'] {
-  cursor: default;
-  opacity: 0.7;
-}
 .message-reactions button:disabled:not([aria-pressed='true']) {
   opacity: 0.7;
 }
-.message-reactions button:focus-visible,
-.message-reaction-options button:focus-visible {
+.message-reactions button:focus-visible {
   outline: 2px solid #d2b4ff;
   outline-offset: 3px;
 }
-.message-reaction-picker[data-slot='popover-content'] {
-  width: 232px;
+.message-context-menu[data-slot='context-menu-content'] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 234px;
   max-width: calc(100vw - 24px);
-  padding: 12px;
-  gap: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 transparent;
+}
+.message-context-menu.has-reactions {
+  width: 296px;
+}
+.message-menu-actions {
+  padding: 6px;
+  border: 1px solid #ffffff1c;
+  border-radius: 15px;
+  background: linear-gradient(150deg, #29232c, #19191e 75%);
+}
+.message-reaction-bar {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 1px;
+  padding: 5px;
   border: 1px solid #44384f;
-  border-radius: 18px;
+  border-radius: 999px;
   background: #201c26;
   color: #f1eafa;
-  box-shadow: 0 12px 36px rgb(0 0 0 / 35%);
 }
-.message-reaction-picker [data-slot='popover-title'] {
-  font-size: 12px;
-  color: #cbbbdc;
-}
-.message-reaction-options {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
-.message-reaction-options button {
+.message-context-menu .message-reaction-option[data-slot='context-menu-item'] {
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: 0;
-  height: 44px;
-  padding: 7px;
+  height: 34px;
+  padding: 4px 0;
   border: 1px solid transparent;
-  border-radius: 12px;
-  background: #302838;
-  font-size: 25px;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 23px;
+  line-height: 1;
   cursor: pointer;
 }
-.message-reaction-options .chat-emoji {
-  width: 26px;
-  height: 26px;
+.message-reaction-option .chat-emoji {
+  width: 24px;
+  height: 24px;
 }
-.message-reaction-options button[aria-pressed='true'] {
+.message-context-menu
+  .message-reaction-option:is(
+    [data-selected],
+    [data-highlighted],
+    :focus-visible
+  ) {
   background: #55406c;
   border-color: #bb99e7;
+}
+.room-message-context {
+  user-select: text;
 }
 .chat-media-message > .message-reactions,
 .room-bubble.room-media-message > .message-reactions {
@@ -112,33 +122,25 @@
   justify-content: center;
   margin-bottom: 4px;
 }
-.message-reaction-loading {
-  animation: message-reaction-spin 900ms linear infinite;
-}
-@keyframes message-reaction-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @media (hover: hover) {
-  .message-reactions button:not(:disabled):not([aria-disabled='true']):hover,
-  .message-reaction-options button:not(:disabled):hover {
+  .message-reactions button:not(:disabled):hover,
+  .message-context-menu .message-reaction-option:not([data-disabled]):hover {
     background: #5d4675;
     border-color: #bda2db;
   }
 }
 @media (pointer: coarse) {
-  .message-reactions .message-reaction-chip,
-  .message-reactions .message-reaction-add {
+  .message-reactions .message-reaction-chip {
     min-height: 40px;
     min-width: 40px;
+  }
+  .message-context-menu
+    .message-reaction-option[data-slot='context-menu-item'] {
+    height: 40px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .message-reactions button {
     transition: none;
-  }
-  .message-reaction-loading {
-    animation: none;
   }
 }

@@ -1,5 +1,7 @@
 'use client';
 import { MessageReactions } from './message-reactions';
+import { RoomMessageContext } from './room-message-menu';
+import { chatHistoryContextMenu } from './message-context-menu';
 import type { ReactionEmoji } from '@/lib/message-reactions';
 import { EmojiPicker, EmojiPreview } from './premium-emoji';
 import { MentionText } from './profile-link';
@@ -25,7 +27,6 @@ import {
   Send,
   Settings,
   ShieldCheck,
-  Trash2,
   Users,
   X,
 } from 'lucide-react';
@@ -38,7 +39,6 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { Person } from '@/lib/client';
@@ -720,7 +720,11 @@ export function RoomConversation({
               </button>
             </div>
           )}
-          <div className="room-message-list" ref={scroll}>
+          <div
+            className="room-message-list"
+            ref={scroll}
+            onContextMenu={chatHistoryContextMenu}
+          >
             <div className="chat-history-content" ref={content}>
               {room.nextCursor && (
                 <button
@@ -784,8 +788,27 @@ export function RoomConversation({
                   ? messagesById.get(message.replyTo)
                   : null;
                 return (
-                  <div
+                  <RoomMessageContext
                     key={message.id}
+                    message={message}
+                    kind={room.kind}
+                    role={room.role}
+                    own={self}
+                    disabled={disabled}
+                    canSend={room.canSend}
+                    pending={pending || busy}
+                    reactionPending={reactionPending.has(message.id)}
+                    onReact={reactToMessage}
+                    onReply={setReply}
+                    onRemove={setRemove}
+                    onCopy={() => {
+                      void navigator.clipboard
+                        .writeText(message.text)
+                        .catch(() => {
+                          if (alive.current)
+                            setMutationError('Не удалось скопировать текст');
+                        });
+                    }}
                     className={
                       giveawayEvent
                         ? 'room-giveaway-event'
@@ -896,46 +919,7 @@ export function RoomConversation({
                         </span>
                       )}
                     </div>
-                    {!message.deletedAt && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          className="room-message-more icon-button"
-                          aria-label={
-                            giveawayEvent
-                              ? 'Действия с розыгрышем'
-                              : 'Действия с сообщением'
-                          }
-                        >
-                          <MoreHorizontal size={16} />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          className="chat-options-menu"
-                          align="end"
-                        >
-                          {room.kind === 'group' && (
-                            <DropdownMenuItem
-                              disabled={disabled || !room.canSend || pending}
-                              onClick={() => setReply(message)}
-                            >
-                              <Reply size={15} />
-                              Ответить
-                            </DropdownMenuItem>
-                          )}
-                          {(self ||
-                            (room.role !== 'member' &&
-                              room.kind === 'group')) && (
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onClick={() => setRemove(message)}
-                            >
-                              <Trash2 size={15} />
-                              Удалить у всех
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
+                  </RoomMessageContext>
                 );
               })}
             </div>

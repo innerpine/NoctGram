@@ -72,6 +72,8 @@ export const ChatMessage = memo(function ChatMessage({
     canSend,
     selected,
     onAction,
+    onReact,
+    reactionPending,
     unconfirmed: !!delivery,
   };
   const emojiCount =

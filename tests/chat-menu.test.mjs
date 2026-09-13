@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 
 const compiled = await build({
-  entryPoints: ['app/chat-message-menu.tsx'],
+  stdin: {
+    contents:
+      "export * from './app/chat-message-menu'; export * from './app/room-message-menu'; export * from './app/message-reactions';",
+    resolveDir: process.cwd(),
+  },
   bundle: true,
   write: false,
   platform: 'node',
@@ -12,6 +16,13 @@ const compiled = await build({
     {
       name: 'menu-surfaces',
       setup(build) {
+        build.onResolve({ filter: /^\.\/chat-emoji-text$/ }, ({ path }) => ({
+          path,
+          namespace: 'emoji',
+        }));
+        build.onLoad({ filter: /.*/, namespace: 'emoji' }, () => ({
+          contents: 'export const ChatEmojiText="ChatEmojiText";',
+        }));
         build.onResolve(
           {
             filter:
@@ -26,20 +37,25 @@ const compiled = await build({
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
                 : path === 'lucide-react'
-                  ? 'export const CheckSquare="CheckSquare", Copy="Copy", Ellipsis="Ellipsis", Flag="Flag", Forward="Forward", Pencil="Pencil", Pin="Pin", PinOff="PinOff", Reply="Reply", Trash2="Trash2";'
+                  ? 'export const CheckSquare="CheckSquare", Copy="Copy", Ellipsis="Ellipsis", MoreHorizontal="MoreHorizontal", Flag="Flag", Forward="Forward", Pencil="Pencil", Pin="Pin", PinOff="PinOff", Reply="Reply", Trash2="Trash2";'
                   : path.endsWith('/context-menu')
-                    ? 'export const ContextMenu="ContextMenu", ContextMenuTrigger="ContextMenuTrigger", ContextMenuContent="ContextMenuContent", ContextMenuItem="ContextMenuItem", ContextMenuSeparator="ContextMenuSeparator";'
+                    ? 'export const ContextMenu="ContextMenu", ContextMenuTrigger="ContextMenuTrigger", ContextMenuContent="ContextMenuContent", ContextMenuItem="ContextMenuItem", ContextMenuGroup="ContextMenuGroup", ContextMenuSeparator="ContextMenuSeparator";'
                     : 'export const DropdownMenu="DropdownMenu", DropdownMenuTrigger="DropdownMenuTrigger", DropdownMenuContent="DropdownMenuContent", DropdownMenuItem="DropdownMenuItem", DropdownMenuSeparator="DropdownMenuSeparator";',
         }));
       },
     },
   ],
 });
-const { ChatMessageContext, preserveContextTarget, chatHistoryContextMenu } =
-  await import(
-    'data:text/javascript;base64,' +
-      Buffer.from(compiled.outputFiles[0].text).toString('base64')
-  );
+const {
+  ChatMessageContext,
+  RoomMessageContext,
+  MessageReactions,
+  preserveContextTarget,
+  chatHistoryContextMenu,
+} = await import(
+  'data:text/javascript;base64,' +
+    Buffer.from(compiled.outputFiles[0].text).toString('base64')
+);
 function nodes(node) {
   if (!node || typeof node !== 'object') return [];
   if (typeof node.type === 'function') return nodes(node.type(node.props));
@@ -266,6 +282,258 @@ try {
     ['select', 'm1'],
     'Selection mode does not trigger a reply',
   );
+  const reactions = [];
+  const reactedMessage = {
+    ...props.message,
+    reactions: [{ emoji: '🔥', count: 2, own: true }],
+  };
+  const react = async (message, emoji) => {
+    reactions.push([message.id, emoji]);
+  };
+  const dmReactions = nodes(
+    ChatMessageContext({
+      ...props,
+      message: reactedMessage,
+      selecting: false,
+      onReact: react,
+    }),
+  );
+  const choices = dmReactions.filter(
+    (node) => node.props?.className === 'message-reaction-option',
+  );
+  assert.equal(
+    choices.length,
+    8,
+    'DM reaction choices live inside the context menu',
+  );
+  assert.ok(
+    dmReactions
+      .find((node) => node.type === 'ContextMenuContent')
+      .props.className.includes('has-reactions'),
+  );
+  choices.find((node) => node.props.title === 'Огонь').props.onClick();
+  assert.deepEqual(
+    reactions.at(-1),
+    ['m1', null],
+    'Selecting the current reaction removes it',
+  );
+  choices.find((node) => node.props.title === 'Любовь').props.onClick();
+  assert.deepEqual(
+    reactions.at(-1),
+    ['m1', '❤️'],
+    'Selecting a different reaction replaces it',
+  );
+  for (const state of [
+    { disabled: true },
+    { canSend: false },
+    { reactionPending: true },
+  ]) {
+    const lockedChoices = nodes(
+      ChatMessageContext({
+        ...props,
+        message: reactedMessage,
+        selecting: false,
+        onReact: react,
+        ...state,
+      }),
+    ).filter((node) => node.props?.className === 'message-reaction-option');
+    const count = reactions.length;
+    assert(lockedChoices.every((node) => node.props.disabled));
+    lockedChoices.forEach((node) => node.props.onClick());
+    assert.equal(
+      reactions.length,
+      count,
+      'Disabled or pending reactions cannot send changes',
+    );
+  }
+  for (const state of [
+    { selecting: true },
+    { unconfirmed: true },
+    { removing: true },
+  ]) {
+    assert.equal(
+      nodes(
+        ChatMessageContext({
+          ...props,
+          selecting: false,
+          onReact: react,
+          ...state,
+        }),
+      ).filter((node) => node.props?.className === 'message-reaction-option')
+        .length,
+      0,
+    );
+  }
+  assert.equal(
+    MessageReactions({
+      reactions: [],
+      disabled: false,
+      onReact: async () => {},
+    }),
+    null,
+    'Messages without reactions have no add button or empty row',
+  );
+  const chips = nodes(
+    MessageReactions({
+      reactions: reactedMessage.reactions,
+      disabled: false,
+      onReact: async (emoji) => {
+        reactions.push(['chip', emoji]);
+      },
+    }),
+  );
+  assert.equal(
+    chips.filter((node) => node.type === 'button').length,
+    1,
+    'Only existing reaction counters remain under a message',
+  );
+  chips.find((node) => node.type === 'button').props.onClick();
+  assert.deepEqual(reactions.at(-1), ['chip', null]);
+
+  const roomActions = [];
+  const roomProps = {
+    message: reactedMessage,
+    kind: 'group',
+    role: 'member',
+    own: false,
+    disabled: false,
+    canSend: true,
+    pending: false,
+    reactionPending: false,
+    className: 'room-message other',
+    children: { type: 'p', props: { children: 'Group text' } },
+    onReact: react,
+    onReply: (message) => roomActions.push(['reply', message.id]),
+    onRemove: (message) => roomActions.push(['delete', message.id]),
+    onCopy: () => roomActions.push(['copy', 'm1']),
+  };
+  const groupNodes = nodes(RoomMessageContext(roomProps));
+  assert.equal(
+    groupNodes.filter(
+      (node) => node.props?.className === 'message-reaction-option',
+    ).length,
+    8,
+  );
+  const groupTrigger = groupNodes.find(
+    (node) => node.type === 'ContextMenuTrigger',
+  );
+  const oldBypass = bypassed;
+  groupTrigger.props.onContextMenu(event(new TestElement()));
+  groupTrigger.props.onTouchStart(event(new TestElement()));
+  assert.equal(
+    bypassed,
+    oldBypass,
+    'Group right click and long press reach Base UI',
+  );
+  const actionItem = (list, label) =>
+    list.find(
+      (node) =>
+        node.type === 'ContextMenuItem' &&
+        [node.props.children].flat().includes(label),
+    );
+  actionItem(groupNodes, 'Ответить').props.onClick();
+  actionItem(groupNodes, 'Копировать текст').props.onClick();
+  assert.deepEqual(roomActions, [
+    ['reply', 'm1'],
+    ['copy', 'm1'],
+  ]);
+  assert.equal(
+    actionItem(groupNodes, 'Удалить у всех'),
+    undefined,
+    'Members cannot delete another user’s message',
+  );
+  for (const rights of [{ own: true }, { role: 'admin' }, { role: 'owner' }]) {
+    const allowed = nodes(RoomMessageContext({ ...roomProps, ...rights }));
+    actionItem(allowed, 'Удалить у всех').props.onClick();
+    assert.deepEqual(roomActions.at(-1), ['delete', 'm1']);
+  }
+  const secretNodes = nodes(
+    RoomMessageContext({ ...roomProps, kind: 'secret' }),
+  );
+  assert.equal(
+    secretNodes.filter(
+      (node) => node.props?.className === 'message-reaction-option',
+    ).length,
+    0,
+    'Secret chats do not expose plaintext reactions',
+  );
+  const deletedNodes = nodes(
+    RoomMessageContext({
+      ...roomProps,
+      message: { ...reactedMessage, deletedAt: 1 },
+    }),
+  );
+  assert.equal(
+    deletedNodes.find((node) => node.type === 'ContextMenu').props.disabled,
+    true,
+  );
+  assert.equal(
+    deletedNodes.some(
+      (node) => node.props?.className === 'room-message-more icon-button',
+    ),
+    false,
+  );
+
+  const oldMouseEvent = Object.getOwnPropertyDescriptor(
+    globalThis,
+    'MouseEvent',
+  );
+  const dispatched = [];
+  Object.defineProperty(globalThis, 'MouseEvent', {
+    configurable: true,
+    value: class {
+      constructor(type, init) {
+        Object.assign(this, { type }, init);
+      }
+    },
+  });
+  try {
+    const surface = {
+      getBoundingClientRect: () => ({
+        left: 20,
+        top: 30,
+        width: 100,
+        height: 40,
+      }),
+      dispatchEvent: (e) => dispatched.push(e),
+    };
+    groupTrigger.props.ref.current = surface;
+    const more = groupNodes.find(
+      (node) => node.props?.className === 'room-message-more icon-button',
+    );
+    more.props.onClick({
+      stopPropagation() {},
+      currentTarget: {
+        getBoundingClientRect: () => ({
+          left: 130,
+          top: 40,
+          width: 20,
+          height: 30,
+        }),
+      },
+    });
+    assert.deepEqual(
+      [dispatched[0].type, dispatched[0].clientX, dispatched[0].clientY],
+      ['contextmenu', 140, 55],
+      'More button opens the same context menu at its own position',
+    );
+    groupTrigger.props.onKeyDown({
+      ...event(new TestElement()),
+      key: 'F10',
+      shiftKey: true,
+      currentTarget: { contains: () => true, querySelector: () => surface },
+    });
+    assert.equal(
+      dispatched.length,
+      2,
+      'Keyboard shortcut also opens the group menu',
+    );
+    assert.equal(dispatched[1].bubbles, true);
+  } finally {
+    if (oldMouseEvent)
+      Object.defineProperty(globalThis, 'MouseEvent', oldMouseEvent);
+    else delete globalThis.MouseEvent;
+  }
   const oldWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   Object.defineProperty(globalThis, 'window', {
     configurable: true,

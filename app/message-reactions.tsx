@@ -1,12 +1,8 @@
 'use client';
-import { useState } from 'react';
-import { LoaderCircle, SmilePlus } from 'lucide-react';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+  ContextMenuGroup,
+  ContextMenuItem,
+} from '@/components/ui/context-menu';
 import {
   MESSAGE_REACTIONS,
   type MessageReaction,
@@ -25,13 +21,11 @@ export function MessageReactions({
   pending?: boolean;
   onReact: (emoji: ReactionEmoji | null) => Promise<void>;
 }) {
-  const [open, setOpen] = useState(false);
+  if (!reactions.length) return null;
   const own = reactions.find((reaction) => reaction.own)?.emoji;
   const unavailable = disabled || !!pending;
-  if (unavailable && open) setOpen(false);
   const choose = (emoji: ReactionEmoji) => {
     if (unavailable) return;
-    setOpen(false);
     void onReact(own === emoji ? null : emoji);
   };
   return (
@@ -57,47 +51,44 @@ export function MessageReactions({
           </span>
         </button>
       ))}
-      <Popover
-        open={open && !unavailable}
-        onOpenChange={(value) => setOpen(value && !unavailable)}
-      >
-        <PopoverTrigger
-          type="button"
-          className="message-reaction-add"
-          aria-disabled={unavailable}
-          aria-label="Добавить реакцию"
-          title="Добавить реакцию"
-        >
-          {pending ? (
-            <LoaderCircle size={16} className="message-reaction-loading" />
-          ) : (
-            <SmilePlus size={16} />
-          )}
-        </PopoverTrigger>
-        <PopoverContent
-          className="message-reaction-picker"
-          side="top"
-          sideOffset={8}
-          data-chat-menu-exempt
-        >
-          <PopoverTitle>Реакция на сообщение</PopoverTitle>
-          <div className="message-reaction-options">
-            {MESSAGE_REACTIONS.map(({ emoji, label }) => (
-              <button
-                type="button"
-                key={emoji}
-                aria-label={label}
-                title={label}
-                aria-pressed={own === emoji}
-                disabled={unavailable}
-                onClick={() => choose(emoji)}
-              >
-                <ChatEmojiText text={emoji} mentions={false} />
-              </button>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
     </div>
+  );
+}
+
+export function MessageReactionMenu({
+  reactions = [],
+  disabled,
+  pending,
+  onReact,
+}: {
+  reactions?: MessageReaction[];
+  disabled: boolean;
+  pending?: boolean;
+  onReact: (emoji: ReactionEmoji | null) => Promise<void>;
+}) {
+  const own = reactions.find((reaction) => reaction.own)?.emoji;
+  const unavailable = disabled || !!pending;
+  return (
+    <ContextMenuGroup
+      className="message-reaction-bar"
+      aria-label="Реакции на сообщение"
+      aria-busy={!!pending}
+    >
+      {MESSAGE_REACTIONS.map(({ emoji, label }) => (
+        <ContextMenuItem
+          key={emoji}
+          className="message-reaction-option"
+          aria-label={own === emoji ? `${label}, твоя реакция. Убрать` : label}
+          title={label}
+          data-selected={own === emoji ? '' : undefined}
+          disabled={unavailable}
+          onClick={() => {
+            if (!unavailable) void onReact(own === emoji ? null : emoji);
+          }}
+        >
+          <ChatEmojiText text={emoji} mentions={false} />
+        </ContextMenuItem>
+      ))}
+    </ContextMenuGroup>
   );
 }
