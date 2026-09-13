@@ -3019,6 +3019,7 @@ export default function Noctgram({
                   <ChatConversation
                     key={'conversation:' + myId + ':' + peer.id}
                     messages={messages}
+                    ready={!!messageAccess}
                     me={me}
                     peer={peer}
                     threads={threads}

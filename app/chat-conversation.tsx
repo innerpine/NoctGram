@@ -14,6 +14,7 @@ import { chatRequest } from '@/lib/chat-client';
 import { chatOutbox, emptyOutbox, mergeOutgoing } from '@/lib/chat-outbox';
 import { messageSummary } from '@/lib/chat-message-display';
 import { createChatNavigator } from '@/lib/chat-navigation';
+import { revealChat, watchChatTail } from '@/lib/chat-viewport';
 import { createChatDragSelection } from '@/lib/chat-drag-selection';
 import { createChatRemoval } from '@/lib/chat-removal';
 import { ChatReveal } from './chat-reveal';
@@ -30,6 +31,7 @@ import {
 
 export function ChatConversation({
   messages,
+  ready,
   me,
   peer,
   threads,
@@ -45,6 +47,7 @@ export function ChatConversation({
   notify,
 }: {
   messages: Message[];
+  ready: boolean;
   me: Person;
   peer: Person;
   threads: Person[];
@@ -108,6 +111,7 @@ export function ChatConversation({
   } | null>(null);
   const [, updateRemoval] = useState(0);
   const list = useRef<HTMLDivElement>(null),
+    content = useRef<HTMLDivElement>(null),
     removal = useRef<ReturnType<typeof createChatRemoval> | null>(null),
     dragSelection = useRef<ReturnType<typeof createChatDragSelection> | null>(
       null,
@@ -150,27 +154,32 @@ export function ChatConversation({
         },
         limit: () => latest.current.notify('Можно выделить до 20 сообщений'),
       });
-    const resize = new ResizeObserver(() => {
-      if (
-        followTail.current &&
-        !navigation.current?.scrolling &&
-        !dragSelection.current?.dragging
-      )
-        navigation.current?.bottom();
-    });
-    if (list.current) resize.observe(list.current);
+    const stopTail =
+      list.current && content.current
+        ? watchChatTail(list.current, content.current, {
+            following: followTail,
+            busy: () =>
+              !!navigation.current?.scrolling ||
+              !!dragSelection.current?.dragging ||
+              !!pendingJump.current,
+            bottom: () => navigation.current?.bottom(),
+          })
+        : undefined;
     return () => {
       alive.current = false;
       cancelAnimationFrame(jumpFrame.current);
       navigation.current?.dispose();
       navigation.current = null;
-      resize.disconnect();
+      stopTail?.();
       dragSelection.current?.dispose();
       dragSelection.current = null;
       removal.current?.dispose();
       removal.current = null;
     };
   }, []);
+  useLayoutEffect(() => {
+    if (ready && list.current) return revealChat(list.current);
+  }, [ready]);
   const latest = useRef({ onFocus, notify });
   latest.current = { onFocus, notify };
   const jumpHere = (id: string) => {
@@ -390,46 +399,36 @@ export function ChatConversation({
         className="message-list"
         ref={list}
         onContextMenu={chatHistoryContextMenu}
-        onScroll={() => {
-          if (
-            list.current &&
-            !navigation.current?.scrolling &&
-            !dragSelection.current?.dragging
-          )
-            followTail.current =
-              list.current.scrollHeight -
-                list.current.scrollTop -
-                list.current.clientHeight <
-              64;
-        }}
       >
-        {!visibleMessages.length && (
-          <p className="chat-empty-history">Сообщений пока нет.</p>
-        )}
-        {visibleMessages.map((message) => (
-          <ChatMessage
-            key={message.id}
-            message={message}
-            delivery={
-              messages.some((item) => item.id === message.id)
-                ? undefined
-                : outgoing.find((entry) => entry.message.id === message.id)
-            }
-            onRetry={onRetry}
-            initial={initialMessages.has(message.id)}
-            me={me}
-            peer={peer}
-            disabled={readonly}
-            canSend={canSend}
-            onProfile={onProfile}
-            onAvatar={openMiniProfile}
-            onAction={onAction}
-            onJump={onJump}
-            selected={selected.includes(message.id)}
-            selecting={selectedMessages.length > 0}
-            removing={removal.current?.has(message.id) ?? false}
-          />
-        ))}
+        <div className="chat-history-content" ref={content}>
+          {!visibleMessages.length && (
+            <p className="chat-empty-history">Сообщений пока нет.</p>
+          )}
+          {visibleMessages.map((message) => (
+            <ChatMessage
+              key={message.id}
+              message={message}
+              delivery={
+                messages.some((item) => item.id === message.id)
+                  ? undefined
+                  : outgoing.find((entry) => entry.message.id === message.id)
+              }
+              onRetry={onRetry}
+              initial={initialMessages.has(message.id)}
+              me={me}
+              peer={peer}
+              disabled={readonly}
+              canSend={canSend}
+              onProfile={onProfile}
+              onAvatar={openMiniProfile}
+              onAction={onAction}
+              onJump={onJump}
+              selected={selected.includes(message.id)}
+              selecting={selectedMessages.length > 0}
+              removing={removal.current?.has(message.id) ?? false}
+            />
+          ))}
+        </div>
       </div>
       {!!privacyNote && <p className="message-privacy-note">{privacyNote}</p>}
       <ChatProfileDialog

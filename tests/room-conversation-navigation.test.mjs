@@ -55,6 +55,8 @@ globalThis.__roomNavigation = {
     );
   },
   roomAction: async () => ({ ok: true }),
+  watchChatTail: () => () => {},
+  revealChat: () => () => {},
   createChatNavigator(list, interrupt) {
     const nav = {
       scrolling: false,
@@ -128,14 +130,16 @@ const { outputFiles } = await build({
                   ? 'export const {roomRequest,roomAction}=globalThis.__roomNavigation;'
                   : path === '@/lib/chat-navigation'
                     ? 'export const {createChatNavigator}=globalThis.__roomNavigation;'
-                    : (names[path] || '')
-                        .split(' ')
-                        .filter(Boolean)
-                        .map(
-                          (name) =>
-                            `export const ${name}=${JSON.stringify(name)};`,
-                        )
-                        .join('\n'),
+                    : path === '@/lib/chat-viewport'
+                      ? 'export const {watchChatTail,revealChat}=globalThis.__roomNavigation;'
+                      : (names[path] || '')
+                          .split(' ')
+                          .filter(Boolean)
+                          .map(
+                            (name) =>
+                              `export const ${name}=${JSON.stringify(name)};`,
+                          )
+                          .join('\n'),
         }));
       },
     },

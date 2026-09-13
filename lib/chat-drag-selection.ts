@@ -49,7 +49,7 @@ export function createChatDragSelection(
   const rows = () =>
     Array.from(
       list.querySelectorAll<HTMLElement>(
-        ':scope > [data-chat-message-id]:not([data-chat-removing])',
+        ':scope > [data-chat-message-id]:not([data-chat-removing]), :scope > .chat-history-content > [data-chat-message-id]:not([data-chat-removing])',
       ),
     );
   const position = (y: number) =>

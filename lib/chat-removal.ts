@@ -48,7 +48,9 @@ export function createChatRemoval(list: HTMLElement, update: () => void) {
     remove(messages: Message[]) {
       if (disposed) return;
       const rows = Array.from(
-        list.querySelectorAll<HTMLElement>(':scope > [data-chat-message-id]'),
+        list.querySelectorAll<HTMLElement>(
+          ':scope > [data-chat-message-id], :scope > .chat-history-content > [data-chat-message-id]',
+        ),
       );
       const reduced =
         host.matchMedia('(prefers-reduced-motion: reduce)').matches ||

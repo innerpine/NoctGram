@@ -434,7 +434,7 @@
   -webkit-line-clamp: 4;
   overflow: hidden;
 }
-.message-list > :is(.bubble, .chat-gift-event):focus-visible {
+.message-list :is(.bubble, .chat-gift-event):focus-visible {
   outline: 2px solid var(--chat-accent, #cbbadb);
   outline-offset: 3px;
 }
