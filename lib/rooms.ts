@@ -1,5 +1,6 @@
 import { assertPremiumEmoji } from './premium-emoji-access';
 import { db } from './storage';
+import { COMMUNITY_ROOM_ID } from './community-group';
 import { ApiError } from './api-error';
 import {
   validateSecretPublicKey,
@@ -57,6 +58,10 @@ const canSend = (
   AND NOT EXISTS(SELECT 1 FROM chat_room_members pm WHERE pm.roomId=${r}.id AND pm.userId<>${actor} AND NOT (${accepts(actor, 'pm.userId')}))))`;
 const memberCount = (r: string) =>
   `(SELECT COUNT(*) FROM chat_room_members countm WHERE countm.roomId=${r}.id AND countm.status='active')`;
+// The shared community admits every registered person. Ordinary groups retain
+// their existing cap, including for explicit joins and invitations.
+const hasCapacity = (r: string) =>
+  `(${r}.id='${COMMUNITY_ROOM_ID}' OR ${memberCount(r)}<${LIMIT})`;
 const columns =
   'r.id,r.kind,r.ownerId,r.name,r.description,r.avatar,r.visibility,r.username,r.created,r.updatedAt';
 // Secret room storage stays generic; each participant sees the other person's
@@ -287,7 +292,8 @@ export async function readRoom(
   const members = await viewerQuery(
     `SELECT m.userId,u.name,u.avatar,COALESCE((SELECT h.handle FROM handles h WHERE h.userId=u.id AND h.main=1),'') AS handle,
     m.role,m.status,m.publicKey,m.joinedAt FROM chat_room_members m JOIN users u ON u.id=m.userId JOIN chat_rooms r ON r.id=m.roomId
-    WHERE m.roomId=? AND m.status='active' AND ${access('r', ':viewer')} ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,m.joinedAt,m.userId`,
+    WHERE m.roomId=? AND m.status='active' AND ${access('r', ':viewer')}
+    ORDER BY CASE WHEN m.userId=:viewer THEN 0 WHEN m.role='owner' THEN 1 WHEN m.role='admin' THEN 2 ELSE 3 END,m.joinedAt,m.userId LIMIT ${LIMIT}`,
     me,
   )
     .bind(roomId)
@@ -515,7 +521,7 @@ export async function changeRoom(
     const result = await db()
       .prepare(`INSERT INTO chat_room_members(roomId,userId,role,status,joinedAt,lastReadAt)
       SELECT r.id,u.id,'member','active',?,? FROM chat_rooms r,users u WHERE u.id=? AND ${writable('u')} AND r.kind='group' AND ${visibleRoom('r', 'u.id')}
-      AND ${gate} AND (${memberCount('r')}<${LIMIT} OR EXISTS(SELECT 1 FROM chat_room_members existing WHERE existing.roomId=r.id AND existing.userId=u.id AND existing.status='active'))
+      AND ${gate} AND (${hasCapacity('r')} OR EXISTS(SELECT 1 FROM chat_room_members existing WHERE existing.roomId=r.id AND existing.userId=u.id AND existing.status='active'))
       AND NOT EXISTS(SELECT 1 FROM chat_room_members old WHERE old.roomId=r.id AND old.userId=u.id AND old.status='banned')
       ON CONFLICT(roomId,userId) DO UPDATE SET status='active',role=CASE WHEN chat_room_members.status='active' THEN chat_room_members.role ELSE 'member' END,
       joinedAt=CASE WHEN chat_room_members.status='active' THEN chat_room_members.joinedAt ELSE excluded.joinedAt END,
@@ -775,7 +781,7 @@ export async function changeRoom(
       .prepare(`INSERT INTO chat_room_members(roomId,userId,role,status,joinedAt,lastReadAt)
       SELECT r.id,target.id,'member','active',?,? FROM chat_rooms r,users target,users actor WHERE r.id=? AND actor.id=? AND target.id=?
       AND ${access('r', 'actor.id', true, ['owner', 'admin'])} AND ${readable('target')} AND ${accepts('actor.id', 'target.id')}
-      AND ${unblocked('target.id', 'r.ownerId')} AND (${memberCount('r')}<${LIMIT} OR EXISTS(SELECT 1 FROM chat_room_members existing WHERE existing.roomId=r.id AND existing.userId=target.id AND existing.status='active')) AND target.id<>r.ownerId
+      AND ${unblocked('target.id', 'r.ownerId')} AND (${hasCapacity('r')} OR EXISTS(SELECT 1 FROM chat_room_members existing WHERE existing.roomId=r.id AND existing.userId=target.id AND existing.status='active')) AND target.id<>r.ownerId
       AND NOT EXISTS(SELECT 1 FROM chat_room_members old WHERE old.roomId=r.id AND old.userId=target.id AND old.status='banned')
       ON CONFLICT(roomId,userId) DO UPDATE SET status='active',role=CASE WHEN chat_room_members.status='active' THEN chat_room_members.role ELSE 'member' END,
       joinedAt=CASE WHEN chat_room_members.status='active' THEN chat_room_members.joinedAt ELSE excluded.joinedAt END
