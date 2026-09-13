@@ -1370,6 +1370,11 @@ textarea::placeholder {
 .comment .row {
   gap: 6px;
 }
+.comment-thread-reply {
+  margin-inline-start: calc(var(--comment-depth) * clamp(20px, 4vw, 32px));
+  border-inline-start: 1px solid var(--border);
+  padding-inline-start: 10px;
+}
 .comment .row strong {
   font-size: 13px;
   color: #fff;

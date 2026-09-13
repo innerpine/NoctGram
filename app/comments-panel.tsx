@@ -4,7 +4,14 @@ import { DisplayName } from './profile-identity';
 import { ProfileLink, MentionText } from './profile-link';
 /* The subscription starts an asynchronous request and updates its loading state. */
 /* eslint-disable react/react-compiler */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import {
   MessageCircle,
   Send,
@@ -19,6 +26,7 @@ import {
 import { Avatar, Empty, Stamp } from './post-card';
 import { ContentDecisionForm } from './content-decision-form';
 import { request, type Comment, type Post, type Profile } from '@/lib/client';
+import { commentThreads } from '@/lib/comment-threads';
 export function CommentsPanel({
   post,
   me,
@@ -46,9 +54,33 @@ export function CommentsPanel({
   const live = useRef(false),
     generation = useRef(0),
     lock = useRef(false),
-    end = useRef<HTMLDivElement>(null),
+    list = useRef<HTMLDivElement>(null),
+    commentElements = useRef(new Map<string, HTMLElement>()),
+    scrollToComment = useRef<string | null>(null),
     cursor = useRef<Comment | null>(null),
     emojiField = useRef<HTMLTextAreaElement>(null);
+  const threadedComments = useMemo(() => commentThreads(comments), [comments]);
+  useEffect(() => {
+    const id = scrollToComment.current;
+    if (!id) return;
+    scrollToComment.current = null;
+    const container = list.current;
+    const element = commentElements.current.get(id);
+    if (!container || !element) return;
+    const bounds = container.getBoundingClientRect();
+    const target = element.getBoundingClientRect();
+    const offset =
+      target.height > container.clientHeight || target.top < bounds.top
+        ? target.top - bounds.top
+        : Math.max(0, target.bottom - bounds.bottom);
+    if (offset)
+      container.scrollTo({
+        top: container.scrollTop + offset,
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'instant'
+          : 'smooth',
+      });
+  }, [comments]);
   const load = useCallback(
     async (append = false) => {
       const gen = ++generation.current;
@@ -112,16 +144,9 @@ export function CommentsPanel({
       if (live.current) {
         setText('');
         setReply(null);
+        scrollToComment.current = row.id;
         setComments((old) =>
           old.some((c) => c.id === row.id) ? old : [...old, row],
-        );
-        setTimeout(
-          () =>
-            end.current?.scrollIntoView({
-              block: 'nearest',
-              behavior: 'smooth',
-            }),
-          0,
         );
       }
     } catch (e) {
@@ -198,7 +223,7 @@ export function CommentsPanel({
           <RefreshCw size={14} />
         </button>
       </div>
-      <div className="comment-list">
+      <div className="comment-list" ref={list}>
         {more && (
           <button
             className="secondary load-more"
@@ -208,8 +233,16 @@ export function CommentsPanel({
             {loading ? 'Загрузка…' : 'Предыдущие комментарии'}
           </button>
         )}
-        {comments.map((c) => (
-          <article key={c.id} className="comment">
+        {threadedComments.map(({ comment: c, depth }) => (
+          <article
+            key={c.id}
+            className={depth ? 'comment comment-thread-reply' : 'comment'}
+            style={{ '--comment-depth': Math.min(depth, 2) } as CSSProperties}
+            ref={(element) => {
+              if (element) commentElements.current.set(c.id, element);
+              else commentElements.current.delete(c.id);
+            }}
+          >
             <ProfileLink
               target={{ id: c.userId }}
               aria-label={'Профиль ' + c.name}
@@ -332,7 +365,6 @@ export function CommentsPanel({
             </Empty>
           )
         )}
-        <div ref={end} />
       </div>
       {error && (
         <div className="form-error" role="alert">
