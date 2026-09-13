@@ -265,6 +265,41 @@ try {
   console.log(
     'Profile tabs passed: both accounts, own/other profiles, repeated gifts/media/posts switches, unique sibling keys and publication tools.',
   );
+
+  for (const managed of [false, true]) {
+    const viewer = account('channel-viewer');
+    const channel = {
+      ...account('gift-channel'),
+      kind: 'channel',
+      ownerId: managed ? viewer.id : 'channel-owner',
+      canEditProfile: managed,
+    };
+    states.set(1, viewer);
+    states.set(2, channel);
+    states.set(stateSlots.get('profileTab'), 'posts');
+    const tabs = all(render(), 'Tabs').find((node) =>
+      all(node, 'TabsTrigger').some((item) => item.props.value === 'gifts'),
+    );
+    assert.ok(tabs, 'Channels expose their gift collection');
+    tabs.props.onValueChange('gifts');
+    const tree = render();
+    const gifts = all(tree, 'ProfileGifts')[0];
+    assert.ok(gifts);
+    assert.equal(gifts.props.userId, channel.id);
+    assert.equal(
+      gifts.props.own,
+      false,
+      'Channel gifts do not expose personal sale/upgrade actions',
+    );
+    assert.equal(gifts.props.canManageVisibility, managed);
+    assert.equal(gifts.props.selfGift.props.recipient.id, channel.id);
+    assert.equal(gifts.props.selfGift.props.senderId, viewer.id);
+    assert.ok(
+      all(tree, 'SendGiftButton').some(
+        (button) => button.props.recipient.id === channel.id,
+      ),
+    );
+  }
   const editorMe = account('editor-me');
   states.set(1, editorMe);
   states.set(2, editorMe);

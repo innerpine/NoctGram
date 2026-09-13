@@ -118,7 +118,7 @@ import {
 import { ChatEmojiText } from './chat-emoji-text';
 import { MentionText } from './profile-link';
 import { PROFILE_NAVIGATE, type ProfileNavigation } from '@/lib/profile-links';
-
+import { resolveMention } from '@/lib/mention-navigation';
 import { NoctMascot } from './noct-mascot';
 
 import {
@@ -1083,10 +1083,24 @@ export default function Noctgram({
         conversation: Person | null = null;
       let conversationSnapshot: ChatSnapshot | undefined;
       let fetchedConversation = false;
+      if (
+        next.page === 'profile' &&
+        (next.handle || next.profileRef) &&
+        !next.profileId
+      ) {
+        const resolved = await resolveMention(
+          next.handle || next.profileRef!,
+          !next.handle,
+        );
+        if (resolved.kind === 'group')
+          next = { page: 'messages', group: resolved.group };
+        else person = resolved.profile;
+      }
       if (next.page === 'profile') {
         const id =
           next.profileId || (!next.handle && !next.profileRef ? myId : '');
-        person = id === myId ? me : id ? cache.profiles.get(id) || null : null;
+        person ??=
+          id === myId ? me : id ? cache.profiles.get(id) || null : null;
         person ??= await request<Profile>(
           '?' +
             new URLSearchParams({
@@ -1117,10 +1131,7 @@ export default function Noctgram({
           ...(next.boost && person.kind === 'channel' && !person.blocked
             ? { boost: true }
             : {}),
-          profileTab:
-            person.kind === 'channel' && next.profileTab === 'gifts'
-              ? 'posts'
-              : next.profileTab || 'posts',
+          profileTab: next.profileTab || 'posts',
         };
       }
       if (next.page === 'messages' && next.peerId) {
@@ -1277,12 +1288,22 @@ export default function Noctgram({
       }
       const target = (event as CustomEvent<ProfileNavigation>).detail;
       void appHistory.current
-        ?.navigate({
-          page: 'profile',
-          profileId: target.id,
-          handle: target.handle,
-          profileTab: 'posts',
-        })
+        ?.navigate(
+          target.group || target.invite || target.roomId
+            ? {
+                page: 'messages',
+                group: target.group,
+                invite: target.invite,
+                roomId: target.roomId,
+              }
+            : {
+                page: 'profile',
+                profileId: target.id,
+                profileRef: target.ref,
+                handle: target.handle,
+                profileTab: 'posts',
+              },
+        )
         .then((opened) => {
           if (opened) target.onNavigated?.();
         });
@@ -2352,15 +2373,6 @@ export default function Noctgram({
                       </button>
                       {profile.id !== 'noctgram' &&
                         profile.kind !== 'channel' && (
-                          <SendGiftButton
-                            key={profile.id}
-                            recipient={profile}
-                            senderId={me?.id || ''}
-                            disabled={!me || readOnly || busy}
-                          />
-                        )}
-                      {profile.id !== 'noctgram' &&
-                        profile.kind !== 'channel' && (
                           <button
                             className="icon-button"
                             aria-label="Написать сообщение"
@@ -2370,6 +2382,14 @@ export default function Noctgram({
                           </button>
                         )}
                     </>
+                  )}
+                  {profile.id !== 'noctgram' && profile.id !== me?.id && (
+                    <SendGiftButton
+                      key={profile.id}
+                      recipient={profile}
+                      senderId={me?.id || ''}
+                      disabled={!me || readOnly || channelRestricted || busy}
+                    />
                   )}
                 </div>
                 <div className="profile-identity-row">
@@ -2548,10 +2568,7 @@ export default function Noctgram({
             )}
             <div
               key={'profile-tabs:' + profile.id}
-              className={
-                'feed-tabs profile-tabs' +
-                (profile.kind !== 'channel' ? ' has-gifts' : '')
-              }
+              className="feed-tabs profile-tabs has-gifts"
               data-selected={
                 profileTab === 'gifts' ? 2 : profileTab === 'media' ? 1 : 0
               }
@@ -2566,24 +2583,25 @@ export default function Noctgram({
                 <TabsList>
                   <TabsTrigger value="posts">Публикации</TabsTrigger>
                   <TabsTrigger value="media">Медиа</TabsTrigger>
-                  {profile.kind !== 'channel' && (
-                    <TabsTrigger value="gifts">Подарки</TabsTrigger>
-                  )}
+                  <TabsTrigger value="gifts">Подарки</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
-            {profileTab === 'gifts' && me && profile.kind !== 'channel' && (
+            {profileTab === 'gifts' && me && (
               <ProfileGifts
                 key={'gifts:' + profile.id}
                 userId={profile.id}
                 own={profile.id === me.id}
+                canManageVisibility={
+                  profileEditable && !readOnly && !channelRestricted
+                }
                 ownerName={profile.name}
                 selfGift={
-                  profile.id === me.id ? (
+                  profile.id === me.id || profile.kind === 'channel' ? (
                     <SendGiftButton
                       recipient={profile}
                       senderId={me.id}
-                      disabled={readOnly || busy}
+                      disabled={readOnly || channelRestricted || busy}
                       showLabel
                     />
                   ) : undefined
@@ -2598,6 +2616,8 @@ export default function Noctgram({
                 <ChannelTools
                   key={'publishing:' + profile.id}
                   profile={profile}
+                  actorId={me?.id}
+                  onCreated={() => void refresh()}
                 />
               )}
             {profilePublisher &&

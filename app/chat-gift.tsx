@@ -1,5 +1,5 @@
 'use client';
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Check, CheckCheck, Gift } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { giftDefinition } from '@/lib/gift-catalog';
@@ -11,6 +11,7 @@ import { StarsIcon } from './stars-icon';
 import { GiftReceipt } from './gift-receipt';
 import { GiftCollectibleArt } from './gift-collectible-art';
 import type { GiftCollectible } from '@/lib/gift-collectibles';
+import type { GiftConversionUpdate } from './gift-conversion-panel';
 
 export function ChatGift({
   message,
@@ -27,12 +28,27 @@ export function ChatGift({
 }) {
   const [open, setOpen] = useState(false);
   const [upgraded, setUpgraded] = useState<GiftCollectible | null>(null);
+  const [conversion, setConversion] = useState<GiftConversionUpdate | null>(
+    null,
+  );
+  const receiptId = message.gift?.id;
+  useEffect(() => {
+    const changed = (event: Event) => {
+      const converted = (
+        event as CustomEvent<{ conversion?: GiftConversionUpdate }>
+      ).detail?.conversion;
+      if (converted && converted.id === receiptId) setConversion(converted);
+    };
+    window.addEventListener('noctgram:gifts-changed', changed);
+    return () => window.removeEventListener('noctgram:gifts-changed', changed);
+  }, [receiptId]);
   const gift = message.gift && giftDefinition(message.gift.giftId);
   if (!gift || !message.gift) return null;
   const outgoing = message.sender === me.id;
   const sender = outgoing ? me : peer;
   const recipient = outgoing ? peer : me;
   const collectible = upgraded || message.gift.collectible;
+  const sold = !!conversion || !!message.gift.converted;
   const style = { '--gift-color': gift.color } as CSSProperties;
   const time = new Date(message.created).toLocaleTimeString('ru-RU', {
     hour: '2-digit',
@@ -66,6 +82,11 @@ export function ChatGift({
           <GiftAnimation id={gift.id} />
         )}
         <h3>{gift.name}</h3>
+        {sold && (
+          <span className="chat-gift-sold">
+            <Check size={13} aria-hidden="true" /> Подарок продан
+          </span>
+        )}
         {collectible && (
           <span className="gift-number">
             #{collectible.number.toLocaleString('ru-RU')}
@@ -113,6 +134,8 @@ export function ChatGift({
             own={!outgoing}
             ownerName={recipient.name}
             onUpdated={setUpgraded}
+            onConverted={setConversion}
+            converted={sold}
             receipt={{
               id: message.gift.id,
               giftId: gift.id,
@@ -125,6 +148,7 @@ export function ChatGift({
               senderAvatar: sender.avatar,
               senderHandle: sender.handle,
               collectible,
+              converted: conversion,
             }}
             footer={
               <>

@@ -184,3 +184,35 @@ void test('badge counts stop at the displayed 99+ / 9+ caps', async (t) => {
     10,
   );
 });
+
+void test('channel gift notifications route to the channel and remain visible only to its current owner', async (t) => {
+  const f = fixture(t);
+  f.sql.exec(`
+    INSERT INTO users(id,name,kind,ownerId,created) VALUES('gifts-channel','Gift channel','channel','alice',1);
+    INSERT INTO star_transfers(id,sender,recipient,amount,kind,created) VALUES('channel-gift-transfer','bob','noctgram_gifts',25,'gift',1);
+    INSERT INTO received_gifts(id,transferId,giftId,sender,recipient,created) VALUES('channel-gift','channel-gift-transfer','toy_bear','bob','gifts-channel',1);
+    INSERT INTO notifications(id,userId,actorId,kind,targetId,created) VALUES('channel-gift','alice','bob','gift','channel-gift',1);
+  `);
+  const list = await (await f.notificationsGet('notifications', 'alice')).json();
+  assert.equal(list.length, 1);
+  assert.equal(list[0].giftRecipient, 'gifts-channel');
+  assert.equal(
+    (await (await f.notificationsGet('notificationCount', 'alice')).json())
+      .unread,
+    1,
+  );
+  f.sql.exec("UPDATE users SET ownerId='carol' WHERE id='gifts-channel'");
+  assert.equal(
+    (await (await f.notificationsGet('notifications', 'alice')).json()).length,
+    0,
+    'Former owners lose access',
+  );
+  f.sql.exec(
+    "UPDATE users SET ownerId='alice' WHERE id='gifts-channel'; INSERT INTO user_blocks(blocker,blocked,created) VALUES('bob','gifts-channel',1)",
+  );
+  assert.equal(
+    (await (await f.notificationsGet('notifications', 'alice')).json()).length,
+    0,
+    'Channel blocks suppress its gift notification',
+  );
+});

@@ -13,6 +13,7 @@ export type RoomMember = {
   joinedAt: number;
 };
 export type RoomMessage = {
+  giveawayId?: string | null;
   id: string;
   roomId: string;
   sender: string;

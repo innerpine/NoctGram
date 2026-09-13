@@ -6,6 +6,7 @@ import { balance, ensureWallet } from '@/lib/star-wallet';
 import { sendGift, listGifts, giftVisibility } from '@/lib/gifts';
 import { rateLimit } from '@/lib/rate-limit';
 import { previewGiftUpgrade, upgradeGift } from '@/lib/gift-upgrades';
+import { previewGiftConversion, convertGift } from '@/lib/gift-conversions';
 export const dynamic = 'force-dynamic';
 const reply = (data: unknown) =>
   Response.json(data, { headers: { 'Cache-Control': 'private, no-store' } });
@@ -14,7 +15,10 @@ export async function GET(req: Request) {
     const me = await viewer();
     await assertReadable(me);
     const q = new URL(req.url).searchParams;
-    if (q.get('action') === 'upgrade') return reply(await previewGiftUpgrade(me, q.get('id')));
+    if (q.get('action') === 'convert')
+      return reply(await previewGiftConversion(me, q.get('id')));
+    if (q.get('action') === 'upgrade')
+      return reply(await previewGiftUpgrade(me, q.get('id')));
     if (q.get('action') === 'catalog') {
       await ensureWallet(me);
       return reply({ catalog: GIFT_CATALOG, balance: await balance(me) });
@@ -45,6 +49,7 @@ export async function POST(req: Request) {
       return reply(await giftVisibility(me, body));
     }
     await assertWritable(me);
+    if (body.action === 'convert') return reply(await convertGift(me, body));
     if (body.action === 'upgrade') return reply(await upgradeGift(me, body));
     if (body.action !== 'send') throw new ApiError(400, 'Неизвестное действие');
     return reply(await sendGift(me, body));

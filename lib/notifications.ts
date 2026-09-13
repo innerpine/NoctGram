@@ -79,7 +79,11 @@ export async function removePushDevice(me?: string) {
 function notificationVisible() {
   return `${visibleAccount('u')} AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE (b.blocker=n.userId AND b.blocked IN(u.id,u.ownerId)) OR (b.blocker IN(u.id,u.ownerId) AND b.blocked=n.userId))
     AND ((n.kind='message' AND EXISTS(SELECT 1 FROM messages m WHERE m.id=n.targetId AND m.recipient=n.userId AND ${messageVisible('m', 'n.userId')}))
-      OR (n.kind='gift' AND EXISTS(SELECT 1 FROM received_gifts g WHERE g.id=n.targetId AND g.recipient=n.userId AND g.sender=n.actorId AND NOT EXISTS(SELECT 1 FROM messages m WHERE m.giftReceiptId=g.id AND NOT (${messageVisible('m', 'n.userId')}))))
+      OR (n.kind='gift' AND EXISTS(SELECT 1 FROM received_gifts g JOIN users gr ON gr.id=g.recipient
+        WHERE g.id=n.targetId AND g.sender=n.actorId AND ${visibleAccount('gr')}
+          AND (g.recipient=n.userId OR (gr.kind='channel' AND gr.ownerId=n.userId
+            AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE (b.blocker=n.actorId AND b.blocked=gr.id) OR(b.blocker=gr.id AND b.blocked=n.actorId))))
+          AND NOT EXISTS(SELECT 1 FROM messages m WHERE m.giftReceiptId=g.id AND NOT (${messageVisible('m', 'n.userId')}))))
       OR n.kind='call' OR (n.kind='post' AND EXISTS(SELECT 1 FROM posts p WHERE p.id=n.targetId AND ${published('p')}
         AND NOT EXISTS(SELECT 1 FROM user_privacy pref WHERE pref.userId=n.userId AND pref.hideAdult=1 AND p.adult=1))))`;
 }
@@ -130,7 +134,9 @@ export async function notificationsGet(
   }
   const rows = await db()
     .prepare(
-      `SELECT n.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM notifications n JOIN users u ON u.id=n.actorId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE n.userId=? AND ${notificationVisible()} ORDER BY n.created DESC,n.id DESC LIMIT 50`,
+      `SELECT n.*,u.name,u.avatar,${appearanceColumns('u')},h.handle,
+        (SELECT g.recipient FROM received_gifts g WHERE n.kind='gift' AND g.id=n.targetId) AS giftRecipient
+        FROM notifications n JOIN users u ON u.id=n.actorId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE n.userId=? AND ${notificationVisible()} ORDER BY n.created DESC,n.id DESC LIMIT 50`,
     )
     .bind(me)
     .all();
@@ -247,7 +253,8 @@ export async function flushPush(notificationId?: string) {
     .bind(now - 86400000, now, ...(targeted ? [notificationId] : []))
     .run();
   const rows = await d
-    .prepare(`SELECT pd.*,n.kind,n.actorId,n.targetId,n.created,n.read,s.endpoint,s.p256dh,s.auth,u.name
+    .prepare(`SELECT pd.*,n.kind,n.actorId,n.targetId,n.created,n.read,n.userId,s.endpoint,s.p256dh,s.auth,u.name,
+      (SELECT g.recipient FROM received_gifts g WHERE n.kind='gift' AND g.id=n.targetId) AS giftRecipient
     FROM push_deliveries pd JOIN notifications n ON n.id=pd.notificationId JOIN push_subscriptions s ON s.id=pd.subscriptionId JOIN users u ON u.id=n.actorId
     WHERE pd.state='pending' AND pd.retryAt<=? AND pd.attempts<5${targeted ? ' AND pd.notificationId=?' : ''} ORDER BY (n.kind='call') DESC,n.created,n.id,pd.subscriptionId LIMIT 10`)
     .bind(now, ...(targeted ? [notificationId] : []))
@@ -284,7 +291,9 @@ export async function flushPush(notificationId?: string) {
           title: String(r.name),
           body:
             r.kind === 'gift'
-              ? 'Тебе подарили подарок'
+              ? r.giftRecipient && r.giftRecipient !== r.userId
+                ? 'Твоему каналу подарили подарок'
+                : 'Тебе подарили подарок'
               : r.kind === 'call'
                 ? 'Входящий аудиозвонок'
                 : r.kind === 'post'
@@ -292,7 +301,11 @@ export async function flushPush(notificationId?: string) {
                   : 'Новое сообщение',
           url:
             r.kind === 'gift'
-              ? '/?gifts=1'
+              ? typeof r.giftRecipient === 'string' && r.giftRecipient
+                ? '/?profile=' +
+                  encodeURIComponent(r.giftRecipient) +
+                  '&tab=gifts'
+                : '/?gifts=1'
               : r.kind === 'post'
                 ? '/?post=' + encodeURIComponent(String(r.targetId))
                 : '/?chat=' + encodeURIComponent(String(r.actorId)),

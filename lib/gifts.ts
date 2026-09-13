@@ -40,7 +40,8 @@ export async function sendGift(
       409,
       'Этот запрос уже использован. Выбери подарок заново.',
     );
-  // Self-gifts are profile purchases; gifts to others also create a message.
+  // Person gifts create a private message; channel gifts belong to the channel.
+  // The recipient kind and permissions are checked again in the debit statement.
   // Both consume the mutation budget; committed retries create no new work.
   if (!existing) {
     await socialRateLimit(me, recipient === me ? 'unclassified' : 'message');
@@ -52,8 +53,12 @@ export async function sendGift(
     db()
       .prepare(`INSERT INTO star_transfers(id,sender,recipient,postText,amount,kind,created)
       SELECT ?,s.id,?,?,?,'gift',? FROM users s,users r
-      WHERE s.id=? AND r.id=? AND s.kind='person' AND r.kind='person'
-        AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND (s.id=r.id OR (${messageAllowed}))
+      WHERE s.id=? AND r.id=? AND s.kind='person' AND r.kind IN ('person','channel')
+        AND ${visibleAccount('s')} AND ${visibleAccount('r')}
+        AND (s.id=r.id OR (r.kind='person' AND (${messageAllowed})) OR (r.kind='channel'
+          AND EXISTS(SELECT 1 FROM users owner WHERE owner.id=r.ownerId AND owner.kind='person' AND ${visibleAccount('owner')})
+          AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker=s.id AND blocked IN(r.id,r.ownerId)) OR(blocker IN(r.id,r.ownerId) AND blocked=s.id))
+          AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId IN(r.id,r.ownerId) AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))))
         AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=s.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
         AND ? <= (SELECT COALESCE(SUM(CASE WHEN recipient=s.id THEN amount ELSE -amount END),0) FROM star_transfers WHERE recipient=s.id OR sender=s.id)
       ON CONFLICT(id) DO NOTHING`)
@@ -66,11 +71,14 @@ export async function sendGift(
     db()
       .prepare(`INSERT INTO messages(id,sender,recipient,text,created,giftReceiptId)
       SELECT 'gift-message:' || id,sender,recipient,?,created,id FROM received_gifts WHERE id=? AND sender<>recipient
+        AND EXISTS(SELECT 1 FROM users r WHERE r.id=received_gifts.recipient AND r.kind='person')
       ON CONFLICT(giftReceiptId) DO NOTHING`)
       .bind(`🎁 Подарок «${gift.name}»${message ? '\n' + message : ''}`, id),
     db()
       .prepare(`INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created)
-      SELECT id,recipient,sender,'gift',id,created FROM received_gifts WHERE id=? AND sender<>recipient`)
+      SELECT g.id,CASE WHEN r.kind='channel' THEN r.ownerId ELSE r.id END,g.sender,'gift',g.id,g.created
+      FROM received_gifts g JOIN users r ON r.id=g.recipient WHERE g.id=?
+        AND g.sender<>CASE WHEN r.kind='channel' THEN r.ownerId ELSE r.id END`)
       .bind(id),
   ]);
   const receipt = await db()
@@ -106,12 +114,16 @@ export async function listGifts(
   before = '',
   onlyId = '',
 ) {
-  const person = await db()
-    .prepare(`SELECT u.id FROM users u WHERE u.id=? AND u.kind='person' AND ${visibleAccount('u')}
-    AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker=? AND blocked=u.id) OR(blocker=u.id AND blocked=?))`)
-    .bind(recipient, me, me)
-    .first();
-  if (!person) throw new ApiError(404, 'Профиль недоступен');
+  const profile = await db()
+    .prepare(`SELECT u.id,(u.id=? OR (u.kind='channel' AND (u.ownerId=?
+      OR EXISTS(SELECT 1 FROM channel_members cm WHERE cm.channelId=u.id AND cm.userId=? AND cm.role='admin')))) AS canManage
+    FROM users u WHERE u.id=? AND u.kind IN ('person','channel') AND ${visibleAccount('u')}
+      AND (u.kind='person' OR EXISTS(SELECT 1 FROM users owner WHERE owner.id=u.ownerId AND owner.kind='person' AND ${visibleAccount('owner')}))
+      AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker=? AND blocked IN(u.id,u.ownerId)) OR(blocker IN(u.id,u.ownerId) AND blocked=?))`)
+    .bind(me, me, me, recipient, me, me)
+    .first<{ id: string; canManage: number }>();
+  if (!profile) throw new ApiError(404, 'Профиль недоступен');
+  const canManage = !!profile.canManage;
   const rows = await db()
     .prepare(`SELECT g.*,u.name AS senderName,u.avatar AS senderAvatar,COALESCE(h.handle,'') AS senderHandle,
     (${visibleAccount('u')} AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker IN (?,g.recipient) AND blocked=u.id) OR(blocker=u.id AND blocked IN (?,g.recipient)))) AS senderVisible,
@@ -119,7 +131,8 @@ export async function listGifts(
     c.keepOriginal AS collectibleKeepOriginal,c.created AS collectibleCreated
     FROM received_gifts g JOIN users u ON u.id=g.sender LEFT JOIN handles h ON h.userId=u.id AND h.main=1
     LEFT JOIN gift_upgrades c ON c.receiptId=g.id
-    WHERE g.recipient=? AND (g.hidden=0 OR g.recipient=?)
+    WHERE g.recipient=? AND (g.hidden=0 OR ?=1)
+      AND NOT EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=g.id)
       AND (c.receiptId IS NOT NULL OR (${visibleAccount('u')} AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker IN (?,g.recipient) AND blocked=u.id) OR(blocker=u.id AND blocked IN (?,g.recipient)))))
       AND (?='' OR g.id=? OR ('collectible:'||c.family||':'||c.number)=?)
       AND (?='' OR (g.created,g.id)<(SELECT bg.created,bg.id FROM received_gifts bg LEFT JOIN gift_upgrades bc ON bc.receiptId=bg.id WHERE (bg.id=? OR ('collectible:'||bc.family||':'||bc.number)=?) AND bg.recipient=?))
@@ -128,7 +141,7 @@ export async function listGifts(
       me,
       me,
       recipient,
-      me,
+      Number(canManage),
       me,
       me,
       onlyId,
@@ -151,7 +164,7 @@ export async function listGifts(
       }
     >();
   const publicId = (row: (typeof rows.results)[number]) =>
-    recipient !== me && row.collectibleFamily
+    !canManage && row.collectibleFamily
       ? `collectible:${row.collectibleFamily}:${row.collectibleNumber}`
       : row.id;
   return {
@@ -210,8 +223,18 @@ export async function giftVisibility(
   if (typeof body.hidden !== 'boolean')
     throw new ApiError(400, 'Укажи видимость подарка');
   const result = await db()
-    .prepare('UPDATE received_gifts SET hidden=? WHERE id=? AND recipient=?')
-    .bind(Number(body.hidden), id, me)
+    .prepare(
+      `UPDATE received_gifts SET hidden=? WHERE id=?
+        AND NOT EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=received_gifts.id)
+        AND EXISTS(SELECT 1 FROM users u WHERE u.id=received_gifts.recipient AND ${visibleAccount('u')}
+          AND (u.id=? OR (u.kind='channel' AND (u.ownerId=? OR EXISTS(
+            SELECT 1 FROM channel_members cm WHERE cm.channelId=u.id AND cm.userId=? AND cm.role='admin'))
+            AND EXISTS(SELECT 1 FROM users actor WHERE actor.id=? AND actor.kind='person' AND ${visibleAccount('actor')})
+            AND EXISTS(SELECT 1 FROM users owner WHERE owner.id=u.ownerId AND owner.kind='person' AND ${visibleAccount('owner')})
+            AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId IN(u.id,u.ownerId,?)
+              AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000)))))`,
+    )
+    .bind(Number(body.hidden), id, me, me, me, me, me)
     .run();
   if (!result.meta.changes) throw new ApiError(404, 'Подарок не найден');
   return { ok: true };

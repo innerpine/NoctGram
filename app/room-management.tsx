@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { roomAction } from '@/lib/rooms-client';
+import { COMMUNITY_ROOM_ID } from '@/lib/community-group';
 import type { RoomDetail } from '@/lib/rooms-types';
 import type { Person } from '@/lib/client';
 import { request } from '@/lib/client';
@@ -71,6 +72,7 @@ export function RoomManagement({
   const memberIds = JSON.stringify(room.members.map((member) => member.userId));
   const [peopleLoading, setPeopleLoading] = useState(false);
   const manage = room.role === 'owner' || room.role === 'admin';
+  const full = room.id !== COMMUNITY_ROOM_ID && room.memberCount >= 200;
   useEffect(() => {
     if (!manage) setTab('members');
   }, [manage]);
@@ -228,14 +230,14 @@ export function RoomManagement({
                     !people.length && (
                       <p className="room-note">Новых участников не найдено.</p>
                     )}
-                  {room.memberCount >= 200 && (
+                  {full && (
                     <p className="room-note">В группе уже 200 участников.</p>
                   )}
                   {people.map((person) => (
                     <button
                       key={person.id}
                       className="room-member-add"
-                      disabled={busy || disabled || room.memberCount >= 200}
+                      disabled={busy || disabled || full}
                       onClick={() =>
                         void perform('addMember', { userId: person.id }).then(
                           (done) => {
@@ -253,6 +255,12 @@ export function RoomManagement({
                     </button>
                   ))}
                 </div>
+              )}
+              {room.memberCount > room.members.length && (
+                <p className="room-note">
+                  Показаны {room.members.length} из {room.memberCount}{' '}
+                  участников.
+                </p>
               )}
               {room.members.map((member) => (
                 <div className="room-member-row" key={member.userId}>

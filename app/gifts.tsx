@@ -34,6 +34,7 @@ import {
 import { GiftAnimation } from './gift-animation';
 import { GiftCollectibleArt } from './gift-collectible-art';
 import { GiftReceipt } from './gift-receipt';
+import type { GiftConversionUpdate } from './gift-conversion-panel';
 import { StarsIcon } from './stars-icon';
 import type { Person } from '@/lib/client';
 import { Avatar } from './profile-identity';
@@ -111,7 +112,11 @@ export function SendGiftButton({
     [session, setSession] = useState(0);
   const popup = useRef<HTMLDivElement>(null);
   const label =
-    recipient.id === senderId ? 'Подарить себе' : 'Подарить подарок';
+    recipient.id === senderId
+      ? 'Подарить себе'
+      : recipient.kind === 'channel'
+        ? 'Подарить каналу'
+        : 'Подарить подарок';
   return (
     <>
       <button
@@ -161,6 +166,7 @@ function SendGiftForm({
 }) {
   const draftKey = 'noctgram:gift-draft:' + senderId + ':' + recipient.id;
   const self = senderId === recipient.id;
+  const channel = recipient.kind === 'channel';
   const [initial] = useState(() => storedDraft(draftKey, recipient.id));
   const [catalog, setCatalog] = useState<GiftDefinition[]>([]),
     [balance, setBalance] = useState<number | null>(null);
@@ -276,10 +282,14 @@ function SendGiftForm({
             {sent
               ? self
                 ? 'Он уже появился во вкладке «Подарки» твоего профиля'
-                : `${recipient.name} получит подарок в переписке`
+                : channel
+                  ? `Он уже появился во вкладке «Подарки» канала ${recipient.name}`
+                  : `${recipient.name} получит подарок в переписке`
               : self
                 ? 'Выбери подарок — он появится в твоём профиле'
-                : `Подарок для ${recipient.name}`}
+                : channel
+                  ? `Подарок каналу ${recipient.name} — увидят все посетители профиля`
+                  : `Подарок для ${recipient.name}`}
           </DialogDescription>
         </div>
         {!selected && (
@@ -442,11 +452,13 @@ type GiftPage = { gifts: ReceivedGift[]; next: string | null };
 export function ProfileGifts({
   userId,
   own,
+  canManageVisibility = own,
   ownerName,
   selfGift,
 }: {
   userId: string;
   own: boolean;
+  canManageVisibility?: boolean;
   ownerName?: string;
   selfGift?: ReactNode;
 }) {
@@ -462,6 +474,24 @@ export function ProfileGifts({
     expanded = useRef(false),
     loadingMore = useRef(false),
     saving = useRef(false);
+  const convertedIds = useRef(new Set<string>());
+  function converted(conversion: GiftConversionUpdate) {
+    const { id, amount, created } = conversion;
+    if (convertedIds.current.has(id)) return;
+    convertedIds.current.add(id);
+    // Invalidate pending pages and restart the cursor after removing a receipt.
+    version.current++;
+    expanded.current = false;
+    loadingMore.current = false;
+    setMoreBusy(false);
+    setPage((old) => ({
+      gifts: old.gifts.filter((gift) => gift.id !== id),
+      next: null,
+    }));
+    setSelected((old) =>
+      old?.id === id ? { ...old, converted: { amount, created } } : old,
+    );
+  }
   useEffect(() => {
     let active = true;
     const refresh = async () => {
@@ -472,7 +502,13 @@ export function ProfileGifts({
           '?user=' + encodeURIComponent(userId),
         );
         if (active && request === version.current) {
-          setPage((previous) => reconcileSnapshot(previous, result));
+          const visible = {
+            ...result,
+            gifts: result.gifts.filter(
+              (gift) => !gift.converted && !convertedIds.current.has(gift.id),
+            ),
+          };
+          setPage((previous) => reconcileSnapshot(previous, visible));
           setError('');
         }
       } catch (e) {
@@ -481,11 +517,17 @@ export function ProfileGifts({
         if (active) setLoading(false);
       }
     };
-    const changed = () => {
+    const changed = (event?: Event) => {
+      const conversion = (
+        event as CustomEvent<{ conversion?: GiftConversionUpdate }> | undefined
+      )?.detail?.conversion;
+      if (conversion) converted(conversion);
       void refresh();
     };
     setPage({ gifts: [], next: null });
     expanded.current = false;
+    loadingMore.current = false;
+    setMoreBusy(false);
     setLoading(true);
     changed();
     window.addEventListener('noctgram:gifts-changed', changed);
@@ -502,6 +544,8 @@ export function ProfileGifts({
       window.removeEventListener('noctgram:gifts-changed', changed);
       document.removeEventListener('visibilitychange', changed);
     };
+    // Conversion only uses state setters and stable refs; it never reads a page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, reload]);
   async function more() {
     if (!page.next || loadingMore.current) return;
@@ -521,20 +565,31 @@ export function ProfileGifts({
           gifts: [
             ...old.gifts,
             ...result.gifts.filter(
-              (gift) => !old.gifts.some((row) => row.id === gift.id),
+              (gift) =>
+                !gift.converted &&
+                !convertedIds.current.has(gift.id) &&
+                !old.gifts.some((row) => row.id === gift.id),
             ),
           ],
           next: result.next,
         }));
     } catch (e) {
-      setError((e as Error).message);
+      if (request === version.current) setError((e as Error).message);
     } finally {
-      loadingMore.current = false;
-      setMoreBusy(false);
+      if (request === version.current) {
+        loadingMore.current = false;
+        setMoreBusy(false);
+      }
     }
   }
   async function visibility() {
-    if (!selected || saving.current) return;
+    if (
+      !selected ||
+      selected.converted ||
+      convertedIds.current.has(selected.id) ||
+      saving.current
+    )
+      return;
     saving.current = true;
     setBusy(true);
     setError('');
@@ -544,6 +599,7 @@ export function ProfileGifts({
         id: selected.id,
         hidden: !selected.hidden,
       });
+      if (convertedIds.current.has(selected.id)) return;
       const updated = { ...selected, hidden: selected.hidden ? 0 : 1 };
       setSelected((old) => (old?.id === updated.id ? updated : old));
       setPage((old) => ({
@@ -561,9 +617,7 @@ export function ProfileGifts({
   const definition = selected && giftDefinition(selected.giftId);
   return (
     <section className="profile-gifts" aria-label="Подарки в профиле">
-      {own && selfGift && (
-        <div className="profile-gifts-actions">{selfGift}</div>
-      )}
+      {selfGift && <div className="profile-gifts-actions">{selfGift}</div>}
       {loading ? (
         <div className="gift-loading">
           <LoaderCircle className="spin" size={22} />
@@ -672,6 +726,7 @@ export function ProfileGifts({
               receipt={selected}
               own={own}
               ownerName={ownerName}
+              onConverted={converted}
               onUpdated={(collectible) => {
                 const id = selected.id;
                 setSelected((old) =>
@@ -691,7 +746,7 @@ export function ProfileGifts({
                       {error}
                     </p>
                   )}
-                  {own && (
+                  {canManageVisibility && (
                     <button
                       className="secondary gift-visibility"
                       disabled={busy}

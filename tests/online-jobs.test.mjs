@@ -23,6 +23,8 @@ const { outputFiles } = await build({
             '@/lib/auth-session': 'export const setting=()=>"fixture-secret";',
             '@/lib/admin-online':
               'export async function recordOnlineSnapshot(){ globalThis.__onlineJobs.calls.push("online"); if(globalThis.__onlineJobs.failSnapshot) throw new Error("snapshot failed"); }',
+            '@/lib/giveaways':
+              'export async function settleDueGiveaways(){globalThis.__onlineJobs.calls.push("giveaways"); return {completed:0,failed:0};}',
             '@/lib/notifications':
               'export async function flushPush(){globalThis.__onlineJobs.calls.push("push"); return {delivered:0};}',
             '@/lib/calls':
@@ -52,15 +54,16 @@ await test('anonymous callers cannot record samples or run maintenance', async (
 await test('minute-only job does not run five-minute maintenance', async () => {
   calls.length = 0;
   assert.equal((await POST(request('?onlineOnly=1'))).status, 200);
-  assert.deepEqual(calls, ['online']);
+  assert.deepEqual(calls, ['online', 'giveaways']);
 });
 await test('full job records online and preserves existing maintenance', async () => {
   calls.length = 0;
   assert.deepEqual(await (await POST(request())).json(), {
     delivered: 0,
     uploads: 0,
+    giveaways: { completed: 0, failed: 0 },
   });
-  assert.deepEqual(calls, ['online', 'calls', 'push', 'uploads']);
+  assert.deepEqual(calls, ['online', 'giveaways', 'calls', 'push', 'uploads']);
 });
 await test('sampling failure surfaces without preventing maintenance from starting', async () => {
   calls.length = 0;

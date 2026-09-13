@@ -13,7 +13,16 @@ import {
 } from '@/components/ui/dialog';
 import { request, type Person, type Profile } from '@/lib/client';
 import { Avatar } from './post-card';
-export function ChannelTools({ profile }: { profile: Profile }) {
+import { GiveawayCreateButton } from './giveaway-create';
+export function ChannelTools({
+  profile,
+  actorId,
+  onCreated,
+}: {
+  profile: Profile;
+  actorId?: string;
+  onCreated?: () => void;
+}) {
   const [open, setOpen] = useState(false),
     [members, setMembers] = useState<(Person & { role: string })[]>([]),
     [query, setQuery] = useState(''),
@@ -86,6 +95,15 @@ export function ChannelTools({ profile }: { profile: Profile }) {
   return (
     <>
       <div className="channel-tools">
+        {profile.kind === 'channel' && profile.canManagePosts && actorId && (
+          <GiveawayCreateButton
+            targetKind="channel"
+            targetId={profile.id}
+            targetName={profile.name}
+            actorId={actorId}
+            onCreated={onCreated}
+          />
+        )}
         <button className="secondary" onClick={() => setOpen(true)}>
           <UsersRound size={15} /> Команда канала
         </button>

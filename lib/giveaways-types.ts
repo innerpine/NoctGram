@@ -1,0 +1,23 @@
+export const GIVEAWAY_PREMIUM_COST = 500;
+export const GIVEAWAY_PREMIUM_DAYS = 30;
+export type GiveawayTarget = 'group' | 'channel';
+export type GiveawayPrize = 'stars' | 'premium';
+export type Giveaway = {
+  id: string;
+  targetKind: GiveawayTarget;
+  targetId: string;
+  creator: string;
+  prize: GiveawayPrize;
+  winnerCount: number;
+  starsPerWinner: number;
+  premiumDays: number;
+  totalCost: number;
+  created: number;
+  endsAt: number;
+  status: 'active' | 'completed';
+  completedAt: number;
+  participantCount: number;
+  participating: boolean;
+  winners: { id: string; name: string; avatar: string; handle: string }[];
+  refund: number;
+};

@@ -59,6 +59,7 @@ export type Profile = Person & {
 };
 export type Media = { id: string; type: string; name: string; url?: string };
 export type Post = Appearance & {
+  giveawayId?: string | null;
   publishAt?: number;
   publisherId?: string;
   cancelledAt?: number;
@@ -130,6 +131,7 @@ export type Message = {
     price: number;
     message: string;
     collectible?: import('./gift-collectibles').GiftCollectible | null;
+    converted?: boolean;
   };
 };
 export const welcome: Post[] = [

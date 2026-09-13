@@ -1,5 +1,8 @@
 'use client';
-import { EmojiPicker, EmojiPreview, EmojiText } from './premium-emoji';
+import { EmojiPicker, EmojiPreview } from './premium-emoji';
+import { MentionText } from './profile-link';
+import { GiveawayCard } from './giveaway-card';
+import { GiveawayCreateButton } from './giveaway-create';
 /* eslint-disable react/react-compiler */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -441,6 +444,19 @@ export function RoomConversation({
         ) : (
           <strong>{loading ? 'Открываем чат…' : 'Чат недоступен'}</strong>
         )}
+        {room?.kind === 'group' && room.role !== 'member' && (
+          <GiveawayCreateButton
+            targetKind="group"
+            targetId={room.id}
+            targetName={room.name}
+            actorId={me.id}
+            compact
+            disabled={disabled || !room.canSend}
+            onCreated={() => {
+              void refresh().catch((error) => setError(reason(error)));
+            }}
+          />
+        )}
         {room && (
           <button
             className="icon-button"
@@ -671,9 +687,11 @@ export function RoomConversation({
                         </span>
                       </div>
                     )}
-                    <p>
-                      <EmojiText text={content} />
-                    </p>
+                    {message.giveawayId && !message.deletedAt ? (
+                      <GiveawayCard id={message.giveawayId} viewerId={me.id} />
+                    ) : (
+                      <p><MentionText text={content} /></p>
+                    )}
                     <span className="room-message-time">
                       {time(message.created)}
                       {self && <Check size={12} />}
