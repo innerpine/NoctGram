@@ -171,6 +171,24 @@ void test(
       text: 'Reply',
       replyTo: message.id,
     });
+    const focused = await api.readRoom('initial-0', full.id, null, message.id);
+    assert.equal(focused.messages[0].id, message.id);
+    assert.equal(focused.messages[1].replyText, 'A real D1 group message');
+    await api.saveRoomNotifications('initial-0', {
+      actor: 'initial-0',
+      id: full.id,
+      muted: true,
+    });
+    assert.equal(
+      (await api.readRoomNotifications('initial-0', full.id)).muted,
+      true,
+    );
+    assert.equal((await api.readRoom('initial-0', full.id)).unread, 1);
+    await api.saveRoomNotifications('initial-0', {
+      actor: 'initial-0',
+      id: full.id,
+      muted: false,
+    });
     await change('initial-0', {
       action: 'read',
       id: full.id,

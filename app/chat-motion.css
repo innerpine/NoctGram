@@ -1,4 +1,68 @@
 /* Scoped to chat surfaces. Native media controls and the music player keep their behavior. */
+.chat-panel {
+  animation: chat-panel-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.room-message-list {
+  animation: chat-history-in 180ms ease;
+}
+[data-room-new] {
+  animation: chat-detail-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes chat-panel-in {
+  from {
+    opacity: 0.25;
+    translate: 12px 0;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes chat-history-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.room-message-list [data-chat-arrival] {
+  outline: none;
+  box-shadow:
+    0 0 0 1px #cdb4df70,
+    inset 0 0 0 100vmax #cdb4df20;
+}
+.room-quote {
+  width: 100%;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.room-quote:hover:not(:disabled) {
+  background: #cbb0df25;
+}
+.room-quote:focus-visible {
+  outline: 2px solid #cbb0df;
+  outline-offset: 2px;
+}
+.room-quote:disabled {
+  cursor: default;
+}
+.room-thread .thread-copy strong > svg {
+  display: inline;
+  vertical-align: -1px;
+  opacity: 0.6;
+}
+.room-thread .unread.muted {
+  background: #ffffff18;
+  color: #aaa;
+}
+.thread-row {
+  transition: background-color 160ms ease;
+}
 /* Loaded history is visible on its first frame; only newly arriving messages enter. */
 .chat-message-shell[data-chat-initial]
   :is(.chat-message-row, .bubble, .chat-gift-event) {
@@ -162,6 +226,10 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .chat-panel,
+  .room-workspace,
+  .room-workspace *,
+  .thread-row,
   .chat-conversation,
   .chat-conversation *,
   .chat-action-menu,

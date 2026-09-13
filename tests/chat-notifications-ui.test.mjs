@@ -71,7 +71,7 @@ const { ChatNotificationsItem } = await import(
     Buffer.from(outputFiles[0].text).toString('base64')
 );
 const mounts = [];
-function mount(owner = 'alice', peer = 'bob') {
+function mount(owner = 'alice', peer = 'bob', extra = {}) {
   const view = {
     slots: [],
     effects: [],
@@ -81,7 +81,7 @@ function mount(owner = 'alice', peer = 'bob') {
     render() {
       active = view;
       view.cursor = 0;
-      const node = ChatNotificationsItem({ owner, peer });
+      const node = ChatNotificationsItem({ owner, peer, ...extra });
       view.first = false;
       return node;
     },
@@ -162,6 +162,31 @@ try {
     savedUpdates,
     'Late saves cannot update a closed account menu',
   );
+  let refreshed = 0;
+  const group = mount('alice', 'room:community', {
+    kind: 'room',
+    onChanged: async () => {
+      refreshed++;
+    },
+  });
+  assert.equal(
+    requests.at(-1).url,
+    '/api/rooms?actor=alice&id=room%3Acommunity&action=notifications',
+  );
+  requests.at(-1).resolve({ muted: false });
+  await flush();
+  click(group);
+  assert.equal(requests.at(-1).url, '/api/rooms');
+  assert.deepEqual(JSON.parse(requests.at(-1).options.body), {
+    actor: 'alice',
+    id: 'room:community',
+    action: 'notifications',
+    muted: true,
+  });
+  requests.at(-1).resolve({ muted: true });
+  await flush();
+  assert.equal(label(group), label(view));
+  assert.equal(refreshed, 1);
   console.log(
     'Chat notification controls: load, mute/unmute, single in-flight save, error recovery, and closed/account-switched menu isolation passed.',
   );

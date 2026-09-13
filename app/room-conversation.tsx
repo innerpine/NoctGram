@@ -4,7 +4,13 @@ import { MentionText } from './profile-link';
 import { GiveawayCard } from './giveaway-card';
 import { GiveawayCreateButton } from './giveaway-create';
 /* eslint-disable react/react-compiler */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   ArrowLeft,
   Check,
@@ -46,6 +52,9 @@ import {
 import { RoomAvatar } from './room-list';
 import { RoomManagement } from './room-management';
 import { Avatar } from './post-card';
+import { ChatNotificationsItem } from './chat-notifications';
+import { ChatReveal } from './chat-reveal';
+import { createChatNavigator } from '@/lib/chat-navigation';
 
 const reason = (error: unknown) =>
   error instanceof Error ? error.message : 'Не удалось загрузить чат';
@@ -89,6 +98,7 @@ export function RoomConversation({
     [older, setOlder] = useState(false);
   const [remove, setRemove] = useState<RoomMessage | null>(null),
     [leaveSecret, setLeaveSecret] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const alive = useRef(true),
     serial = useRef(0),
     newestRead = useRef('');
@@ -107,93 +117,145 @@ export function RoomConversation({
     paging = useRef(false);
   const sending = useRef(false);
   const emojiField = useRef<HTMLTextAreaElement>(null);
-  const load = useCallback(async () => {
-    const ticket = ++serial.current;
-    readController.current?.abort();
-    const controller = new AbortController();
-    readController.current = controller;
-    loadingRequest.current = true;
-    try {
-      if (target.roomId) {
-        const data = await roomRequest<RoomDetail>(
-          {
-            actor: me.id,
-            action: 'room',
-            id: target.roomId,
-            ...(pageBefore.current ? { before: pageBefore.current } : {}),
-          },
-          controller.signal,
-        );
-        if (!alive.current || ticket !== serial.current) return;
-        if (data.me !== me.id)
-          throw Object.assign(
-            new Error('Аккаунт изменился. Открой чат снова.'),
-            { status: 401 },
+  const navigation = useRef<ReturnType<typeof createChatNavigator> | null>(
+      null,
+    ),
+    pendingJump = useRef(''),
+    previousNewest = useRef<RoomMessage | undefined>(undefined);
+  const load = useCallback(
+    async (around?: string) => {
+      const ticket = ++serial.current;
+      readController.current?.abort();
+      const controller = new AbortController();
+      readController.current = controller;
+      loadingRequest.current = true;
+      try {
+        if (target.roomId) {
+          const data = await roomRequest<RoomDetail>(
+            {
+              actor: me.id,
+              action: 'room',
+              id: target.roomId,
+              ...(around
+                ? { around }
+                : pageBefore.current
+                  ? { before: pageBefore.current }
+                  : {}),
+            },
+            controller.signal,
           );
-        setRoom(data);
-        const last = data.messages.at(-1);
-        if (last && newestRead.current !== last.id && !document.hidden) {
-          newestRead.current = last.id;
-          void roomAction({
-            actor: me.id,
-            action: 'read',
-            id: data.id,
-            through: last.id,
-          })
-            .then(onRoomsChanged)
-            .catch(() => {
-              newestRead.current = '';
-            });
+          if (!alive.current || ticket !== serial.current) return;
+          if (around && pendingJump.current !== around) return;
+          if (
+            around &&
+            !data.messages.some(
+              (message) => message.id === around && !message.deletedAt,
+            )
+          )
+            throw new Error('Сообщение больше недоступно');
+          if (data.me !== me.id)
+            throw Object.assign(
+              new Error('Аккаунт изменился. Открой чат снова.'),
+              { status: 401 },
+            );
+          if (around) pageBefore.current = data.pageCursor || '';
+          setRoom(data);
+          const last = data.messages.at(-1);
+          if (
+            last &&
+            !around &&
+            !pageBefore.current &&
+            newestRead.current !== last.id &&
+            !document.hidden
+          ) {
+            newestRead.current = last.id;
+            void roomAction({
+              actor: me.id,
+              action: 'read',
+              id: data.id,
+              through: last.id,
+            })
+              .then(onRoomsChanged)
+              .catch(() => {
+                newestRead.current = '';
+              });
+          }
+        } else {
+          const data = await roomRequest<{ room: RoomPreview }>(
+            target.invite
+              ? { actor: me.id, action: 'resolveInvite', token: target.invite }
+              : {
+                  actor: me.id,
+                  action: 'resolveGroup',
+                  username: target.group || '',
+                },
+            controller.signal,
+          );
+          if (!alive.current || ticket !== serial.current) return;
+          if (data.room.joined) {
+            onOpen(data.room.id);
+            return;
+          }
+          setPreview(data.room);
         }
-      } else {
-        const data = await roomRequest<{ room: RoomPreview }>(
-          target.invite
-            ? { actor: me.id, action: 'resolveInvite', token: target.invite }
-            : {
-                actor: me.id,
-                action: 'resolveGroup',
-                username: target.group || '',
-              },
-          controller.signal,
-        );
+        setError('');
+      } catch (error) {
         if (!alive.current || ticket !== serial.current) return;
-        if (data.room.joined) {
-          onOpen(data.room.id);
-          return;
+        if (
+          !around &&
+          [401, 403, 404].includes(
+            Number((error as { status?: number }).status),
+          )
+        ) {
+          setRoom(null);
+          setPreview(null);
+          session.current?.dispose();
+          session.current = null;
+          setPlaintext({});
+          setSecretReady(false);
         }
-        setPreview(data.room);
+        if (!around) setError(reason(error));
+        throw error;
+      } finally {
+        if (ticket === serial.current) {
+          loadingRequest.current = false;
+          if (alive.current) setLoading(false);
+        }
       }
-      setError('');
-    } catch (error) {
-      if (!alive.current || ticket !== serial.current) return;
-      if (
-        [401, 403, 404].includes(Number((error as { status?: number }).status))
-      ) {
-        setRoom(null);
-        setPreview(null);
-        session.current?.dispose();
-        session.current = null;
-        setPlaintext({});
-        setSecretReady(false);
-      }
-      setError(reason(error));
-      throw error;
-    } finally {
-      if (ticket === serial.current) {
-        loadingRequest.current = false;
-        if (alive.current) setLoading(false);
-      }
-    }
-  }, [
-    target.roomId,
-    target.group,
-    target.invite,
-    me.id,
-    onOpen,
-    onRoomsChanged,
-  ]);
+    },
+    [target.roomId, target.group, target.invite, me.id, onOpen, onRoomsChanged],
+  );
   const latestLoad = useRef(load);
   latestLoad.current = load;
+  const jumpHere = useCallback((id: string) => {
+    const target = document.getElementById('room-message-' + id);
+    return !!target && (navigation.current?.jump(target) ?? false);
+  }, []);
+  const onJump = (id: string) => {
+    pendingJump.current = '';
+    follow.current = false;
+    setMutationError('');
+    if (jumpHere(id)) return;
+    navigation.current?.cancel();
+    pendingJump.current = id;
+    void latestLoad.current(id).catch((error) => {
+      if (alive.current && pendingJump.current === id) {
+        pendingJump.current = '';
+        setMutationError(reason(error));
+      }
+    });
+  };
+  useLayoutEffect(() => {
+    const list = scroll.current;
+    if (!list) return;
+    navigation.current = createChatNavigator(list, () => {
+      pendingJump.current = '';
+    });
+    return () => {
+      navigation.current?.dispose();
+      navigation.current = null;
+    };
+  }, [room?.id]);
   useEffect(() => {
     alive.current = true;
     const abortLatestRequest = () => readController.current?.abort();
@@ -297,9 +359,17 @@ export function RoomConversation({
       current = false;
     };
   }, [roomMessages, secretReady]);
+  useLayoutEffect(() => {
+    const last = room?.messages.at(-1);
+    const previous = previousNewest.current;
+    previousNewest.current = last;
+    if (pendingJump.current) {
+      if (jumpHere(pendingJump.current)) pendingJump.current = '';
+    } else if (follow.current && !navigation.current?.scrolling) {
+      navigation.current?.bottom(!!previous && last?.id !== previous.id);
+    }
+  }, [room?.messages, plaintext, jumpHere]);
   useEffect(() => {
-    const list = scroll.current;
-    if (list && follow.current) list.scrollTop = list.scrollHeight;
     const item = outgoing.current;
     if (
       item &&
@@ -405,6 +475,9 @@ export function RoomConversation({
     }
   };
   const head = room || preview;
+  const messagesById = new Map(
+    room?.messages.map((message) => [message.id, message]),
+  );
   const ownKey = room?.members.find(
     (member) => member.userId === me.id,
   )?.publicKey;
@@ -456,6 +529,27 @@ export function RoomConversation({
               void refresh().catch((error) => setError(reason(error)));
             }}
           />
+        )}
+        {room && (
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger
+              className="icon-button"
+              aria-label="Действия с чатом"
+            >
+              <MoreHorizontal size={19} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="chat-options-menu">
+              {menuOpen && (
+                <ChatNotificationsItem
+                  key={me.id + ':' + room.id}
+                  owner={me.id}
+                  peer={room.id}
+                  kind="room"
+                  onChanged={onRoomsChanged}
+                />
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
         {room && (
           <button
@@ -582,7 +676,11 @@ export function RoomConversation({
             ref={scroll}
             onScroll={() => {
               const list = scroll.current;
-              if (list)
+              if (
+                list &&
+                !navigation.current?.scrolling &&
+                !pendingJump.current
+              )
                 follow.current =
                   list.scrollHeight - list.scrollTop - list.clientHeight < 90;
             }}
@@ -592,6 +690,8 @@ export function RoomConversation({
                 className="room-load-earlier"
                 disabled={older}
                 onClick={() => {
+                  pendingJump.current = '';
+                  navigation.current?.cancel();
                   const previous = pageBefore.current;
                   pageBefore.current = room.nextCursor!;
                   paging.current = true;
@@ -643,7 +743,7 @@ export function RoomConversation({
                   ? plaintext[message.id] || 'Зашифрованное сообщение'
                   : message.text;
               const quoted = message.replyTo
-                ? room.messages.find((item) => item.id === message.replyTo)
+                ? messagesById.get(message.replyTo)
                 : null;
               return (
                 <div
@@ -670,6 +770,14 @@ export function RoomConversation({
                     </button>
                   )}
                   <div
+                    id={'room-message-' + message.id}
+                    tabIndex={-1}
+                    data-room-new={
+                      (!!previousNewest.current &&
+                        !pageBefore.current &&
+                        message.created > previousNewest.current.created) ||
+                      undefined
+                    }
                     className={
                       giveawayEvent
                         ? 'room-giveaway-content'
@@ -684,15 +792,27 @@ export function RoomConversation({
                         {message.senderName}
                       </button>
                     )}
-                    {message.replyTo && (
-                      <div className="room-quote">
+                    {message.replyTo && !message.deletedAt && (
+                      <button
+                        type="button"
+                        className="room-quote"
+                        disabled={
+                          message.replyUnavailable || !!quoted?.deletedAt
+                        }
+                        aria-label="Перейти к исходному сообщению"
+                        onClick={() => onJump(message.replyTo!)}
+                      >
                         <Reply size={13} />
                         <span>
-                          {quoted && !quoted.deletedAt
-                            ? quoted.text.slice(0, 160)
-                            : 'Ответ на сообщение'}
+                          {message.replyUnavailable || quoted?.deletedAt
+                            ? 'Сообщение удалено'
+                            : (
+                                quoted?.text ||
+                                message.replyText ||
+                                'Ответ на сообщение'
+                              ).slice(0, 160)}
                         </span>
-                      </div>
+                      </button>
                     )}
                     {message.giveawayId && !message.deletedAt ? (
                       <GiveawayCard id={message.giveawayId} viewerId={me.id} />
@@ -773,6 +893,8 @@ export function RoomConversation({
             <button
               className="room-return-new"
               onClick={() => {
+                pendingJump.current = '';
+                navigation.current?.cancel();
                 pageBefore.current = '';
                 follow.current = true;
                 void refresh().catch((error) => setError(reason(error)));
@@ -781,23 +903,25 @@ export function RoomConversation({
               К новым сообщениям <ChevronDown size={14} />
             </button>
           )}
-          {reply && (
-            <div className="room-reply-preview">
-              <Reply size={17} />
-              <span>
-                <strong>{reply.senderName}</strong>
-                <small>{reply.text.slice(0, 140)}</small>
-              </span>
-              <button
-                className="icon-button"
-                aria-label="Отменить ответ"
-                disabled={pending}
-                onClick={() => setReply(null)}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          )}
+          <ChatReveal>
+            {reply && (
+              <div className="room-reply-preview">
+                <Reply size={17} />
+                <span>
+                  <strong>{reply.senderName}</strong>
+                  <small>{reply.text.slice(0, 140)}</small>
+                </span>
+                <button
+                  className="icon-button"
+                  aria-label="Отменить ответ"
+                  disabled={pending}
+                  onClick={() => setReply(null)}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            )}
+          </ChatReveal>
           <EmojiPreview text={text} />
           <form
             className="room-composer"

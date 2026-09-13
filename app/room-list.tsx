@@ -2,7 +2,7 @@
 import { emojiFallback } from '@/lib/premium-emoji';
 /* eslint-disable react/react-compiler */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { LockKeyhole, Users, RefreshCw } from 'lucide-react';
+import { BellOff, LockKeyhole, Users, RefreshCw } from 'lucide-react';
 import { roomRequest } from '@/lib/rooms-client';
 import type { RoomPreview, RoomSummary } from '@/lib/rooms-types';
 import { Avatar } from './post-card';
@@ -136,7 +136,12 @@ export function RoomThreadRow({
     >
       <RoomAvatar room={room} />
       <span className="thread-copy">
-        <strong>{room.name || 'Секретный чат'}</strong>
+        <strong>
+          {room.name || 'Секретный чат'}{' '}
+          {room.muted && (
+            <BellOff size={12} aria-label="Уведомления выключены" />
+          )}
+        </strong>
         <small>
           {room.kind === 'secret'
             ? 'Со сквозным шифрованием'
@@ -145,7 +150,9 @@ export function RoomThreadRow({
         </small>
       </span>
       {!!room.unread && (
-        <span className="unread">{room.unread > 99 ? '99+' : room.unread}</span>
+        <span className={'unread' + (room.muted ? ' muted' : '')}>
+          {room.unread > 99 ? '99+' : room.unread}
+        </span>
       )}
     </button>
   );

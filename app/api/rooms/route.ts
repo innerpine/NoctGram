@@ -5,6 +5,8 @@ import {
   changeRoom,
   listRooms,
   readRoom,
+  readRoomNotifications,
+  saveRoomNotifications,
   resolveGroup,
   resolveRoomInvite,
   searchRooms,
@@ -25,7 +27,14 @@ export async function GET(req: Request) {
     if (action === 'list')
       result = await listRooms(me, params.get('archived') === '1');
     else if (action === 'room')
-      result = await readRoom(me, params.get('id') || '', params.get('before'));
+      result = await readRoom(
+        me,
+        params.get('id') || '',
+        params.get('before'),
+        params.get('around'),
+      );
+    else if (action === 'notifications')
+      result = await readRoomNotifications(me, params.get('id') || '');
     else if (action === 'search')
       result = await searchRooms(me, params.get('q') || '');
     else if (action === 'resolveGroup')
@@ -61,7 +70,12 @@ export async function POST(req: Request) {
     else if (body.action === 'create')
       await rateLimit('room-create', me, 10, 3600);
     else await rateLimit('room-manage', me, 60, 60);
-    return Response.json(await changeRoom(me, body), { headers });
+    return Response.json(
+      body.action === 'notifications'
+        ? await saveRoomNotifications(me, body)
+        : await changeRoom(me, body),
+      { headers },
+    );
   } catch (error) {
     // Finish only bounded early-rejected payloads so local Worker connections
     // are not left holding a request body after an Origin/length rejection.

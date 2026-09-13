@@ -22,6 +22,9 @@ export type RoomMessage = {
   text: string;
   ciphertext: string | null;
   replyTo: string | null;
+  replyText?: string | null;
+  replyName?: string | null;
+  replyUnavailable?: boolean;
   created: number;
   deletedAt: number;
 };
@@ -43,6 +46,7 @@ export type RoomPreview = {
 export type RoomSummary = Omit<RoomPreview, 'joined'> & {
   role: RoomRole;
   archivedAt: number;
+  muted: boolean;
   unread: number;
   lastMessage: {
     id: string;
@@ -56,5 +60,6 @@ export type RoomDetail = RoomSummary & {
   members: RoomMember[];
   messages: RoomMessage[];
   nextCursor: string | null;
+  pageCursor?: string | null;
   canSend: boolean;
 };

@@ -169,7 +169,7 @@ function preview(row: RoomPreview & { joined: number | boolean }): RoomPreview {
 }
 async function roomRow(me: string, roomId: string): Promise<RoomSummary> {
   const row = await db()
-    .prepare(`SELECT ${summaryColumns('m.userId')},m.role,m.archivedAt,${memberCount('r')} AS memberCount,
+    .prepare(`SELECT ${summaryColumns('m.userId')},m.role,m.archivedAt,m.muted,${memberCount('r')} AS memberCount,
     (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0) AS unread
     FROM chat_rooms r JOIN chat_room_members m ON m.roomId=r.id AND m.userId=? WHERE r.id=? AND ${access('r', 'm.userId')}`)
     .bind(me, roomId)
@@ -177,9 +177,32 @@ async function roomRow(me: string, roomId: string): Promise<RoomSummary> {
   if (!row) throw new ApiError(404, 'Чат недоступен');
   return {
     ...row,
+    muted: !!row.muted,
     label: row.kind === 'group' ? 'Группа' : 'Секретный чат',
     lastMessage: null,
   };
+}
+export async function readRoomNotifications(me: string, roomId: string) {
+  const room = await roomRow(me, id(roomId));
+  return { muted: room.muted };
+}
+export async function saveRoomNotifications(
+  me: string,
+  body: Record<string, unknown>,
+) {
+  if (body.actor !== me) throw new ApiError(401, 'Аккаунт изменился');
+  if (typeof body.muted !== 'boolean')
+    throw new ApiError(400, 'Выбери настройку уведомлений');
+  const roomId = id(body.id);
+  await readRoomNotifications(me, roomId);
+  await viewerQuery(
+    `UPDATE chat_room_members SET muted=? WHERE roomId=? AND userId=:viewer
+    AND EXISTS(SELECT 1 FROM chat_rooms r WHERE r.id=chat_room_members.roomId AND ${access('r', ':viewer')})`,
+    me,
+  )
+    .bind(body.muted ? 1 : 0, roomId)
+    .run();
+  return readRoomNotifications(me, roomId);
 }
 export async function listRooms(
   me: string,
@@ -187,7 +210,7 @@ export async function listRooms(
 ): Promise<{ rooms: RoomSummary[] }> {
   await actorAllowed(me);
   const result = await db()
-    .prepare(`SELECT ${summaryColumns('m.userId')},m.role,m.archivedAt,${memberCount('r')} AS memberCount,
+    .prepare(`SELECT ${summaryColumns('m.userId')},m.role,m.archivedAt,m.muted,${memberCount('r')} AS memberCount,
     (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0) AS unread,
     (SELECT json_object('id',lastm.id,'text',CASE WHEN r.kind='secret' THEN '' ELSE lastm.text END,'created',lastm.created,'sender',lastm.sender)
     FROM chat_room_messages lastm WHERE lastm.roomId=r.id AND lastm.deletedAt=0 ORDER BY lastm.created DESC,lastm.id DESC LIMIT 1) AS lastMessage
@@ -198,6 +221,7 @@ export async function listRooms(
   return {
     rooms: result.results.map((r) => ({
       ...r,
+      muted: !!r.muted,
       label: r.kind === 'group' ? 'Группа' : 'Секретный чат',
       lastMessage: r.lastMessage ? JSON.parse(r.lastMessage) : null,
     })),
@@ -271,9 +295,30 @@ export async function readRoom(
   me: string,
   roomId: string,
   before?: string | null,
+  around?: string | null,
 ): Promise<RoomDetail> {
   const row = await roomRow(me, id(roomId));
   let cursor: { created: number; id: string } | null = null;
+  if (around) {
+    if (before) throw new ApiError(400, 'Выбери страницу или сообщение');
+    const target = await viewerQuery(
+      `SELECT msg.created,msg.id FROM chat_room_messages msg JOIN chat_rooms r ON r.id=msg.roomId
+       WHERE msg.id=? AND msg.roomId=? AND msg.deletedAt=0 AND ${access('r', ':viewer')}`,
+      me,
+    )
+      .bind(id(around), roomId)
+      .first<{ created: number; id: string }>();
+    if (!target) throw new ApiError(404, 'Сообщение больше недоступно');
+    // A bounded window around the target; never download every older page.
+    cursor = await viewerQuery(
+      `SELECT msg.created,msg.id FROM chat_room_messages msg JOIN chat_rooms r ON r.id=msg.roomId
+       WHERE msg.roomId=? AND (msg.created>? OR (msg.created=? AND msg.id>?)) AND ${access('r', ':viewer')}
+       ORDER BY msg.created,msg.id LIMIT 1 OFFSET 49`,
+      me,
+    )
+      .bind(roomId, target.created, target.created, target.id)
+      .first();
+  }
   if (before) {
     try {
       const value = JSON.parse(atob(string(before, 500)));
@@ -299,8 +344,11 @@ export async function readRoom(
     .bind(roomId)
     .all<Omit<RoomMember, 'publicKey'> & { publicKey: string }>();
   const messages = await viewerQuery(
-    `SELECT msg.id,msg.roomId,msg.sender,u.name AS senderName,u.avatar AS senderAvatar,msg.text,msg.ciphertext,msg.replyTo,msg.created,msg.deletedAt,msg.giveawayId
+    `SELECT msg.id,msg.roomId,msg.sender,u.name AS senderName,u.avatar AS senderAvatar,msg.text,msg.ciphertext,msg.replyTo,msg.created,msg.deletedAt,msg.giveawayId,
+    substr(rp.text,1,160) AS replyText,ru.name AS replyName,(msg.replyTo IS NOT NULL AND rp.id IS NULL) AS replyUnavailable
     FROM chat_room_messages msg JOIN users u ON u.id=msg.sender JOIN chat_rooms r ON r.id=msg.roomId
+    LEFT JOIN chat_room_messages rp ON rp.id=msg.replyTo AND rp.roomId=msg.roomId AND rp.deletedAt=0
+    LEFT JOIN users ru ON ru.id=rp.sender
     WHERE msg.roomId=? AND ${access('r', ':viewer')} ${cursor ? 'AND (msg.created<? OR (msg.created=? AND msg.id<?))' : ''}
     ORDER BY msg.created DESC,msg.id DESC LIMIT ${PAGE_SIZE + 1}`,
     me,
@@ -325,7 +373,13 @@ export async function readRoom(
       ...m,
       publicKey: m.publicKey ? JSON.parse(m.publicKey) : null,
     })),
-    messages: page.reverse(),
+    messages: page
+      .reverse()
+      .map((message) => ({
+        ...message,
+        replyUnavailable: !!message.replyUnavailable,
+      })),
+    pageCursor: cursor ? btoa(JSON.stringify(cursor)) : null,
     canSend: !!permission,
     nextCursor:
       messages.results.length > PAGE_SIZE && oldest

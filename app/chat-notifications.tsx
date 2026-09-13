@@ -7,9 +7,13 @@ import { chatRequest } from '@/lib/chat-client';
 export function ChatNotificationsItem({
   owner,
   peer,
+  kind = 'person',
+  onChanged,
 }: {
   owner: string;
   peer: string;
+  kind?: 'person' | 'room';
+  onChanged?: () => Promise<unknown>;
 }) {
   const [state, setState] = useState<{ muted: boolean } | null>(null);
   const [busy, setBusy] = useState(false),
@@ -22,8 +26,12 @@ export function ChatNotificationsItem({
     lifetime.current = current;
     if (owner && peer) {
       void chatRequest<{ muted: boolean }>(
-        '/api/chat-notifications?' +
-          new URLSearchParams({ actor: owner, peer }),
+        (kind === 'room' ? '/api/rooms?' : '/api/chat-notifications?') +
+          new URLSearchParams(
+            kind === 'room'
+              ? { actor: owner, id: peer, action: 'notifications' }
+              : { actor: owner, peer },
+          ),
         {
           cache: 'no-store',
           signal: AbortSignal.any([
@@ -46,7 +54,7 @@ export function ChatNotificationsItem({
       current.active = false;
       controller.abort();
     };
-  }, [owner, peer]);
+  }, [owner, peer, kind]);
   const toggle = async () => {
     const current = lifetime.current;
     if (!state || locked.current || !current?.active) return;
@@ -55,15 +63,24 @@ export function ChatNotificationsItem({
     setError('');
     try {
       const saved = await chatRequest<{ muted: boolean }>(
-        '/api/chat-notifications',
+        kind === 'room' ? '/api/rooms' : '/api/chat-notifications',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ actor: owner, peer, muted: !state.muted }),
+          body: JSON.stringify({
+            actor: owner,
+            ...(kind === 'room'
+              ? { id: peer, action: 'notifications' }
+              : { peer }),
+            muted: !state.muted,
+          }),
           signal: AbortSignal.timeout(15000),
         },
       );
-      if (current.active) setState(saved);
+      if (current.active) {
+        setState(saved);
+        await onChanged?.();
+      }
     } catch (e) {
       if (current.active)
         setError(

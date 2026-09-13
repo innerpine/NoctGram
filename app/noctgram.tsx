@@ -1897,7 +1897,11 @@ export default function Noctgram({
           ? displayPosts.filter((p) => p.saved)
           : displayPosts;
   const unread =
-    threadUnread + roomList.rooms.reduce((sum, room) => sum + room.unread, 0);
+    threadUnread +
+    roomList.rooms.reduce(
+      (sum, room) => sum + (room.muted ? 0 : room.unread),
+      0,
+    );
   const dialogs = [
     ...threads.map((person) => ({
       type: 'person' as const,
@@ -2772,7 +2776,11 @@ export default function Noctgram({
                 unread={archivedDialogs.reduce(
                   (n, d) =>
                     n +
-                    (d.type === 'room' ? d.room.unread : d.person.unread || 0),
+                    (d.type === 'room'
+                      ? d.room.muted
+                        ? 0
+                        : d.room.unread
+                      : d.person.unread || 0),
                   0,
                 )}
                 onClick={() =>
@@ -2868,6 +2876,12 @@ export default function Noctgram({
               )}
             </section>
             <section
+              key={
+                'chat-panel:' +
+                myId +
+                ':' +
+                (roomTarget ? JSON.stringify(roomTarget) : peer?.id || 'empty')
+              }
               className={'chat-panel' + (peer ? ' chat-themed' : '')}
               style={
                 peer

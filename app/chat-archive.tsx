@@ -83,11 +83,13 @@ export function ArchiveRow({
           <MoreHorizontal size={16} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="room-menu">
-          {kind === 'person' && menuOpen && (
+          {menuOpen && (
             <ChatNotificationsItem
               key={owner + ':' + id}
               owner={owner}
               peer={id}
+              kind={kind}
+              onChanged={onDone}
             />
           )}
           <DropdownMenuItem onClick={() => void move()}>

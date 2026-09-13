@@ -176,6 +176,51 @@ void test('room HTTP guards bind mutations to the signed-in actor and preserve g
       await get({ action: 'room', id: room.id, actor: 'alice' })
     ).json();
     assert.equal(detail.messages[0].text, 'Hello from the route');
+    const muted = await post({
+      action: 'notifications',
+      actor: 'alice',
+      id: room.id,
+      muted: true,
+    });
+    assert.equal(muted.status, 200);
+    assert.match(muted.headers.get('Cache-Control'), /no-store/);
+    assert.equal((await muted.json()).muted, true);
+    assert.equal(
+      (
+        await (
+          await get({ action: 'notifications', actor: 'alice', id: room.id })
+        ).json()
+      ).muted,
+      true,
+    );
+    assert.equal(
+      (
+        await post({
+          action: 'notifications',
+          actor: 'bob',
+          id: room.id,
+          muted: false,
+        })
+      ).status,
+      401,
+    );
+    assert.equal(
+      (
+        await post(
+          {
+            action: 'notifications',
+            actor: 'alice',
+            id: room.id,
+            muted: false,
+          },
+          { Origin: 'https://evil.test' },
+        )
+      ).status,
+      403,
+    );
+    const focused = await get({ action: 'room', id: room.id, around: key });
+    assert.equal(focused.status, 200);
+    assert.equal((await focused.json()).messages[0].id, key);
     assert.equal(
       (
         await post({

@@ -808,6 +808,138 @@ assert.equal(
   (await api.listRooms('carol')).rooms.some((r) => r.id === survivor.id),
   true,
 );
+// Reply navigation stays bounded even when the target is far outside the current page.
+const navigationRoom = await change('alice', {
+  action: 'create',
+  name: 'Navigation',
+  memberIds: ['bob'],
+});
+const insertHistory = sqlite.prepare(
+  'INSERT INTO chat_room_messages(id,roomId,sender,text,created,replyTo) VALUES(?,?,?,?,?,?)',
+);
+for (let i = 0; i < 230; i++)
+  insertHistory.run(
+    'navigation-' + String(i).padStart(3, '0'),
+    navigationRoom.id,
+    'alice',
+    'Message ' + i,
+    now,
+    i === 229 ? 'navigation-005' : null,
+  );
+const recent = await api.readRoom('bob', navigationRoom.id);
+assert.equal(recent.messages.length, 100);
+assert.equal(recent.messages.at(-1).replyText, 'Message 5');
+assert.equal(recent.messages.at(-1).replyUnavailable, false);
+const centered = await api.readRoom(
+  'bob',
+  navigationRoom.id,
+  null,
+  'navigation-080',
+);
+assert.equal(centered.messages.length, 100);
+assert.ok(centered.messages.some((m) => m.id === 'navigation-080'));
+assert.ok(centered.nextCursor);
+assert.ok(centered.pageCursor);
+assert.deepEqual(
+  (
+    await api.readRoom('bob', navigationRoom.id, centered.pageCursor)
+  ).messages.map((m) => m.id),
+  centered.messages.map((m) => m.id),
+);
+assert.equal(
+  (await api.readRoom('bob', navigationRoom.id, null, 'navigation-229'))
+    .pageCursor,
+  null,
+);
+await deny(
+  api.readRoom('carol', navigationRoom.id, null, 'navigation-080'),
+  404,
+);
+await deny(api.readRoom('alice', survivor.id, null, 'navigation-080'), 404);
+await deny(
+  api.readRoom('bob', navigationRoom.id, centered.pageCursor, 'navigation-080'),
+  400,
+);
+sqlite
+  .prepare("UPDATE chat_room_messages SET deletedAt=1,text='' WHERE id=?")
+  .run('navigation-005');
+await deny(api.readRoom('bob', navigationRoom.id, null, 'navigation-005'), 404);
+assert.equal(
+  (await api.readRoom('bob', navigationRoom.id)).messages.at(-1)
+    .replyUnavailable,
+  true,
+);
+assert.equal(
+  (await api.readRoom('bob', navigationRoom.id)).messages.at(-1).replyText,
+  null,
+);
+// Muting belongs to one member, persists, and never acknowledges unread history.
+const memberBefore = sqlite
+  .prepare('SELECT * FROM chat_room_members WHERE roomId=? AND userId=?')
+  .get(navigationRoom.id, 'bob');
+const mute = (muted, extra = {}) =>
+  api.saveRoomNotifications('bob', {
+    actor: 'bob',
+    id: navigationRoom.id,
+    muted,
+    ...extra,
+  });
+assert.equal(
+  (await api.readRoomNotifications('bob', navigationRoom.id)).muted,
+  false,
+);
+await mute(true);
+assert.equal(
+  (await api.listRooms('bob')).rooms.find((r) => r.id === navigationRoom.id)
+    .muted,
+  true,
+);
+assert.equal(
+  (await api.readRoomNotifications('alice', navigationRoom.id)).muted,
+  false,
+);
+assert.equal((await api.readRoom('bob', navigationRoom.id)).unread, 229);
+assert.deepEqual(
+  {
+    ...sqlite
+      .prepare('SELECT * FROM chat_room_members WHERE roomId=? AND userId=?')
+      .get(navigationRoom.id, 'bob'),
+    muted: 0,
+  },
+  { ...memberBefore },
+);
+restrict('bob');
+await mute(false);
+assert.equal(
+  (await api.readRoomNotifications('bob', navigationRoom.id)).muted,
+  false,
+);
+unrestrict('bob');
+await deny(mute('true'), 400);
+await deny(mute(true, { actor: 'alice' }), 401);
+await deny(
+  api.saveRoomNotifications('carol', {
+    actor: 'carol',
+    id: navigationRoom.id,
+    muted: true,
+  }),
+  404,
+);
+beforeWrite = () =>
+  sqlite
+    .prepare(
+      "UPDATE chat_room_members SET status='banned' WHERE roomId=? AND userId='bob'",
+    )
+    .run(navigationRoom.id);
+await deny(mute(true), 404);
+assert.equal(
+  sqlite
+    .prepare(
+      "SELECT muted FROM chat_room_members WHERE roomId=? AND userId='bob'",
+    )
+    .get(navigationRoom.id).muted,
+  0,
+);
 console.log(
   'Room integration passed: membership, roles, invites, discovery, privacy, restrictions, races, secret envelopes, limits and pagination.',
 );

@@ -1226,6 +1226,7 @@ export const chatRoomMembers = sqliteTable(
     lastReadAt: integer().notNull().default(0),
     lastReadId: text().notNull().default(''),
     archivedAt: integer().notNull().default(0),
+    muted: integer().notNull().default(0),
   },
   (t) => [
     primaryKey({ columns: [t.roomId, t.userId] }),
@@ -1241,6 +1242,7 @@ export const chatRoomMembers = sqliteTable(
       'chat_room_members_status',
       sql`${t.status} IN ('active','left','banned')`,
     ),
+    check('chat_room_members_muted', sql`${t.muted} IN (0,1)`),
   ],
 );
 export const chatRoomMessages = sqliteTable(
