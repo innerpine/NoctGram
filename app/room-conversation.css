@@ -286,6 +286,8 @@
 }
 .room-quote {
   display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
   gap: 6px;
   padding: 6px 8px;
   border-left: 2px solid #cbb0df;
@@ -301,6 +303,7 @@
   margin-top: 2px;
 }
 .room-quote > span {
+  min-width: 0;
   display: -webkit-box;
   overflow: hidden;
   overflow-wrap: anywhere;
