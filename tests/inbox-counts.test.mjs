@@ -100,6 +100,9 @@ function fixture(t) {
       published,
       fanoutPosts: async () => {},
       appearanceColumns: () => 'u.verified AS verified',
+      ...functions('lib/direct-notification-policy.ts', [
+        'directNotificationAllowed',
+      ]),
     },
   );
   const message = (id, sender = 'bob', recipient = 'alice', read = 0) => {
@@ -116,6 +119,23 @@ function fixture(t) {
   };
   return { sql, queries, message, readUnreadMessageCount, notificationsGet };
 }
+
+await test('muting suppresses personal message and gift alerts without changing unread history or channel gifts', async (t) => {
+  const f = fixture(t);
+  f.message('personal');
+  f.message('other', 'carol');
+  f.sql
+    .exec(`INSERT INTO direct_chat_notifications(userId,peerId,muted,updated) VALUES('alice','bob',1,0);
+    INSERT INTO users(id,name,kind,ownerId,created) VALUES('channel-muted-test','Channel','channel','alice',1);
+    INSERT INTO star_transfers(id,sender,recipient,amount,kind,created) VALUES('gift-pay','bob','noctgram_gifts',75,'gift',1),('channel-pay','bob','noctgram_gifts',75,'gift',1);
+    INSERT INTO received_gifts(id,transferId,giftId,sender,recipient,created) VALUES('personal-gift','gift-pay','toy_bear','bob','alice',1),('channel-gift','channel-pay','toy_bear','bob','channel-muted-test',1);
+    INSERT INTO notifications(id,userId,actorId,kind,targetId,created) VALUES('personal-gift','alice','bob','gift','personal-gift',1),('channel-gift','alice','bob','gift','channel-gift',1);`);
+  assert.equal(await f.readUnreadMessageCount('alice'), 2);
+  const alerts = await (
+    await f.notificationsGet('notifications', 'alice')
+  ).json();
+  assert.deepEqual(alerts.map((n) => n.id).sort(), ['channel-gift', 'n-other']);
+});
 
 void test('background message badge excludes read, outgoing, hidden, deleted and inaccessible messages', async (t) => {
   const f = fixture(t);
@@ -193,7 +213,9 @@ void test('channel gift notifications route to the channel and remain visible on
     INSERT INTO received_gifts(id,transferId,giftId,sender,recipient,created) VALUES('channel-gift','channel-gift-transfer','toy_bear','bob','gifts-channel',1);
     INSERT INTO notifications(id,userId,actorId,kind,targetId,created) VALUES('channel-gift','alice','bob','gift','channel-gift',1);
   `);
-  const list = await (await f.notificationsGet('notifications', 'alice')).json();
+  const list = await (
+    await f.notificationsGet('notifications', 'alice')
+  ).json();
   assert.equal(list.length, 1);
   assert.equal(list[0].giftRecipient, 'gifts-channel');
   assert.equal(

@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { request } from '@/lib/client';
 import { roomAction } from '@/lib/rooms-client';
+import { ChatNotificationsItem } from './chat-notifications';
 
 export function ArchiveRow({
   owner,
@@ -40,6 +41,7 @@ export function ArchiveRow({
   }, []);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
   const move = async () => {
     if (locked.current) return;
     locked.current = true;
@@ -72,7 +74,7 @@ export function ArchiveRow({
   return (
     <div className="archive-row-wrap">
       {children}
-      <DropdownMenu>
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger
           className="icon-button archive-row-menu"
           aria-label="Действия с чатом"
@@ -81,6 +83,13 @@ export function ArchiveRow({
           <MoreHorizontal size={16} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="room-menu">
+          {kind === 'person' && menuOpen && (
+            <ChatNotificationsItem
+              key={owner + ':' + id}
+              owner={owner}
+              peer={id}
+            />
+          )}
           <DropdownMenuItem onClick={() => void move()}>
             {archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}{' '}
             {archived ? 'Вернуть из архива' : 'В архив'}

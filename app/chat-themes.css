@@ -289,3 +289,10 @@
     gap: 13px 8px;
   }
 }
+.chat-notifications-error {
+  max-width: 270px;
+  margin: 4px 8px;
+  color: #eabcbc;
+  font-size: 12px;
+  line-height: 1.4;
+}

@@ -7,6 +7,7 @@ import { assertReadable, visibleAccount } from './account-access';
 import { published, sqlNow } from './channel-access';
 import { messageVisible } from './chat-access';
 import { callAllowed } from './calls';
+import { directNotificationAllowed } from './direct-notification-policy';
 
 export function validPushEndpoint(endpoint: string) {
   const u = new URL(endpoint),
@@ -77,7 +78,7 @@ export async function removePushDevice(me?: string) {
       .run();
 }
 function notificationVisible() {
-  return `${visibleAccount('u')} AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE (b.blocker=n.userId AND b.blocked IN(u.id,u.ownerId)) OR (b.blocker IN(u.id,u.ownerId) AND b.blocked=n.userId))
+  return `${visibleAccount('u')} AND ${directNotificationAllowed()} AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE (b.blocker=n.userId AND b.blocked IN(u.id,u.ownerId)) OR (b.blocker IN(u.id,u.ownerId) AND b.blocked=n.userId))
     AND ((n.kind='message' AND EXISTS(SELECT 1 FROM messages m WHERE m.id=n.targetId AND m.recipient=n.userId AND ${messageVisible('m', 'n.userId')}))
       OR (n.kind='gift' AND EXISTS(SELECT 1 FROM received_gifts g JOIN users gr ON gr.id=g.recipient
         WHERE g.id=n.targetId AND g.sender=n.actorId AND ${visibleAccount('gr')}
@@ -249,7 +250,7 @@ export async function flushPush(notificationId?: string) {
       .run();
   await d
     .prepare(`INSERT OR IGNORE INTO push_deliveries(notificationId,subscriptionId)
-    SELECT n.id,s.id FROM notifications n JOIN push_subscriptions s ON s.userId=n.userId WHERE n.created>=s.created AND n.created>? AND s.expiresAt>? AND n.read=0${targeted ? ' AND n.id=?' : ''}`)
+    SELECT n.id,s.id FROM notifications n JOIN push_subscriptions s ON s.userId=n.userId WHERE n.created>=s.created AND n.created>? AND s.expiresAt>? AND n.read=0 AND ${directNotificationAllowed()}${targeted ? ' AND n.id=?' : ''}`)
     .bind(now - 86400000, now, ...(targeted ? [notificationId] : []))
     .run();
   const rows = await d

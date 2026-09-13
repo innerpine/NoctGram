@@ -176,6 +176,9 @@ function fixture(t) {
       './channel-access': channel,
       './chat-access': chat,
       './calls': { callAllowed },
+      './direct-notification-policy': evaluate(
+        source('lib/direct-notification-policy.ts'),
+      ),
     },
     {
       Date: Clock,
@@ -447,6 +450,58 @@ void test('global flush still prioritizes calls and performs cleanup without par
       )
       .get().n,
     0,
+  );
+});
+
+await test('muted direct messages never enqueue, queued alerts are skipped, and resuming does not deliver a backlog', async (t) => {
+  const f = fixture(t);
+  f.subscription();
+  const message = (id, actor = 'alice', created = NOW) => {
+    f.sql
+      .prepare(
+        "INSERT INTO messages(id,sender,recipient,text,created) VALUES(?,?,'bob','Private',?)",
+      )
+      .run(id, actor, created);
+    f.sql
+      .prepare(
+        "INSERT INTO notifications(id,userId,actorId,kind,targetId,created) VALUES(?,'bob',?,'message',?,?)",
+      )
+      .run('message:' + id, actor, id, created);
+  };
+  message('queued');
+  f.sql.exec(
+    "INSERT INTO push_deliveries(notificationId,subscriptionId) VALUES('message:queued','sub-0'); INSERT INTO direct_chat_notifications(userId,peerId,muted,updated) VALUES('bob','alice',1,0)",
+  );
+  assert.equal((await f.notifications.flushPush('message:queued')).sent, 0);
+  assert.equal(f.deliveries()[0].state, 'skipped');
+  message('muted');
+  assert.equal((await f.notifications.flushPush('message:muted')).sent, 0);
+  assert.equal(f.deliveries().length, 1);
+  message('other-peer', 'mallory');
+  assert.equal((await f.notifications.flushPush('message:other-peer')).sent, 1);
+  f.call();
+  assert.equal(
+    (await f.notifications.flushPush('call:target')).sent,
+    1,
+    'Incoming calls stay enabled',
+  );
+  f.sql
+    .prepare(
+      "UPDATE direct_chat_notifications SET muted=0,updated=? WHERE userId='bob'",
+    )
+    .run(NOW);
+  assert.equal(
+    (await f.notifications.flushPush('message:muted')).sent,
+    0,
+    'No backlog after unmuting',
+  );
+  f.clock.now = NOW + 1;
+  message('new', 'alice', NOW + 1);
+  assert.equal((await f.notifications.flushPush('message:new')).sent, 1);
+  assert.equal(
+    f.sql.prepare('SELECT COUNT(*) n FROM messages WHERE read=0').get().n,
+    4,
+    'All messages and unread markers survive',
   );
 });
 

@@ -1354,6 +1354,25 @@ export const directChatArchives = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.peerId] })],
 );
 
+export const directChatNotifications = sqliteTable(
+  'direct_chat_notifications',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    peerId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    muted: integer().notNull().default(0),
+    updated: integer().notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.peerId] }),
+    check('direct_chat_notifications_muted', sql`${t.muted} IN (0,1)`),
+    check('direct_chat_notifications_peer', sql`${t.userId}<>${t.peerId}`),
+  ],
+);
+
 export const paymentOrders = sqliteTable(
   'payment_orders',
   {

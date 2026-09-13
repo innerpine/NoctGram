@@ -2966,6 +2966,8 @@ export default function Noctgram({
                     </button>
                     <ChatThemeMenu
                       key={'chat-theme:' + myId + ':' + peer.id}
+                      owner={myId || ''}
+                      peer={peer.id}
                       value={currentChatTheme}
                       canShare={!readOnly && !!messageAccess?.allowed}
                       onRefresh={() => {

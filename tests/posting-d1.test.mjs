@@ -163,6 +163,11 @@ function sqlFunction(file, name, bindings) {
   )(...Object.values(bindings));
 }
 const pushSqlHelpers = {
+  directNotificationAllowed: sqlFunction(
+    'lib/direct-notification-policy.ts',
+    'directNotificationAllowed',
+    {},
+  ),
   ...load('lib/channel-access.ts'),
   visibleAccount: load('lib/account-access.ts').visibleAccount,
   messageVisible: load('lib/chat-access.ts').messageVisible,

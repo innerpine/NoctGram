@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { ChatNotificationsItem } from './chat-notifications';
 import {
   Check,
   EllipsisVertical,
@@ -27,11 +28,15 @@ import {
 } from '@/lib/chat-themes';
 
 export function ChatThemeMenu({
+  owner,
+  peer,
   value,
   canShare,
   onRefresh,
   onSave,
 }: {
+  owner: string;
+  peer: string;
   value: ChatThemeState;
   canShare: boolean;
   onRefresh: () => void;
@@ -41,6 +46,7 @@ export function ChatThemeMenu({
   ) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [selected, setSelected] = useState<ChatThemeId>('noct');
   const [scope, setScope] = useState<'personal' | 'shared'>('personal');
   const [saving, setSaving] = useState(false);
@@ -64,7 +70,7 @@ export function ChatThemeMenu({
   };
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger
           className="icon-button chat-more"
           aria-label="Меню диалога"
@@ -73,6 +79,13 @@ export function ChatThemeMenu({
           <EllipsisVertical size={19} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="chat-options-menu">
+          {menuOpen && (
+            <ChatNotificationsItem
+              key={owner + ':' + peer}
+              owner={owner}
+              peer={peer}
+            />
+          )}
           <DropdownMenuItem
             onClick={() => {
               setSelected(value.personal || value.shared);
