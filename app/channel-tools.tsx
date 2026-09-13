@@ -113,7 +113,7 @@ export function ChannelTools({
   return (
     <>
       <div className="channel-tools">
-        {profile.kind === 'channel' && profile.canManagePosts && actorId && (
+        {profile.kind === 'channel' && actorId && profile.ownerId === actorId && (
           <GiveawayCreateButton
             targetKind="channel"
             targetId={profile.id}

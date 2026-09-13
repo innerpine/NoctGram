@@ -443,7 +443,7 @@ export function RoomConversation({
         ) : (
           <strong>{loading ? 'Открываем чат…' : 'Чат недоступен'}</strong>
         )}
-        {room?.kind === 'group' && room.role !== 'member' && (
+        {room?.kind === 'group' && (
           <GiveawayCreateButton
             targetKind="group"
             targetId={room.id}
