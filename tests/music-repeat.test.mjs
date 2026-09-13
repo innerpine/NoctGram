@@ -198,9 +198,25 @@ void test('repeat control is shared, persists, and works when storage is unavail
   };
   run(toggle, env);
   assert.equal(env.state, true);
-  env.roomRef.current = { detail: {} };
+  const sharedCommands = [];
+  env.roomRef.current = {
+    detail: { playback: { repeatOne: 0 } },
+    command: (command, extra) => sharedCommands.push([command, extra.enabled]),
+  };
   run(toggle, env);
+  assert.deepEqual(sharedCommands, [['repeat', true]]);
+  env.roomRef.current.detail.playback.repeatOne = 1;
+  run(toggle, env);
+  assert.deepEqual(sharedCommands, [
+    ['repeat', true],
+    ['repeat', false],
+  ]);
   assert.equal(env.state, true);
+  assert.equal(
+    env.repeatOneRef.current,
+    true,
+    'Shared repeat must not overwrite the personal preference',
+  );
   let clicked = 0;
   const ui = {
     p: {
@@ -233,6 +249,10 @@ void test('repeat control is shared, persists, and works when storage is unavail
   );
   assert.equal(button.type, 'button');
   assert.equal(button.props['aria-pressed'], true);
+  assert.ok(
+    !button.props.disabled,
+    'Repeat remains available in a shared player',
+  );
   assert.equal(button.children[0].type, 'Repeat1');
   button.props.onClick();
   assert.equal(clicked, 1);

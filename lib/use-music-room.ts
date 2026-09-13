@@ -36,6 +36,7 @@ export type MusicRoom = {
   detail: PlaylistDetail | null;
   error: string;
   busy: boolean; // Connecting only; ordinary playback commands keep controls usable.
+  repeatPending: boolean;
   join: (playlist: PlaylistDetail, trackId?: string) => Promise<void>;
   leave: () => void;
   command: (command: string, extra?: Record<string, unknown>) => Promise<void>;
@@ -47,6 +48,8 @@ export function useMusicRoom(engine: Engine): MusicRoom {
   const [detail, setDetail] = useState<PlaylistDetail | null>(null);
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
+  const [repeatPending, setRepeatPending] = useState(false);
+  const repeatRequest = useRef<RoomCommand | null>(null);
   const current = useRef<PlaylistDetail | null>(null),
     session = useRef('');
   const timing = useRef({ received: 0, server: 0 });
@@ -110,8 +113,8 @@ export function useMusicRoom(engine: Engine): MusicRoom {
     const { command, extra, version, roomId, seek } = request;
     locked.current = request;
     try {
-      // A concurrent command can win the revision race. Retry a seek once, but
-      // only for the same track and only if a newer local seek hasn't replaced it.
+      // Retry explicit seek/repeat intent once after a revision conflict.
+      // Automatic end events must never retry and advance the room twice.
       for (let attempt = 0; attempt < 2; attempt++) {
         const room = current.current;
         if (version !== generation.current || room?.id !== roomId) return;
@@ -149,13 +152,17 @@ export function useMusicRoom(engine: Engine): MusicRoom {
           if (version !== generation.current) return;
           if ((e as { status: number }).status !== 409) throw e;
           await refresh();
-          if (!seek || attempt > 0) return;
+          if ((!seek && command !== 'repeat') || attempt > 0) return;
         }
       }
     } catch (e) {
       if (version !== generation.current) return;
       setError((e as Error).message);
     } finally {
+      if (repeatRequest.current === request) {
+        repeatRequest.current = null;
+        setRepeatPending(false);
+      }
       if (seek === seeking.current) seeking.current = null;
       if (locked.current === request) {
         locked.current = null;
@@ -178,6 +185,11 @@ export function useMusicRoom(engine: Engine): MusicRoom {
       session: session.current,
       version: generation.current,
     };
+    if (command === 'repeat') {
+      if (repeatRequest.current || typeof extra.enabled !== 'boolean') return;
+      repeatRequest.current = request;
+      setRepeatPending(true);
+    }
     // A local pause should stop the audio immediately, even on a slow network.
     // Reconciliation resumes after the command succeeds or fails.
     if (command === 'pause' && latest.current.playing)
@@ -219,6 +231,8 @@ export function useMusicRoom(engine: Engine): MusicRoom {
     generation.current++;
     pending.current = [];
     locked.current = null;
+    repeatRequest.current = null;
+    setRepeatPending(false);
     seeking.current = null;
     current.current = null;
     setDetail(null);
@@ -435,7 +449,7 @@ export function useMusicRoom(engine: Engine): MusicRoom {
     };
   }, []);
   return useMemo(
-    () => ({ detail, error, busy, ...controls }),
-    [detail, error, busy, controls],
+    () => ({ detail, error, busy, repeatPending, ...controls }),
+    [detail, error, busy, repeatPending, controls],
   );
 }

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 import { checkMusicRoom } from './music-room-harness.mjs';
+import { checkPlaylistRepeat } from './music-playlist-repeat-harness.mjs';
 
 const sqlite = new DatabaseSync(':memory:');
 const journal = JSON.parse(
@@ -640,6 +641,7 @@ await api.changePlaylist(
   { action: 'delete', id: orderedId },
   now + 400025,
 );
+await checkPlaylistRepeat(api, now + 1000000);
 sqlite.close();
 delete globalThis.__activityDb;
 console.log(

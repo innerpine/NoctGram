@@ -119,6 +119,7 @@ export async function readPlaylist(
     playback: {
       trackId: row.trackId,
       playing: row.playing,
+      repeatOne: row.repeatOne,
       positionMs: row.positionMs,
       durationMs: row.durationMs,
       playbackAt: row.playbackAt,
@@ -392,7 +393,8 @@ export async function changePlaylist(
     let trackId = row.trackId,
       position = roomPosition(row, now),
       duration = row.durationMs,
-      playing = row.playing;
+      playing = row.playing,
+      repeatOne = row.repeatOne;
     if (command === 'play' || command === 'advance') {
       const tracks = (
         await db()
@@ -405,10 +407,12 @@ export async function changePlaylist(
       const next =
         command === 'play'
           ? tracks.find((t) => t.id === body.trackId)
-          : tracks[
-              (tracks.findIndex((t) => t.id === row.trackId) + 1) %
-                tracks.length
-            ];
+          : repeatOne
+            ? tracks.find((t) => t.id === row.trackId)
+            : tracks[
+                (tracks.findIndex((t) => t.id === row.trackId) + 1) %
+                  tracks.length
+              ];
       if (!next) throw new ApiError(400, 'Добавьте песню в плейлист');
       if (
         command === 'advance' &&
@@ -419,8 +423,13 @@ export async function changePlaylist(
         throw new ApiError(409, 'Песня ещё играет');
       trackId = next.id;
       position = 0;
-      duration = next.durationMs || 0;
+      duration =
+        next.durationMs || (next.id === row.trackId ? row.durationMs : 0);
       playing = 1;
+    } else if (command === 'repeat') {
+      if (typeof body.enabled !== 'boolean')
+        throw new ApiError(400, 'Некорректная настройка повтора');
+      repeatOne = body.enabled ? 1 : 0;
     } else if (command === 'pause') {
       playing = 0;
     } else if (command === 'resume') {
@@ -440,13 +449,15 @@ export async function changePlaylist(
         duration = input;
       }
     } else throw new ApiError(400, 'Неизвестная команда');
-    if (!trackId) throw new ApiError(400, 'Сначала выберите песню');
+    if (!trackId && command !== 'repeat')
+      throw new ApiError(400, 'Сначала выберите песню');
     const result = await db()
-      .prepare(`UPDATE music_playlists SET trackId=?,playing=?,positionMs=?,durationMs=?,playbackAt=?,revision=revision+1
+      .prepare(`UPDATE music_playlists SET trackId=?,playing=?,repeatOne=?,positionMs=?,durationMs=?,playbackAt=?,revision=revision+1
       WHERE id=? AND revision=? AND ${allowed} AND EXISTS(SELECT 1 FROM music_playlist_members WHERE playlistId=? AND userId=? AND listenSession=? AND listenUntil>?)`)
       .bind(
         trackId,
         playing,
+        repeatOne,
         Math.round(position),
         Math.round(duration),
         now,

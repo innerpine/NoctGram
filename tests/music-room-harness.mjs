@@ -530,8 +530,86 @@ export async function checkMusicRoom(api, start) {
       [],
       'Reordering a playing room never seeks, pauses or restarts its current song',
     );
+    // A queued repeat keeps only its own button busy until the actual ack.
+    const releaseRepeatSeek = delayControl('seek');
+    const repeatSeek = output.command('seek', { positionMs: 5000 });
+    await flush();
+    await output.command('repeat', { enabled: true });
+    await flush();
+    assert.equal(output.repeatPending, true);
+    assert.equal(output.busy, false);
+    await output.command('repeat', { enabled: false });
+    releaseRepeatSeek();
+    await repeatSeek;
+    await flush();
+    assert.equal(output.repeatPending, false);
+    assert.equal(output.detail.playback.repeatOne, 1);
+    assert.equal(
+      requests.filter((r) => r.command === 'repeat').length,
+      1,
+      'A pending repeat cannot be sent twice',
+    );
+
+    // A concurrent metadata update must not swallow a listener's repeat command.
+    const beforeRepeat = calls.length;
+    const releaseRepeat = delayControl('repeat');
+    const repeatOff = output.command('repeat', { enabled: false });
+    await flush();
+    await control('duration', { durationMs: 120000 });
+    releaseRepeat();
+    await repeatOff;
+    await flush();
+    await step(2000);
+    assert.equal(output.detail.playback.repeatOne, 0);
+    assert.equal(output.repeatPending, false);
+    assert.deepEqual(
+      calls.slice(beforeRepeat),
+      [],
+      'A repeat toggle never seeks or restarts aligned audio',
+    );
+    await output.command('repeat', { enabled: true });
+    await flush();
+    await output.command('seek', { positionMs: 119999 });
+    const playsBeforeLoop = calls.filter((c) => c[0] === 'play').length;
+    await step(1000);
+    await step(1000);
+    assert.equal(output.detail.playback.trackId, 'first');
+    assert.equal(engine.url, 'https://soundcloud.com/test/first');
+    assert.ok(
+      engine.position < 3000,
+      'All listeners seek into the restarted timeline',
+    );
+    assert.equal(
+      calls.filter((c) => c[0] === 'play').length,
+      playsBeforeLoop,
+      'Repeat reuses the loaded audio engine',
+    );
+    await control('repeat', { enabled: false });
+    await step(2000);
+    assert.equal(
+      output.detail.playback.repeatOne,
+      0,
+      'Another listener can disable repeat',
+    );
+    await output.command('seek', { positionMs: 119999 });
+    await step(1000);
+    await step(1000);
+    assert.equal(output.detail.playback.trackId, 'second');
+    assert.equal(engine.url, 'https://soundcloud.com/test/second');
+    const releaseObsoleteRepeat = delayControl('repeat');
+    const obsoleteRepeat = output.command('repeat', { enabled: true });
+    await flush();
     output.leave();
     await flush();
+    assert.equal(output.repeatPending, false);
+    releaseObsoleteRepeat();
+    await obsoleteRepeat;
+    await flush();
+    assert.equal(
+      output.detail,
+      null,
+      'A late repeat response cannot reopen a departed room',
+    );
     await api.changePlaylist('alice', { action: 'delete', id }, now);
     console.log(
       'Shared room hook: uninterrupted startup and metadata updates, small remote seeks, drift correction, delayed seeks, responsive controls, CAS retry, track changes, pause/resume and leave verified against real API/SQLite.',

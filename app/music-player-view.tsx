@@ -661,7 +661,7 @@ export function MusicPlayerView(p: Props) {
         aria-pressed={p.repeatOne}
         title={
           p.repeatDisabled
-            ? 'Повтор доступен при личном прослушивании'
+            ? 'Сохраняем настройку повтора…'
             : p.repeatOne
               ? 'Выключить повтор трека'
               : 'Повторять этот трек'

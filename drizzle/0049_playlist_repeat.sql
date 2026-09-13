@@ -1,0 +1,1 @@
+ALTER TABLE `music_playlists` ADD `repeatOne` integer DEFAULT 0 NOT NULL;

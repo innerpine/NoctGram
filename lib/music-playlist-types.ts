@@ -29,6 +29,7 @@ export type PlaylistDetail = {
   playback: {
     trackId: string | null;
     playing: number;
+    repeatOne: number;
     positionMs: number;
     durationMs: number;
     playbackAt: number;

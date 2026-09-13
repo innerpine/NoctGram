@@ -694,6 +694,7 @@ export const musicPlaylists = sqliteTable(
     updatedAt: integer().notNull(),
     trackId: text().references(() => musicTracks.id, { onDelete: 'set null' }),
     playing: integer().notNull().default(0),
+    repeatOne: integer().notNull().default(0),
     positionMs: integer().notNull().default(0),
     durationMs: integer().notNull().default(0),
     playbackAt: integer().notNull().default(0),

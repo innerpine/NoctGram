@@ -171,7 +171,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   const toggleRepeatOne = () => {
-    if (roomRef.current?.detail) return;
+    const shared = roomRef.current;
+    if (shared?.detail) {
+      void shared.command('repeat', {
+        enabled: !shared.detail.playback.repeatOne,
+      });
+      return;
+    }
     const value = !repeatOneRef.current;
     repeatOneRef.current = value;
     setRepeatOne(value);
@@ -1418,8 +1424,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             onSelect={select}
             onReorder={reorderQueue}
             onToggle={togglePlayer}
-            repeatOne={repeatOne && !room.detail}
-            repeatDisabled={!!room.detail}
+            repeatOne={
+              room.detail ? !!room.detail.playback.repeatOne : repeatOne
+            }
+            repeatDisabled={room.repeatPending}
             onRepeat={toggleRepeatOne}
             onSeek={seekPlayer}
             onVolume={changeVolume}
