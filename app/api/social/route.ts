@@ -122,7 +122,15 @@ export async function GET(req: Request) {
           .bind(me, me, me)
           .all(),
         profile(me, me),
-        feed(me, 'all', '', '', Date.now() + 1),
+        s.get('feed') === '0'
+          ? Promise.resolve([])
+          : feed(
+              me,
+              s.get('mode') === 'following' ? 'following' : 'all',
+              '',
+              '',
+              Date.now() + 1,
+            ),
       ]);
       return Response.json({
         me: account,

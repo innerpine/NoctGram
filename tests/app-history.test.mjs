@@ -578,3 +578,40 @@ void test('failed restoration keeps the displayed view and URL consistent; dispo
   assert.equal(disposed.commits.length, 0);
   assert.equal(await disposed.controller.navigate({ page: 'music' }), false);
 });
+
+void test('reload waits for its destination without committing the default feed', async () => {
+  const slow = deferred();
+  const f = fixture('/?profile=alice&tab=media', () => slow.promise);
+  await tick();
+  assert.equal(f.commits.length, 0);
+  assert.equal(f.host.location.search, '?profile=alice&tab=media');
+  slow.resolve({
+    page: 'profile',
+    profileId: 'user-alice',
+    handle: 'alice',
+    profileTab: 'media',
+  });
+  assert.equal(await f.controller.ready, true);
+  assert.deepEqual(
+    f.commits.map((route) => route.page),
+    ['profile'],
+  );
+  assert.equal(f.ui.profileTab, 'media');
+});
+
+void test('a failed initial reload retains the target URL so retry opens the same section', async () => {
+  for (const href of [
+    '/?profile=alice&tab=gifts',
+    '/?chat=alice',
+    '/?room=group-1',
+    '/music?tab=library',
+  ]) {
+    const f = fixture(href, () => {
+      throw new Error('Temporary connection failure');
+    });
+    assert.equal(await f.controller.ready, false);
+    assert.equal(f.host.location.pathname + f.host.location.search, href);
+    assert.equal(f.commits.length, 0);
+    assert.deepEqual(f.errors, ['Temporary connection failure']);
+  }
+});

@@ -48,6 +48,7 @@ import {
 } from 'react';
 import {
   createAppHistory,
+  appRouteFromURL,
   appRouteHref,
   type AppRoute,
   type PreparedRoute,
@@ -131,7 +132,6 @@ import { SignOutButton } from './sign-out-button';
 import {
   request,
   upload,
-  welcome,
   type Person,
   type Profile,
   type Media,
@@ -235,7 +235,7 @@ export default function Noctgram({
     [me, setMe] = useState<Profile | null>(null),
     [profile, setProfile] = useState<Profile | null>(null),
     [people, setPeople] = useState<Person[]>([]),
-    [posts, setPosts] = useState<Post[]>(welcome),
+    [posts, setPosts] = useState<Post[]>([]),
     [mode, setMode] = useState('all'),
     [profileTab, setProfileTab] = useState('posts'),
     [query, setQuery] = useState(''),
@@ -254,6 +254,9 @@ export default function Noctgram({
     [lightbox, setLightbox] = useState<Media | null>(null),
     [lightboxOpen, setLightboxOpen] = useState(false),
     [hasMore, setHasMore] = useState(false);
+  const [routeReady, setRouteReady] = useState(false),
+    [routeError, setRouteError] = useState('');
+  const startupComplete = useRef(false);
   useEffect(() => {
     setPageState(initialPage);
   }, [initialPage]);
@@ -506,16 +509,50 @@ export default function Noctgram({
   const bootstrap = useCallback(async () => {
     setLoading(true);
     setLoadError('');
+    const initial = appRouteFromURL(window.location.href, '');
+    setPageState(initial.page);
+    setMode(initial.mode || 'all');
+    setProfileTab(initial.profileTab || 'posts');
+    setMusicTab(initial.musicTab || 'playlists');
+    setQuery(initial.query || '');
+    // Fetch the selected section's code alongside the account, not after it.
+    const panel =
+      initial.page === 'music'
+        ? MusicPanel
+        : initial.page === 'music-services'
+          ? MusicServices
+          : initial.page === 'channels'
+            ? ChannelsPanel
+            : initial.page === 'premium'
+              ? PremiumPanel
+              : initial.page === 'stars'
+                ? StarsPanel
+                : initial.page === 'moderation'
+                  ? ModerationPanel
+                  : initial.page === 'messages'
+                    ? initial.peerId
+                      ? ChatConversation
+                      : RoomConversation
+                    : null;
+    void panel?.preload().catch(() => {});
+    const includeFeed = initial.page === 'feed';
     try {
       const r = await request<{ me: Profile; people: Person[]; posts: Post[] }>(
-        '?action=bootstrap',
+        '?' +
+          new URLSearchParams({
+            action: 'bootstrap',
+            feed: includeFeed ? '1' : '0',
+            mode: initial.mode || 'all',
+          }),
       );
-      bootstrapFeed.current = feedKey(r.me.id, 'feed', 'all', '');
+      bootstrapFeed.current = includeFeed
+        ? feedKey(r.me.id, 'feed', initial.mode || 'all', '')
+        : '';
       setMe(r.me);
       setProfile(r.me);
       setPeople(r.people);
-      setPosts(r.posts);
-      setPostsKey(feedKey(r.me.id, 'feed', 'all', ''));
+      setPosts(includeFeed ? r.posts : []);
+      setPostsKey(bootstrapFeed.current);
       setGuest(false);
     } catch (e) {
       if ((e as Error).message.startsWith('Войдите')) setGuest(true);
@@ -705,6 +742,7 @@ export default function Noctgram({
     latestRefresh.current = refresh;
   }, [refresh]);
   useEffect(() => {
+    if (!routeReady) return;
     const preparedFeed = bootstrapFeed.current;
     if (myId) bootstrapFeed.current = '';
     if (
@@ -749,6 +787,7 @@ export default function Noctgram({
       version.current++;
     };
   }, [
+    routeReady,
     myId,
     page,
     query,
@@ -773,7 +812,7 @@ export default function Noctgram({
   useEffect(() => {
     if (!myId || !privacyVersion) return;
     let active = true;
-    request<{ me: Profile; people: Person[] }>('?action=bootstrap')
+    request<{ me: Profile; people: Person[] }>('?action=bootstrap&feed=0')
       .then((r) => {
         if (active) {
           setPeople(r.people);
@@ -1088,13 +1127,21 @@ export default function Noctgram({
         (next.handle || next.profileRef) &&
         !next.profileId
       ) {
-        const resolved = await resolveMention(
-          next.handle || next.profileRef!,
-          !next.handle,
-        );
-        if (resolved.kind === 'group')
-          next = { page: 'messages', group: resolved.group };
-        else person = resolved.profile;
+        const ref = next.handle || next.profileRef!;
+        if (
+          me &&
+          (ref === me.id ||
+            [me.handle, ...me.handles].includes(
+              ref.replace(/^@/, '').toLowerCase(),
+            ))
+        ) {
+          person = me;
+        } else {
+          const resolved = await resolveMention(ref, !next.handle);
+          if (resolved.kind === 'group')
+            next = { page: 'messages', group: resolved.group };
+          else person = resolved.profile;
+        }
       }
       if (next.page === 'profile') {
         const id =
@@ -1229,8 +1276,21 @@ export default function Noctgram({
       initial: navigationLatest.current!.route,
       prepare: (next) => navigationLatest.current!.prepare(next),
       render: (from, to, update, initial) =>
-        motion.run(from.page, to.page, update, !initial),
-      error: (message) => navigationLatest.current!.notify(message),
+        motion.run(
+          from.page,
+          to.page,
+          () => {
+            update();
+            startupComplete.current = true;
+            setRouteError('');
+            setRouteReady(true);
+          },
+          !initial,
+        ),
+      error: (message) => {
+        if (!startupComplete.current) setRouteError(message);
+        else navigationLatest.current!.notify(message);
+      },
     });
     appHistory.current = history;
     return () => {
@@ -1241,6 +1301,7 @@ export default function Noctgram({
     };
   }, [myId, guest]);
   useEffect(() => {
+    if (!routeReady) return;
     appHistory.current?.observe({
       page,
       musicTab,
@@ -1253,6 +1314,7 @@ export default function Noctgram({
       query,
     });
   }, [
+    routeReady,
     page,
     viewedId,
     profile?.id,
@@ -1266,9 +1328,10 @@ export default function Noctgram({
   ]);
   const profileView = page === 'profile' ? viewedId : '';
   useLayoutEffect(() => {
+    if (!routeReady) return;
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     if (page === 'search') searchRef.current?.focus({ preventScroll: true });
-  }, [page, profileView]);
+  }, [page, profileView, routeReady]);
   const openProfile = async (id: string, tab = 'posts') => {
     if (!auth()) return false;
     return (
@@ -1943,6 +2006,40 @@ export default function Noctgram({
     chatAppearance.peer === peer?.id
       ? chatAppearance.value
       : DEFAULT_CHAT_THEME;
+  if (!routeReady) {
+    const error = routeError || loadError;
+    return (
+      <main className="app-startup" aria-busy={!error}>
+        <div className="app-startup-brand">
+          <NoctLogo size={42} /> noctgram
+        </div>
+        {error ? (
+          <div className="app-startup-error" role="alert">
+            <p>{error}</p>
+            <button
+              className="secondary"
+              onClick={() => window.location.reload()}
+            >
+              Повторить
+            </button>
+            {guest && (
+              <a className="secondary" href="/login">
+                Войти
+              </a>
+            )}
+            <a className="text-button" href="/">
+              На главную
+            </a>
+          </div>
+        ) : (
+          <output className="app-startup-status">
+            <LoaderCircle size={18} className="spin" aria-hidden="true" />{' '}
+            Загрузка…
+          </output>
+        )}
+      </main>
+    );
+  }
   return (
     <div
       className={

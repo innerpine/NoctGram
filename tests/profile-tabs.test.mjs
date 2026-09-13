@@ -184,7 +184,19 @@ try {
     premium: false,
   });
   // The first state group is page, me, profile, people, posts, mode, profileTab.
-  render();
+  const startup = render();
+  assert.equal(startup.props.className, 'app-startup');
+  assert.equal(
+    all(startup, 'PostCard').length,
+    0,
+    'Startup must not display fabricated posts or the default feed',
+  );
+  assert.equal(
+    all(startup, 'ProfileGifts').length,
+    0,
+    'No unrelated section mounts before route restoration',
+  );
+  states.set(stateSlots.get('routeReady'), true);
   states.set(0, 'profile');
   for (const me of [account('local_music_friend'), account('local_seedy')]) {
     states.set(1, me);

@@ -252,7 +252,9 @@ export function createAppHistory(
       if (disposed || generation !== version) return false;
       pending = false;
       settling = '';
-      if (mode === 'replace') write('replace', active);
+      // A failed reload must retain its destination for Retry, not replace it
+      // with the default feed before that destination has ever been displayed.
+      if (mode === 'replace' && !initial) write('replace', active);
       options.error(
         error instanceof Error ? error.message : 'Не удалось открыть раздел',
       );
