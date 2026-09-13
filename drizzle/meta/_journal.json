@@ -288,6 +288,13 @@
       "when": 1789219173334,
       "tag": "0041_gift_conversions",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1789313240331,
+      "tag": "0044_giveaways",
+      "breakpoints": true
     }
   ]
 }

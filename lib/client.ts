@@ -59,6 +59,7 @@ export type Profile = Person & {
 };
 export type Media = { id: string; type: string; name: string; url?: string };
 export type Post = Appearance & {
+  giveawayId?: string | null;
   publishAt?: number;
   publisherId?: string;
   cancelledAt?: number;

@@ -23,6 +23,7 @@ import { request, type Person } from '@/lib/client';
 import { Avatar } from './post-card';
 type NotificationRow = Person & {
   actorId: string;
+  giftRecipient?: string | null;
   kind: string;
   targetId: string;
   created: number;
@@ -174,7 +175,7 @@ export function NotificationsBell({
   me: string;
   onPost: (id: string) => void;
   onChat: (id: string) => void;
-  onGift: () => void;
+  onGift: (recipient?: string) => void;
 }) {
   const [rows, setRows] = useState<NotificationRow[]>([]),
     [unread, setUnread] = useState(0),
@@ -267,7 +268,8 @@ export function NotificationsBell({
                         className="notification-open"
                         onClick={() => {
                           setOpen(false);
-                          if (n.kind === 'gift') onGift();
+                          if (n.kind === 'gift')
+                            onGift(n.giftRecipient || undefined);
                           else if (n.kind === 'post') onPost(n.targetId);
                           else onChat(n.actorId);
                         }}
@@ -282,7 +284,9 @@ export function NotificationsBell({
                           <MessageCircle size={13} />
                         )}{' '}
                         {n.kind === 'gift'
-                          ? 'Новый подарок'
+                          ? n.giftRecipient && n.giftRecipient !== me
+                            ? 'Подарок твоему каналу'
+                            : 'Новый подарок'
                           : n.kind === 'call'
                             ? 'Аудиозвонок'
                             : n.kind === 'post'

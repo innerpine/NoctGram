@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { request, type Person, type Profile, type Post } from '@/lib/client';
 import { Avatar } from './post-card';
+import { GiveawayCreateButton } from './giveaway-create';
 export function localDate(value = Date.now() + 3600000) {
   const date = new Date(value);
   return new Date(value - date.getTimezoneOffset() * 60000)
@@ -22,9 +23,13 @@ export function localDate(value = Date.now() + 3600000) {
 export function ChannelTools({
   profile,
   revision = 0,
+  actorId,
+  onCreated,
 }: {
   profile: Profile;
   revision?: number;
+  actorId?: string;
+  onCreated?: () => void;
 }) {
   const [panel, setPanel] = useState(''),
     [open, setOpen] = useState(false),
@@ -108,6 +113,15 @@ export function ChannelTools({
   return (
     <>
       <div className="channel-tools">
+        {profile.kind === 'channel' && profile.canManagePosts && actorId && (
+          <GiveawayCreateButton
+            targetKind="channel"
+            targetId={profile.id}
+            targetName={profile.name}
+            actorId={actorId}
+            onCreated={onCreated}
+          />
+        )}
         <button className="secondary" onClick={() => launch('queue')}>
           <Clock3 size={15} /> Отложенные
         </button>

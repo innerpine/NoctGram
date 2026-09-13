@@ -263,7 +263,11 @@ export function StarsPanel({
         {!wallet && loading && <p className="meta">Загружаем баланс…</p>}
         {rows.map((t) => (
           <div className="star-transaction" key={t.id}>
-            {t.kind === 'gift_conversion' ? (
+            {t.kind.startsWith('giveaway_') ? (
+              <span className="transaction-grant" aria-hidden="true">
+                <StarsIcon size={26} />
+              </span>
+            ) : t.kind === 'gift_conversion' ? (
               <span className="transaction-grant" aria-hidden="true">
                 <Gift size={23} />
               </span>
@@ -296,7 +300,13 @@ export function StarsPanel({
             )}
             <div>
               <strong>
-                {t.kind === 'gift_conversion' ? (
+                {t.kind === 'giveaway_debit' ? (
+                  'Оплата розыгрыша'
+                ) : t.kind === 'giveaway_prize' ? (
+                  'Победа в розыгрыше'
+                ) : t.kind === 'giveaway_refund' ? (
+                  'Возврат за розыгрыш'
+                ) : t.kind === 'gift_conversion' ? (
                   'Продажа подарка'
                 ) : t.kind === 'gift_upgrade' ? (
                   'Улучшение подарка'
@@ -319,29 +329,35 @@ export function StarsPanel({
                 )}
               </strong>
               <span>
-                {t.kind === 'gift_conversion'
-                  ? giftDefinition(t.giftId)?.name || 'Подарок'
-                  : t.kind === 'gift_upgrade'
-                    ? (giftDefinition(t.giftId)?.name ||
-                        'Коллекционный подарок') +
-                      (t.giftNumber ? ' #' + t.giftNumber : '')
-                    : t.kind === 'purchase'
-                      ? 'Оплата подтверждена'
-                      : t.kind === 'purchase_refund'
-                        ? 'Сумма возвращена через платёжный сервис'
-                        : t.kind === 'gift'
-                          ? 'Подарок «' +
-                            (giftDefinition(t.giftId)?.name || 'Подарок') +
-                            '»'
-                          : t.kind === 'admin_grant'
-                            ? 'Начислено администратором'
-                            : t.kind === 'telegram_test'
-                              ? 'Тестовые звёзды · без оплаты'
-                              : t.kind === 'grant'
-                                ? 'Стартовые звёзды'
-                                : t.sender === me.id
-                                  ? 'Поддержка автора'
-                                  : 'Поддержали твою публикацию'}
+                {t.kind.startsWith('giveaway_')
+                  ? t.kind === 'giveaway_debit'
+                    ? 'Призы оплачены'
+                    : t.kind === 'giveaway_prize'
+                      ? 'Noct Stars зачислены на баланс'
+                      : 'Возврат за неразыгранные призы'
+                  : t.kind === 'gift_conversion'
+                    ? giftDefinition(t.giftId)?.name || 'Подарок'
+                    : t.kind === 'gift_upgrade'
+                      ? (giftDefinition(t.giftId)?.name ||
+                          'Коллекционный подарок') +
+                        (t.giftNumber ? ' #' + t.giftNumber : '')
+                      : t.kind === 'purchase'
+                        ? 'Оплата подтверждена'
+                        : t.kind === 'purchase_refund'
+                          ? 'Сумма возвращена через платёжный сервис'
+                          : t.kind === 'gift'
+                            ? 'Подарок «' +
+                              (giftDefinition(t.giftId)?.name || 'Подарок') +
+                              '»'
+                            : t.kind === 'admin_grant'
+                              ? 'Начислено администратором'
+                              : t.kind === 'telegram_test'
+                                ? 'Тестовые звёзды · без оплаты'
+                                : t.kind === 'grant'
+                                  ? 'Стартовые звёзды'
+                                  : t.sender === me.id
+                                    ? 'Поддержка автора'
+                                    : 'Поддержали твою публикацию'}
               </span>
               <Stamp time={t.created} />
             </div>

@@ -112,7 +112,11 @@ export function SendGiftButton({
     [session, setSession] = useState(0);
   const popup = useRef<HTMLDivElement>(null);
   const label =
-    recipient.id === senderId ? 'Подарить себе' : 'Подарить подарок';
+    recipient.id === senderId
+      ? 'Подарить себе'
+      : recipient.kind === 'channel'
+        ? 'Подарить каналу'
+        : 'Подарить подарок';
   return (
     <>
       <button
@@ -162,6 +166,7 @@ function SendGiftForm({
 }) {
   const draftKey = 'noctgram:gift-draft:' + senderId + ':' + recipient.id;
   const self = senderId === recipient.id;
+  const channel = recipient.kind === 'channel';
   const [initial] = useState(() => storedDraft(draftKey, recipient.id));
   const [catalog, setCatalog] = useState<GiftDefinition[]>([]),
     [balance, setBalance] = useState<number | null>(null);
@@ -277,10 +282,14 @@ function SendGiftForm({
             {sent
               ? self
                 ? 'Он уже появился во вкладке «Подарки» твоего профиля'
-                : `${recipient.name} получит его в уведомлениях`
+                : channel
+                  ? `Он уже появился во вкладке «Подарки» канала ${recipient.name}`
+                  : `${recipient.name} получит его в уведомлениях`
               : self
                 ? 'Выбери подарок — он появится в твоём профиле'
-                : `Подарок для ${recipient.name}`}
+                : channel
+                  ? `Подарок каналу ${recipient.name} — увидят все посетители профиля`
+                  : `Подарок для ${recipient.name}`}
           </DialogDescription>
         </div>
         {!selected && (
@@ -443,11 +452,13 @@ type GiftPage = { gifts: ReceivedGift[]; next: string | null };
 export function ProfileGifts({
   userId,
   own,
+  canManageVisibility = own,
   ownerName,
   selfGift,
 }: {
   userId: string;
   own: boolean;
+  canManageVisibility?: boolean;
   ownerName?: string;
   selfGift?: ReactNode;
 }) {
@@ -606,9 +617,7 @@ export function ProfileGifts({
   const definition = selected && giftDefinition(selected.giftId);
   return (
     <section className="profile-gifts" aria-label="Подарки в профиле">
-      {own && selfGift && (
-        <div className="profile-gifts-actions">{selfGift}</div>
-      )}
+      {selfGift && <div className="profile-gifts-actions">{selfGift}</div>}
       {loading ? (
         <div className="gift-loading">
           <LoaderCircle className="spin" size={22} />
@@ -737,7 +746,7 @@ export function ProfileGifts({
                       {error}
                     </p>
                   )}
-                  {own && (
+                  {canManageVisibility && (
                     <button
                       className="secondary gift-visibility"
                       disabled={busy}

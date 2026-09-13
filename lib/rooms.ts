@@ -293,7 +293,7 @@ export async function readRoom(
     .bind(roomId)
     .all<Omit<RoomMember, 'publicKey'> & { publicKey: string }>();
   const messages = await viewerQuery(
-    `SELECT msg.id,msg.roomId,msg.sender,u.name AS senderName,u.avatar AS senderAvatar,msg.text,msg.ciphertext,msg.replyTo,msg.created,msg.deletedAt
+    `SELECT msg.id,msg.roomId,msg.sender,u.name AS senderName,u.avatar AS senderAvatar,msg.text,msg.ciphertext,msg.replyTo,msg.created,msg.deletedAt,msg.giveawayId
     FROM chat_room_messages msg JOIN users u ON u.id=msg.sender JOIN chat_rooms r ON r.id=msg.roomId
     WHERE msg.roomId=? AND ${access('r', ':viewer')} ${cursor ? 'AND (msg.created<? OR (msg.created=? AND msg.id<?))' : ''}
     ORDER BY msg.created DESC,msg.id DESC LIMIT ${PAGE_SIZE + 1}`,

@@ -67,7 +67,7 @@ globalThis.__giftDb = {
 const compiled = await build({
   stdin: {
     contents:
-      "export * from './lib/gifts'; export * from './lib/star-wallet'; export * from './lib/chat-messages'; export * from './lib/gift-catalog';",
+      "export * from './lib/gifts'; export * from './lib/star-wallet'; export * from './lib/chat-messages'; export * from './lib/gift-catalog'; export { previewGiftUpgrade } from './lib/gift-upgrades'; export { previewGiftConversion } from './lib/gift-conversions';",
     resolveDir: fileURLToPath(new URL('..', import.meta.url)),
   },
   bundle: true,
@@ -425,6 +425,147 @@ assert.equal(
   100,
   'Retiring a gift preserves the profile receipt and the original chat price',
 );
+
+// Channel receipts stay on the channel, without a fake private conversation or
+// a second spendable Stars balance for any owner/administrator.
+sqlite.exec(`
+  INSERT INTO users(id,name,kind,ownerId,created) VALUES('channel-gifts','Gift channel','channel','bob',1);
+  INSERT INTO channel_members(channelId,userId,role,created) VALUES('channel-gifts','carol','admin',1),('channel-gifts','alice','editor',1);
+  UPDATE user_privacy SET messagePolicy='nobody' WHERE userId='bob';
+`);
+const channelBalanceBefore = await api.balance('alice');
+const channelOwnerBalanceBefore = await api.balance('bob');
+const channelMessagesBefore = count('messages');
+const channelPurchase = purchase({ recipient: 'channel-gifts' });
+const channelReceipt = await api.sendGift('alice', channelPurchase, now + 500);
+assert.equal(channelReceipt.balance, channelBalanceBefore - 25);
+assert.equal(await api.balance('channel-gifts'), 0);
+assert.equal(await api.balance('bob'), channelOwnerBalanceBefore);
+assert.equal(
+  count('messages'),
+  channelMessagesBefore,
+  'Channel gifts never create a direct-message conversation',
+);
+assert.equal(
+  sqlite
+    .prepare('SELECT recipient FROM received_gifts WHERE id=?')
+    .get(channelReceipt.id).recipient,
+  'channel-gifts',
+);
+assert.equal(
+  sqlite
+    .prepare('SELECT userId FROM notifications WHERE targetId=?')
+    .get(channelReceipt.id).userId,
+  'bob',
+);
+assert.equal(
+  (await api.listGifts('alice', 'channel-gifts')).gifts[0].id,
+  channelReceipt.id,
+);
+await Promise.all(
+  Array.from({ length: 5 }, () =>
+    api.sendGift('alice', channelPurchase, now + 500),
+  ),
+);
+assert.equal(
+  await api.balance('alice'),
+  channelBalanceBefore - 25,
+  'Retries debit once for channel gifts',
+);
+assert.equal(
+  sqlite
+    .prepare('SELECT COUNT(*) AS n FROM received_gifts WHERE recipient=?')
+    .get('channel-gifts').n,
+  1,
+);
+await assert.rejects(
+  api.giftVisibility('alice', { id: channelReceipt.id, hidden: true }),
+  (e) => e.status === 404,
+  'Channel editors do not manage gifts',
+);
+await api.giftVisibility('bob', { id: channelReceipt.id, hidden: true });
+assert.equal((await api.listGifts('alice', 'channel-gifts')).gifts.length, 0);
+assert.equal((await api.listGifts('bob', 'channel-gifts')).gifts[0].hidden, 1);
+assert.equal(
+  (await api.listGifts('carol', 'channel-gifts')).gifts[0].hidden,
+  1,
+);
+await api.giftVisibility('carol', { id: channelReceipt.id, hidden: false });
+for (const actor of ['alice', 'bob', 'carol']) {
+  await assert.rejects(
+    api.previewGiftUpgrade(actor, channelReceipt.id),
+    (e) => e.status === 404,
+  );
+  await assert.rejects(
+    api.previewGiftConversion(actor, channelReceipt.id),
+    (e) => e.status === 404,
+  );
+}
+for (const [blocker, blocked] of [
+  ['alice', 'channel-gifts'],
+  ['channel-gifts', 'alice'],
+  ['alice', 'bob'],
+  ['bob', 'alice'],
+]) {
+  sqlite
+    .prepare('INSERT INTO user_blocks(blocker,blocked,created) VALUES(?,?,?)')
+    .run(blocker, blocked, now);
+  const before = await api.balance('alice');
+  await assert.rejects(
+    api.sendGift('alice', purchase({ recipient: 'channel-gifts' })),
+    (e) => e.status === 403,
+  );
+  await assert.rejects(
+    api.listGifts('alice', 'channel-gifts'),
+    (e) => e.status === 404,
+  );
+  assert.equal(
+    await api.balance('alice'),
+    before,
+    'Blocked channel/owner gifts never debit',
+  );
+  sqlite.exec('DELETE FROM user_blocks');
+}
+for (const target of ['channel-gifts', 'bob']) {
+  sqlite.prepare('UPDATE users SET deletedAt=1 WHERE id=?').run(target);
+  await assert.rejects(
+    api.sendGift('alice', purchase({ recipient: 'channel-gifts' })),
+    (e) => e.status === 403,
+  );
+  await assert.rejects(
+    api.listGifts('carol', 'channel-gifts'),
+    (e) => e.status === 404,
+  );
+  sqlite.prepare('UPDATE users SET deletedAt=0 WHERE id=?').run(target);
+}
+sqlite
+  .prepare(
+    "INSERT INTO moderation_events(id,userId,moderatorId,mode,reason,created) VALUES('channel-gift-restriction','channel-gifts','bob','read_only','fixture',?)",
+  )
+  .run(now);
+sqlite
+  .prepare(
+    "INSERT INTO account_restrictions(userId,eventId,mode,reason,created) VALUES('channel-gifts','channel-gift-restriction','read_only','fixture',?)",
+  )
+  .run(now);
+await assert.rejects(
+  api.sendGift('alice', purchase({ recipient: 'channel-gifts' })),
+  (e) => e.status === 403,
+);
+await assert.rejects(
+  api.giftVisibility('carol', { id: channelReceipt.id, hidden: true }),
+  (e) => e.status === 404,
+);
+sqlite.exec("DELETE FROM account_restrictions WHERE userId='channel-gifts'");
+const channelRollbackBalance = await api.balance('alice');
+const channelRollbackGifts = count('received_gifts');
+failNotification = true;
+await assert.rejects(
+  api.sendGift('alice', purchase({ recipient: 'channel-gifts' })),
+  /Simulated/,
+);
+assert.equal(await api.balance('alice'), channelRollbackBalance);
+assert.equal(count('received_gifts'), channelRollbackGifts);
 sqlite.close();
 
 // Upgrading an existing installation adds old receipts without changing money,

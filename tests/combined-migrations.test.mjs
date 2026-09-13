@@ -284,7 +284,9 @@ for (const [label, additions] of [
         .prepare(`PRAGMA table_info('${table}')`)
         .all()
         .map((column) => column.name);
-      const query = `SELECT ${columns.join(',')} FROM ${table} ORDER BY 1`;
+      // The giveaway migration adds one non-login treasury account; existing
+      // user rows must still remain byte-for-byte unchanged.
+      const query = `SELECT ${columns.join(',')} FROM ${table}${table === 'users' ? " WHERE id<>'noctgram_giveaways'" : ''} ORDER BY 1`;
       return { table, query, rows: db.prepare(query).all() };
     });
     for (const [tag, sql] of scripts) if (!applied.has(tag)) db.exec(sql);
@@ -299,6 +301,16 @@ for (const [label, additions] of [
         rows,
         label + ' preserves ' + table,
       );
+    assert.deepEqual(
+      {
+        ...db
+          .prepare(
+            "SELECT kind,onboardingComplete,created FROM users WHERE id='noctgram_giveaways'",
+          )
+          .get(),
+      },
+      { kind: 'system', onboardingComplete: 0, created: 0 },
+    );
     assert.equal(
       db.prepare("SELECT plays FROM music_listens WHERE userId='one'").get()
         .plays,

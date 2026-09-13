@@ -31,6 +31,7 @@ import { StarsIcon } from './stars-icon';
 import { CodeBlock } from './code-block';
 import { MusicLinkCard } from './music-link-card';
 import { ChatVideoPlayer } from './chat-video-player';
+import { GiveawayCard } from './giveaway-card';
 import type { Post, Media } from '@/lib/client';
 import {
   memo,
@@ -343,6 +344,7 @@ export const PostCard = memo(function PostCard({
             {expanded ? 'Свернуть' : 'Ещё'}
           </button>
         )}
+        {p.giveawayId && <GiveawayCard id={p.giveawayId} viewerId={me} />}
         <MusicLinkCard text={p.text} />
         {p.code && <CodeBlock code={p.code} language={p.codeLang} />}
         {p.media.length > 0 && (

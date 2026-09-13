@@ -104,12 +104,14 @@ export const posts = sqliteTable(
     publishAt: integer().notNull().default(0),
     cancelledAt: integer().notNull().default(0),
     publisherId: text().references(() => users.id),
+    giveawayId: text().references(() => giveaways.id),
     notifyPending: integer().notNull().default(0),
     created: integer().notNull(),
   },
   (t) => [
     index('posts_created').on(t.created),
     index('posts_user').on(t.userId),
+    uniqueIndex('posts_giveaway').on(t.giveawayId),
   ],
 );
 export const likes = sqliteTable(
@@ -1238,15 +1240,77 @@ export const chatRoomMessages = sqliteTable(
     text: text().notNull().default(''),
     ciphertext: text(),
     replyTo: text(),
+    giveawayId: text().references(() => giveaways.id),
     created: integer().notNull(),
     deletedAt: integer().notNull().default(0),
   },
   (t) => [
     index('chat_room_messages_room').on(t.roomId, t.created, t.id),
+    uniqueIndex('chat_room_messages_giveaway').on(t.giveawayId),
     check(
       'chat_room_message_payload',
       sql`${t.ciphertext} IS NULL OR (${t.text} = '' AND ${t.replyTo} IS NULL)`,
     ),
+  ],
+);
+export const giveaways = sqliteTable(
+  'giveaways',
+  {
+    id: text().primaryKey().notNull(),
+    creator: text()
+      .notNull()
+      .references(() => users.id),
+    targetKind: text().notNull(),
+    targetId: text().notNull(),
+    prize: text().notNull(),
+    winnerCount: integer().notNull(),
+    starsPerWinner: integer().notNull(),
+    premiumDays: integer().notNull().default(30),
+    totalCost: integer().notNull(),
+    payload: text().notNull(),
+    created: integer().notNull(),
+    endsAt: integer().notNull(),
+    status: text().notNull().default('active'),
+    drawToken: text().notNull().default(''),
+    completedAt: integer().notNull().default(0),
+    participantCount: integer().notNull().default(0),
+    refund: integer().notNull().default(0),
+  },
+  (t) => [
+    index('giveaways_due').on(t.status, t.endsAt),
+    index('giveaways_creator').on(t.creator, t.status),
+    check('giveaways_target', sql`${t.targetKind} IN ('group','channel')`),
+    check('giveaways_prize', sql`${t.prize} IN ('stars','premium')`),
+    check('giveaways_count', sql`${t.winnerCount} BETWEEN 1 AND 50`),
+    check('giveaways_stars', sql`${t.starsPerWinner} BETWEEN 0 AND 100000`),
+    check('giveaways_premium_days', sql`${t.premiumDays}=30`),
+    check('giveaways_cost', sql`${t.totalCost} BETWEEN 1 AND 1000000`),
+    check(
+      'giveaways_status',
+      sql`${t.status} IN ('active','settling','completed')`,
+    ),
+    check('giveaways_time', sql`${t.endsAt}>${t.created}`),
+    check(
+      'giveaways_budget',
+      sql`(${t.prize}='premium' AND ${t.starsPerWinner}=0 AND ${t.totalCost}=${t.winnerCount}*500) OR (${t.prize}='stars' AND ${t.starsPerWinner}>0 AND ${t.totalCost}=${t.winnerCount}*${t.starsPerWinner})`,
+    ),
+  ],
+);
+export const giveawayWinners = sqliteTable(
+  'giveaway_winners',
+  {
+    giveawayId: text()
+      .notNull()
+      .references(() => giveaways.id),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    position: integer().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.giveawayId, t.userId] }),
+    uniqueIndex('giveaway_winners_position').on(t.giveawayId, t.position),
   ],
 );
 export const chatRoomInvites = sqliteTable('chat_room_invites', {
