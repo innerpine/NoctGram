@@ -1,6 +1,6 @@
 'use client';
 /* eslint-disable react/react-compiler */
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   Search,
   ShieldCheck,
@@ -15,7 +15,10 @@ import {
   ArrowUpRight,
   RefreshCw,
   Gift,
+  Activity,
+  Users,
 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { request, type Person } from '@/lib/client';
 import { Avatar, DisplayName } from './profile-identity';
 import { StaffSelect } from './staff-select';
@@ -23,6 +26,7 @@ import { GratitudeBadge } from './gratitude-badge';
 import { ProfileRecognitions } from './profile-recognitions';
 import { AdminGiftForm } from './admin-gift-form';
 import { giftDefinition } from '@/lib/gift-catalog';
+const AdminOnlinePanel = lazy(() => import('./admin-online-panel'));
 type AdminPerson = Person & {
   administrator: number;
   moderator: number;
@@ -70,6 +74,51 @@ function giftEventDetails(event: Event) {
   }
 }
 export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
+  const [tab, setTab] = useState('people');
+  const [locked, setLocked] = useState(false);
+  return (
+    <Tabs
+      value={tab}
+      onValueChange={(value) => {
+        if (!locked) setTab(String(value));
+      }}
+      className="admin-sections"
+    >
+      <TabsList
+        className="admin-section-tabs"
+        aria-label="Разделы администрирования"
+      >
+        <TabsTrigger value="people" disabled={locked}>
+          <Users size={16} /> Пользователи
+        </TabsTrigger>
+        <TabsTrigger value="online" disabled={locked}>
+          <Activity size={16} /> Онлайн
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="people" keepMounted>
+        <AdministrationAccounts
+          onChanged={onChanged}
+          active={tab === 'people'}
+          onLocked={setLocked}
+        />
+      </TabsContent>
+      <TabsContent value="online">
+        <Suspense fallback={<p className="meta">Загружаем статистику…</p>}>
+          <AdminOnlinePanel />
+        </Suspense>
+      </TabsContent>
+    </Tabs>
+  );
+}
+function AdministrationAccounts({
+  onChanged,
+  active,
+  onLocked,
+}: {
+  onChanged: () => void;
+  active: boolean;
+  onLocked: (locked: boolean) => void;
+}) {
   const [query, setQuery] = useState(''),
     [people, setPeople] = useState<AdminPerson[]>([]),
     [events, setEvents] = useState<Event[]>([]),
@@ -86,6 +135,10 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
   const lock = useRef(false),
     pending = useRef<{ body: string; id: string } | null>(null);
   useEffect(() => {
+    onLocked(busy || giftLocked);
+  }, [busy, giftLocked, onLocked]);
+  useEffect(() => {
+    if (!active) return;
     let live = true;
     setLoading(true);
     const t = setTimeout(() => {
@@ -113,7 +166,7 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
       live = false;
       clearTimeout(t);
     };
-  }, [query, version]);
+  }, [query, version, active]);
   const submit = async () => {
     if (!selected || lock.current) return;
     lock.current = true;

@@ -5,6 +5,7 @@ import { isAdministrator, requireAdministrator } from './administrator-access';
 import { adminGiftCatalog, grantCollectibleGifts } from './admin-gifts';
 import { appearanceColumns } from './premium-access';
 import { rateLimit } from './rate-limit';
+import { readAdminOnline } from './admin-online';
 
 export { isAdministrator } from './administrator-access';
 export async function administrationGet(
@@ -12,6 +13,10 @@ export async function administrationGet(
   s: URLSearchParams,
   me: string,
 ) {
+  if (action === 'adminOnline')
+    return Response.json(await readAdminOnline(me, s.get('range')), {
+      headers: { 'Cache-Control': 'private, no-store' },
+    });
   if (action === 'adminGiftCatalog')
     return Response.json(await adminGiftCatalog(me, s.get('giftId') || ''), {
       headers: { 'Cache-Control': 'private, no-store' },

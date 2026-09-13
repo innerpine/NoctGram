@@ -18,21 +18,30 @@ export const musicAppTokens = sqliteTable('music_app_tokens', {
   leaseUntil: integer().notNull().default(0),
   retryAt: integer().notNull().default(0),
 });
-export const users = sqliteTable('users', {
-  id: text().primaryKey(),
-  name: text().notNull(),
-  bio: text().notNull().default(''),
-  avatar: text().notNull().default(''),
-  cover: text().notNull().default(''),
-  created: integer().notNull(),
-  lastSeen: integer().notNull().default(0),
-  onboardingComplete: integer().notNull().default(1),
-  kind: text().notNull().default('person'),
-  verified: integer().notNull().default(0),
-  gratitude: integer().notNull().default(0),
-  deletedAt: integer().notNull().default(0),
-  sessionsRevokedAt: integer().notNull().default(0),
-  ownerId: text().references((): AnySQLiteColumn => users.id),
+export const users = sqliteTable(
+  'users',
+  {
+    id: text().primaryKey(),
+    name: text().notNull(),
+    bio: text().notNull().default(''),
+    avatar: text().notNull().default(''),
+    cover: text().notNull().default(''),
+    created: integer().notNull(),
+    lastSeen: integer().notNull().default(0),
+    onboardingComplete: integer().notNull().default(1),
+    kind: text().notNull().default('person'),
+    verified: integer().notNull().default(0),
+    gratitude: integer().notNull().default(0),
+    deletedAt: integer().notNull().default(0),
+    sessionsRevokedAt: integer().notNull().default(0),
+    ownerId: text().references((): AnySQLiteColumn => users.id),
+  },
+  (t) => [index('users_last_seen').on(t.lastSeen)],
+);
+export const onlineSamples = sqliteTable('online_samples', {
+  minute: integer().primaryKey(),
+  online: integer().notNull(),
+  recordedAt: integer().notNull(),
 });
 export const userPresencePrivacy = sqliteTable(
   'user_presence_privacy',

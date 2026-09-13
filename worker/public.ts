@@ -75,7 +75,7 @@ const publicWorker = {
     return app.fetch(new Request(request, { headers }), env, ctx);
   },
   async scheduled(
-    _event: ScheduledController,
+    event: ScheduledController,
     env: PublicSettings,
     ctx: ExecutionContext,
   ) {
@@ -83,11 +83,18 @@ const publicWorker = {
       throw new Error(
         'Public jobs require email authentication and a job secret',
       );
+    // Presence is sampled every minute; the existing maintenance keeps its 5-minute cadence.
+    const scheduledTime = event.scheduledTime ?? Date.now();
+    const onlineOnly = Math.floor(scheduledTime / 60000) % 5 !== 0;
     const response = await app.fetch(
-      new Request('https://noctgram.com/api/jobs/run', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${env.NOCT_JOBS_SECRET}` },
-      }),
+      new Request(
+        'https://noctgram.com/api/jobs/run' +
+          (onlineOnly ? '?onlineOnly=1' : ''),
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${env.NOCT_JOBS_SECRET}` },
+        },
+      ),
       env,
       ctx,
     );

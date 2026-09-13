@@ -20,6 +20,7 @@ await build({
         );
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
           contents: `export default { async fetch(request, env) {
+      env.testRequests?.push({url:request.url, authorization:request.headers.get('authorization')});
       return new Response(JSON.stringify({ method:request.method, url:request.url, headers:Object.fromEntries(request.headers), body:await request.text() }),{status:env.testStatus||200});
     }};`,
           loader: 'js',
@@ -67,7 +68,10 @@ await test('HTTP public links redirect before loading the app or assets', async 
         {},
       );
       assert.equal(response.status, 308);
-      assert.equal(response.headers.get('location'), `https://noctgram.com${path}`);
+      assert.equal(
+        response.headers.get('location'),
+        `https://noctgram.com${path}`,
+      );
     }
   }
 });
@@ -193,4 +197,21 @@ await test('scheduled jobs require valid public config and a secret, and surface
       ),
     /503/,
   );
+});
+
+await test('minute sampling preserves the five-minute maintenance schedule', async () => {
+  const testRequests = [];
+  const env = { ...settings, NOCT_JOBS_SECRET: 'test', testRequests };
+  for (let minute = 0; minute < 10; minute++)
+    await worker.scheduled(
+      { scheduledTime: Date.UTC(2026, 8, 13, 12, minute) },
+      env,
+      {},
+    );
+  assert.equal(testRequests.length, 10);
+  assert.deepEqual(
+    testRequests.map((r) => new URL(r.url).searchParams.get('onlineOnly')),
+    [null, '1', '1', '1', '1', null, '1', '1', '1', '1'],
+  );
+  assert.ok(testRequests.every((r) => r.authorization === 'Bearer test'));
 });

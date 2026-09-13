@@ -187,6 +187,11 @@ function fixture(t) {
       try {
         const results = statements.map((s) => {
           hooks.beforeStatement?.(s.text);
+          if (/^\s*SELECT\b/i.test(s.text))
+            return {
+              success: true,
+              results: sql.prepare(s.text).all(...s.args),
+            };
           const result = sql.prepare(s.text).run(...s.args);
           return { success: true, meta: { changes: Number(result.changes) } };
         });
@@ -204,6 +209,8 @@ function fixture(t) {
     'lib/administration.ts',
     'lib/administrator-access.ts',
     'lib/admin-gifts.ts',
+    'lib/admin-online.ts',
+    'lib/online-stats.ts',
     'lib/gift-catalog.ts',
     'lib/gift-upgrade-catalog.ts',
     'lib/gift-upgrade-data.json',
@@ -350,6 +357,7 @@ function fixture(t) {
     sql,
     hooks,
     admin,
+    online: load('lib/admin-online.ts'),
     access,
     premium,
     ApiError,
@@ -370,6 +378,158 @@ function scenario(name, run) {
 }
 
 scenario(
+  'online counts active personal accounts once and excludes invalid or blocked profiles',
+  async (f) => {
+    for (const id of ['user_a', 'user_b', 'deleted', 'incomplete', 'channel_a'])
+      f.sql
+        .prepare('UPDATE users SET lastSeen=? WHERE id=?')
+        .run(NOW - 60000, id);
+    f.sql
+      .prepare('UPDATE users SET lastSeen=? WHERE id=?')
+      .run(NOW + 1, 'ordinary');
+    f.sql
+      .prepare('UPDATE users SET lastSeen=? WHERE id=?')
+      .run(NOW - 120000, 'moderator');
+    f.sql
+      .prepare(
+        "INSERT INTO user_presence_privacy(userId,policy) VALUES('user_a','nobody')",
+      )
+      .run();
+    assert.equal((await f.online.readAdminOnline(OWNER, 'hour')).online, 2);
+    // The aggregate includes private presence without disclosing names or their status.
+    const response = await f.admin.administrationGet(
+      'adminOnline',
+      new URLSearchParams('range=hour'),
+      OWNER,
+    );
+    assert.equal(response.headers.get('cache-control'), 'private, no-store');
+    const data = await response.json();
+    assert.equal(data.online, 2);
+    assert.ok(!JSON.stringify(data).includes('user_a'));
+    f.restrict('user_b', 'blocked');
+    assert.equal((await f.online.readAdminOnline(OWNER, 'hour')).online, 1);
+    f.sql
+      .prepare('UPDATE users SET lastSeen=? WHERE id=?')
+      .run(NOW - 120001, 'user_a');
+    assert.equal((await f.online.readAdminOnline(OWNER, 'hour')).online, 0);
+  },
+);
+
+scenario(
+  'online history records actual zeroes, deduplicates cron retries and never fabricates missing minutes',
+  async (f) => {
+    const empty = await f.online.readAdminOnline(OWNER, 'hour');
+    assert.equal(empty.points.length, 60);
+    assert.ok(empty.points.every((p) => p.average === null && p.samples === 0));
+    assert.equal(empty.day.peak, null);
+    await f.online.recordOnlineSnapshot(NOW);
+    f.sql.prepare('UPDATE users SET lastSeen=? WHERE id=?').run(NOW, 'user_a');
+    await f.online.recordOnlineSnapshot(NOW + 1000);
+    assert.equal(
+      f.sql.prepare('SELECT online FROM online_samples').get().online,
+      0,
+    );
+    await f.online.recordOnlineSnapshot(NOW + 60000);
+    const data = await f.online.readAdminOnline(OWNER, 'hour', NOW + 60000);
+    assert.deepEqual(
+      data.points.slice(-2).map((p) => p.average),
+      [0, 1],
+    );
+    assert.equal(data.day.peak, 1);
+    assert.equal(data.day.average, 0.5);
+    assert.equal(data.day.samples, 2);
+    assert.ok(data.points.slice(0, -2).every((p) => p.average === null));
+    assert.equal(data.firstSampleAt, NOW);
+    assert.equal(data.latestSampleAt, NOW + 60000);
+  },
+);
+
+scenario(
+  'hourly online uses minute averages and peaks, not a sum of users',
+  async (f) => {
+    const hour = Math.floor(NOW / 3600000) * 3600000 - 3600000;
+    for (const [offset, online] of [
+      [0, 2],
+      [1, 6],
+      [2, 4],
+    ])
+      f.sql
+        .prepare(
+          'INSERT INTO online_samples(minute,online,recordedAt) VALUES(?,?,?)',
+        )
+        .run(hour + offset * 60000, online, hour + offset * 60000);
+    const day = await f.online.readAdminOnline(OWNER, 'day');
+    assert.equal(day.points.length, 24);
+    const point = day.points.find((p) => p.time === hour);
+    assert.deepEqual(
+      { ...point },
+      { time: hour, average: 4, peak: 6, minimum: 2, samples: 3 },
+    );
+    assert.equal(
+      (await f.online.readAdminOnline(OWNER, 'week')).points.length,
+      168,
+    );
+    assert.equal(
+      (await f.online.readAdminOnline(OWNER, 'malformed')).range,
+      'day',
+    );
+  },
+);
+
+scenario(
+  'online retention deletes only old aggregate samples and presence queries use an index',
+  async (f) => {
+    const minute = Math.floor(NOW / 60000) * 60000;
+    const cutoff = minute - 30 * DAY;
+    for (const at of [cutoff - 60000, cutoff, minute - 60000])
+      f.sql
+        .prepare(
+          'INSERT INTO online_samples(minute,online,recordedAt) VALUES(?,2,?)',
+        )
+        .run(at, at);
+    const users = JSON.stringify(
+      f.sql.prepare('SELECT * FROM users ORDER BY id').all(),
+    );
+    await f.online.recordOnlineSnapshot(NOW);
+    assert.equal(
+      f.sql
+        .prepare('SELECT COUNT(*) AS n FROM online_samples WHERE minute<?')
+        .get(cutoff).n,
+      0,
+    );
+    assert.ok(
+      f.sql
+        .prepare('SELECT minute FROM online_samples WHERE minute=?')
+        .get(cutoff),
+    );
+    assert.equal(
+      JSON.stringify(f.sql.prepare('SELECT * FROM users ORDER BY id').all()),
+      users,
+    );
+    let countQuery;
+    f.hooks.beforeStatement = (query) => {
+      if (query.startsWith('SELECT COUNT(*) AS online')) countQuery = query;
+    };
+    await f.online.readAdminOnline(OWNER, 'day');
+    const plan = f.sql
+      .prepare('EXPLAIN QUERY PLAN ' + countQuery)
+      .all(NOW - 120000, NOW, NOW);
+    assert.ok(plan.some((row) => row.detail.includes('users_last_seen')));
+  },
+);
+
+scenario(
+  'restricted administrators cannot access online aggregates',
+  async (f) => {
+    f.restrict(OWNER, 'read_only');
+    await assert.rejects(
+      f.online.readAdminOnline(OWNER, 'day'),
+      (e) => e.status === 403,
+    );
+  },
+);
+
+scenario(
   'journal creates real tables, provisions only the owner, and validates foreign keys',
   async (f) => {
     assert.deepEqual(f.sql.prepare('PRAGMA foreign_key_check').all(), []);
@@ -383,6 +543,10 @@ for (const actor of ['ordinary', 'moderator'])
   scenario(
     `${actor} cannot GET administration or grant any privilege`,
     async (f) => {
+      await assert.rejects(
+        f.admin.administrationGet('adminOnline', new URLSearchParams(), actor),
+        (e) => e.status === 403,
+      );
       await assert.rejects(
         f.admin.administrationGet(
           'administration',
