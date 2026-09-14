@@ -638,6 +638,13 @@ export function ProfileGifts({
                   <button
                     className="gift-tile-open"
                     aria-label={'Посмотреть подарок «' + gift.name + '»'}
+                    title={
+                      gift.name +
+                      (receipt.collectible
+                        ? ' #' +
+                          receipt.collectible.number.toLocaleString('ru-RU')
+                        : '')
+                    }
                     onClick={() => {
                       setSelected(receipt);
                       setReceiptOpen(true);
@@ -659,23 +666,12 @@ export function ProfileGifts({
                     ) : (
                       <GiftAnimation id={gift.id} />
                     )}
-                    <strong>{gift.name}</strong>
                     {receipt.collectible && (
                       <span className="gift-number">
                         #{receipt.collectible.number.toLocaleString('ru-RU')}
                       </span>
                     )}
                   </button>
-                  {!!receipt.sender &&
-                    (!receipt.collectible ||
-                      receipt.collectible.keepOriginal) && (
-                      <span className="gift-from">
-                        от{' '}
-                        <ProfileLink target={{ id: receipt.sender }}>
-                          {receipt.senderName}
-                        </ProfileLink>
-                      </span>
-                    )}
                 </div>
               )
             );

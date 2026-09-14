@@ -553,8 +553,63 @@
 .profile-gifts {
   padding: 4px 0 20px;
 }
-.received-gift {
-  padding-bottom: 17px;
+.profile-gifts .received-gift {
+  aspect-ratio: 5 / 3;
+  padding: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.profile-gifts .gift-tile-open {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  padding: 0;
+  justify-content: center;
+  border-radius: inherit;
+}
+.profile-gifts .gift-tile-open:focus-visible {
+  outline-offset: -3px;
+}
+.profile-gifts .gift-tile-open > .gift-art {
+  width: 52%;
+  max-width: 104px;
+}
+.profile-gifts .received-gift .gift-collectible-scene {
+  height: 100%;
+  aspect-ratio: auto;
+  padding: 0;
+  border-radius: inherit;
+  justify-content: center;
+}
+.profile-gifts .received-gift .gift-collectible-model {
+  width: 52%;
+  max-width: 104px;
+  height: auto;
+  margin: 0;
+}
+.profile-gifts .received-gift .gift-number {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  max-width: calc(100% - 36px);
+  margin: 0;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: #10101370;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.profile-gifts .gift-hidden-mark {
+  top: 8px;
+  right: auto;
+  left: 8px;
+  color: #eee;
 }
 .profile-gifts-actions {
   display: flex;
@@ -660,6 +715,9 @@
   }
 }
 @media (max-width: 480px) {
+  .profile-gifts .gift-collection {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .gift-dialog.noct-dialog {
     padding: 20px 16px;
   }
