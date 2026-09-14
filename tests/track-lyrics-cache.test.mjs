@@ -90,11 +90,11 @@ await unfinished;
 assert.equal((await cache.load('unmounted-view', recording)).lyrics, lyrics);
 assert.equal(calls, 5);
 
-for (const failure of [
-  () => new LyricsUnavailable(now + 60000),
-  () => new LyricsRateLimit(now + 120000),
-  () => new TypeError('Network failed'),
-  () => new DOMException('Timed out', 'AbortError'),
+for (const [failure, delay, global] of [
+  [() => new LyricsUnavailable(now + 8000), 8000, false],
+  [() => new LyricsRateLimit(now + 120000), 120000, true],
+  [() => new TypeError('Network failed'), 8000, false],
+  [() => new DOMException('Timed out', 'AbortError'), 8000, false],
 ]) {
   let requests = 0,
     broken = false;
@@ -108,27 +108,89 @@ for (const failure of [
   );
   await service.load('cached-song', recording);
   broken = true;
-  assert.equal((await service.load('failure', recording)).error, true);
+  const failed = await service.load('failure', recording);
+  assert.equal(failed.error, true);
+  assert.equal(failed.retryAt, now + delay);
   for (let i = 0; i < 20; i++)
-    assert.equal(
-      (await service.load('failure-' + i, recording, true)).error,
-      true,
-    );
+    assert.equal((await service.load('failure', recording, true)).error, true);
   assert.equal(
     requests,
     2,
-    'An outage pauses lookups for all songs, including manual retries',
+    'Rapid retries share the error until its advertised retry time',
   );
   assert.equal(
     (await service.load('cached-song', recording)).lyrics,
     lyrics,
     'Cached lyrics remain available during an outage',
   );
-  now += 121000;
   broken = false;
+  const unrelated = await service.load('other-song', recording);
+  assert.equal(
+    unrelated.error === true,
+    global,
+    'Only 429 blocks unrelated songs',
+  );
+  now += delay + 1;
   assert.equal((await service.load('failure', recording, true)).lyrics, lyrics);
-  assert.equal(requests, 3, 'Lookup recovers after the cooldown');
+  assert.equal(
+    requests,
+    global ? 3 : 4,
+    'Lookup really runs after the displayed wait',
+  );
 }
+let saved = null;
+const store = {
+  async read() {
+    return saved;
+  },
+  async write(_key, _duration, value) {
+    saved = value;
+  },
+};
+let savedCalls = 0;
+const online = new TrackLyricsCache(
+  async () => {
+    savedCalls++;
+    return lyrics;
+  },
+  () => now,
+  store,
+);
+await online.load('persisted', recording);
+const offline = new TrackLyricsCache(
+  async () => {
+    savedCalls++;
+    throw new TypeError('Offline');
+  },
+  () => now,
+  store,
+);
+assert.equal(
+  (await offline.load('persisted', recording)).lyrics,
+  lyrics,
+  'Lyrics survive a new cache instance/page reload',
+);
+assert.equal(savedCalls, 1);
+now += 16000;
+assert.equal(
+  (await offline.load('persisted', recording, true)).lyrics,
+  lyrics,
+  'A failed refresh cannot erase good lyrics',
+);
+assert.equal(savedCalls, 2);
+const unavailableStore = new TrackLyricsCache(
+  async () => lyrics,
+  () => now,
+  {
+    async read() {
+      throw new Error('Storage disabled');
+    },
+    async write() {
+      throw new Error('Quota');
+    },
+  },
+);
+assert.equal((await unavailableStore.load('track', recording)).lyrics, lyrics);
 let memoryCalls = 0;
 const bounded = new TrackLyricsCache(
   async () => {

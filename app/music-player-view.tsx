@@ -261,7 +261,11 @@ function Lyrics({
               : 'Можно продолжить слушать и выбрать следующий трек.'}
         </p>
         {!lyrics?.instrumental && (
-          <button onClick={lookup.retry}>Повторить поиск текста</button>
+          <button onClick={lookup.retry} disabled={lookup.retryIn > 0}>
+            {lookup.retryIn > 0
+              ? `Повтор через ${lookup.retryIn} с`
+              : 'Повторить поиск текста'}
+          </button>
         )}
       </div>
     );

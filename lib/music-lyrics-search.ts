@@ -1,7 +1,7 @@
 import { readUpstreamJson } from './upstream-json';
 import { readLyrics, type TrackLyrics } from './music-player';
 
-type Recording = { title: string; artist: string; duration: number };
+export type Recording = { title: string; artist: string; duration: number };
 type Candidate = Record<string, unknown>;
 // Strip publishing credits, but retain remix/live/sped-up labels: they identify recordings.
 export function cleanLyricTitle(title: string) {
@@ -155,6 +155,17 @@ export class LyricsUnavailable extends Error {
   }
 }
 export class LyricsRateLimit extends LyricsUnavailable {}
+export function lyricRetryAt(response: Response, now = Date.now()) {
+  const minimum = response.status === 429 ? 60000 : 8000;
+  const header = response.headers.get('Retry-After');
+  const seconds = header === null ? NaN : Number(header);
+  return Math.max(
+    now + minimum,
+    Number.isFinite(seconds)
+      ? now + Math.max(0, seconds) * 1000
+      : Date.parse(header || '') || 0,
+  );
+}
 export async function findTrackLyrics(
   recording: Recording,
   signal: AbortSignal,
@@ -171,21 +182,12 @@ export async function findTrackLyrics(
       },
     );
     if (response.status === 429 || response.status >= 500) {
-      const header = response.headers.get('Retry-After') || '60',
-        seconds = Number(header);
       const Failure =
         response.status === 429 ? LyricsRateLimit : LyricsUnavailable;
-      throw new Failure(
-        Math.max(
-          Date.now() + 60000,
-          Number.isFinite(seconds)
-            ? Date.now() + seconds * 1000
-            : Date.parse(header) || 0,
-        ),
-      );
+      throw new Failure(lyricRetryAt(response));
     }
     if (response.status === 404) return null;
-    if (!response.ok) throw new LyricsUnavailable(Date.now() + 60000);
+    if (!response.ok) throw new LyricsUnavailable(Date.now() + 8000);
     return readUpstreamJson(response);
   };
   const identities = recordingIdentities(recording);

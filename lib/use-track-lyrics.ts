@@ -29,26 +29,49 @@ export function useTrackLyrics(
     key: string;
     lyrics: TrackLyrics | null;
     error?: boolean;
+    retryAt?: number;
   } | null>(null);
   const [attempt, setAttempt] = useState(0);
   const forceRetry = useRef(false);
+  const [clock, setClock] = useState(0);
   useEffect(() => {
     if (!enabled || !lookupDuration || !track.artist) return;
     const retry = forceRetry.current;
     forceRetry.current = false;
     let cancelled = false;
-    // Only the selected track metadata goes to LRCLIB, without account tokens.
-    void trackLyricsCache
-      .load(
-        trackKey,
-        { title: track.title, artist: track.artist, duration: lookupDuration },
-        retry,
-      )
-      .then((value) => {
-        if (!cancelled) setResult({ key, ...value });
-      });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // The same-origin endpoint sends only public track metadata to LRCLIB.
+    const load = (manual: boolean, remaining: number) =>
+      void trackLyricsCache
+        .load(
+          trackKey,
+          {
+            title: track.title,
+            artist: track.artist,
+            duration: lookupDuration,
+          },
+          manual,
+        )
+        .then((value) => {
+          if (cancelled) return;
+          setClock(Date.now());
+          setResult({ key, ...value });
+          if (value.error && value.retryAt && remaining > 0) {
+            timer = setTimeout(
+              () => {
+                if (!cancelled) load(false, remaining - 1);
+              },
+              Math.min(
+                2147483647,
+                Math.max(1000, value.retryAt - Date.now() + 50),
+              ),
+            );
+          }
+        });
+    load(retry, 2);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [
     key,
@@ -59,12 +82,25 @@ export function useTrackLyrics(
     track.title,
     attempt,
   ]);
+  const retryAt = result?.key === key ? result.retryAt || 0 : 0;
+  useEffect(() => {
+    if (!enabled || retryAt <= Date.now()) return;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setClock(now);
+      if (now >= retryAt) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [enabled, retryAt]);
+  const retryIn = Math.max(0, Math.ceil((retryAt - clock) / 1000));
   return {
     key,
     lyrics: result?.key === key ? result.lyrics : null,
     loading: !lookupDuration || !track.artist || result?.key !== key,
     error: result?.key === key && !!result.error,
+    retryIn,
     retry: () => {
+      if (retryAt > Date.now()) return;
       forceRetry.current = true;
       setResult(null);
       setAttempt((value) => value + 1);
