@@ -292,12 +292,34 @@ html:has(.app-shell) {
   text-align: center;
 }
 .app-startup-brand {
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 8px;
   color: #f5f5f7;
   font-size: 28px;
   letter-spacing: -1.2px;
+}
+.app-startup-description {
+  margin: 0;
+  max-width: 480px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #aaaab1;
+}
+.app-startup-about {
+  color: #bdbdc4;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.welcome-banner span a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.aside-footer > a {
+  font-size: 13px;
 }
 .app-startup-status {
   display: flex;

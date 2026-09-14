@@ -54,6 +54,7 @@ import {
 } from '@/lib/app-history';
 import { AppLink } from './app-link';
 import { MainNavigation } from './main-navigation';
+import { SITE_DESCRIPTION } from '@/lib/site-metadata';
 import {
   Moon,
   Search,
@@ -2009,9 +2010,13 @@ export default function Noctgram({
     const error = routeError || loadError;
     return (
       <main className="app-startup" aria-busy={!error}>
-        <div className="app-startup-brand">
+        <h1 className="app-startup-brand">
           <NoctLogo size={42} /> noctgram
-        </div>
+        </h1>
+        <p className="app-startup-description">{SITE_DESCRIPTION}</p>
+        <a className="app-startup-about" href="/about">
+          О Noctgram
+        </a>
         {error ? (
           <div className="app-startup-error" role="alert">
             <p>{error}</p>
@@ -2301,8 +2306,11 @@ export default function Noctgram({
           {guest && (
             <div className="welcome-banner">
               <div>
-                <strong>Публикации, музыка и сообщения.</strong>
-                <span>Войдите или создайте аккаунт.</span>
+                <strong>Noctgram — социальная сеть и мессенджер</strong>
+                <span>
+                  Публикации, каналы, чаты, музыка и плейлисты.{' '}
+                  <a href="/about">О сервисе</a>
+                </span>
               </div>
               <a href="/login" target="_top" className="primary">
                 Войти <ArrowUpRight size={14} />
@@ -3233,7 +3241,7 @@ export default function Noctgram({
             </button>
           </section>
           <div className="aside-footer">
-            <span>noctgram</span>
+            <a href="/about">О Noctgram</a>
             <span>alpha / 2026</span>
             <p>Меньше шума. Больше своего.</p>
           </div>

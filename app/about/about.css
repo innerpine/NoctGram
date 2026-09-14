@@ -1,0 +1,58 @@
+.about-noctgram {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: calc(28px + env(safe-area-inset-top, 0px)) 24px
+    calc(40px + env(safe-area-inset-bottom, 0px));
+  line-height: 1.65;
+}
+.about-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #f5f5f7;
+  font-size: 22px;
+}
+.about-noctgram h1 {
+  margin: 40px 0 12px;
+  font-size: clamp(32px, 7vw, 48px);
+  line-height: 1.15;
+  letter-spacing: -1px;
+}
+.about-noctgram .about-description {
+  font-size: 18px;
+  color: #d4d4d8;
+}
+.about-noctgram section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #ffffff1a;
+}
+.about-noctgram h2 {
+  margin: 0 0 10px;
+  font-size: 21px;
+}
+.about-noctgram p {
+  margin: 0;
+  color: #aaaab1;
+  font-size: 16px;
+}
+.about-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+.about-actions a {
+  padding: 11px 16px;
+  border-radius: 999px;
+  text-align: center;
+}
+.about-noctgram footer {
+  margin-top: 40px;
+  color: #9999a1;
+  font-size: 14px;
+}
+.about-noctgram footer a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

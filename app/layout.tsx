@@ -53,13 +53,16 @@ import './rain.css';
 import { RainEffect } from './rain-effect';
 import { MusicProvider } from './music-provider';
 import { APP_HISTORY_BOOTSTRAP } from '@/lib/app-history-bootstrap';
+import { SITE_URL, SITE_DESCRIPTION } from '@/lib/site-metadata';
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
 };
 export const metadata: Metadata = {
-  title: 'Noctgram — лента и диалоги',
+  metadataBase: new URL(SITE_URL),
+  applicationName: 'Noctgram',
+  title: 'Noctgram — социальная сеть и мессенджер',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
@@ -79,7 +82,7 @@ export const metadata: Metadata = {
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
-  description: 'Noctgram — публикации, фотографии, музыка и личные сообщения.',
+  description: SITE_DESCRIPTION,
 };
 export default function RootLayout({
   children,
