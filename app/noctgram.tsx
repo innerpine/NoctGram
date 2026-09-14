@@ -55,6 +55,7 @@ import {
 import { AppLink } from './app-link';
 import { MainNavigation } from './main-navigation';
 import { SITE_DESCRIPTION } from '@/lib/site-metadata';
+import { profileHandleLimit } from '@/lib/channel-limits';
 import {
   Moon,
   Search,
@@ -1563,6 +1564,7 @@ export default function Noctgram({
   const profileEditable = profileOwned || !!profile?.canEditProfile;
   const editTarget =
     editId === me?.id ? me : profile?.id === editId ? profile : null;
+  const editAliasLimit = profileHandleLimit(editTarget?.kind) - 1;
   const profilePublisher = profileOwned || !!profile?.canPublish;
   const channelRestricted =
     profile?.kind === 'channel' && !!profile.restriction;
@@ -3629,12 +3631,16 @@ export default function Noctgram({
                           </button>
                         </div>
                       ))}
-                      {editAliases.length < 4 && (
+                      {editAliases.length < editAliasLimit && (
                         <button
                           type="button"
                           className="text-button"
                           onClick={() =>
-                            setEditAliases((rows) => [...rows, ''])
+                            setEditAliases((rows) =>
+                              rows.length < editAliasLimit
+                                ? [...rows, '']
+                                : rows,
+                            )
                           }
                         >
                           <Plus size={14} />
@@ -3642,8 +3648,8 @@ export default function Noctgram({
                         </button>
                       )}
                       <span className="meta">
-                        До 4 дополнительных имён. 4–24 латинские буквы, цифры
-                        или _.
+                        До {editAliasLimit} дополнительных имён. 4–24 латинские
+                        буквы, цифры или _.
                       </span>
                     </fieldset>
                     <label>

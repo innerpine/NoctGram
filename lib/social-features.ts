@@ -18,7 +18,12 @@ import {
 } from './account-access';
 import { db, clean, ApiError, profile } from '@/lib/server';
 import { ensureWallet, balance } from './star-wallet';
-import { CHANNEL_LIMIT_MESSAGE, MAX_OWNED_CHANNELS } from './channel-limits';
+import {
+  CHANNEL_LIMIT_MESSAGE,
+  CHANNEL_HANDLE_LIMIT_MESSAGE,
+  MAX_OWNED_CHANNELS,
+  profileHandleLimit,
+} from './channel-limits';
 
 async function assertChannelCapacity(owner: string) {
   const row = await db()
@@ -213,9 +218,9 @@ export async function featurePost(
     if (!(await allowed(target, me, 'profile')))
       throw new ApiError(403, 'Нельзя редактировать чужой профиль');
     const current = await d
-      .prepare('SELECT avatar,cover FROM users WHERE id=?')
+      .prepare('SELECT avatar,cover,kind FROM users WHERE id=?')
       .bind(target)
-      .first<{ avatar: string; cover: string }>();
+      .first<{ avatar: string; cover: string; kind: string }>();
     const rights = await channelRights(target, me);
     const name = clean(b.name, 40, true),
       bio = clean(b.bio, 300),
@@ -227,11 +232,13 @@ export async function featurePost(
     const eligibility = `WITH input AS(SELECT ? AS actor,? AS avatar,? AS cover),eligible AS(SELECT u.id FROM users u,input i WHERE u.id=? AND ${mediaAssignment('u.avatar', 'i.avatar', 'i.actor')} AND ${mediaAssignment('u.cover', 'i.cover', 'i.actor')})`;
     const eligibilityArgs = [me, avatar, cover, target];
     if (b.mainHandle !== undefined && rights.canManageMembers) {
+      const limit = profileHandleLimit(current?.kind);
+      const limitMessage =
+        current?.kind === 'channel'
+          ? CHANNEL_HANDLE_LIMIT_MESSAGE
+          : 'Можно сохранить основной и до четырёх дополнительных юзернеймов';
       if (!Array.isArray(b.extraHandles) || b.extraHandles.length > 4)
-        throw new ApiError(
-          400,
-          'Можно сохранить основной и до четырёх дополнительных юзернеймов',
-        );
+        throw new ApiError(400, limitMessage);
       // Individually granted short names can be retained, but never claimed
       // through ordinary profile editing or moved from another account.
       const existing = await d
@@ -247,6 +254,11 @@ export async function featurePost(
       ];
       if (new Set(names).size !== names.length)
         throw new ApiError(400, 'Юзернеймы не должны повторяться');
+      // Keep existing addresses during unrelated profile edits; changed sets use the new cap.
+      const unchanged =
+        names.length === assigned.size && names.every((h) => assigned.has(h));
+      if (names.length > limit && !unchanged)
+        throw new ApiError(400, limitMessage, 'CHANNEL_HANDLE_LIMIT');
       const occupied = await d
         .prepare(
           'SELECT handle FROM handles WHERE userId<>? AND handle IN (' +

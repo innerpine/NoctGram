@@ -1,5 +1,9 @@
 import { assertPremiumEmoji } from '@/lib/premium-emoji-access';
 import {
+  CHANNEL_HANDLE_LIMIT_MESSAGE,
+  profileHandleLimit,
+} from '@/lib/channel-limits';
+import {
   commentReplyTarget,
   insertComment,
   withCommentReplies,
@@ -471,11 +475,18 @@ export async function POST(req: Request) {
       if (taken && taken.userId !== me)
         throw new ApiError(409, 'Этот юзернейм уже занят');
       const count = await d
-        .prepare('SELECT COUNT(*) as n FROM handles WHERE userId=?')
+        .prepare(
+          'SELECT kind,(SELECT COUNT(*) FROM handles WHERE userId=u.id) AS n FROM users u WHERE id=?',
+        )
         .bind(me)
-        .first();
-      if (!taken && Number(count?.n) >= 5)
-        throw new ApiError(400, 'Можно добавить до пяти юзернеймов');
+        .first<{ kind: string; n: number }>();
+      const handleLimit = profileHandleLimit(count?.kind);
+      const limitMessage =
+        count?.kind === 'channel'
+          ? CHANNEL_HANDLE_LIMIT_MESSAGE
+          : 'Можно добавить до пяти юзернеймов';
+      if (!taken && Number(count?.n) >= handleLimit)
+        throw new ApiError(400, limitMessage);
       try {
         // Batch is atomic: a concurrent claimant cannot clear the old main handle.
         await d.batch([
@@ -483,9 +494,9 @@ export async function POST(req: Request) {
             ? [
                 d
                   .prepare(
-                    'INSERT INTO handles (handle,userId,main) SELECT ?,?,0 WHERE (SELECT COUNT(*) FROM handles WHERE userId=?) < 5',
+                    'INSERT INTO handles (handle,userId,main) SELECT ?,?,0 WHERE (SELECT COUNT(*) FROM handles WHERE userId=?) < ?',
                   )
-                  .bind(handle, me, me),
+                  .bind(handle, me, me, handleLimit),
               ]
             : []),
           d
@@ -503,7 +514,7 @@ export async function POST(req: Request) {
           .bind(handle, me)
           .first())
       )
-        throw new ApiError(400, 'Можно добавить до пяти юзернеймов');
+        throw new ApiError(400, limitMessage);
       return Response.json(await profile(me, me));
     }
     if (action === 'removeHandle') {

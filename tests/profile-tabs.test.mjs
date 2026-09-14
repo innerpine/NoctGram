@@ -103,6 +103,7 @@ try {
               '@/lib/chat-snapshots',
               '@/lib/profile-cover-cache',
               '@/lib/app-history',
+              '@/lib/channel-limits',
             ].includes(path)
               ? undefined
               : { path, namespace: 'boundary' },

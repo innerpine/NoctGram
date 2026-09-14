@@ -61,7 +61,11 @@ globalThis.__channelLimitDB = {
 };
 
 const { outputFiles } = await build({
-  entryPoints: ['lib/social-features.ts'],
+  stdin: {
+    contents:
+      "export * from './lib/social-features'; export {POST} from './app/api/social/route';",
+    resolveDir: process.cwd(),
+  },
   bundle: true,
   write: false,
   format: 'esm',
@@ -84,7 +88,7 @@ const { outputFiles } = await build({
               : path === 'next/server'
                 ? 'export const after=()=>{};'
                 : path === 'next/headers'
-                  ? 'export const headers=async()=>new Headers(); export const cookies=async()=>({get:()=>undefined,set:()=>{}});'
+                  ? 'export const headers=async()=>globalThis.__channelLimitHeaders || new Headers(); export const cookies=async()=>({get:()=>undefined,set:()=>{}});'
                   : path === 'next/navigation'
                     ? 'export const redirect=()=>{throw Error("Unexpected redirect")};'
                     : 'export const db=()=>globalThis.__channelLimitDB; export const bucket=()=>({});',
@@ -151,6 +155,92 @@ await create('bob', 'bob_first');
 await create('bob', 'bob_second');
 assert.equal(count('bob'), 2);
 
+const editHandles = async (owner, id, mainHandle, extraHandles, extra = {}) => {
+  const result = await api.featurePost(
+    'profile',
+    {
+      id,
+      name: 'Updated profile',
+      bio: 'Description',
+      avatar: '',
+      cover: '',
+      mainHandle,
+      extraHandles,
+      ...extra,
+    },
+    owner,
+  );
+  return result.json();
+};
+const handles = (id) =>
+  sql
+    .prepare(
+      'SELECT handle,main FROM handles WHERE userId=? ORDER BY main DESC,handle',
+    )
+    .all(id);
+const tooManyHandles = (e) =>
+  e.status === 400 && /максимум 3 юзернейма/.test(e.message);
+await editHandles('alice', first.id, 'alice_first', [
+  'channel_one',
+  'channel_two',
+]);
+const saved = handles(first.id);
+assert.equal(saved.length, 3);
+await assert.rejects(
+  editHandles(
+    'alice',
+    first.id,
+    'alice_first',
+    ['channel_one', 'channel_two', 'channel_three'],
+    { kind: 'person' },
+  ),
+  tooManyHandles,
+);
+assert.deepEqual(
+  handles(first.id),
+  saved,
+  'Rejected updates must retain the main handle and aliases',
+);
+await editHandles('alice', first.id, 'alice_first', [
+  'channel_one',
+  'channel_two',
+  '',
+  '',
+]);
+assert.deepEqual(
+  handles(first.id),
+  saved,
+  'Blank fields from an older client do not count as aliases',
+);
+await editHandles('alice', 'alice', 'alice', [
+  'personal_one',
+  'personal_two',
+  'personal_three',
+  'personal_four',
+]);
+assert.equal(
+  handles('alice').length,
+  5,
+  'Personal account limits are unchanged',
+);
+
+// The older single-handle endpoint cannot bypass the channel cap either.
+globalThis.__channelLimitHeaders = new Headers({
+  'oai-authenticated-user-id': first.id,
+  'oai-authenticated-user-email': first.id + '@example.test',
+});
+const single = await api.POST(
+  new Request('http://localhost/api/social', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'handle', handle: 'channel_four' }),
+  }),
+);
+assert.equal(single.status, 400);
+assert.match((await single.json()).error, /максимум 3 юзернейма/);
+assert.deepEqual(handles(first.id), saved);
+delete globalThis.__channelLimitHeaders;
+
 // Both preflight checks see one channel; only one atomic insert may claim the last slot.
 await create('carol', 'carol_first');
 capacityReads.length = 0;
@@ -192,6 +282,36 @@ for (let i = 0; i < 4; i++)
     .run('legacy_' + i, 'Legacy ' + i);
 await assert.rejects(create('legacy', 'legacy_new'), atLimit);
 assert.equal(count('legacy'), 4);
+for (let i = 0; i < 5; i++)
+  sql
+    .prepare('INSERT INTO handles(handle,userId,main) VALUES(?,?,?)')
+    .run('legacy_handle_' + i, 'legacy_0', i === 0 ? 1 : 0);
+const legacyAliases = [
+  'legacy_handle_1',
+  'legacy_handle_2',
+  'legacy_handle_3',
+  'legacy_handle_4',
+];
+await editHandles('legacy', 'legacy_0', 'legacy_handle_0', legacyAliases);
+assert.equal(
+  handles('legacy_0').length,
+  5,
+  'Unrelated edits keep existing addresses until the owner changes the set',
+);
+await assert.rejects(
+  editHandles('legacy', 'legacy_0', 'legacy_handle_0', [
+    ...legacyAliases.slice(0, 3),
+    'legacy_new_alias',
+  ]),
+  tooManyHandles,
+);
+await editHandles(
+  'legacy',
+  'legacy_0',
+  'legacy_handle_0',
+  legacyAliases.slice(0, 2),
+);
+assert.equal(handles('legacy_0').length, 3);
 sql.close();
 delete globalThis.__channelLimitDB;
 console.log(
