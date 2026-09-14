@@ -5,6 +5,7 @@ import { build } from 'esbuild';
 const sqlite = new DatabaseSync(':memory:');
 sqlite.exec(await readFile('drizzle/0029_music_app_tokens.sql', 'utf8'));
 const settings = {};
+let holdTokenRead;
 globalThis.__scTest = {
   settings,
   db: {
@@ -16,6 +17,11 @@ globalThis.__scTest = {
           return this;
         },
         async first() {
+          if (holdTokenRead && sql.startsWith('SELECT * FROM music_app_tokens')) {
+            const hold = holdTokenRead;
+            holdTokenRead = null;
+            await hold;
+          }
           return sqlite.prepare(sql).get(...args) || null;
         },
         async run() {
@@ -74,6 +80,7 @@ let tokens = 0,
   sharing = 'public',
   onlyPreview = false;
 const network = [];
+let holdResource;
 globalThis.fetch = async (input, options) => {
   const u = new URL(input);
   network.push(u.origin + u.pathname);
@@ -103,6 +110,11 @@ globalThis.fetch = async (input, options) => {
     'Never send authorization to a CDN or arbitrary redirect',
   );
   assert.match(options.headers.Authorization, /^OAuth access-/);
+  if (holdResource && u.pathname === '/resolve') {
+    const hold = holdResource;
+    holdResource = null;
+    await hold;
+  }
   if (u.pathname === '/tracks') {
     assert.equal(u.searchParams.get('q'), 'FACE антидепрессант');
     assert.equal(u.searchParams.get('access'), 'playable');
@@ -190,6 +202,45 @@ const tracks = await Promise.all(
   ),
 );
 assert.equal(tokens, 1, 'Concurrent requests share one app token');
+async function independentRequest(first, second, release, message) {
+  let timer;
+  try {
+    await Promise.race([
+      second(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), 1000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    release();
+    await first;
+  }
+}
+// A disconnected Worker request can leave its I/O promise unresolved. Another
+// request must read the saved credential itself rather than join that promise.
+let releaseToken;
+holdTokenRead = new Promise((resolve) => (releaseToken = resolve));
+const strandedToken = api.soundcloudTrack(url('stranded-token'));
+await independentRequest(
+  strandedToken,
+  () => api.soundcloudTrack(url('after-stranded-token')),
+  releaseToken,
+  'A pending token read must not block every subsequent track',
+);
+let releaseResource;
+holdResource = new Promise((resolve) => (releaseResource = resolve));
+const strandedResource = api.soundcloudTrack(url('stranded-resource'));
+await new Promise((resolve) => setTimeout(resolve, 10));
+await independentRequest(
+  strandedResource,
+  () => api.soundcloudTrack(url('stranded-resource')),
+  releaseResource,
+  'Retrying a track must not join its previous unfinished request',
+);
+const beforeCached = network.length;
+await api.soundcloudTrack(url('stranded-resource'));
+assert.equal(network.length, beforeCached, 'Completed metadata remains cached');
 const searched = await api.searchSoundCloud(' FACE антидепрессант ');
 assert.equal(searched.items.length, 1);
 assert.equal(searched.items[0].url, 'https://soundcloud.com/face/song');

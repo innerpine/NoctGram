@@ -15,8 +15,10 @@ type TokenRow = {
 };
 type Data = Record<string, unknown>;
 const API = 'https://api.soundcloud.com';
-const pendingTokens = new Map<string, Promise<CachedTokens>>();
-const resources = new Map<string, { until: number; data: Promise<Data> }>();
+// Only completed values can outlive their Worker request. Sharing an in-flight
+// fetch/D1 promise lets a canceled request strand subsequent playback requests.
+// Token refreshes are already serialized by the durable lease in storedToken.
+const resources = new Map<string, { until: number; data: Data }>();
 export function soundcloudStreamingConfigured() {
   return (
     !!setting('SOUNDCLOUD_CLIENT_ID') &&
@@ -137,15 +139,6 @@ async function storedToken(): Promise<CachedTokens> {
   }
   throw unavailable();
 }
-async function token() {
-  const id = setting('SOUNDCLOUD_CLIENT_ID');
-  let pending = pendingTokens.get(id);
-  if (!pending) {
-    pending = storedToken().finally(() => pendingTokens.delete(id));
-    pendingTokens.set(id, pending);
-  }
-  return pending;
-}
 function apiURL(value: string) {
   const url = new URL(value, API);
   if (url.origin !== API || url.username || url.password || url.hash)
@@ -153,7 +146,7 @@ function apiURL(value: string) {
   return url.href;
 }
 async function request(path: string, redirect = true) {
-  const auth = await token();
+  const auth = await storedToken();
   let url = apiURL(path);
   for (let hop = 0; hop < 3; hop++) {
     let response: Response;
@@ -168,6 +161,7 @@ async function request(path: string, redirect = true) {
     }
     if (response.status === 302 && redirect) {
       url = apiURL(response.headers.get('location') || '');
+      await response.body?.cancel();
       continue;
     }
     if (response.status === 401) {
@@ -202,7 +196,7 @@ async function resource(value: unknown) {
     cacheKey = setting('SOUNDCLOUD_CLIENT_ID') + ':' + link.url;
   const cached = resources.get(cacheKey);
   if (cached && cached.until > Date.now()) return cached.data;
-  const data = (async () => {
+  const data = await (async () => {
     const response = await request(
       '/resolve?url=' + encodeURIComponent(link.url),
     );
@@ -228,12 +222,7 @@ async function resource(value: unknown) {
   const entry = { until: Date.now() + 60000, data };
   resources.set(cacheKey, entry);
   if (resources.size > 128) resources.delete(resources.keys().next().value!);
-  try {
-    return await data;
-  } catch (error) {
-    if (resources.get(cacheKey) === entry) resources.delete(cacheKey);
-    throw error;
-  }
+  return data;
 }
 export async function soundcloudTrack(value: unknown): Promise<MusicTrack> {
   const link = publicTrack(value),
@@ -333,6 +322,7 @@ export async function soundcloudStream(value: unknown) {
     );
   const stream = await request(apiURL(path), false);
   const location = stream.headers.get('location');
+  await stream.body?.cancel();
   if (stream.status !== 302 || !location) throw unavailable();
   const url = new URL(location);
   if (
