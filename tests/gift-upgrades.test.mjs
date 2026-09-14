@@ -133,6 +133,66 @@ function receipt() {
 }
 const body = (id) => ({ id, expectedPrice: 25, keepOriginal: true });
 const count = (t) => sqlite.prepare('SELECT COUNT(*) n FROM ' + t).get().n;
+const eligible = JSON.parse(
+  await readFile(root + '/lib/gift-upgrade-eligibility.json', 'utf8'),
+);
+for (const giftId of eligible) {
+  fresh(25);
+  const gift = receipt();
+  sqlite
+    .prepare('UPDATE received_gifts SET giftId=? WHERE id=?')
+    .run(giftId, gift);
+  const preview = await api.previewGiftUpgrade('bob', gift);
+  assert.equal(preview.collection.price, 25, giftId + ': preview price');
+  assert.equal(preview.balance, 25);
+  const result = await api.upgradeGift('bob', body(gift));
+  assert.equal(result.collectible.family, giftId);
+  assert.equal(result.balance, 0);
+  assert.equal(
+    sqlite
+      .prepare("SELECT amount FROM star_transfers WHERE kind='gift_upgrade'")
+      .get().amount,
+    25,
+  );
+}
+fresh(24);
+const insufficientGift = receipt();
+sqlite
+  .prepare('UPDATE received_gifts SET giftId=? WHERE id=?')
+  .run('loot_bag', insufficientGift);
+await assert.rejects(
+  api.upgradeGift('bob', body(insufficientGift)),
+  (e) => e.status === 400,
+);
+assert.equal(await api.balance('bob'), 24);
+assert.equal(count('gift_upgrades'), 0);
+fresh(500);
+const staleGift = receipt();
+sqlite
+  .prepare('UPDATE received_gifts SET giftId=? WHERE id=?')
+  .run('loot_bag', staleGift);
+await assert.rejects(
+  api.upgradeGift('bob', { ...body(staleGift), expectedPrice: 500 }),
+  (e) => e.status === 409,
+);
+assert.equal(await api.balance('bob'), 500);
+assert.equal(count('gift_upgrades'), 0);
+const unavailableGift = receipt();
+sqlite
+  .prepare('UPDATE received_gifts SET giftId=? WHERE id=?')
+  .run('chill_flame', unavailableGift);
+assert.equal(
+  (await api.previewGiftUpgrade('bob', unavailableGift)).collection,
+  null,
+);
+await assert.rejects(
+  api.upgradeGift('bob', body(unavailableGift)),
+  (e) => e.status === 400,
+);
+assert.equal(await api.balance('bob'), 500);
+console.log(
+  'all eligible upgrades cost 25; insufficient balance, stale quotes and ineligible gifts remain protected: PASS',
+);
 fresh();
 let id = receipt();
 let out = await Promise.all(
