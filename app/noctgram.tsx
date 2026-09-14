@@ -2077,6 +2077,7 @@ export default function Noctgram({
             return (
               <AppLink
                 key={String(id)}
+                data-nav={String(id)}
                 className={selected ? 'active' : ''}
                 aria-current={selected ? 'page' : undefined}
                 aria-label={String(label)}

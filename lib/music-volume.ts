@@ -10,6 +10,32 @@ export function readMusicVolume(saved: string | null) {
     ? DEFAULT_MUSIC_VOLUME
     : clampMusicVolume(Number(saved));
 }
+
+// Keep this in sync with the phone controls breakpoint in viewport.css.
+export const SYSTEM_MUSIC_VOLUME_QUERY =
+  '(pointer: coarse) and (max-width: 1000px)';
+
+/** Phone playback uses the device volume; desktop retains its saved software level. */
+export function observeMusicVolume(
+  onChange: (value: number, system: boolean) => void,
+  host: Pick<Window, 'matchMedia' | 'localStorage'> = window,
+) {
+  const media = host.matchMedia(SYSTEM_MUSIC_VOLUME_QUERY);
+  const update = () => {
+    let saved: string | null = null;
+    if (!media.matches) {
+      try {
+        saved = host.localStorage.getItem('noctgram:music-volume');
+      } catch {
+        // Optional device storage must not prevent playback.
+      }
+    }
+    onChange(media.matches ? 100 : readMusicVolume(saved), media.matches);
+  };
+  media.addEventListener('change', update);
+  update();
+  return () => media.removeEventListener('change', update);
+}
 // More travel at quiet levels: 1% on the slider is 0.01% of linear gain.
 export function musicGain(percent: number) {
   return (clampMusicVolume(percent) / 100) ** 2;

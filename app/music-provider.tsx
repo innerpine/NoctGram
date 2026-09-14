@@ -32,7 +32,7 @@ import { loadYouTubeSDK, YouTubePlayback } from '@/lib/youtube-player';
 import {
   DEFAULT_MUSIC_VOLUME,
   clampMusicVolume,
-  readMusicVolume,
+  observeMusicVolume,
   musicGain,
   youtubeVolume,
   volumeFromYouTube,
@@ -157,6 +157,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const generation = useRef(0),
     isPlaying = useRef(false),
     volumeRef = useRef(volume);
+  const systemVolume = useRef(false);
   const tracker = useRef<MusicListenTracker | null>(null);
   const roomRef = useRef<MusicRoom | null>(null);
   const [repeatOne, setRepeatOne] = useState(false);
@@ -202,15 +203,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   });
   volumeRef.current = volume;
   useEffect(() => {
-    try {
-      const value = readMusicVolume(
-        localStorage.getItem('noctgram:music-volume'),
-      );
+    return observeMusicVolume((value, system) => {
+      systemVolume.current = system;
       volumeRef.current = value;
       setVolume(value);
-    } catch {
-      /* Device storage is optional. */
-    }
+      if (audio.current) audio.current.volume = musicGain(value);
+      spotify.current?.volume(musicGain(value));
+      youtube.current?.volume(youtubeVolume(value));
+      widget.current?.setVolume(musicGain(value) * 100);
+    });
   }, []);
   const clearStats = () => {
     tracker.current?.dispose();
@@ -987,10 +988,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             setPlaying(state.playing);
             setPosition(state.position);
             setDuration(state.duration);
-            const nextVolume = volumeFromYouTube(
-              state.volume,
-              volumeRef.current,
-            );
+            const nextVolume = systemVolume.current
+              ? 100
+              : volumeFromYouTube(state.volume, volumeRef.current);
             volumeRef.current = nextVolume;
             setVolume(nextVolume);
             if (state.playing) {
@@ -1343,7 +1343,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     else widget.current?.seekTo(value);
   };
   const changeVolume = (value: number) => {
-    if (!link) return;
+    if (!link || systemVolume.current) return;
     value = clampMusicVolume(value);
     volumeRef.current = value;
     setVolume(value);

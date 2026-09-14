@@ -8,11 +8,17 @@ const compiled = await build({
   platform: 'node',
   format: 'esm',
 });
-const { musicGain, readMusicVolume, youtubeVolume, volumeFromYouTube } =
-  await import(
-    'data:text/javascript;base64,' +
-      Buffer.from(compiled.outputFiles[0].text).toString('base64')
-  );
+const {
+  musicGain,
+  readMusicVolume,
+  youtubeVolume,
+  volumeFromYouTube,
+  observeMusicVolume,
+  SYSTEM_MUSIC_VOLUME_QUERY,
+} = await import(
+  'data:text/javascript;base64,' +
+    Buffer.from(compiled.outputFiles[0].text).toString('base64')
+);
 
 void test('quiet volume choices have fine gain control, mute is silent and full scale remains available', () => {
   assert.equal(musicGain(0), 0);
@@ -52,4 +58,64 @@ void test('YouTube native integer limits do not create silent nonzero steps or m
   }
   assert.equal(volumeFromYouTube(0, 25), 0);
   assert.equal(volumeFromYouTube(25, 10), 50);
+});
+
+void test('phone playback uses hardware volume without overwriting the saved desktop level', () => {
+  const media = Object.assign(new EventTarget(), { matches: true });
+  let saved = '0';
+  const changes = [];
+  const stop = observeMusicVolume(
+    (value, system) => changes.push([value, system]),
+    {
+      matchMedia(query) {
+        assert.equal(query, SYSTEM_MUSIC_VOLUME_QUERY);
+        return media;
+      },
+      localStorage: {
+        getItem: () => saved,
+        setItem: () =>
+          assert.fail(
+            'Hardware volume must not overwrite the desktop preference',
+          ),
+      },
+    },
+  );
+  assert.deepEqual(
+    changes,
+    [[100, true]],
+    'A previously muted website must not mute the phone',
+  );
+  media.matches = false;
+  media.dispatchEvent(new Event('change'));
+  assert.deepEqual(changes.at(-1), [0, false]);
+  saved = '7';
+  media.matches = true;
+  media.dispatchEvent(new Event('change'));
+  assert.deepEqual(changes.at(-1), [100, true]);
+  media.matches = false;
+  media.dispatchEvent(new Event('change'));
+  assert.deepEqual(changes.at(-1), [7, false]);
+  stop();
+  const count = changes.length;
+  media.dispatchEvent(new Event('change'));
+  assert.equal(changes.length, count, 'The listener is removed on cleanup');
+});
+
+void test('unavailable device storage does not prevent mobile or desktop playback', () => {
+  const media = Object.assign(new EventTarget(), { matches: true });
+  const changes = [];
+  let reads = 0;
+  const stop = observeMusicVolume((value) => changes.push(value), {
+    matchMedia: () => media,
+    get localStorage() {
+      reads++;
+      throw new Error('Storage disabled');
+    },
+  });
+  assert.deepEqual(changes, [100]);
+  assert.equal(reads, 0);
+  media.matches = false;
+  media.dispatchEvent(new Event('change'));
+  assert.deepEqual(changes, [100, 25]);
+  stop();
 });

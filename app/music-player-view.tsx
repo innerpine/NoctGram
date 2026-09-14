@@ -623,7 +623,7 @@ export function MusicPlayerView(p: Props) {
   const transport = () => (
     <div className="music-transport">
       <button
-        className="icon-button"
+        className="icon-button music-previous"
         aria-label="Предыдущий трек"
         disabled={!p.ready || !p.previousEnabled}
         onClick={p.onPrevious}
@@ -645,7 +645,7 @@ export function MusicPlayerView(p: Props) {
         )}
       </button>
       <button
-        className="icon-button"
+        className="icon-button music-next"
         aria-label="Следующий трек"
         disabled={!p.ready || !p.nextEnabled}
         onClick={p.onNext}
@@ -1091,7 +1091,7 @@ export function MusicPlayerView(p: Props) {
                 {progress('full')}
                 <div className="music-stage-controls">
                   <button
-                    className="music-stage-icon"
+                    className="music-stage-icon music-stage-mute"
                     aria-label={p.volume ? 'Выключить звук' : 'Включить звук'}
                     onClick={toggleVolume}
                   >
