@@ -1,11 +1,26 @@
 .mobile-nav-pill {
   display: none;
 }
+.page-header .mobile-stars-link {
+  display: none;
+}
 .sidebar nav a .nav-item-content {
   display: contents;
 }
 
 @media (max-width: 500px) {
+  .page-header .mobile-stars-link {
+    display: flex;
+  }
+  .page-header .icon-button {
+    flex-shrink: 0;
+  }
+  .page-header h1 {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   :root,
   .dark {
     --app-nav-inset: calc(80px + env(safe-area-inset-bottom, 0px));

@@ -2202,6 +2202,16 @@ export default function Noctgram({
               </span>
             )}
             <AppLink
+              className="icon-button mobile-stars-link"
+              title="Noct Stars"
+              aria-label="Открыть Noct Stars"
+              aria-current={page === 'stars' ? 'page' : undefined}
+              href={navigationHref('stars')}
+              onNavigate={() => navigate('stars')}
+            >
+              <StarsIcon size={22} />
+            </AppLink>
+            <AppLink
               className="icon-button"
               aria-label="Найти в Noctgram"
               href={navigationHref('search')}
