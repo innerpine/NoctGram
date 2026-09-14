@@ -168,6 +168,15 @@ void test('a snapshot setup failure cannot prevent navigation', async () => {
   assert.equal(f.attributes.size, 0);
   assert.equal(f.animations.length, 1);
 });
+void test('phone page changes keep the navbar live instead of freezing its spring in a snapshot', async () => {
+  const f = fixture();
+  f.host.matchMedia = (query) => ({ matches: query === '(max-width: 500px)' });
+  await f.run('feed', 'music');
+  assert.deepEqual(f.updates, ['music']);
+  assert.equal(f.transitions.length, 0);
+  assert.equal(f.animations.length, 1, 'the page still animates');
+  assert.equal(f.attributes.size, 0);
+});
 void test('destination cards finish their entrance before capture, while looping media keeps animating', async () => {
   const f = fixture(),
     finished = [];

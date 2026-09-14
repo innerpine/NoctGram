@@ -47,6 +47,7 @@ import './account-management.css';
 import './staff-panel.css';
 import './channel-boosts.css';
 import './viewport.css';
+import './mobile-navigation.css';
 import './settings.css';
 import './rain.css';
 import { RainEffect } from './rain-effect';

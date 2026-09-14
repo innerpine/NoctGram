@@ -65,7 +65,12 @@ export function createPageTransition(
         }
         document.documentElement.setAttribute('data-page-transition', 'in');
       };
-      if (!document.startViewTransition) {
+      // A snapshot of the phone navbar would freeze its live spring animation.
+      // Animate the page alone so navigation remains interactive throughout.
+      if (
+        !document.startViewTransition ||
+        host.matchMedia('(max-width: 500px)').matches
+      ) {
         reveal();
         clear();
         enter();

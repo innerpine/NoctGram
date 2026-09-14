@@ -34,7 +34,6 @@ import { Phone } from 'lucide-react';
 import { MusicAccountGuard } from './music-provider';
 import { MusicActivityStatus } from './music-activity';
 import { Settings } from 'lucide-react';
-import { Music2 } from 'lucide-react';
 import { Ban } from 'lucide-react';
 import {
   type CSSProperties,
@@ -54,9 +53,9 @@ import {
   type PreparedRoute,
 } from '@/lib/app-history';
 import { AppLink } from './app-link';
+import { MainNavigation } from './main-navigation';
 import {
   Moon,
-  Home,
   Search,
   Image as ImageIcon,
   ChartNoAxesColumn,
@@ -2060,43 +2059,13 @@ export default function Noctgram({
           </span>
           noctgram<span className="alpha">α</span>
         </AppLink>
-        <nav aria-label="Главное меню">
-          {[
-            ['feed', 'Лента', Home],
-            ['search', 'Поиск', Search],
-            ['messages', 'Сообщения', Mail],
-            ['channels', 'Каналы', Megaphone],
-            ['music', 'Музыка', Music2],
-            ['profile', 'Профиль', UserRound],
-          ].map(([id, label, Icon]) => {
-            const NavIcon = Icon as typeof Home;
-            const selected =
-              page === id ||
-              (id === 'music' && page === 'music-services') ||
-              (id === 'profile' && page === 'saved');
-            return (
-              <AppLink
-                key={String(id)}
-                data-nav={String(id)}
-                className={selected ? 'active' : ''}
-                aria-current={selected ? 'page' : undefined}
-                aria-label={String(label)}
-                aria-busy={(id === 'profile' && !!openingProfile) || undefined}
-                href={navigationHref(String(id))}
-                onNavigate={() => navigate(String(id))}
-              >
-                <NavIcon size={21} />
-                <span>{String(label)}</span>
-                {id === 'messages' && unread > 0 && (
-                  <span className="nav-unread">
-                    {unread > 99 ? '99+' : unread}
-                  </span>
-                )}
-                {selected && <i />}
-              </AppLink>
-            );
-          })}
-        </nav>
+        <MainNavigation
+          page={page}
+          href={navigationHref}
+          navigate={navigate}
+          openingProfile={!!openingProfile}
+          unread={unread}
+        />
         <div className="sidebar-bottom">
           <div className="premium-nav-shell">
             <NavBorderBeam />

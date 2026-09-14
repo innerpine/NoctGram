@@ -394,15 +394,13 @@ try {
     states.set(2, me);
     states.set(4, [{ id: 'old-feed', author: me }]);
     states.set(9, false);
-    const searchLink = all(render(), 'AppLink').find(
-      (node) => node.props['aria-label'] === 'Поиск',
-    );
+    const navigation = all(render(), 'MainNavigation')[0];
     const originalTimer = globalThis.setTimeout;
     try {
       globalThis.setTimeout = () =>
         assert.fail('Search navigation must not queue a delayed autofocus');
-      assert.equal(searchLink.props.href, '/?page=search');
-      searchLink.props.onNavigate();
+      assert.equal(navigation.props.href('search'), '/?page=search');
+      navigation.props.navigate('search');
     } finally {
       globalThis.setTimeout = originalTimer;
     }
@@ -445,9 +443,7 @@ try {
       'Typing cannot restart the entrance or steal the input caret',
     );
     assert.equal(focusCalls.length, 1);
-    all(render(), 'AppLink')
-      .find((node) => node.props['aria-label'] === 'Сообщения')
-      .props.onNavigate();
+    all(render(), 'MainNavigation')[0].props.navigate('messages');
     render();
     pendingLayouts.forEach((effect) => effect());
     assert.equal(

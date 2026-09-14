@@ -1,0 +1,159 @@
+.mobile-nav-pill {
+  display: none;
+}
+.sidebar nav a .nav-item-content {
+  display: contents;
+}
+
+@media (max-width: 500px) {
+  :root,
+  .dark {
+    --app-nav-inset: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+  .sidebar {
+    padding: 0 10px calc(12px + env(safe-area-inset-bottom, 0px));
+    border: 0;
+    background: transparent;
+    overflow: visible;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    pointer-events: none;
+  }
+  .sidebar .main-navigation {
+    position: relative;
+    isolation: isolate;
+    flex-shrink: 0;
+    height: 68px;
+    width: 100%;
+    gap: 0;
+    padding: 5px 6px;
+    border: 1px solid #ffffff30;
+    border-radius: 999px;
+    background: #18181b;
+    box-shadow:
+      0 8px 24px #0006,
+      inset 0 1px 0 #ffffff08;
+    overflow: hidden;
+    pointer-events: auto;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sidebar .main-navigation[data-nav-surface='glass'] {
+    border-color: transparent;
+    background:
+      linear-gradient(135deg, #18181bc9, #0f0f12df) padding-box,
+      linear-gradient(165deg, #ffffff99, #ffffff24 48%, #ffffff32) border-box;
+    backdrop-filter: blur(22px) saturate(1.15);
+    -webkit-backdrop-filter: blur(22px) saturate(1.15);
+  }
+  .sidebar .main-navigation a {
+    position: relative;
+    z-index: 1;
+    height: 56px;
+    min-height: 44px;
+    padding: 0 2px;
+    border: 0;
+    border-radius: 999px;
+    color: #b9b9bc;
+    background: transparent;
+    user-select: none;
+    transition: color 110ms ease;
+  }
+  .sidebar .main-navigation a.active {
+    color: #fff;
+    background: #343436;
+  }
+  .sidebar .main-navigation a:active {
+    transform: none;
+  }
+  .sidebar .main-navigation[data-nav-enhanced] a.active {
+    background: transparent;
+  }
+  .sidebar .main-navigation a > i {
+    display: none;
+  }
+  .sidebar .main-navigation a .nav-item-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+    min-width: 0;
+    transform-origin: 50% 65%;
+    transition: transform 90ms ease;
+  }
+  .sidebar .main-navigation a:active .nav-item-content {
+    transform: translateY(1px) scale(0.95);
+  }
+  .sidebar .main-navigation a:focus-visible {
+    outline: 2px solid #ffffffb0;
+    outline-offset: -3px;
+  }
+  .sidebar .main-navigation a .nav-item-label {
+    display: block;
+    max-width: 100%;
+    font-size: clamp(10px, 2.8vw, 12px);
+    line-height: 1.2;
+    letter-spacing: -0.15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sidebar .main-navigation a.active .nav-item-label {
+    font-weight: 500;
+  }
+  .sidebar .main-navigation a .nav-item-icon {
+    flex-shrink: 0;
+    width: 23px;
+    height: 23px;
+    transform-origin: 50% 70%;
+  }
+  .sidebar .main-navigation .nav-unread {
+    top: 2px;
+    right: max(2px, calc(50% - 24px));
+    margin: 0;
+    font-size: 9px;
+    line-height: 14px;
+    min-width: 14px;
+    padding: 0 3px;
+    border: 1px solid #18181b;
+  }
+  .main-navigation[data-nav-enhanced] .mobile-nav-pill {
+    display: block;
+    position: absolute;
+    z-index: 0;
+    left: 0;
+    top: 5px;
+    bottom: 5px;
+    pointer-events: none;
+  }
+  .mobile-nav-pill-shape {
+    width: 100%;
+    height: 100%;
+    background: #343436;
+    border-radius: 999px;
+    transform-origin: center;
+  }
+  .main-navigation[data-nav-surface='glass'] .mobile-nav-pill-shape {
+    background: #ffffff1c;
+    box-shadow: inset 0 1px 0 #ffffff14;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar .main-navigation a,
+  .sidebar .main-navigation a .nav-item-content {
+    transition: none;
+  }
+  .sidebar .main-navigation a:active .nav-item-content {
+    transform: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sidebar .main-navigation[data-nav-surface='glass'] {
+    background: #18181b;
+    border-color: #ffffff40;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
