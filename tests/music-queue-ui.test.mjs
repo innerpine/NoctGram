@@ -187,18 +187,33 @@ void test('heart: one playlist saves directly; duplicate clicks lock; several ch
     byType(c.tree, 'button').find((n) =>
       n.props.className.includes('music-favorite-button'),
     );
-  await heart().props.onClick();
+  let blurred = 0;
+  await heart().props.onClick({
+    detail: 1,
+    currentTarget: { blur: () => blurred++ },
+  });
   await c.flush();
+  assert.equal(
+    blurred,
+    1,
+    'Touch/mouse activation releases the old button focus',
+  );
   assert.equal(calls.length, 1);
   assert.equal(calls[0].action, 'add');
   assert.equal(byType(c.tree, 'Dialog')[0].props.open, false);
   assert.equal(heart().props['aria-pressed'], true);
-  await heart().props.onClick();
+  assert.equal(heart().props['data-feedback'], true);
+  await heart().props.onClick({
+    detail: 0,
+    currentTarget: {
+      blur: () => assert.fail('Keyboard focus must remain visible'),
+    },
+  });
   await c.flush();
   assert.equal(calls[1].action, 'remove');
   lists.push({ id: 'two', name: 'Утро', trackCount: 0, savedTrackId: null });
-  heart().props.onClick();
-  heart().props.onClick();
+  heart().props.onClick({ detail: 0 });
+  heart().props.onClick({ detail: 0 });
   await c.flush();
   assert.equal(
     calls.length,
@@ -215,8 +230,8 @@ void test('heart: one playlist saves directly; duplicate clicks lock; several ch
   const choice = byType(c.tree, 'button').find(
     (n) => n.props['aria-label'] === 'Добавить в «Утро»',
   );
-  choice.props.onClick();
-  choice.props.onClick();
+  choice.props.onClick({ detail: 0 });
+  choice.props.onClick({ detail: 0 });
   await c.flush();
   assert.equal(calls.length, 3);
   assert.equal(
@@ -255,7 +270,7 @@ void test('heart: no playlists creates favorites, while a failed save leaves the
     track: { url: 'https://soundcloud.com/test/first', title: 'Первая' },
   });
   await c.flush();
-  byType(c.tree, 'button')[0].props.onClick();
+  byType(c.tree, 'button')[0].props.onClick({ detail: 0 });
   await c.flush();
   assert.deepEqual(
     calls.map((c) => c.action),
@@ -267,12 +282,12 @@ void test('heart: no playlists creates favorites, while a failed save leaves the
     { id: 'one', name: 'Один', trackCount: 0 },
     { id: 'two', name: 'Два', trackCount: 0 },
   ];
-  byType(c.tree, 'button')[0].props.onClick();
+  byType(c.tree, 'button')[0].props.onClick({ detail: 0 });
   await c.flush();
   fail = true;
   byType(c.tree, 'button')
     .find((n) => n.props.className === 'music-favorite-choice')
-    .props.onClick();
+    .props.onClick({ detail: 0 });
   await c.flush();
   assert.equal(byType(c.tree, 'Dialog')[0].props.open, true);
   assert.equal(

@@ -59,6 +59,7 @@ import {
   type PlayerAppearance,
 } from '@/lib/music-player';
 import { useTrackLyrics, type LyricLookup } from '@/lib/use-track-lyrics';
+import { centerLyric } from '@/lib/lyric-scroll';
 import { MusicSeekControl } from './music-seek-control';
 import { MusicFavorite } from './music-favorite';
 import { MusicReorderList } from './music-reorder-list';
@@ -124,7 +125,10 @@ const LyricLines = memo(function LyricLines({
       className={'music-lyric-line' + (index === active ? ' current' : '')}
       aria-current={index === active ? 'true' : undefined}
       aria-label={`${formatMusicTime(line.time)} — ${line.text || 'Проигрыш'}`}
-      onClick={() => onChoose(line.time)}
+      onClick={(event) => {
+        if (event.detail > 0) event.currentTarget.blur();
+        onChoose(line.time);
+      }}
     >
       {line.text || '•••'}
     </button>
@@ -137,7 +141,6 @@ function Lyrics({
   enabled,
   appearance,
   offset,
-  onQueue,
   onSeek,
 }: {
   lookup: LyricLookup;
@@ -145,7 +148,6 @@ function Lyrics({
   enabled: boolean;
   appearance: PlayerAppearance;
   offset: number;
-  onQueue: () => void;
   onSeek: (time: number) => void;
 }) {
   const { key, lyrics } = lookup;
@@ -154,12 +156,14 @@ function Lyrics({
   const activeLine = useRef<HTMLButtonElement>(null);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchOrigin = useRef<{ x: number; y: number } | null>(null);
+  const cancelScroll = useRef<(() => void) | null>(null);
   const [size, setSize] = useState(0);
   const resumeFollow = useCallback(() => {
     if (resumeTimer.current) clearTimeout(resumeTimer.current);
     setFollow(true);
   }, []);
   const browseLyrics = () => {
+    cancelScroll.current?.();
     setFollow(false);
     if (resumeTimer.current) clearTimeout(resumeTimer.current);
     resumeTimer.current = setTimeout(resumeFollow, 4000);
@@ -213,15 +217,13 @@ function Lyrics({
     const reduced = window.matchMedia(
       '(prefers-reduced-motion: reduce)',
     ).matches;
-    container.current.scrollTo({
-      top:
-        container.current.scrollTop +
-        activeLine.current.getBoundingClientRect().top -
-        container.current.getBoundingClientRect().top -
-        container.current.clientHeight / 2 +
-        activeLine.current.getBoundingClientRect().height / 2,
-      behavior: appearance.motion && !reduced ? 'smooth' : 'instant',
-    });
+    const cancel = centerLyric(
+      container.current,
+      activeLine.current,
+      appearance.motion && !reduced,
+    );
+    cancelScroll.current = cancel;
+    return cancel;
   }, [
     active,
     follow,
@@ -258,9 +260,6 @@ function Lyrics({
               ? 'Сервис текстов временно недоступен. Попробуйте чуть позже.'
               : 'Можно продолжить слушать и выбрать следующий трек.'}
         </p>
-        <button onClick={onQueue}>
-          <ListMusic size={17} /> Открыть очередь
-        </button>
         {!lyrics?.instrumental && (
           <button onClick={lookup.retry}>Повторить поиск текста</button>
         )}
@@ -321,7 +320,6 @@ function Lyrics({
         )}
       </section>
       <div className="music-lyrics-footer">
-        <span>Текст · LRCLIB</span>
         {!follow && lyrics.lines.length > 0 ? (
           <button onClick={resumeFollow}>К текущей строке</button>
         ) : (
@@ -934,10 +932,6 @@ export function MusicPlayerView(p: Props) {
               enabled={dockVisible}
               appearance={appearance}
               offset={offset}
-              onQueue={() => {
-                setPane('queue');
-                p.onExpanded(true);
-              }}
               onSeek={p.onSeek}
             />
           )}
@@ -1104,16 +1098,6 @@ export function MusicPlayerView(p: Props) {
                     {p.volume ? <Volume2 size={21} /> : <VolumeX size={21} />}
                   </button>
                   {transport()}
-                  <button
-                    className="music-stage-icon"
-                    aria-label="Показать очередь"
-                    aria-pressed={pane === 'queue'}
-                    onClick={() =>
-                      setPane(pane === 'queue' ? 'lyrics' : 'queue')
-                    }
-                  >
-                    <ListMusic size={22} />
-                  </button>
                 </div>
                 <div className="music-stage-volume">
                   <Volume2 size={15} />
@@ -1149,7 +1133,6 @@ export function MusicPlayerView(p: Props) {
                     }
                     appearance={appearance}
                     offset={offset}
-                    onQueue={() => setPane('queue')}
                     onSeek={p.onSeek}
                   />
                 </div>

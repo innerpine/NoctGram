@@ -62,6 +62,25 @@
 .music-favorite-button[data-saved='true'] {
   color: #e5b3d8;
 }
+.music-favorite-button {
+  -webkit-tap-highlight-color: transparent;
+}
+.music-favorite-button[data-feedback='true'] {
+  animation: music-favorite-feedback 650ms ease-out;
+}
+@keyframes music-favorite-feedback {
+  from {
+    background-color: #ffffff20;
+  }
+  to {
+    background-color: transparent;
+  }
+}
+@media (hover: none), (pointer: coarse) {
+  .music-favorite-button:hover {
+    background: transparent;
+  }
+}
 .music-favorite-button[data-saved='true'] > svg:not(.spin) {
   animation: music-heart-in 260ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
 }
@@ -207,6 +226,7 @@
     transition: none;
   }
   .music-favorite-note,
+  .music-favorite-button[data-feedback='true'],
   .music-favorite-button[data-saved='true'] > svg:not(.spin) {
     animation: none;
   }

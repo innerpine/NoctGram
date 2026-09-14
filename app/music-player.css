@@ -185,11 +185,16 @@
     background 0.2s,
     transform 0.2s;
 }
-.music-stage-icon:hover,
 .music-stage-icon[data-popup-open],
-.music-stage-icon[aria-pressed='true'] {
+.music-stage-icon[aria-pressed='true']:not(.music-favorite-button) {
   color: #fff;
   background: #ffffff12;
+}
+@media (hover: hover) and (pointer: fine) {
+  .music-stage-icon:hover {
+    color: #fff;
+    background: #ffffff12;
+  }
 }
 .music-stage-icon:active {
   transform: scale(0.94);
@@ -487,6 +492,8 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
+  scroll-behavior: auto;
+  overflow-anchor: none;
   padding: var(--lyrics-center-space, 35%) 8px var(--lyrics-center-space, 40%);
   touch-action: pan-y pinch-zoom;
   mask-image: linear-gradient(transparent, #000 12%, #000 85%, transparent);
@@ -495,6 +502,8 @@
   display: none;
 }
 .music-lyric-line {
+  background: transparent;
+  -webkit-tap-highlight-color: transparent;
   text-align: left;
   width: 100%;
   display: block;
@@ -517,13 +526,27 @@
 .soft-lines .music-lyric-line:not(.current) {
   filter: blur(1.6px);
 }
-.music-lyric-line:hover,
+.music-lyric-line:hover {
+  background: transparent;
+}
 .music-lyric-line:focus-visible {
   color: #ffffffc9;
   filter: none !important;
 }
-.music-lyric-line.current:hover {
-  color: #fff;
+@media (hover: hover) and (pointer: fine) {
+  .music-lyric-line:hover {
+    color: #ffffffc9;
+    filter: none !important;
+  }
+  .music-lyric-line.current:hover {
+    color: #fff;
+  }
+}
+@media (pointer: coarse) {
+  .music-lyric-line {
+    /* Avoid animating text blur on every line while iOS is scrolling. */
+    transition: color 240ms ease;
+  }
 }
 .music-lyrics-plain {
   color: #ffffffce;
@@ -537,7 +560,7 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 15px;
   padding-top: 12px;
   font-size: 12px;

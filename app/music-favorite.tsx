@@ -144,6 +144,7 @@ export function MusicFavorite({ track }: { track: Track }) {
           type="button"
           className="music-favorite-button music-stage-icon"
           data-saved={saved}
+          data-feedback={!!note && saved}
           aria-pressed={saved}
           aria-label={
             saved
@@ -152,7 +153,10 @@ export function MusicFavorite({ track }: { track: Track }) {
           }
           title={note || (saved ? 'Песня в плейлисте' : 'Добавить в плейлист')}
           disabled={busy || !valid}
-          onClick={() => void click()}
+          onClick={(event) => {
+            if (event.detail > 0) event.currentTarget.blur();
+            void click();
+          }}
         >
           {busy ? (
             <LoaderCircle size={21} className="spin" />
