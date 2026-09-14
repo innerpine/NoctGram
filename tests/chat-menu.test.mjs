@@ -22,7 +22,7 @@ const compiled = await build({
         build.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({
           contents:
             path === 'react'
-              ? 'export const useRef=(current)=>({current});'
+              ? 'export const useRef=(current)=>({current}); export const useState=(initial)=>[typeof initial === "function" ? initial() : initial,()=>{}]; export const useLayoutEffect=(setup)=>{setup();};'
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
                 : path === 'lucide-react'
@@ -139,7 +139,10 @@ Object.defineProperty(globalThis, 'Element', {
   value: TestElement,
 });
 try {
-  const root = { contains: (target) => target.contained };
+  const root = {
+    contains: (target) => !!target?.contained,
+    ownerDocument: { getSelection: () => null },
+  };
   const trigger = nodes(menu).find(
     (node) => node.type === 'ContextMenuTrigger',
   );
@@ -218,19 +221,23 @@ try {
     ['reply', 'm1'],
     'Double click replies to the message owning the gutter',
   );
+  const beforeBubble = actions.length;
+  doubleClick(trigger, new TestElement(false, true, true));
+  assert.equal(actions.length, beforeBubble + 1);
+  assert.deepEqual(
+    actions.at(-1),
+    ['reply', 'm1'],
+    'Double click on message text also starts a reply',
+  );
   const replied = actions.length;
-  for (const target of [
-    new TestElement(true),
-    new TestElement(false, false),
-    new TestElement(false, true, true),
-  ])
+  for (const target of [new TestElement(true), new TestElement(false, false)])
     doubleClick(trigger, target);
   for (const key of ['ctrlKey', 'metaKey', 'altKey', 'shiftKey'])
     doubleClick(trigger, new TestElement(), { [key]: true });
   assert.equal(
     actions.length,
     replied,
-    'Message content, portals, media and modified clicks keep their existing behaviour',
+    'Portals, media and modified clicks keep their existing behaviour',
   );
   for (const restrictions of [
     { disabled: true },

@@ -16,7 +16,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { Message } from '@/lib/client';
-import { isChatSelectionSurface } from '@/lib/chat-drag-selection';
+import { useMessageReplyGesture } from './use-message-reply-gesture';
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -136,15 +136,22 @@ export function ChatMessageContext({
   initial?: boolean;
 }) {
   const pointer = useRef<{ x: number; y: number } | null>(null);
-  const replyGesture = useRef(false);
   const canQuickReply =
     !selecting &&
     !removing &&
     !props.disabled &&
     props.canSend &&
     !props.unconfirmed;
+  const replyGesture = useMessageReplyGesture(canQuickReply, () =>
+    props.onAction('reply', props.message),
+  );
   return (
-    <ContextMenu disabled={removing || props.unconfirmed}>
+    <ContextMenu
+      disabled={removing || props.unconfirmed}
+      onOpenChange={(open) => {
+        if (open) replyGesture.cancel();
+      }}
+    >
       <ContextMenuTrigger
         tabIndex={0}
         aria-haspopup="menu"
@@ -156,6 +163,7 @@ export function ChatMessageContext({
         aria-hidden={removing || undefined}
         className={
           'chat-message-shell select-text' +
+          (canQuickReply ? ' chat-reply-gesture' : '') +
           (props.selected ? ' is-selected' : '')
         }
         onKeyDown={(event) => {
@@ -196,40 +204,17 @@ export function ChatMessageContext({
           pointer.current =
             event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
         }}
+        onPointerDown={replyGesture.onPointerDown}
+        onPointerMove={replyGesture.onPointerMove}
+        onPointerUp={replyGesture.onPointerUp}
+        onLostPointerCapture={replyGesture.onLostPointerCapture}
         onPointerCancel={() => {
           pointer.current = null;
-          replyGesture.current = false;
+          replyGesture.cancel();
         }}
-        onDoubleClick={(event) => {
-          const startedOnGutter = replyGesture.current;
-          replyGesture.current = false;
-          if (
-            !startedOnGutter ||
-            !canQuickReply ||
-            event.button !== 0 ||
-            event.ctrlKey ||
-            event.metaKey ||
-            event.altKey ||
-            event.shiftKey ||
-            !isChatSelectionSurface(event.target, event.currentTarget)
-          )
-            return;
-          event.preventDefault();
-          event.stopPropagation();
-          props.onAction('reply', props.message);
-        }}
+        onDoubleClick={replyGesture.onDoubleClick}
         onClickCapture={(event) => {
-          // Remember the first click: deselecting the final selected message
-          // during a double click must not turn that gesture into a reply.
-          if (event.detail === 1)
-            replyGesture.current =
-              event.button === 0 &&
-              canQuickReply &&
-              !event.ctrlKey &&
-              !event.metaKey &&
-              !event.altKey &&
-              !event.shiftKey &&
-              isChatSelectionSurface(event.target, event.currentTarget);
+          if (replyGesture.onClickCapture(event)) return;
           const start = pointer.current;
           pointer.current = null;
           if (
@@ -275,6 +260,9 @@ export function ChatMessageContext({
           </button>
         )}
         {children}
+        <span className="chat-reply-indicator" aria-hidden="true">
+          <Reply size={18} />
+        </span>
       </ContextMenuTrigger>
       <ContextMenuContent className="chat-action-menu">
         <Items {...props} />

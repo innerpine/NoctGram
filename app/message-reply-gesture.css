@@ -1,0 +1,42 @@
+.chat-reply-gesture {
+  position: relative;
+  touch-action: pan-y pinch-zoom;
+  translate: var(--reply-shift, 0px) 0;
+  transition: translate 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.chat-reply-gesture[data-reply-dragging] {
+  transition: none;
+  user-select: none;
+}
+.chat-reply-indicator {
+  position: absolute;
+  right: max(-40px, var(--reply-shift, 0px));
+  top: calc(50% - 16px);
+  width: 32px;
+  height: 32px;
+  display: none;
+  place-items: center;
+  border-radius: 50%;
+  background: #332b3e;
+  color: #d6c2ef;
+  opacity: var(--reply-progress, 0);
+  scale: calc(0.7 + var(--reply-progress, 0) * 0.3);
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    scale 140ms ease,
+    background 140ms ease;
+}
+.chat-reply-gesture[data-reply-dragging] > .chat-reply-indicator {
+  display: grid;
+}
+.chat-reply-gesture[data-reply-ready] > .chat-reply-indicator {
+  background: #685078;
+  color: #fff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-reply-gesture,
+  .chat-reply-indicator {
+    transition: none;
+  }
+}

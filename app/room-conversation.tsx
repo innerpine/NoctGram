@@ -1,4 +1,5 @@
 'use client';
+import { RoomMessageGesture } from './room-message-gesture';
 import { MessageReactions } from './message-reactions';
 import type { ReactionEmoji } from '@/lib/message-reactions';
 import { EmojiPicker, EmojiPreview } from './premium-emoji';
@@ -112,6 +113,20 @@ export function RoomConversation({
   const pageBefore = useRef(''),
     paging = useRef(false);
   const sending = useRef(false);
+  const composer = useRef<HTMLTextAreaElement>(null);
+  const selectReply = (message: RoomMessage) => {
+    if (
+      disabled ||
+      busy ||
+      pending ||
+      !room?.canSend ||
+      room.kind !== 'group' ||
+      message.deletedAt
+    )
+      return;
+    setReply(message);
+    composer.current?.focus({ preventScroll: true });
+  };
   const load = useCallback(async () => {
     const ticket = ++serial.current;
     readController.current?.abort();
@@ -682,8 +697,17 @@ export function RoomConversation({
                 ? room.messages.find((item) => item.id === message.replyTo)
                 : null;
               return (
-                <div
+                <RoomMessageGesture
                   key={message.id}
+                  enabled={
+                    room.kind === 'group' &&
+                    room.canSend &&
+                    !disabled &&
+                    !busy &&
+                    !pending &&
+                    !message.deletedAt
+                  }
+                  onReply={() => selectReply(message)}
                   className={
                     giveawayEvent
                       ? 'room-giveaway-event'
@@ -789,7 +813,7 @@ export function RoomConversation({
                         {room.kind === 'group' && (
                           <DropdownMenuItem
                             disabled={disabled || !room.canSend || pending}
-                            onClick={() => setReply(message)}
+                            onClick={() => selectReply(message)}
                           >
                             <Reply size={15} />
                             Ответить
@@ -809,7 +833,7 @@ export function RoomConversation({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
-                </div>
+                </RoomMessageGesture>
               );
             })}
           </div>
@@ -857,6 +881,7 @@ export function RoomConversation({
               disabled={disabled || pending || !room.canSend}
             />
             <textarea
+              ref={composer}
               aria-label="Сообщение"
               placeholder={
                 room.kind === 'secret'
