@@ -451,6 +451,12 @@
     width: 100%;
     min-width: 0;
   }
+  .sidebar nav a[data-nav='channels'] {
+    grid-area: 1 / 2;
+  }
+  .sidebar nav a[data-nav='messages'] {
+    grid-area: 1 / 3;
+  }
   /* iOS Safari can retain an old fixed-bottom boundary while its toolbar
      collapses. Anchor controls to the visible viewport's top + height instead. */
   .sidebar {
