@@ -14,10 +14,10 @@ export async function GET(
       assertReadable(me),
       db()
         .prepare(
-          `SELECT up.userId,up.name,up.type,u.onboardingComplete,u.deletedAt,c.kind,
+          `SELECT up.userId,up.name,up.type,u.onboardingComplete,u.deletedAt,COALESCE(c.kind,rf.kind) AS kind,
         (SELECT onboardingComplete FROM users WHERE id=?) AS viewerComplete,
         EXISTS(SELECT 1 FROM users av WHERE av.avatar='/api/media/'||up.id AND ${visibleAccount('av')}) AS avatar
-        FROM uploads up JOIN users u ON u.id=up.userId LEFT JOIN chat_uploads c ON c.uploadId=up.id WHERE up.id=? AND up.state='ready'`,
+        FROM uploads up JOIN users u ON u.id=up.userId LEFT JOIN chat_uploads c ON c.uploadId=up.id LEFT JOIN room_uploads rf ON rf.uploadId=up.id WHERE up.id=? AND up.state='ready'`,
         )
         .bind(me, id)
         .first<{

@@ -153,6 +153,7 @@ function fixture(t) {
     'lib/premium.ts',
     'lib/stories.ts',
     'lib/media-access.ts',
+    'lib/room-access.ts',
     'lib/avatar-media.ts',
     'lib/appearance.ts',
   ]);

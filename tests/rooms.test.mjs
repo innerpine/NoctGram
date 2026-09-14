@@ -83,6 +83,8 @@ const compiled = await build({
     path.join(sourceRoot, 'lib/rooms.ts'),
     path.join(sourceRoot, 'lib/secret-format.ts'),
     path.join(sourceRoot, 'lib/account-removal.ts'),
+    path.join(sourceRoot, 'lib/chat-uploads.ts'),
+    path.join(sourceRoot, 'lib/media-access.ts'),
   ],
   outdir: 'unused',
   bundle: true,
@@ -101,12 +103,15 @@ const compiled = await build({
         build.onLoad({ filter: /.*/, namespace: 'fixture-settings' }, () => ({
           contents: "export const setting=()=> '1';",
         }));
-        build.onResolve({ filter: /^\.\/storage$/ }, () => ({
+        build.onResolve({ filter: /^\.\/(storage|server)$/ }, () => ({
           path: 'storage',
           namespace: 'fixture',
         }));
         build.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
-          contents: 'export const db = () => globalThis.__roomsDb;',
+          contents: `export const db = () => globalThis.__roomsDb;
+            export const clean = value => String(value).trim();
+            export const bucket = () => ({put:async()=>{},delete:async()=>{}});
+            export class ApiError extends Error {constructor(status,message){super(message);this.status=status;}}`,
         }));
       },
     },
@@ -123,6 +128,8 @@ const imported = async (name) =>
 const api = await imported('rooms');
 const format = await imported('secret-format');
 const removal = await imported('account-removal');
+const uploadsApi = await imported('chat-uploads');
+const mediaApi = await imported('media-access');
 let now = Date.now();
 const change = (me, body) => api.changeRoom(me, body, ++now);
 const deny = (promise, status = 403) =>
@@ -939,6 +946,165 @@ assert.equal(
     )
     .get(navigationRoom.id).muted,
   0,
+);
+// Group attachments use real migrations and SQL, with an in-memory bucket only.
+sqlite.exec(
+  "INSERT INTO users(id,name,created) VALUES('files_owner','Owner',1),('files_member','Member',1),('files_outside','Outside',1)",
+);
+const fileRoom = await change('files_owner', {
+  action: 'create',
+  kind: 'group',
+  name: 'Files',
+  memberIds: ['files_member'],
+});
+const otherFileRoom = await change('files_owner', {
+  action: 'create',
+  kind: 'group',
+  name: 'Other files',
+  memberIds: [],
+});
+const photo = () =>
+  new File(
+    [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0])],
+    'photo.png',
+    { type: 'image/png' },
+  );
+await deny(
+  uploadsApi.storeChatUpload('files_outside', '', photo(), fileRoom.id),
+);
+const file = await uploadsApi.storeChatUpload(
+  'files_owner',
+  '',
+  photo(),
+  fileRoom.id,
+);
+await mediaApi.assertMediaRead(file.id, 'files_owner', 'files_owner');
+await deny(
+  mediaApi.assertMediaRead(file.id, 'files_member', 'files_owner'),
+  404,
+);
+await deny(
+  send('files_owner', otherFileRoom.id, 'wrong room', {
+    attachments: [file.id],
+  }),
+);
+await deny(
+  send('files_member', fileRoom.id, 'wrong owner', { attachments: [file.id] }),
+);
+await deny(
+  send('files_owner', fileRoom.id, 'duplicates', {
+    attachments: [file.id, file.id],
+  }),
+  400,
+);
+await deny(
+  send('files_owner', fileRoom.id, 'unknown', { attachments: ['missing'] }),
+);
+const fileKey = crypto.randomUUID();
+const fileMessage = await send('files_owner', fileRoom.id, '', {
+  attachments: [file.id],
+  key: fileKey,
+});
+assert.equal(
+  sqlite
+    .prepare('SELECT messageId FROM room_uploads WHERE uploadId=?')
+    .get(file.id).messageId,
+  fileMessage.id,
+);
+await send('files_owner', fileRoom.id, '', {
+  attachments: [file.id],
+  key: fileKey,
+});
+assert.equal(
+  (await api.readRoom('files_member', fileRoom.id)).messages.length,
+  1,
+  'Retry is idempotent',
+);
+assert.deepEqual(
+  (await api.readRoom('files_member', fileRoom.id)).messages[0].attachments,
+  [file],
+);
+await deny(
+  send('files_owner', fileRoom.id, 'changed', {
+    attachments: [file.id],
+    key: fileKey,
+  }),
+  409,
+);
+await deny(
+  send('files_owner', fileRoom.id, 'reuse', { attachments: [file.id] }),
+);
+await mediaApi.assertMediaRead(file.id, 'files_member', 'files_owner');
+await deny(
+  mediaApi.assertMediaRead(file.id, 'files_outside', 'files_owner'),
+  404,
+);
+assert.equal(
+  sqlite
+    .prepare(`SELECT 1 WHERE ${mediaApi.mediaPermission('?1', '?2')}`)
+    .get(file.id, 'files_owner'),
+  undefined,
+  'Group media cannot be published as public profile/post media',
+);
+await uploadsApi.discardChatUpload('files_owner', file.id);
+assert.equal(
+  sqlite.prepare('SELECT state FROM uploads WHERE id=?').get(file.id).state,
+  'ready',
+  'Composer cleanup never discards a sent file',
+);
+await change('files_member', { action: 'leave', id: fileRoom.id });
+await deny(
+  mediaApi.assertMediaRead(file.id, 'files_member', 'files_owner'),
+  404,
+);
+await change('files_owner', {
+  action: 'deleteMessage',
+  id: fileRoom.id,
+  messageId: fileMessage.id,
+});
+assert.deepEqual(
+  (await api.readRoom('files_owner', fileRoom.id)).messages[0].attachments,
+  [],
+);
+await deny(
+  mediaApi.assertMediaRead(file.id, 'files_owner', 'files_owner'),
+  404,
+);
+const garbage = await uploadsApi.storeChatUpload(
+  'files_owner',
+  '',
+  photo(),
+  fileRoom.id,
+);
+sqlite
+  .prepare("UPDATE uploads SET state='deleting' WHERE id=?")
+  .run(garbage.id);
+await deny(
+  send('files_owner', fileRoom.id, 'garbage', { attachments: [garbage.id] }),
+);
+const raced = await uploadsApi.storeChatUpload(
+  'files_owner',
+  '',
+  photo(),
+  fileRoom.id,
+);
+beforeWrite = () =>
+  sqlite
+    .prepare(
+      "UPDATE chat_room_members SET status='left' WHERE roomId=? AND userId='files_owner'",
+    )
+    .run(fileRoom.id);
+await deny(
+  send('files_owner', fileRoom.id, 'revoked', { attachments: [raced.id] }),
+);
+assert.equal(
+  sqlite
+    .prepare('SELECT messageId FROM room_uploads WHERE uploadId=?')
+    .get(raced.id).messageId,
+  null,
+);
+console.log(
+  'Group attachments: upload, membership, owner/room scope, retry, revoked access, deletion, GC race and public-media isolation passed.',
 );
 console.log(
   'Room integration passed: membership, roles, invites, discovery, privacy, restrictions, races, secret envelopes, limits and pagination.',

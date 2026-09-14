@@ -33,7 +33,7 @@ const compiled = await build({
         build.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({
           contents:
             path === 'react'
-              ? 'export const useRef=(current)=>({current});'
+              ? 'export const useRef=(current)=>({current}); export const useState=init=>[typeof init === "function" ? init() : init,()=>{}];'
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
                 : path === 'lucide-react'

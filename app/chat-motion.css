@@ -9,33 +9,12 @@
   min-width: 0;
   gap: inherit;
 }
-[data-room-new] {
-  animation: chat-detail-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.room-message-list [data-chat-arrival] {
+.message-list [data-chat-arrival] {
   outline: none;
   box-shadow:
-    0 0 0 1px #cdb4df70,
-    inset 0 0 0 100vmax #cdb4df20;
-}
-.room-quote {
-  width: 100%;
-  border-top: 0;
-  border-right: 0;
-  border-bottom: 0;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 150ms ease;
-}
-.room-quote:hover:not(:disabled) {
-  background: #cbb0df25;
-}
-.room-quote:focus-visible {
-  outline: 2px solid #cbb0df;
-  outline-offset: 2px;
-}
-.room-quote:disabled {
-  cursor: default;
+    0 0 0 1px color-mix(in srgb, var(--chat-accent, #cbbadb) 35%, transparent),
+    inset 0 0 0 100vmax
+      color-mix(in srgb, var(--chat-accent, #cbbadb) 12%, transparent);
 }
 .room-thread .thread-copy strong > svg {
   display: inline;
@@ -52,6 +31,9 @@
 /* Loaded history is visible on its first frame; only newly arriving messages enter. */
 .chat-message-shell[data-chat-initial]
   :is(.chat-message-row, .bubble, .chat-gift-event) {
+  animation: none;
+}
+.chat-message-row[data-chat-initial] {
   animation: none;
 }
 .chat-action-menu,

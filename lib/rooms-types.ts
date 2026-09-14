@@ -13,6 +13,7 @@ export type RoomMember = {
   joinedAt: number;
 };
 export type RoomMessage = {
+  attachments?: import('./chat-files').ChatAttachment[];
   reactions?: import('./message-reactions').MessageReaction[];
   giveawayId?: string | null;
   id: string;

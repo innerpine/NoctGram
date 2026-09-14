@@ -1,3 +1,4 @@
+import { access } from './room-access';
 import { animatedAvatarActive } from './premium-access';
 import { db, ApiError } from './server';
 import { published, channelPermission, sqlNow } from './channel-access';
@@ -11,9 +12,20 @@ export async function assertMediaRead(
   const d = db(),
     url = '/api/media/' + id;
   const privateFile = await d
-    .prepare('SELECT recipient,messageId FROM chat_uploads WHERE uploadId=?')
-    .bind(id)
-    .first<{ recipient: string; messageId: string | null }>();
+    .prepare(`SELECT messageId,NULL AS roomId FROM chat_uploads WHERE uploadId=?
+      UNION ALL SELECT messageId,roomId FROM room_uploads WHERE uploadId=? LIMIT 1`)
+    .bind(id, id)
+    .first<{ roomId: string | null; messageId: string | null }>();
+  if (privateFile?.roomId) {
+    const allowed = await d
+      .prepare(`SELECT 1 FROM chat_rooms r WHERE r.id=? AND r.kind='group' AND ${access('r', '?2')}
+      AND ((?3 IS NULL AND ?2=?4) OR EXISTS(SELECT 1 FROM chat_room_messages m,json_each(m.media) j
+        WHERE m.id=?3 AND m.roomId=r.id AND m.deletedAt=0 AND json_extract(j.value,'$.id')=?5))`)
+      .bind(privateFile.roomId, me, privateFile.messageId, uploader, id)
+      .first();
+    if (allowed) return;
+    throw new ApiError(404, 'Файл недоступен');
+  }
   if (privateFile) {
     if (me === uploader && !privateFile.messageId) return;
     if (
@@ -59,7 +71,7 @@ export async function assertMediaRead(
 // content writes so revoking a channel editor cannot race an attachment check.
 export function mediaPermission(idExpr: string, actorExpr: string) {
   // Keep both D1 limits: shallow expressions and at most five compound SELECTs.
-  return `NOT EXISTS(SELECT 1 FROM chat_uploads cu WHERE cu.uploadId=${idExpr}) AND EXISTS(SELECT 1 FROM uploads live WHERE live.id=${idExpr} AND live.state='ready') AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=${idExpr}) AND (EXISTS(
+  return `NOT EXISTS(SELECT 1 FROM room_uploads rf WHERE rf.uploadId=${idExpr}) AND NOT EXISTS(SELECT 1 FROM chat_uploads cu WHERE cu.uploadId=${idExpr}) AND EXISTS(SELECT 1 FROM uploads live WHERE live.id=${idExpr} AND live.state='ready') AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=${idExpr}) AND (EXISTS(
  SELECT 1 FROM users pu WHERE (pu.avatar='/api/media/'||${idExpr} OR pu.cover='/api/media/'||${idExpr}) AND ${visibleAccount('pu')}
  UNION SELECT 1 FROM profile_appearance ma JOIN users pu ON pu.id=ma.userId WHERE ma.avatarMotion='/api/media/'||${idExpr} AND ${visibleAccount('pu')} AND ${animatedAvatarActive('pu')}
  UNION SELECT 1 FROM posts mp JOIN users pu ON pu.id=mp.userId WHERE ${published('mp')} AND ${visibleAccount('pu')} AND EXISTS(SELECT 1 FROM json_each(mp.media) mm WHERE json_extract(mm.value,'$.id')=${idExpr})

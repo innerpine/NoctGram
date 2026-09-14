@@ -3,8 +3,13 @@ import { MessageReactions } from './message-reactions';
 import { RoomMessageContext } from './room-message-menu';
 import { chatHistoryContextMenu } from './message-context-menu';
 import type { ReactionEmoji } from '@/lib/message-reactions';
-import { EmojiPicker, EmojiPreview } from './premium-emoji';
-import { MentionText } from './profile-link';
+import { ChatComposer } from './chat-composer';
+import type { ChatDraft } from '@/lib/chat-outbox';
+import { ChatEmojiText } from './chat-emoji-text';
+import { largeEmojiCount } from '@/lib/chat-emoji';
+import { ChatMessageFiles } from './chat-message-files';
+import { MusicLinkCard } from './music-link-card';
+import { chatTheme } from '@/lib/chat-themes';
 import { GiveawayCard } from './giveaway-card';
 import { GiveawayCreateButton } from './giveaway-create';
 /* eslint-disable react/react-compiler */
@@ -23,12 +28,9 @@ import {
   LoaderCircle,
   LockKeyhole,
   MoreHorizontal,
-  Reply,
-  Send,
   Settings,
   ShieldCheck,
   Users,
-  X,
 } from 'lucide-react';
 import {
   Dialog,
@@ -55,7 +57,6 @@ import { RoomAvatar } from './room-list';
 import { RoomManagement } from './room-management';
 import { Avatar } from './post-card';
 import { ChatNotificationsItem } from './chat-notifications';
-import { ChatReveal } from './chat-reveal';
 import { createChatNavigator } from '@/lib/chat-navigation';
 import { revealChat, watchChatTail } from '@/lib/chat-viewport';
 
@@ -119,12 +120,14 @@ export function RoomConversation({
     id: string;
     text: string;
     replyTo: string | null;
+    attachments: NonNullable<ChatDraft['attachments']>;
     ciphertext?: string;
   } | null>(null);
   const pageBefore = useRef(''),
     paging = useRef(false);
   const sending = useRef(false);
-  const emojiField = useRef<HTMLTextAreaElement>(null);
+  const [replyFocus, setReplyFocus] = useState(0);
+  const [confirmedMessage, setConfirmedMessage] = useState('');
   const navigation = useRef<ReturnType<typeof createChatNavigator> | null>(
       null,
     ),
@@ -428,6 +431,7 @@ export function RoomConversation({
     ) {
       outgoing.current = null;
       setPending(false);
+      setConfirmedMessage(item.id);
       setText((current) => (current.trim() === item.text ? '' : current));
       setReply(null);
       setMutationError('');
@@ -462,22 +466,23 @@ export function RoomConversation({
       if (alive.current) setBusy(false);
     }
   };
-  const send = async () => {
+  const send = async (draft: ChatDraft): Promise<boolean> => {
     if (
       sending.current ||
       !room ||
       disabled ||
       busy ||
       !room.canSend ||
-      (!text.trim() && !outgoing.current)
+      (!draft.text.trim() && !draft.attachments?.length && !outgoing.current)
     )
-      return;
+      return false;
     sending.current = true;
     setBusy(true);
     setMutationError('');
     const item = outgoing.current || {
       id: crypto.randomUUID(),
-      text: text.trim(),
+      text: draft.text.trim(),
+      attachments: draft.attachments || [],
       replyTo: reply?.id || null,
     };
     outgoing.current = item;
@@ -492,7 +497,7 @@ export function RoomConversation({
           text: item.text,
         });
       }
-      if (!alive.current) return;
+      if (!alive.current) return false;
       await roomAction({
         actor: me.id,
         action: 'send',
@@ -500,15 +505,25 @@ export function RoomConversation({
         key: item.id,
         ...(room.kind === 'secret'
           ? { ciphertext: item.ciphertext }
-          : { text: item.text, replyTo: item.replyTo }),
+          : {
+              text: item.text,
+              replyTo: item.replyTo,
+              attachments: item.attachments.map((file) => file.id),
+            }),
       });
       if (alive.current) {
+        outgoing.current = null;
+        setPending(false);
+        setConfirmedMessage(item.id);
         follow.current = true;
         pageBefore.current = '';
-        await refresh();
+        await refresh().catch((error) => {
+          if (alive.current) setMutationError(reason(error));
+        });
       }
+      return true;
     } catch (error) {
-      if (!alive.current) return;
+      if (!alive.current) return false;
       setMutationError(reason(error));
       if (
         (Number((error as { status?: number }).status) >= 400 &&
@@ -518,6 +533,7 @@ export function RoomConversation({
         outgoing.current = null;
         setPending(false);
       }
+      return false;
     } finally {
       sending.current = false;
       if (alive.current) setBusy(false);
@@ -534,7 +550,7 @@ export function RoomConversation({
     (member) => member.userId !== me.id,
   )?.publicKey;
   return (
-    <div className="room-workspace">
+    <div className="room-workspace chat-themed" style={chatTheme('noct').style}>
       <div className="chat-header room-header">
         <button
           className="chat-back icon-button"
@@ -721,7 +737,7 @@ export function RoomConversation({
             </div>
           )}
           <div
-            className="room-message-list"
+            className="room-message-list message-list"
             ref={scroll}
             onContextMenu={chatHistoryContextMenu}
           >
@@ -797,9 +813,17 @@ export function RoomConversation({
                     disabled={disabled}
                     canSend={room.canSend}
                     pending={pending || busy}
+                    initial={
+                      !previousNewest.current ||
+                      !!pageBefore.current ||
+                      message.created <= previousNewest.current.created
+                    }
                     reactionPending={reactionPending.has(message.id)}
                     onReact={reactToMessage}
-                    onReply={setReply}
+                    onReply={(message) => {
+                      setReply(message);
+                      setReplyFocus((value) => value + 1);
+                    }}
                     onRemove={setRemove}
                     onCopy={() => {
                       void navigator.clipboard
@@ -812,12 +836,12 @@ export function RoomConversation({
                     className={
                       giveawayEvent
                         ? 'room-giveaway-event'
-                        : 'room-message ' + (self ? 'self' : 'other')
+                        : 'chat-message-row ' + (self ? 'self' : 'other')
                     }
                   >
-                    {!giveawayEvent && !self && room.kind === 'group' && (
+                    {!giveawayEvent && (
                       <button
-                        className="room-message-avatar"
+                        className="chat-message-avatar"
                         aria-label={'Профиль ' + message.senderName}
                         onClick={() => onProfile(message.sender)}
                       >
@@ -826,24 +850,26 @@ export function RoomConversation({
                             name: message.senderName,
                             avatar: message.senderAvatar,
                           }}
-                          size={28}
+                          size={32}
                         />
                       </button>
                     )}
                     <div
                       id={'room-message-' + message.id}
                       tabIndex={-1}
-                      data-room-new={
-                        (!!previousNewest.current &&
-                          !pageBefore.current &&
-                          message.created > previousNewest.current.created) ||
-                        undefined
-                      }
+                      data-emoji-count={largeEmojiCount(content) || undefined}
                       className={
                         giveawayEvent
                           ? 'room-giveaway-content'
-                          : 'room-bubble' +
-                            (message.deletedAt ? ' deleted' : '')
+                          : 'bubble ' +
+                            (self ? 'self' : 'other') +
+                            (message.deletedAt ? ' deleted' : '') +
+                            (!message.deletedAt &&
+                            !message.replyTo &&
+                            !message.attachments?.length &&
+                            largeEmojiCount(content)
+                              ? ' chat-emoji-only'
+                              : '')
                       }
                     >
                       {!giveawayEvent && !self && room.kind === 'group' && (
@@ -857,24 +883,35 @@ export function RoomConversation({
                       {message.replyTo && !message.deletedAt && (
                         <button
                           type="button"
-                          className="room-quote"
+                          className="chat-reply-quote"
                           disabled={
                             message.replyUnavailable || !!quoted?.deletedAt
                           }
                           aria-label="Перейти к исходному сообщению"
                           onClick={() => onJump(message.replyTo!)}
                         >
-                          <Reply size={13} />
+                          <strong>
+                            {quoted?.senderName ||
+                              message.replyName ||
+                              'Ответ на сообщение'}
+                          </strong>
                           <span>
-                            {message.replyUnavailable || quoted?.deletedAt
-                              ? 'Сообщение удалено'
-                              : (
+                            {message.replyUnavailable || quoted?.deletedAt ? (
+                              'Сообщение удалено'
+                            ) : (
+                              <ChatEmojiText
+                                text={(
                                   quoted?.text ||
                                   message.replyText ||
-                                  'Ответ на сообщение'
+                                  'Вложение'
                                 ).slice(0, 160)}
+                              />
+                            )}
                           </span>
                         </button>
+                      )}
+                      {!!message.attachments?.length && !message.deletedAt && (
+                        <ChatMessageFiles files={message.attachments} />
                       )}
                       {message.giveawayId && !message.deletedAt ? (
                         <GiveawayCard
@@ -883,8 +920,23 @@ export function RoomConversation({
                         />
                       ) : (
                         <p>
-                          <MentionText text={content} />
+                          <ChatEmojiText
+                            text={content}
+                            large={
+                              !message.replyTo &&
+                              !message.attachments?.length &&
+                              !!largeEmojiCount(content)
+                            }
+                          />
                         </p>
+                      )}
+                      {room.kind === 'group' && !message.deletedAt && (
+                        <div
+                          className="chat-message-music"
+                          data-chat-menu-exempt
+                        >
+                          <MusicLinkCard text={content} />
+                        </div>
                       )}
                       {room.kind === 'group' && !message.deletedAt && (
                         <MessageReactions
@@ -904,7 +956,7 @@ export function RoomConversation({
                             {message.senderName}
                           </button>
                           <span aria-hidden="true">·</span>
-                          <span className="room-message-time">
+                          <span className="message-time">
                             <time
                               dateTime={new Date(message.created).toISOString()}
                             >
@@ -913,7 +965,7 @@ export function RoomConversation({
                           </span>
                         </div>
                       ) : (
-                        <span className="room-message-time">
+                        <span className="message-time">
                           {time(message.created)}
                           {self && <Check size={12} />}
                         </span>
@@ -938,97 +990,41 @@ export function RoomConversation({
               К новым сообщениям <ChevronDown size={14} />
             </button>
           )}
-          <ChatReveal>
-            {reply && (
-              <div className="room-reply-preview">
-                <Reply size={17} />
-                <span>
-                  <strong>{reply.senderName}</strong>
-                  <small>{reply.text.slice(0, 140)}</small>
-                </span>
-                <button
-                  className="icon-button"
-                  aria-label="Отменить ответ"
-                  disabled={pending}
-                  onClick={() => setReply(null)}
-                >
-                  <X size={15} />
-                </button>
-              </div>
-            )}
-          </ChatReveal>
-          <EmojiPreview text={text} />
-          <form
-            className="room-composer"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void send();
-            }}
-          >
-            <EmojiPicker
-              key={room.id}
-              premium={!!me.premium}
-              text={text}
-              onText={setText}
-              field={emojiField}
-              disabled={
-                disabled ||
-                pending ||
-                !room.canSend ||
-                (room.kind === 'secret' && !secretReady)
-              }
-            />
-            <textarea
-              ref={emojiField}
-              aria-label="Сообщение"
-              placeholder={
-                room.kind === 'secret'
-                  ? 'Зашифрованное сообщение…'
-                  : 'Сообщение в группу…'
-              }
-              rows={1}
-              maxLength={4000}
-              value={text}
-              disabled={
-                disabled ||
-                !room.canSend ||
-                pending ||
-                (room.kind === 'secret' && !secretReady)
-              }
-              onChange={(event) => setText(event.target.value)}
-              onKeyDown={(event) => {
-                if (
-                  event.key === 'Enter' &&
-                  !event.shiftKey &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  event.preventDefault();
-                  void send();
-                }
-              }}
-            />
-            <button
-              className="room-send"
-              type="submit"
-              aria-label={
-                pending ? 'Повторить отправку' : 'Отправить сообщение'
-              }
-              title={pending ? 'Повторить отправку' : 'Отправить'}
-              disabled={
-                busy ||
-                disabled ||
-                !room.canSend ||
-                !text.trim() ||
-                (room.kind === 'secret' && !secretReady)
-              }
-            >
-              {busy ? (
-                <LoaderCircle className="spin" size={19} />
-              ) : (
-                <Send size={19} />
-              )}
-            </button>
-          </form>
+          <ChatComposer
+            key={room.id}
+            peerId={room.id}
+            roomId={room.kind === 'group' ? room.id : undefined}
+            textOnly={room.kind === 'secret'}
+            premium={!!me.premium}
+            text={text}
+            onText={setText}
+            readOnly={pending}
+            disabled={
+              disabled ||
+              !room.canSend ||
+              (room.kind === 'secret' && !secretReady)
+            }
+            placeholder={
+              room.kind === 'secret'
+                ? 'Зашифрованное сообщение…'
+                : 'Написать сообщение…'
+            }
+            onSend={send}
+            confirmedMessage={confirmedMessage}
+            reply={
+              reply
+                ? {
+                    id: reply.id,
+                    sender: reply.sender,
+                    name: reply.senderName,
+                    text: reply.text || 'Вложение',
+                    unavailable: false,
+                  }
+                : null
+            }
+            replyFocus={replyFocus}
+            onCancelReply={() => setReply(null)}
+          />
           {(!room.canSend || disabled) && (
             <p className="room-write-note">
               Отправка сообщений недоступна из-за ограничений аккаунта или

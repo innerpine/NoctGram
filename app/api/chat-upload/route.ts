@@ -23,12 +23,24 @@ export async function POST(req: Request) {
     const max = CHAT_FILE_LIMIT + 65536;
     if (Number(req.headers.get('content-length')) > max)
       throw new ApiError(413, 'Файл должен быть меньше 25 МБ');
-    const form = await readMultipart(req, max, ['file', 'peer']);
+    const form = await readMultipart(req, max, ['file', 'peer', 'room']);
     const file = form.get('file'),
-      peer = form.get('peer');
-    if (!(file instanceof File) || typeof peer !== 'string')
+      peer = form.get('peer'),
+      room = form.get('room');
+    if (
+      !(file instanceof File) ||
+      (typeof peer === 'string') === (typeof room === 'string') ||
+      (typeof room === 'string' && !room)
+    )
       throw new ApiError(400, 'Выбери файл и собеседника');
-    return Response.json(await storeChatUpload(me, peer, file));
+    return Response.json(
+      await storeChatUpload(
+        me,
+        typeof peer === 'string' ? peer : '',
+        file,
+        typeof room === 'string' ? room : undefined,
+      ),
+    );
   } catch (e) {
     return failure(e);
   }

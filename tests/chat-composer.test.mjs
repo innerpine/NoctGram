@@ -117,6 +117,7 @@ globalThis.fetch = async (url, init) => {
     };
     uploads.push({
       peer: init.body.get('peer'),
+      room: init.body.get('room'),
       signal: init.signal,
       attachment,
       finish: () => resolve(Response.json(attachment)),
@@ -307,6 +308,53 @@ try {
   );
   assert.equal(calls.at(-1).reply.id, 'original');
   immediate.dispose();
+  const group = mount('room-one');
+  group.props.roomId = 'room-one';
+  group.pick([photo('group.png')]);
+  const groupUpload = uploads.at(-1);
+  assert.equal(groupUpload.room, 'room-one');
+  assert.equal(groupUpload.peer, null);
+  groupUpload.finish();
+  await flush();
+  let finishSend;
+  let sends = 0;
+  group.props.onSend = () => {
+    sends++;
+    return new Promise((resolve) => {
+      finishSend = resolve;
+    });
+  };
+  group.submit();
+  group.submit();
+  assert.equal(sends, 1);
+  assert.equal(group.textarea().disabled, true);
+  finishSend(false);
+  await flush();
+  assert.ok(
+    group.button('Убрать group.png'),
+    'Failed sends retain the attachment for retry',
+  );
+  group.submit();
+  assert.equal(sends, 2);
+  finishSend(true);
+  await flush();
+  assert.equal(group.button('Убрать group.png'), undefined);
+  group.dispose();
+  assert.ok(
+    !deleted.includes(groupUpload.attachment.id),
+    'Confirmed group files are not discarded',
+  );
+  const secret = mount('secret-room');
+  secret.props.textOnly = true;
+  assert.equal(secret.button('Прикрепить фото, видео или файл'), undefined);
+  const uploadCount = uploads.length;
+  secret.pick([photo('secret.png')]);
+  assert.equal(
+    uploads.length,
+    uploadCount,
+    'Secret text chats cannot upload plaintext files',
+  );
+  secret.dispose();
   assert.deepEqual(revoked, previews, 'All preview object URLs are released');
   console.log(
     'Chat composer: upload queue, remove/retry, conversation switch, cleanup, double submit and instant draft handoff passed.',

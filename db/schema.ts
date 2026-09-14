@@ -1299,6 +1299,7 @@ export const chatRoomMessages = sqliteTable(
       .notNull()
       .references(() => users.id),
     text: text().notNull().default(''),
+    media: text().notNull().default('[]'),
     ciphertext: text(),
     replyTo: text(),
     giveawayId: text().references(() => giveaways.id),
@@ -1505,3 +1506,21 @@ export const paymentSupport = sqliteTable('payment_support', {
   text: text().notNull(),
   created: integer().notNull(),
 });
+
+export const roomUploads = sqliteTable(
+  'room_uploads',
+  {
+    uploadId: text()
+      .primaryKey()
+      .references(() => uploads.id, { onDelete: 'cascade' }),
+    roomId: text()
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    messageId: text().references(() => chatRoomMessages.id, {
+      onDelete: 'cascade',
+    }),
+    size: integer().notNull(),
+    kind: text().notNull(),
+  },
+  (t) => [index('room_uploads_message').on(t.messageId)],
+);

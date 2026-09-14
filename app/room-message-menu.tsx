@@ -1,5 +1,5 @@
 'use client';
-import { useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Copy, MoreHorizontal, Reply, Trash2 } from 'lucide-react';
 import { ContextMenu, ContextMenuItem } from '@/components/ui/context-menu';
 import type { RoomMessage, RoomKind, RoomRole } from '@/lib/rooms-types';
@@ -25,6 +25,7 @@ export function RoomMessageContext({
   onReply,
   onRemove,
   onCopy,
+  initial = true,
 }: {
   children: ReactNode;
   className: string;
@@ -40,7 +41,9 @@ export function RoomMessageContext({
   onReply: (message: RoomMessage) => void;
   onRemove: (message: RoomMessage) => void;
   onCopy: () => void;
+  initial?: boolean;
 }) {
+  const [enter] = useState(() => !initial);
   const trigger = useRef<HTMLDivElement>(null);
   const deleted = !!message.deletedAt;
   const readonly = disabled || !canSend || pending;
@@ -50,6 +53,7 @@ export function RoomMessageContext({
         ref={trigger}
         className={className + ' room-message-context select-text'}
         data-room-message-id={message.id}
+        data-chat-initial={!enter || undefined}
       >
         {children}
         {!deleted && (

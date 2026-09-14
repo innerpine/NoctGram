@@ -102,6 +102,13 @@ const names = {
   './post-card': 'Avatar',
   './chat-notifications': 'ChatNotificationsItem',
   './chat-reveal': 'ChatReveal',
+  './chat-composer': 'ChatComposer',
+  './chat-emoji-text': 'ChatEmojiText',
+  './chat-message-files': 'ChatMessageFiles',
+  './music-link-card': 'MusicLinkCard',
+  './message-reactions': 'MessageReactions',
+  './room-message-menu': 'RoomMessageContext',
+  './message-context-menu': 'chatHistoryContextMenu',
   '@/lib/secret-crypto': 'decryptText encryptText ensureKey prepareSession',
 };
 const { outputFiles } = await build({
@@ -122,24 +129,28 @@ const { outputFiles } = await build({
         );
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({
           contents:
-            path === 'react'
-              ? 'export const {useState,useRef,useEffect,useLayoutEffect,useCallback}=globalThis.__roomNavigation;'
-              : path === 'react/jsx-runtime'
-                ? 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx,Fragment="Fragment";'
-                : path === '@/lib/rooms-client'
-                  ? 'export const {roomRequest,roomAction}=globalThis.__roomNavigation;'
-                  : path === '@/lib/chat-navigation'
-                    ? 'export const {createChatNavigator}=globalThis.__roomNavigation;'
-                    : path === '@/lib/chat-viewport'
-                      ? 'export const {watchChatTail,revealChat}=globalThis.__roomNavigation;'
-                      : (names[path] || '')
-                          .split(' ')
-                          .filter(Boolean)
-                          .map(
-                            (name) =>
-                              `export const ${name}=${JSON.stringify(name)};`,
-                          )
-                          .join('\n'),
+            path === '@/lib/chat-themes'
+              ? 'export const chatTheme=()=>({style:{}});'
+              : path === '@/lib/chat-emoji'
+                ? 'export const largeEmojiCount=()=>0;'
+                : path === 'react'
+                  ? 'export const {useState,useRef,useEffect,useLayoutEffect,useCallback}=globalThis.__roomNavigation;'
+                  : path === 'react/jsx-runtime'
+                    ? 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx,Fragment="Fragment";'
+                    : path === '@/lib/rooms-client'
+                      ? 'export const {roomRequest,roomAction}=globalThis.__roomNavigation;'
+                      : path === '@/lib/chat-navigation'
+                        ? 'export const {createChatNavigator}=globalThis.__roomNavigation;'
+                        : path === '@/lib/chat-viewport'
+                          ? 'export const {watchChatTail,revealChat}=globalThis.__roomNavigation;'
+                          : (names[path] || '')
+                              .split(' ')
+                              .filter(Boolean)
+                              .map(
+                                (name) =>
+                                  `export const ${name}=${JSON.stringify(name)};`,
+                              )
+                              .join('\n'),
         }));
       },
     },
@@ -206,7 +217,7 @@ function mount() {
       for (const node of walk(view.tree)) {
         if (node.props?.id)
           view.elements.set(node.props.id, { id: node.props.id });
-        if (node.props?.className === 'room-message-list')
+        if (node.props?.className?.includes('room-message-list'))
           node.props.ref.current = view.list;
       }
       view.pending.splice(0).forEach((effect) => effect());
@@ -222,7 +233,9 @@ function mount() {
   return view;
 }
 const quote = (view) =>
-  walk(view.render()).find((node) => node.props?.className === 'room-quote');
+  walk(view.render()).find(
+    (node) => node.props?.className === 'chat-reply-quote',
+  );
 try {
   const view = mount();
   requests

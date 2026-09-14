@@ -43,17 +43,28 @@ export function ChatComposer({
   reply,
   replyFocus,
   onCancelReply,
+  roomId,
+  textOnly = false,
+  readOnly = false,
+  placeholder = 'Написать сообщение…',
+  confirmedMessage,
 }: {
   premium?: boolean;
   peerId: string;
   text: string;
   onText: (text: string) => void;
   disabled: boolean;
-  onSend: (draft: ChatDraft) => void;
+  onSend: (draft: ChatDraft) => void | Promise<boolean>;
   reply?: NonNullable<ChatDraft['reply']> | null;
   replyFocus?: number;
   onCancelReply?: () => void;
+  roomId?: string;
+  textOnly?: boolean;
+  readOnly?: boolean;
+  placeholder?: string;
+  confirmedMessage?: string;
 }) {
+  const [submitting, setSubmitting] = useState(false);
   const [files, setFiles] = useState<DraftFile[]>([]);
   const current = useRef(files);
   const input = useRef<HTMLInputElement>(null);
@@ -66,6 +77,13 @@ export function ChatComposer({
     current.current = next;
     setFiles(next);
   };
+  useEffect(() => {
+    if (!confirmedMessage) return;
+    for (const file of current.current)
+      if (file.preview) URL.revokeObjectURL(file.preview);
+    current.current = [];
+    setFiles([]);
+  }, [confirmedMessage]);
   useEffect(() => {
     alive.current = true;
     const transfers = controllers.current;
@@ -90,7 +108,7 @@ export function ChatComposer({
     try {
       const form = new FormData();
       form.set('file', item.file);
-      form.set('peer', peerId);
+      form.set(roomId ? 'room' : 'peer', roomId || peerId);
       const attachment = await chatRequest<ChatAttachment>('/api/chat-upload', {
         method: 'POST',
         body: form,
@@ -127,7 +145,8 @@ export function ChatComposer({
     }
   };
   const add = async (incoming: File[]) => {
-    if (disabled || locked.current || !incoming.length) return;
+    if (disabled || readOnly || textOnly || locked.current || !incoming.length)
+      return;
     if (incoming.length + current.current.length > CHAT_ATTACHMENT_LIMIT) {
       setError('Можно прикрепить до 10 файлов');
       return;
@@ -166,24 +185,45 @@ export function ChatComposer({
       return;
     locked.current = true;
     setError('');
-    onSend({
+    const result = onSend({
       text: text.trim(),
       attachments: current.current.map((file) => file.attachment!),
       reply: reply ?? undefined,
     });
-    // Ownership passes to the outbox before unmount cleanup can discard files.
-    for (const file of current.current)
-      if (file.preview) URL.revokeObjectURL(file.preview);
-    changeFiles([]);
-    onText('');
-    onCancelReply?.();
-    editor.current?.focus();
+    const clear = () => {
+      // Ownership passes to the outbox/server before cleanup can discard files.
+      for (const file of current.current)
+        if (file.preview) URL.revokeObjectURL(file.preview);
+      changeFiles([]);
+      onText('');
+      onCancelReply?.();
+      editor.current?.focus();
+    };
+    if (result) {
+      setSubmitting(true);
+      void result
+        .then((sent) => {
+          if (alive.current && sent) clear();
+        })
+        .catch((error) => {
+          if (alive.current)
+            setError(
+              error instanceof Error
+                ? error.message
+                : 'Не удалось отправить сообщение',
+            );
+        })
+        .finally(() => {
+          locked.current = false;
+          if (alive.current) setSubmitting(false);
+        });
+    } else clear();
   };
   // Keep rapid duplicate submits locked until React commits the cleared draft.
   useLayoutEffect(() => {
-    locked.current = false;
-  }, [text, files]);
-  const frozen = disabled;
+    if (!submitting) locked.current = false;
+  }, [text, files, submitting]);
+  const frozen = disabled || readOnly || submitting;
   const chooseEmoji = (emoji: string) => {
     if (frozen) return;
     setError('');
@@ -300,25 +340,25 @@ export function ChatComposer({
             e.target.value = '';
           }}
         />
-        <button
-          type="button"
-          className="chat-attach-button"
-          disabled={frozen}
-          title="Фото, видео или файл"
-          aria-label="Прикрепить фото, видео или файл"
-          onClick={() => input.current?.click()}
-        >
-          <Paperclip size={21} />
-        </button>
+        {!textOnly && (
+          <button
+            type="button"
+            className="chat-attach-button"
+            disabled={frozen}
+            title="Фото, видео или файл"
+            aria-label="Прикрепить фото, видео или файл"
+            onClick={() => input.current?.click()}
+          >
+            <Paperclip size={21} />
+          </button>
+        )}
         <div className="chat-editor-container">
           <ChatTextEditor
             ref={editor}
             value={text}
             onChange={onText}
             disabled={frozen}
-            placeholder={
-              files.length ? 'Добавить подпись…' : 'Написать сообщение…'
-            }
+            placeholder={files.length ? 'Добавить подпись…' : placeholder}
             onFiles={(files) => void add(files)}
             onSubmit={submit}
             onLimit={(reason) =>
@@ -348,11 +388,16 @@ export function ChatComposer({
           aria-label="Отправить сообщение"
           disabled={
             disabled ||
+            submitting ||
             files.some((file) => !file.attachment) ||
             (!text.trim() && !files.length)
           }
         >
-          <Send size={21} fill="currentColor" strokeWidth={1.5} />
+          {submitting ? (
+            <LoaderCircle className="spin" size={21} />
+          ) : (
+            <Send size={21} fill="currentColor" strokeWidth={1.5} />
+          )}
         </button>
       </form>
     </div>
