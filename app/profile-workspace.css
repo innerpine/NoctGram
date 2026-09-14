@@ -296,38 +296,49 @@
   gap: 12px;
 }
 .profile-shell .profile-music-activity {
-  flex: 0 1 230px;
-  max-width: 230px;
+  flex: 0 1 280px;
+  max-width: 280px;
+  min-height: 144px;
   width: 100%;
-  margin: 0 0 0 auto;
-  padding: 10px 12px;
-  border-radius: 12px;
+  margin: -64px 0 0 auto;
+  padding: 14px 16px;
+  border-radius: 16px;
 }
-@container profile-identity (max-width: 441px) {
+@container profile-identity (max-width: 500px) {
   .profile-shell .profile-music-activity {
     flex-basis: 100%;
     max-width: none;
+    margin-top: 0;
   }
 }
+.profile-shell .profile-music-label {
+  font-size: 12px;
+}
 .profile-shell .profile-music-track {
-  margin: 6px 0;
+  margin: 10px 0;
 }
 .profile-shell .profile-music-artwork {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
 }
 .profile-shell .profile-music-track small {
   display: none;
 }
 .profile-shell .profile-music-track strong {
   -webkit-line-clamp: 1;
+  font-size: 14px;
 }
 .profile-shell .profile-music-track-copy > span {
-  margin-top: 1px;
+  margin-top: 3px;
+  font-size: 12px;
 }
 .profile-shell .profile-music-progress {
+  height: 4px;
   margin-top: 5px;
+}
+.profile-shell .profile-music-time {
+  font-size: 11px;
 }
 .profile-shell .profile-tabs {
   margin-top: 12px;
