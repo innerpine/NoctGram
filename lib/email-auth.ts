@@ -433,6 +433,7 @@ export async function finishOnboarding(b: Record<string, unknown>) {
     )
   )
     throw new ApiError(409, 'Этот юзернейм недоступен.');
+  await (await import('./antispam')).assertSpamIdentity(me, name, handle);
   const avatar = clean(b.avatar || '', 200);
   if (
     avatar &&

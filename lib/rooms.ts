@@ -1,4 +1,6 @@
 import { CHAT_ATTACHMENT_LIMIT, type ChatAttachment } from './chat-files';
+import { assertSpamIdentity, reviewSpam } from './antispam';
+import { groupSenderVisible } from './antispam-access';
 import { assertPremiumEmoji } from './premium-emoji-access';
 import { db } from './storage';
 import {
@@ -146,7 +148,7 @@ function preview(row: RoomPreview & { joined: number | boolean }): RoomPreview {
 async function roomRow(me: string, roomId: string): Promise<RoomSummary> {
   const row = await db()
     .prepare(`SELECT ${summaryColumns('m.userId')},m.role,m.archivedAt,m.muted,${memberCount('r')} AS memberCount,
-    (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0) AS unread
+    (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('unreadm')})) AS unread
     FROM chat_rooms r JOIN chat_room_members m ON m.roomId=r.id AND m.userId=? WHERE r.id=? AND ${access('r', 'm.userId')}`)
     .bind(me, roomId)
     .first<RoomSummary>();
@@ -187,11 +189,11 @@ export async function listRooms(
   await actorAllowed(me);
   const result = await db()
     .prepare(`SELECT ${summaryColumns('m.userId')},m.role,m.archivedAt,m.muted,${memberCount('r')} AS memberCount,
-    (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0) AS unread,
+    (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('unreadm')})) AS unread,
     (SELECT json_object('id',lastm.id,'text',CASE WHEN r.kind='secret' THEN '' WHEN lastm.text<>'' THEN lastm.text WHEN json_array_length(lastm.media)>0 THEN 'Вложение' ELSE '' END,'created',lastm.created,'sender',lastm.sender)
-    FROM chat_room_messages lastm WHERE lastm.roomId=r.id AND lastm.deletedAt=0 ORDER BY lastm.created DESC,lastm.id DESC LIMIT 1) AS lastMessage
+    FROM chat_room_messages lastm WHERE lastm.roomId=r.id AND lastm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('lastm')}) ORDER BY lastm.created DESC,lastm.id DESC LIMIT 1) AS lastMessage
     FROM chat_rooms r JOIN chat_room_members m ON m.roomId=r.id WHERE m.userId=? AND (m.archivedAt>0)=? AND ${access('r', 'm.userId')}
-    ORDER BY MAX(r.updatedAt,COALESCE((SELECT MAX(created) FROM chat_room_messages latest WHERE latest.roomId=r.id),0)) DESC,r.id LIMIT 100`)
+    ORDER BY MAX(r.updatedAt,COALESCE((SELECT MAX(created) FROM chat_room_messages latest WHERE latest.roomId=r.id AND (r.kind='secret' OR ${groupSenderVisible('latest')})),0)) DESC,r.id LIMIT 100`)
     .bind(me, archived ? 1 : 0)
     .all<Omit<RoomSummary, 'lastMessage'> & { lastMessage: string | null }>();
   return {
@@ -279,7 +281,7 @@ export async function readRoom(
     if (before) throw new ApiError(400, 'Выбери страницу или сообщение');
     const target = await viewerQuery(
       `SELECT msg.created,msg.id FROM chat_room_messages msg JOIN chat_rooms r ON r.id=msg.roomId
-       WHERE msg.id=? AND msg.roomId=? AND msg.deletedAt=0 AND ${access('r', ':viewer')}`,
+       WHERE msg.id=? AND msg.roomId=? AND msg.deletedAt=0 AND ${access('r', ':viewer')} AND (r.kind='secret' OR ${groupSenderVisible('msg')})`,
       me,
     )
       .bind(id(around), roomId)
@@ -288,7 +290,7 @@ export async function readRoom(
     // A bounded window around the target; never download every older page.
     cursor = await viewerQuery(
       `SELECT msg.created,msg.id FROM chat_room_messages msg JOIN chat_rooms r ON r.id=msg.roomId
-       WHERE msg.roomId=? AND (msg.created>? OR (msg.created=? AND msg.id>?)) AND ${access('r', ':viewer')}
+       WHERE msg.roomId=? AND (msg.created>? OR (msg.created=? AND msg.id>?)) AND ${access('r', ':viewer')} AND (r.kind='secret' OR ${groupSenderVisible('msg')})
        ORDER BY msg.created,msg.id LIMIT 1 OFFSET 49`,
       me,
     )
@@ -314,6 +316,7 @@ export async function readRoom(
     `SELECT m.userId,u.name,u.avatar,COALESCE((SELECT h.handle FROM handles h WHERE h.userId=u.id AND h.main=1),'') AS handle,
     m.role,m.status,m.publicKey,m.joinedAt FROM chat_room_members m JOIN users u ON u.id=m.userId JOIN chat_rooms r ON r.id=m.roomId
     WHERE m.roomId=? AND m.status='active' AND ${access('r', ':viewer')}
+    AND (r.kind='secret' OR NOT EXISTS(SELECT 1 FROM account_restrictions spamblock WHERE spamblock.userId=m.userId AND spamblock.mode='blocked' AND (spamblock.expiresAt IS NULL OR spamblock.expiresAt>strftime('%s','now')*1000)))
     ORDER BY CASE WHEN m.userId=:viewer THEN 0 WHEN m.role='owner' THEN 1 WHEN m.role='admin' THEN 2 ELSE 3 END,m.joinedAt,m.userId LIMIT ${LIMIT}`,
     me,
   )
@@ -325,9 +328,9 @@ export async function readRoom(
     CASE WHEN r.kind='group' AND msg.deletedAt=0 AND msg.ciphertext IS NULL
       THEN ${reactionSummarySql('chat_room_message_reactions', 'msg.id', ':viewer')} ELSE '[]' END AS reactionData
     FROM chat_room_messages msg JOIN users u ON u.id=msg.sender JOIN chat_rooms r ON r.id=msg.roomId
-    LEFT JOIN chat_room_messages rp ON rp.id=msg.replyTo AND rp.roomId=msg.roomId AND rp.deletedAt=0
+    LEFT JOIN chat_room_messages rp ON rp.id=msg.replyTo AND rp.roomId=msg.roomId AND rp.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('rp')})
     LEFT JOIN users ru ON ru.id=rp.sender
-    WHERE msg.roomId=? AND ${access('r', ':viewer')} ${cursor ? 'AND (msg.created<? OR (msg.created=? AND msg.id<?))' : ''}
+    WHERE msg.roomId=? AND ${access('r', ':viewer')} AND (r.kind='secret' OR ${groupSenderVisible('msg')}) ${cursor ? 'AND (msg.created<? OR (msg.created=? AND msg.id<?))' : ''}
     ORDER BY msg.created DESC,msg.id DESC LIMIT ${PAGE_SIZE + 1}`,
     me,
   )
@@ -430,6 +433,7 @@ export async function changeRoom(
     if (visibility !== 'private' && visibility !== 'public')
       throw new ApiError(400, 'Проверьте видимость группы');
     const handle = visibility === 'public' ? username(body.username) : null;
+    if (!secret) await assertSpamIdentity(me, name, description, handle || '');
     const rawMembers = secret ? [id(body.peerId)] : (body.memberIds ?? []);
     if (!Array.isArray(rawMembers) || rawMembers.length > LIMIT - 1)
       throw new ApiError(400, 'В группе может быть до 200 участников');
@@ -577,7 +581,7 @@ export async function changeRoom(
     const messageId = id(body.messageId);
     const gate = `EXISTS(SELECT 1 FROM chat_room_messages msg JOIN chat_rooms r ON r.id=msg.roomId,users a
       WHERE msg.id=? AND r.id=? AND a.id=? AND r.kind='group' AND msg.deletedAt=0 AND msg.ciphertext IS NULL
-      AND ${access('r', 'a.id', true)} AND ${unblocked('a.id', 'msg.sender')})`;
+      AND ${access('r', 'a.id', true)} AND ${unblocked('a.id', 'msg.sender')} AND ${groupSenderVisible('msg')})`;
     return saveMessageReaction(
       'chat_room_message_reactions',
       messageId,
@@ -684,13 +688,56 @@ export async function changeRoom(
       replyTo = body.replyTo == null ? null : id(body.replyTo);
     }
     const ids = JSON.stringify(attachments);
+    if (
+      row.kind === 'group' &&
+      !(await db()
+        .prepare('SELECT id FROM chat_room_messages WHERE id=?')
+        .bind(key)
+        .first())
+    ) {
+      if (
+        replyTo &&
+        !(await db()
+          .prepare(
+            `SELECT rp.id FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=? AND rp.deletedAt=0 AND ${groupSenderVisible('rp')}`,
+          )
+          .bind(replyTo, roomId)
+          .first())
+      )
+        throw new ApiError(404, 'Сообщение для ответа недоступно');
+      if (attachments.length) {
+        const files = await db()
+          .prepare(`SELECT COUNT(*) AS count FROM json_each(?) j JOIN uploads up ON up.id=j.value
+            JOIN room_uploads f ON f.uploadId=up.id WHERE up.userId=? AND up.state='ready' AND f.roomId=?
+            AND (f.messageId IS NULL OR f.messageId=?) AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)`)
+          .bind(ids, me, roomId, key)
+          .first<{ count: number }>();
+        if (Number(files?.count) !== attachments.length)
+          throw new ApiError(
+            403,
+            'Вложение больше недоступно. Прикрепите файл заново.',
+          );
+      }
+      const held = await reviewSpam({
+        kind: 'group',
+        targetId: key,
+        actorId: me,
+        contextId: roomId,
+        payload: {
+          text,
+          replyTo,
+          media: JSON.stringify(attachments.map((id) => ({ id }))),
+        },
+      });
+      if (held) return held;
+    }
     const result = await db()
       .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,ciphertext,replyTo,created,media)
       SELECT ?,r.id,u.id,?,?,?,MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0)),
       (SELECT json_group_array(json_object('id',up.id,'name',up.name,'type',up.type,'size',f.size,'kind',f.kind))
         FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN room_uploads f ON f.uploadId=up.id)
       FROM chat_rooms r,users u WHERE r.id=? AND u.id=? AND ${canSend('r', 'u.id')}
-      AND r.kind=? AND (? IS NULL OR EXISTS(SELECT 1 FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=r.id AND rp.deletedAt=0))
+      AND r.kind=? AND (? IS NULL OR EXISTS(SELECT 1 FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=r.id AND rp.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('rp')})))
       AND NOT EXISTS(SELECT 1 FROM json_each(?) j WHERE NOT EXISTS(SELECT 1 FROM uploads up JOIN room_uploads f ON f.uploadId=up.id
         WHERE up.id=j.value AND up.userId=u.id AND up.state='ready' AND f.roomId=r.id AND (f.messageId IS NULL OR f.messageId=?)
         AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)))
@@ -831,6 +878,7 @@ export async function changeRoom(
     const handle =
       visibility === 'public' ? username(body.username ?? row.username) : null;
     try {
+      await assertSpamIdentity(me, name, description, handle || '');
       const results = await db().batch([
         viewerQuery(
           `UPDATE chat_rooms SET name=?,description=?,avatar=?,visibility=?,username=?,updatedAt=? WHERE id=?
@@ -931,14 +979,14 @@ export function groupRoomExportSections(
       'groupMessages',
       `SELECT msg.id,msg.roomId,msg.sender,msg.text,msg.replyTo,msg.created FROM chat_room_messages msg
       JOIN chat_rooms r ON r.id=msg.roomId JOIN chat_room_members m ON m.roomId=r.id
-      WHERE m.userId=? AND r.kind='group' AND msg.ciphertext IS NULL AND msg.deletedAt=0
+      WHERE m.userId=? AND r.kind='group' AND msg.ciphertext IS NULL AND msg.deletedAt=0 AND ${groupSenderVisible('msg')}
       AND ${access('r', 'm.userId')} AND msg.id>? ORDER BY msg.id LIMIT 100`,
     ],
     [
       'groupMessageReactions',
       `SELECT reaction.messageId AS id,reaction.emoji,reaction.created,msg.roomId FROM chat_room_message_reactions reaction
       JOIN chat_room_messages msg ON msg.id=reaction.messageId JOIN chat_rooms r ON r.id=msg.roomId
-      WHERE reaction.userId=? AND r.kind='group' AND msg.ciphertext IS NULL AND msg.deletedAt=0
+      WHERE reaction.userId=? AND r.kind='group' AND msg.ciphertext IS NULL AND msg.deletedAt=0 AND ${groupSenderVisible('msg')}
       AND ${access('r', 'reaction.userId')} AND msg.id>? ORDER BY msg.id LIMIT 100`,
     ],
   ] as const;

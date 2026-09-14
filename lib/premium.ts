@@ -90,6 +90,7 @@ export async function premiumPost(
   }
   const theme = clean(b.theme, 20, true);
   let ringText = clean(b.ringText || '', 400).normalize('NFC');
+  await (await import('./antispam')).assertSpamIdentity(me, ringText);
   if (
     !Object.hasOwn(profileThemes, theme) ||
     typeof b.nameGradient !== 'boolean' ||

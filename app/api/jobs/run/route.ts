@@ -3,6 +3,7 @@ import { flushPush } from '@/lib/notifications';
 import { expireCalls } from '@/lib/calls';
 import { cleanUploads } from '@/lib/upload-storage';
 import { recordOnlineSnapshot } from '@/lib/admin-online';
+import { cleanSpamActivity } from '@/lib/antispam';
 import { settleDueGiveaways } from '@/lib/giveaways';
 import { cleanAccessHistory } from '@/lib/access-security';
 import { db } from '@/lib/storage';
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
   let maintenance = {};
   if (params.get('onlineOnly') !== '1') {
     await expireCalls();
+    await cleanSpamActivity();
     const push = await flushPush();
     maintenance = { ...push, uploads: await cleanUploads() };
     await cleanAccessHistory(db());

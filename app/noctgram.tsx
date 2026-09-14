@@ -1411,17 +1411,23 @@ export default function Noctgram({
       page === 'profile' && profile?.kind === 'channel' ? profile.id : me!.id;
     void run(async () => {
       setPublishError('');
+      let reviewNotice = '';
       try {
-        await request('', {
-          action: 'post',
-          as: publisher,
-          text: draft,
-          media: attachments.map((x) => x.id),
-          poll: poll || [],
-          code: code || '',
-          codeLang,
-          adult,
-        });
+        const result = await request<{ queued?: boolean; notice?: string }>(
+          '',
+          {
+            action: 'post',
+            as: publisher,
+            text: draft,
+            media: attachments.map((x) => x.id),
+            poll: poll || [],
+            code: code || '',
+            codeLang,
+            adult,
+          },
+        );
+        if (result.queued)
+          reviewNotice = result.notice || 'Публикация отправлена на проверку';
       } catch (error) {
         setPublishError(
           error instanceof Error && error.message
@@ -1437,6 +1443,10 @@ export default function Noctgram({
       setCode(null);
       setCodeLang('text');
       setAdult(false);
+      if (reviewNotice) {
+        notify(reviewNotice);
+        return;
+      }
       notify('Публикация появилась в ленте');
       const results = await Promise.allSettled([
         latestRefresh.current(),

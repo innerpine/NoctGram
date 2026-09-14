@@ -11,7 +11,7 @@ export function commentReplyTarget(value: unknown) {
 
 // Both read and write exclude blocked authors in either direction. A reply
 // cannot retain a copy of text that was later deleted or hidden by moderation.
-function availableParent() {
+export function availableCommentParent() {
   return `${visibleAccount('u')} AND ${personalVisibility('u')}
     AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker IN(u.id,u.ownerId) AND b.blocked=?)`;
 }
@@ -27,7 +27,7 @@ export async function insertComment(
     .prepare(`INSERT INTO comments(id,postId,userId,text,created,replyTo)
     SELECT ?,?,?,?,?,? WHERE ? IS NULL OR EXISTS(
       SELECT 1 FROM comments c JOIN users u ON u.id=c.userId
-      WHERE c.id=? AND c.postId=? AND ${availableParent()})`)
+      WHERE c.id=? AND c.postId=? AND ${availableCommentParent()})`)
     .bind(
       id,
       postId,
@@ -59,7 +59,7 @@ export async function withCommentReplies<
   const { results } = await db()
     .prepare(`SELECT c.id,c.postId,c.userId,u.name,substr(c.text,1,240) AS text
     FROM comments c JOIN users u ON u.id=c.userId
-    WHERE c.id IN(SELECT value FROM json_each(?)) AND ${availableParent()}`)
+    WHERE c.id IN(SELECT value FROM json_each(?)) AND ${availableCommentParent()}`)
     .bind(JSON.stringify(ids), me, me)
     .all<{
       id: string;

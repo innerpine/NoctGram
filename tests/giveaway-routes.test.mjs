@@ -32,6 +32,8 @@ const stubs = {
     'export async function flushPush(){globalThis.__giveawayRoutes.calls.push(["push"]);return {sent:3};}',
   '@/lib/calls':
     'export async function expireCalls(){globalThis.__giveawayRoutes.calls.push(["calls"]);}',
+  '@/lib/antispam':
+    'export async function cleanSpamActivity(){globalThis.__giveawayRoutes.calls.push(["antispam"]);}',
   '@/lib/upload-storage':
     'export async function cleanUploads(){globalThis.__giveawayRoutes.calls.push(["uploads"]);return {deleted:4};}',
 };
@@ -100,9 +102,15 @@ function request(body = payload(), headers = {}) {
 }
 const mutations = (s) =>
   s.calls.filter(([name]) =>
-    ['create', 'settle', 'push', 'calls', 'uploads', 'access-cleanup'].includes(
-      name,
-    ),
+    [
+      'create',
+      'settle',
+      'push',
+      'calls',
+      'uploads',
+      'access-cleanup',
+      'antispam',
+    ].includes(name),
   );
 
 await test('session actor mismatch and missing actor never reach payment creation', async () => {
@@ -232,6 +240,7 @@ await test('ordinary authorized jobs still settle prizes, calls, push and upload
     ['online'],
     ['settle'],
     ['calls'],
+    ['antispam'],
     ['push'],
     ['uploads'],
     ['access-cleanup'],

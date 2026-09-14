@@ -32,6 +32,8 @@ const { outputFiles } = await build({
               'export async function flushPush(){globalThis.__onlineJobs.calls.push("push"); return {delivered:0};}',
             '@/lib/calls':
               'export async function expireCalls(){globalThis.__onlineJobs.calls.push("calls");}',
+            '@/lib/antispam':
+              'export async function cleanSpamActivity(){globalThis.__onlineJobs.calls.push("antispam");}',
             '@/lib/upload-storage':
               'export async function cleanUploads(){globalThis.__onlineJobs.calls.push("uploads"); return 0;}',
           }[path],
@@ -70,6 +72,7 @@ await test('full job records online and preserves existing maintenance', async (
     'online',
     'giveaways',
     'calls',
+    'antispam',
     'push',
     'uploads',
     'access-cleanup',
@@ -84,6 +87,7 @@ await test('access cleanup failure does not prevent existing maintenance', async
       'online',
       'giveaways',
       'calls',
+      'antispam',
       'push',
       'uploads',
       'access-cleanup',

@@ -152,6 +152,9 @@ function fixture(t) {
     'lib/api-error.ts',
     'lib/premium.ts',
     'lib/stories.ts',
+    'lib/antispam.ts',
+    'lib/antispam-detection.ts',
+    'lib/rate-limit.ts',
     'lib/media-access.ts',
     'lib/room-access.ts',
     'lib/avatar-media.ts',
@@ -200,7 +203,7 @@ function fixture(t) {
   }
   function load(file) {
     if (modules.has(file)) return modules.get(file).exports;
-    if (file === 'lib/auth-session.ts') return { setting: () => '1' };
+    if (file === 'lib/auth-session.ts') return { setting: () => '1', tokenHash: async value => value };
     if (file === 'lib/storage.ts') return { db: () => adapter };
     if (file === 'lib/server.ts') {
       // Actual clean and profile functions, without framework/server initialization.

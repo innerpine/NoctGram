@@ -1,4 +1,5 @@
 import { setting } from './auth-session';
+import { assertSpamIdentity } from './antispam';
 import { assertStaticAvatar } from './avatar-media';
 import { appearanceColumns } from '@/lib/premium-access';
 import { assertMediaRead, mediaAssignment } from '@/lib/media-access';
@@ -178,6 +179,7 @@ export async function featurePost(
       avatar = await validImage(b.avatar, me);
     if (avatar) await assertStaticAvatar(avatar);
     const channelId = 'channel_' + crypto.randomUUID();
+    await assertSpamIdentity(me, name, bio, h);
     try {
       // Enforce capacity again inside the write so simultaneous requests cannot exceed it.
       await d.batch([
@@ -228,6 +230,17 @@ export async function featurePost(
       cover = await validImage(b.cover, me, current?.cover);
     if (avatar && avatar !== current?.avatar) await assertStaticAvatar(avatar);
     const statements = [];
+    await assertSpamIdentity(
+      me,
+      name,
+      bio,
+      typeof b.mainHandle === 'string' ? b.mainHandle : '',
+      ...(Array.isArray(b.extraHandles)
+        ? b.extraHandles.filter(
+            (value): value is string => typeof value === 'string',
+          )
+        : []),
+    );
     // mediaAssignment repeats its expressions; use an input CTE to bind each value once.
     const eligibility = `WITH input AS(SELECT ? AS actor,? AS avatar,? AS cover),eligible AS(SELECT u.id FROM users u,input i WHERE u.id=? AND ${mediaAssignment('u.avatar', 'i.avatar', 'i.actor')} AND ${mediaAssignment('u.cover', 'i.cover', 'i.actor')})`;
     const eligibilityArgs = [me, avatar, cover, target];

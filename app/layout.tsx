@@ -47,6 +47,7 @@ import './music-queue.css';
 import './account-management.css';
 import './staff-panel.css';
 import './admin-access.css';
+import './antispam.css';
 import './channel-boosts.css';
 import './viewport.css';
 import './mobile-navigation.css';

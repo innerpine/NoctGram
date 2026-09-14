@@ -64,6 +64,7 @@ export const uploadReferenced = (id: string) => `
   OR EXISTS(SELECT 1 FROM messages m,json_each(m.media) a WHERE m.deletedAt=0 AND json_extract(a.value,'$.id')=${id})
   OR EXISTS(SELECT 1 FROM room_uploads f JOIN chat_room_messages m ON m.id=f.messageId JOIN chat_rooms r ON r.id=m.roomId WHERE f.uploadId=${id} AND m.deletedAt=0 AND r.deletedAt=0)
   OR EXISTS(SELECT 1 FROM moderated_uploads WHERE uploadId=${id})
+  OR EXISTS(SELECT 1 FROM antispam_queue q,json_each(json_extract(q.payload,'$.media')) m WHERE q.status='pending' AND json_extract(m.value,'$.id')=${id})
   OR EXISTS(SELECT 1 FROM content_reports r WHERE json_extract(r.snapshot,'$.mediaId')=${id} OR EXISTS(SELECT 1 FROM json_each(json_extract(r.snapshot,'$.media')) m WHERE json_extract(m.value,'$.id')=${id}))
   OR EXISTS(SELECT 1 FROM content_removals r WHERE json_extract(r.snapshot,'$.mediaId')=${id} OR EXISTS(SELECT 1 FROM json_each(json_extract(r.snapshot,'$.media')) m WHERE json_extract(m.value,'$.id')=${id}))`;
 export async function cleanUploads() {

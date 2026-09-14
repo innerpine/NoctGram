@@ -1,5 +1,6 @@
 'use client';
 import { AdministrationPanel } from './administration-panel';
+import { AntispamPanel } from './antispam-panel';
 import { DisplayName } from './profile-identity';
 /* eslint-disable react/react-compiler */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -229,6 +230,10 @@ export function ModerationPanel({
         }}
       >
         <TabsList aria-label="Разделы кабинета">
+          <TabsTrigger value="antispam">
+            <ShieldCheck size={15} />
+            Антиспам
+          </TabsTrigger>
           <TabsTrigger value="users">
             <Users size={15} />
             Аккаунты
@@ -252,6 +257,13 @@ export function ModerationPanel({
             </TabsTrigger>
           )}
         </TabsList>
+        <TabsContent value="antispam">
+          <AntispamPanel
+            canAdmin={canAdmin}
+            onAccount={openAccount}
+            onChanged={onChanged}
+          />
+        </TabsContent>
         {error && (
           <p className="form-error" role="alert">
             {error}

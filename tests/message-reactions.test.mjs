@@ -84,7 +84,7 @@ const compiled = await build({
           namespace: 'auth',
         }));
         build.onLoad({ filter: /.*/, namespace: 'auth' }, () => ({
-          contents: 'export const setting=()=>"1";',
+          contents: 'export const setting=()=>"1"; export const tokenHash=async value=>value;',
         }));
         build.onResolve(
           { filter: /^(\.\/|@\/lib\/)(storage|server)$/ },

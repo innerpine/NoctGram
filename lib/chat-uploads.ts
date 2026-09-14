@@ -85,7 +85,8 @@ export async function storeChatUpload(
 export async function discardChatUpload(me: string, id: string) {
   const removed = await db()
     .prepare(`UPDATE uploads SET state='deleting' WHERE id=? AND userId=?
-    AND (EXISTS(SELECT 1 FROM chat_uploads c WHERE c.uploadId=uploads.id AND c.messageId IS NULL) OR EXISTS(SELECT 1 FROM room_uploads f WHERE f.uploadId=uploads.id AND f.messageId IS NULL)) RETURNING id`)
+    AND (EXISTS(SELECT 1 FROM chat_uploads c WHERE c.uploadId=uploads.id AND c.messageId IS NULL) OR EXISTS(SELECT 1 FROM room_uploads f WHERE f.uploadId=uploads.id AND f.messageId IS NULL))
+    AND NOT EXISTS(SELECT 1 FROM antispam_queue q,json_each(json_extract(q.payload,'$.media')) m WHERE q.status='pending' AND json_extract(m.value,'$.id')=uploads.id) RETURNING id`)
     .bind(id, me)
     .first<{ id: string }>();
   if (removed) {

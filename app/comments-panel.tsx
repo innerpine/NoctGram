@@ -27,6 +27,7 @@ import { Avatar, Empty, Stamp } from './post-card';
 import { ContentDecisionForm } from './content-decision-form';
 import { request, type Comment, type Post, type Profile } from '@/lib/client';
 import { commentThreads } from '@/lib/comment-threads';
+import type { QueuedSubmission } from '@/lib/antispam-types';
 export function CommentsPanel({
   post,
   me,
@@ -134,12 +135,20 @@ export function CommentsPanel({
     setSending(true);
     setError('');
     try {
-      const row = await request<Comment>('', {
+      const row = await request<Comment | QueuedSubmission>('', {
         action: 'comment',
         id: post.id,
         text,
         replyTo: reply?.id ?? null,
       });
+      if ('queued' in row) {
+        if (live.current) {
+          setText('');
+          setReply(null);
+          setNotice(row.notice);
+        }
+        return;
+      }
       onChanged();
       if (live.current) {
         setText('');

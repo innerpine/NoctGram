@@ -1,4 +1,5 @@
 'use client';
+import type { QueuedSubmission } from '@/lib/antispam-types';
 import { MessageReactions } from './message-reactions';
 import { RoomMessageContext } from './room-message-menu';
 import { chatHistoryContextMenu } from './message-context-menu';
@@ -89,6 +90,7 @@ export function RoomConversation({
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
     [mutationError, setMutationError] = useState(''),
+    [reviewNotice, setReviewNotice] = useState(''),
     [busy, setBusy] = useState(false);
   const [text, setText] = useState(''),
     [reply, setReply] = useState<RoomMessage | null>(null),
@@ -498,7 +500,7 @@ export function RoomConversation({
         });
       }
       if (!alive.current) return false;
-      await roomAction({
+      const sent = await roomAction<{ id: string } | QueuedSubmission>({
         actor: me.id,
         action: 'send',
         id: room.id,
@@ -511,6 +513,17 @@ export function RoomConversation({
               attachments: item.attachments.map((file) => file.id),
             }),
       });
+      if ('queued' in sent) {
+        if (alive.current) {
+          outgoing.current = null;
+          setPending(false);
+          setConfirmedMessage(item.id);
+          setText('');
+          setReply(null);
+          setReviewNotice(sent.notice);
+        }
+        return true;
+      }
       if (alive.current) {
         outgoing.current = null;
         setPending(false);
@@ -1092,6 +1105,19 @@ export function RoomConversation({
             </DialogContent>
           </Dialog>
         </>
+      )}
+      {reviewNotice && (
+        <output className="room-review-notice">
+          {reviewNotice}
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Закрыть уведомление о проверке"
+            onClick={() => setReviewNotice('')}
+          >
+            ×
+          </button>
+        </output>
       )}
       {mutationError && (
         <div className="room-error" role="alert">
