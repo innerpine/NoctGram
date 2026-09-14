@@ -2411,20 +2411,9 @@ export default function Noctgram({
                 </div>
                 <div className="profile-identity-row">
                   <div className="profile-identity-main">
-                    <div className="profile-name-row">
-                      <h2>
-                        <DisplayName person={profile} />
-                      </h2>
-                      {!profileEditable && (
-                        <button
-                          className="primary profile-follow-action"
-                          disabled={readOnly || busy}
-                          onClick={() => follow(profile)}
-                        >
-                          {profile.followed ? 'Вы читаете' : 'Читать'}
-                        </button>
-                      )}
-                    </div>
+                    <h2>
+                      <DisplayName person={profile} />
+                    </h2>
                     <button
                       className="handle-main meta"
                       title="Скопировать юзернейм"
@@ -2490,6 +2479,18 @@ export default function Noctgram({
                       )}
                     </div>
                   </div>
+                  <MusicActivityStatus
+                    person={profile}
+                    own={profile.id === me?.id}
+                    onSettings={
+                      profile.id === me?.id
+                        ? () => {
+                            setSettingsSection('music');
+                            setModal('settings');
+                          }
+                        : undefined
+                    }
+                  />
                 </div>
 
                 <div className="profile-actions">
@@ -2539,6 +2540,13 @@ export default function Noctgram({
                             <Mail size={18} aria-hidden="true" /> Написать
                           </button>
                         )}
+                      <button
+                        className="primary profile-follow-action"
+                        disabled={readOnly || busy}
+                        onClick={() => follow(profile)}
+                      >
+                        {profile.followed ? 'Вы читаете' : 'Читать'}
+                      </button>
                     </>
                   )}
                   {profile.id !== 'noctgram' && profile.id !== me?.id && (
@@ -2599,18 +2607,6 @@ export default function Noctgram({
                     публикаций
                   </span>
                 </div>
-                <MusicActivityStatus
-                  person={profile}
-                  own={profile.id === me?.id}
-                  onSettings={
-                    profile.id === me?.id
-                      ? () => {
-                          setSettingsSection('music');
-                          setModal('settings');
-                        }
-                      : undefined
-                  }
-                />
                 {profile.id === me?.id && (
                   <AppLink
                     className="profile-saved-link"

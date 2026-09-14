@@ -113,30 +113,24 @@
   margin-right: 16px;
 }
 .profile-shell .profile-identity-row {
-  display: block;
+  display: flex;
+  gap: 16px;
   margin-top: 0;
 }
 .profile-shell .profile-identity-main {
-  width: 100%;
-}
-.profile-name-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.profile-name-row h2 {
-  flex: 1;
+  flex: 1 1 200px;
   min-width: 0;
 }
-.profile-follow-action.primary {
+.profile-actions > .profile-follow-action.primary {
   flex-shrink: 0;
   min-height: 40px;
-  min-width: 104px;
-  padding: 9px 18px;
-  border-radius: 999px;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 12px;
   background: #f8f7fa;
   color: #17151c;
-  font-size: 14px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 .profile-shell .profile-info h2 {
   margin: 0;
@@ -302,11 +296,18 @@
   gap: 12px;
 }
 .profile-shell .profile-music-activity {
-  max-width: none;
+  flex: 0 1 230px;
+  max-width: 230px;
   width: 100%;
-  margin: 14px 0 0;
+  margin: 0 0 0 auto;
   padding: 10px 12px;
   border-radius: 12px;
+}
+@container profile-identity (max-width: 441px) {
+  .profile-shell .profile-music-activity {
+    flex-basis: 100%;
+    max-width: none;
+  }
 }
 .profile-shell .profile-music-track {
   margin: 6px 0;
@@ -482,12 +483,7 @@
   .profile-shell .profile-info h2 {
     font-size: 24px;
   }
-  .profile-name-row {
-    gap: 10px;
-  }
-  .profile-follow-action.primary {
-    min-width: 94px;
-    padding-inline: 14px;
+  .profile-actions > .profile-follow-action.primary {
     min-height: 44px;
   }
   .profile-shell .profile-info .bio {
@@ -518,7 +514,7 @@
   }
   .profile-actions:has(.profile-message-action) {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 44px;
+    grid-template-columns: minmax(0, 1fr) auto 44px;
   }
   .profile-shell .profile-stats {
     margin-top: 14px;
@@ -549,10 +545,9 @@
   .profile-shell .profile-info h2 {
     font-size: 23px;
   }
-  .profile-follow-action.primary {
-    min-width: 84px;
-    font-size: 13px;
-    padding-inline: 12px;
+  .profile-actions > .profile-follow-action.primary {
+    padding-inline: 10px;
+    font-size: 12px;
   }
   .profile-shell .profile-stats > :is(button, span) {
     padding-inline: 8px;
