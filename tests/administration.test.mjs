@@ -210,6 +210,8 @@ function fixture(t) {
     'lib/administrator-access.ts',
     'lib/admin-gifts.ts',
     'lib/admin-online.ts',
+    'lib/admin-access.ts',
+    'lib/access-security.ts',
     'lib/online-stats.ts',
     'lib/gift-catalog.ts',
     'lib/gift-upgrade-catalog.ts',

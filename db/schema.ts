@@ -1524,3 +1524,65 @@ export const roomUploads = sqliteTable(
   },
   (t) => [index('room_uploads_message').on(t.messageId)],
 );
+
+export const accessObservations = sqliteTable(
+  'access_observations',
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: text().notNull(),
+    valueHash: text().notNull(),
+    label: text().notNull(),
+    firstSeen: integer().notNull(),
+    lastSeen: integer().notNull(),
+  },
+  (t) => [
+    uniqueIndex('access_observation_identity').on(
+      t.userId,
+      t.kind,
+      t.valueHash,
+    ),
+    index('access_observation_shared').on(t.kind, t.valueHash, t.lastSeen),
+    index('access_observation_age').on(t.lastSeen),
+    check('access_observation_kind', sql`${t.kind} IN ('ip','device')`),
+  ],
+);
+export const accessBlocks = sqliteTable(
+  'access_blocks',
+  {
+    id: text().primaryKey(),
+    targetId: text()
+      .notNull()
+      .references(() => users.id),
+    actorId: text()
+      .notNull()
+      .references(() => users.id),
+    reason: text().notNull(),
+    request: text().notNull(),
+    created: integer().notNull(),
+    revokedAt: integer().notNull().default(0),
+    revokedBy: text().references(() => users.id),
+  },
+  (t) => [
+    index('access_block_target').on(t.targetId, t.revokedAt),
+    index('access_block_created').on(t.created),
+  ],
+);
+export const accessBlockRules = sqliteTable(
+  'access_block_rules',
+  {
+    blockId: text()
+      .notNull()
+      .references(() => accessBlocks.id, { onDelete: 'cascade' }),
+    kind: text().notNull(),
+    valueHash: text().notNull(),
+    label: text().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.blockId, t.kind, t.valueHash] }),
+    index('access_rule_lookup').on(t.kind, t.valueHash),
+    check('access_rule_kind', sql`${t.kind} IN ('ip','device')`),
+  ],
+);

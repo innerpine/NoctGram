@@ -21,6 +21,9 @@ const { outputFiles } = await build({
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({
           contents: {
             '@/lib/auth-session': 'export const setting=()=>"fixture-secret";',
+            '@/lib/storage': 'export const db=()=>({});',
+            '@/lib/access-security':
+              'export async function cleanAccessHistory(){globalThis.__onlineJobs.calls.push("access-cleanup"); if(globalThis.__onlineJobs.failAccess)throw new Error("cleanup failed");}',
             '@/lib/admin-online':
               'export async function recordOnlineSnapshot(){ globalThis.__onlineJobs.calls.push("online"); if(globalThis.__onlineJobs.failSnapshot) throw new Error("snapshot failed"); }',
             '@/lib/giveaways':
@@ -63,7 +66,31 @@ await test('full job records online and preserves existing maintenance', async (
     uploads: 0,
     giveaways: { completed: 0, failed: 0 },
   });
-  assert.deepEqual(calls, ['online', 'giveaways', 'calls', 'push', 'uploads']);
+  assert.deepEqual(calls, [
+    'online',
+    'giveaways',
+    'calls',
+    'push',
+    'uploads',
+    'access-cleanup',
+  ]);
+});
+await test('access cleanup failure does not prevent existing maintenance', async () => {
+  calls.length = 0;
+  globalThis.__onlineJobs.failAccess = true;
+  try {
+    await assert.rejects(POST(request()), /cleanup failed/);
+    assert.deepEqual(calls, [
+      'online',
+      'giveaways',
+      'calls',
+      'push',
+      'uploads',
+      'access-cleanup',
+    ]);
+  } finally {
+    globalThis.__onlineJobs.failAccess = false;
+  }
 });
 await test('sampling failure surfaces without preventing maintenance from starting', async () => {
   calls.length = 0;

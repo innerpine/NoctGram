@@ -4,6 +4,8 @@ import { expireCalls } from '@/lib/calls';
 import { cleanUploads } from '@/lib/upload-storage';
 import { recordOnlineSnapshot } from '@/lib/admin-online';
 import { settleDueGiveaways } from '@/lib/giveaways';
+import { cleanAccessHistory } from '@/lib/access-security';
+import { db } from '@/lib/storage';
 export async function POST(req: Request) {
   const secret = setting('NOCT_JOBS_SECRET'),
     supplied = req.headers.get('authorization') || '';
@@ -23,6 +25,7 @@ export async function POST(req: Request) {
     await expireCalls();
     const push = await flushPush();
     maintenance = { ...push, uploads: await cleanUploads() };
+    await cleanAccessHistory(db());
   }
   if (snapshot.status === 'rejected') throw snapshot.reason;
   if (prizes.status === 'rejected') throw prizes.reason;

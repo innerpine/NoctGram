@@ -36,6 +36,14 @@ const settings = {
   SUPABASE_URL: 'https://example.supabase.co',
   SUPABASE_PUBLISHABLE_KEY: 'test-publishable',
   ASSETS: { fetch: async () => new Response(null, { status: 404 }) },
+  DB: {
+    prepare: () => ({
+      bind() {
+        return this;
+      },
+      first: async () => null,
+    }),
+  },
 };
 
 await test('www redirects to HTTPS apex while retaining path and query', async () => {
@@ -134,7 +142,10 @@ await test('public requests retain session and body but discard all gateway iden
   const request = await response.json();
   assert.equal(request.method, 'POST');
   assert.equal(request.body, '{"name":"Alice"}');
-  assert.equal(request.headers.cookie, 'noct_session=test');
+  assert.match(
+    request.headers.cookie,
+    /^noct_session=test; __Host-noct_device=[a-f0-9]{64}$/,
+  );
   assert.equal(request.headers['content-type'], 'application/json');
   assert.equal(
     Object.keys(request.headers).some(

@@ -6,6 +6,11 @@ import { adminGiftCatalog, grantCollectibleGifts } from './admin-gifts';
 import { appearanceColumns } from './premium-access';
 import { rateLimit } from './rate-limit';
 import { readAdminOnline } from './admin-online';
+import {
+  readAdminAccess,
+  blockAdminAccess,
+  revokeAdminAccess,
+} from './admin-access';
 
 export { isAdministrator } from './administrator-access';
 export async function administrationGet(
@@ -13,6 +18,10 @@ export async function administrationGet(
   s: URLSearchParams,
   me: string,
 ) {
+  if (action === 'adminAccess')
+    return Response.json(await readAdminAccess(me, s), {
+      headers: { 'Cache-Control': 'private, no-store' },
+    });
   if (action === 'adminOnline')
     return Response.json(await readAdminOnline(me, s.get('range')), {
       headers: { 'Cache-Control': 'private, no-store' },
@@ -49,6 +58,13 @@ export async function administrationPost(
   b: Record<string, unknown>,
   me: string,
 ) {
+  if (action === 'adminAccessBlock' || action === 'adminAccessRevoke')
+    return Response.json(
+      await (action === 'adminAccessBlock'
+        ? blockAdminAccess(me, b)
+        : revokeAdminAccess(me, b)),
+      { headers: { 'Cache-Control': 'private, no-store' } },
+    );
   if (action === 'adminGiftGrant')
     return Response.json(await grantCollectibleGifts(me, b), {
       headers: { 'Cache-Control': 'private, no-store' },

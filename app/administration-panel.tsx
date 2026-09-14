@@ -17,6 +17,7 @@ import {
   Gift,
   Activity,
   Users,
+  ShieldBan,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { request, type Person } from '@/lib/client';
@@ -27,6 +28,7 @@ import { ProfileRecognitions } from './profile-recognitions';
 import { AdminGiftForm } from './admin-gift-form';
 import { giftDefinition } from '@/lib/gift-catalog';
 const AdminOnlinePanel = lazy(() => import('./admin-online-panel'));
+const AdminAccessPanel = lazy(() => import('./admin-access-panel'));
 type AdminPerson = Person & {
   administrator: number;
   moderator: number;
@@ -94,6 +96,9 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
         <TabsTrigger value="online" disabled={locked}>
           <Activity size={16} /> Онлайн
         </TabsTrigger>
+        <TabsTrigger value="access" disabled={locked}>
+          <ShieldBan size={16} /> Антиспам
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="people" keepMounted>
         <AdministrationAccounts
@@ -105,6 +110,11 @@ export function AdministrationPanel({ onChanged }: { onChanged: () => void }) {
       <TabsContent value="online">
         <Suspense fallback={<p className="meta">Загружаем статистику…</p>}>
           <AdminOnlinePanel />
+        </Suspense>
+      </TabsContent>
+      <TabsContent value="access">
+        <Suspense fallback={<p className="meta">Загружаем блокировки…</p>}>
+          <AdminAccessPanel onLocked={setLocked} />
         </Suspense>
       </TabsContent>
     </Tabs>

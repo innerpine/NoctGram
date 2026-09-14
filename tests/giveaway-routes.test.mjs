@@ -9,6 +9,9 @@ const require = createRequire(path.join(root, 'package.json'));
 const { build } = require('esbuild');
 const errorModule = JSON.stringify(path.join(root, 'lib/api-error.ts'));
 const stubs = {
+  '@/lib/storage': 'export const db=()=>({});',
+  '@/lib/access-security':
+    'export async function cleanAccessHistory(){globalThis.__giveawayRoutes.calls.push(["access-cleanup"]);}',
   '@/lib/admin-online':
     'export async function recordOnlineSnapshot(){globalThis.__giveawayRoutes.calls.push(["online"]);}',
   '@/lib/server': `import {ApiError,failure} from ${errorModule};
@@ -97,7 +100,9 @@ function request(body = payload(), headers = {}) {
 }
 const mutations = (s) =>
   s.calls.filter(([name]) =>
-    ['create', 'settle', 'push', 'calls', 'uploads'].includes(name),
+    ['create', 'settle', 'push', 'calls', 'uploads', 'access-cleanup'].includes(
+      name,
+    ),
   );
 
 await test('session actor mismatch and missing actor never reach payment creation', async () => {
@@ -229,5 +234,6 @@ await test('ordinary authorized jobs still settle prizes, calls, push and upload
     ['calls'],
     ['push'],
     ['uploads'],
+    ['access-cleanup'],
   ]);
 });

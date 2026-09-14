@@ -1,7 +1,13 @@
 import app from 'vinext/server/fetch-handler';
+import {
+  prepareAccessRequest,
+  checkAccessRequest,
+} from '../lib/access-security';
+import { failure } from '../lib/api-error';
 
 type PublicSettings = {
   ASSETS: Fetcher;
+  DB: D1Database;
   NOCT_DEPLOYMENT_TARGET?: string;
   NOCT_AUTH_MODE?: string;
   NOCT_AUTH_ALLOW_LOCAL_PROVIDER?: string;
@@ -72,7 +78,55 @@ const publicWorker = {
       )
         headers.delete(name);
     }
-    return app.fetch(new Request(request, { headers }), env, ctx);
+    const forwarded = new Request(request, { headers });
+    let path = url.pathname;
+    try {
+      path = new URL(
+        'https://noctgram.invalid' +
+          decodeURIComponent(path).replace(/\/{2,}/g, '/'),
+      ).pathname;
+    } catch {
+      /* Encoded paths still pass through the access gate. */
+    }
+    if (
+      (!path.toLowerCase().startsWith('/api/') &&
+        !url.pathname.includes('%')) ||
+      path === '/api/auth/logout'
+    )
+      return app.fetch(forwarded, env, ctx);
+    const access = prepareAccessRequest(forwarded);
+    let response: Response;
+    try {
+      await checkAccessRequest(env.DB, access.request);
+      response = await app.fetch(access.request, env, ctx);
+      // Email verification can be in flight while an administrator blocks access.
+      // Check the newly authenticated principal before delivering its session cookie.
+      if (path === '/api/auth/verify' && response.ok) {
+        const session = response.headers
+          .getSetCookie()
+          .find((cookie) => cookie.startsWith('noct_session='))
+          ?.split(';')[0];
+        if (session) {
+          const verified = new Headers(access.request.headers);
+          const cookies = (verified.get('cookie') || '')
+            .split(';')
+            .filter((cookie) => !cookie.trim().startsWith('noct_session='));
+          verified.set('cookie', [...cookies, session].join('; '));
+          await checkAccessRequest(
+            env.DB,
+            new Request(request.url, { headers: verified }),
+          );
+        }
+      }
+    } catch (error) {
+      response = failure(error);
+    }
+    response = new Response(response.body, response);
+    response.headers.set('Cache-Control', 'private, no-store');
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    if (access.setCookie)
+      response.headers.append('Set-Cookie', access.setCookie);
+    return response;
   },
   async scheduled(
     event: ScheduledController,
