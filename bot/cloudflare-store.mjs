@@ -98,6 +98,8 @@ export class CloudflareBotStore {
       lastHandledAt: this.get('lastHandledAt'),
       lastPaymentReconcileAt: this.get('lastPaymentReconcileAt'),
       lastReconcileError: this.get('lastReconcileError'),
+      pendingAdminNotifications: this.entries('admin-payment-pending:').length,
+      lastAdminNotificationAt: this.get('lastAdminNotificationAt'),
     };
   }
 }

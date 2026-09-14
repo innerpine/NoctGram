@@ -1,3 +1,9 @@
+import {
+  recordAdminTopup,
+  needsAdminReceipt,
+  flushAdminNotifications,
+} from './admin.mjs';
+
 export function normalizeStarTransaction(tx) {
   const incoming = !!tx.source && !tx.receiver,
     outgoing = !!tx.receiver && !tx.source;
@@ -39,7 +45,9 @@ export async function deliverReceipt(bot, event) {
       bot.store.set('payment-review:' + event.chargeId, event);
       return null;
     }
-    return await bot.site(event);
+    const result = await bot.site(event);
+    recordAdminTopup(bot, event, result);
+    return result;
   } catch (e) {
     if (e.service === 'site' && [400, 403, 404, 409].includes(e.status)) {
       bot.store.set('payment-review:' + event.chargeId, {
@@ -65,7 +73,11 @@ export async function reconcilePayments(bot) {
       continue;
     }
     const key = paymentKey(event);
-    if (!store.get('delivered:' + key)) store.set(key, event);
+    if (
+      !store.get('delivered:' + key) ||
+      needsAdminReceipt(bot, event, tx.date)
+    )
+      store.set(key, event);
   }
   store.set(
     'star-scan-offset',
@@ -130,6 +142,7 @@ export function startBotWorkers(bot, _signal) {
           else bot.store.retry(update.update_id);
         }
       }
+      await flushAdminNotifications(bot);
     } finally {
       processing = false;
     }

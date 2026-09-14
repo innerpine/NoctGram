@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { RemoteError } from './transport.mjs';
 import { screen, num } from './screens.mjs';
 import { handlePaymentUpdate, handleShop } from './payments.mjs';
+import { parseAdminIds, handleAdmin } from './admin.mjs';
 export class NoctBot {
   constructor({
     telegram,
@@ -10,6 +11,8 @@ export class NoctBot {
     secret,
     siteUrl,
     emojiAvailable = false,
+    adminIds = '',
+    adminNotificationsSince = '',
   }) {
     Object.assign(this, {
       telegram,
@@ -18,6 +21,8 @@ export class NoctBot {
       secret,
       siteUrl,
       emojiAvailable,
+      adminIds: parseAdminIds(adminIds),
+      adminNotificationsSince: Date.parse(adminNotificationsSince),
     });
   }
   recordDelivery(message) {
@@ -203,6 +208,7 @@ export class NoctBot {
     const render = (name, state, extra = {}) =>
       this.render(chatId, name, state, { ...extra, delivery });
     try {
+      if (await handleAdmin(this, update)) return;
       const start = text.match(
         /^\/start(?:@[a-z0-9_]+)?\s+link_([a-f0-9]{32})$/i,
       );

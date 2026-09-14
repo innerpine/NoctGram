@@ -8,11 +8,15 @@
   "preview_urls": false,
   "vars": {
     "NOCT_SITE_URL": "https://noctgram.com",
-    "NOCT_BOT_CUSTOM_EMOJI": "0"
+    "NOCT_BOT_CUSTOM_EMOJI": "0",
+    "NOCT_BOT_ADMIN_IDS": "1356155405",
+    "NOCT_BOT_ADMIN_NOTIFICATIONS_SINCE": "2026-09-14T18:36:02.211Z",
   },
-  "durable_objects": { "bindings": [{ "name": "BOT", "class_name": "TelegramBot" }] },
+  "durable_objects": {
+    "bindings": [{ "name": "BOT", "class_name": "TelegramBot" }],
+  },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TelegramBot"] }],
   "triggers": { "crons": ["*/5 * * * *"] },
   "limits": { "cpu_ms": 10000 },
-  "observability": { "enabled": false }
+  "observability": { "enabled": false },
 }

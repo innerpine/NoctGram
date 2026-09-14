@@ -18,6 +18,8 @@ Bot Worker secrets (never in `vars`, source, screenshots or logs):
 
 The tracked `bot/wrangler.jsonc` contains only public configuration. Use Wrangler's `secret bulk` with a private ignored JSON file to upload the three bot secrets. Preserve existing website secrets when adding its bridge secret.
 
+Bot Worker vars `NOCT_BOT_ADMIN_IDS` (numeric Telegram IDs separated by commas) and `NOCT_BOT_ADMIN_NOTIFICATIONS_SINCE` (fixed ISO timestamp) enable private `/admin` access and successful Noct Stars top-up notifications. Preserve the timestamp on redeploy. Queues and delivered order IDs use the existing Durable Object state; no D1 schema change is required. Register `/admin` with Telegram's `setMyCommands` using a `chat` scope for each authorized ID, keeping the ordinary commands in that scope. The scope only controls menu visibility; the handler independently validates the sender's ID on every command and callback. Removed IDs cannot receive queued messages. `getMyStarBalance` is read-only; the panel never authorizes refunds.
+
 ## Deploy
 
 1. Run `npm test`, `npm run typecheck`, `npm run lint` and `npm run check:secrets`. Tests never contact a real payment provider or charge an account.

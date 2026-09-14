@@ -2,6 +2,7 @@ import { CloudflareBotStore } from './cloudflare-store.mjs';
 import { NoctBot } from './handler.mjs';
 import { reconcilePayments } from './payment-worker.mjs';
 import { siteTransport, telegramTransport } from './transport.mjs';
+import { flushAdminNotifications } from './admin.mjs';
 
 export class CloudflareBotRuntime {
   constructor(ctx, env) {
@@ -14,6 +15,8 @@ export class CloudflareBotRuntime {
       secret: env.NOCT_BOT_SECRET,
       siteUrl: env.NOCT_SITE_URL,
       emojiAvailable: env.NOCT_BOT_CUSTOM_EMOJI === '1',
+      adminIds: env.NOCT_BOT_ADMIN_IDS,
+      adminNotificationsSince: env.NOCT_BOT_ADMIN_NOTIFICATIONS_SINCE,
     });
   }
   async wake(at = Date.now() + 1000) {
@@ -74,6 +77,7 @@ export class CloudflareBotRuntime {
     // Schedule recovery first; a process interruption cannot orphan the queue.
     await this.wake(Date.now() + 60000);
     await Promise.all([this.runUpdates(), this.runPayments()]);
+    await flushAdminNotifications(this.bot);
     this.store.cleanup();
     const next = this.store.nextRetry();
     if (next !== null) await this.wake(Math.max(Date.now() + 1000, next));

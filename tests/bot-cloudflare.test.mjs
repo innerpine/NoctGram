@@ -74,6 +74,10 @@ void test(
           NOCT_BOT_SECRET: bridge,
           TELEGRAM_WEBHOOK_SECRET: secret,
           NOCT_SITE_URL: 'https://noctgram.com',
+          NOCT_BOT_ADMIN_IDS: '1356155405',
+          NOCT_BOT_ADMIN_NOTIFICATIONS_SINCE: new Date(
+            Date.now() - 60000,
+          ).toISOString(),
         },
         outboundService: async (request) => {
           const url = new URL(request.url),
@@ -102,6 +106,11 @@ void test(
                 status: 'paid',
                 product: 'stars',
                 units: 100,
+                provider: 'telegram',
+                currency: 'XTR',
+                amountMinor: body.amount,
+                fulfilledAt: Date.now(),
+                reversedAt: null,
               });
             }
             if (body.action === 'paymentRefunds')
@@ -217,5 +226,21 @@ void test(
     await post(paid);
     assert.equal((await status()).queuedUpdates, 0);
     assert.equal(credited.size, 1);
+    for (
+      let i = 0;
+      i < 50 &&
+      !calls.some(
+        (c) => c.telegram === 'sendMessage' && c.body.chat_id === 1356155405,
+      );
+      i++
+    )
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    const adminMessages = calls.filter(
+      (c) => c.telegram === 'sendMessage' && c.body.chat_id === 1356155405,
+    );
+    assert.equal(adminMessages.length, 1);
+    assert.match(adminMessages[0].body.text, /100 Noct Stars/);
+    assert.match(adminMessages[0].body.text, /19 Telegram Stars/);
+    assert.equal((await status()).paymentAdminsConfigured, 1);
   },
 );

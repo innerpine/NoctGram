@@ -1,4 +1,5 @@
 import { telegramTransport, siteTransport } from './transport.mjs';
+import { syncAdminCommands } from './admin.mjs';
 
 // Run only after both Workers and their secrets are deployed. This never calls
 // getUpdates, discards pending updates, sends a message or makes a purchase.
@@ -49,6 +50,7 @@ try {
       { command: 'settings', description: 'Оформление бота' },
     ],
   });
+  await syncAdminCommands(telegram, process.env.NOCT_BOT_ADMIN_IDS);
   await telegram('setMyDescription', {
     description:
       'NoctGram · Stars и Premium\n\nПривяжи аккаунт NoctGram, пополняй баланс Noct Stars и подключай Premium на 30 дней. Оплата — Telegram Stars. Помощь с покупками: /paysupport',

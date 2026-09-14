@@ -42,7 +42,8 @@ export function screen(name, state, options = {}) {
     block,
     head,
   } = ui(preferences, emojiAvailable);
-  if (name === 'shop') return options.view(ui(preferences, emojiAvailable));
+  if (name === 'shop' || name === 'admin')
+    return options.view(ui(preferences, emojiAvailable));
   const site = new URL(siteUrl);
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(site.hostname);
   const siteRow = local ? [] : [[{ text: '☾ открыть noctgram', url: siteUrl }]];

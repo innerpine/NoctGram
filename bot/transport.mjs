@@ -72,6 +72,7 @@ export function telegramTransport(token, signal) {
     'sendInvoice',
     'answerPreCheckoutQuery',
     'getStarTransactions',
+    'getMyStarBalance',
     'refundStarPayment',
     'getWebhookInfo',
     'setWebhook',
@@ -82,6 +83,7 @@ export function telegramTransport(token, signal) {
     'pinChatMessage',
     'unpinChatMessage',
     'setMyCommands',
+    'getMyCommands',
     'setMyDescription',
     'setMyShortDescription',
   ]);

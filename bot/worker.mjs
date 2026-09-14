@@ -27,7 +27,10 @@ export class TelegramBot extends DurableObject {
   async fetch(request) {
     if (new URL(request.url).pathname === '/operator/status') {
       await this.runtime.wake();
-      return reply(200, this.runtime.store.diagnostics());
+      return reply(200, {
+        ...this.runtime.store.diagnostics(),
+        paymentAdminsConfigured: this.runtime.bot.adminIds.length,
+      });
     }
     await this.runtime.accept(await request.json());
     return reply(200, { ok: true });

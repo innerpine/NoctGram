@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { BotStore } from './store.mjs';
 import { NoctBot } from './handler.mjs';
+import { syncAdminCommands } from './admin.mjs';
 import {
   telegramTransport,
   siteTransport,
@@ -53,6 +54,8 @@ try {
     secret,
     siteUrl,
     emojiAvailable: process.env.NOCT_BOT_CUSTOM_EMOJI !== '0',
+    adminIds: process.env.NOCT_BOT_ADMIN_IDS,
+    adminNotificationsSince: process.env.NOCT_BOT_ADMIN_NOTIFICATIONS_SINCE,
   });
   console.log(`@${me.username} запущен · Telegram Stars · оплата · ${siteUrl}`);
   await telegram('setMyCommands', {
@@ -66,6 +69,7 @@ try {
       { command: 'settings', description: 'Оформление бота' },
     ],
   });
+  await syncAdminCommands(telegram, process.env.NOCT_BOT_ADMIN_IDS);
   let failures = 0;
   stopWorkers = startBotWorkers(bot, controller.signal);
   while (!controller.signal.aborted) {
