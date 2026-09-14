@@ -33,7 +33,7 @@ const compiled = await build({
         build.onLoad({ filter: /.*/, namespace: 'fixture' }, ({ path }) => ({
           contents:
             path === 'react'
-              ? 'export const useRef=(current)=>({current}); export const useState=init=>[typeof init === "function" ? init() : init,()=>{}];'
+              ? 'export const useRef=(current)=>({current}); export const useState=(initial)=>[typeof initial === "function" ? initial() : initial,()=>{}]; export const useLayoutEffect=(setup)=>{setup();};'
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
                 : path === 'lucide-react'
@@ -155,7 +155,10 @@ Object.defineProperty(globalThis, 'Element', {
   value: TestElement,
 });
 try {
-  const root = { contains: (target) => target.contained };
+  const root = {
+    contains: (target) => !!target?.contained,
+    ownerDocument: { getSelection: () => null },
+  };
   const trigger = nodes(menu).find(
     (node) => node.type === 'ContextMenuTrigger',
   );
@@ -234,19 +237,23 @@ try {
     ['reply', 'm1'],
     'Double click replies to the message owning the gutter',
   );
+  const beforeBubble = actions.length;
+  doubleClick(trigger, new TestElement(false, true, true));
+  assert.equal(actions.length, beforeBubble + 1);
+  assert.deepEqual(
+    actions.at(-1),
+    ['reply', 'm1'],
+    'Double click on message text also starts a reply',
+  );
   const replied = actions.length;
-  for (const target of [
-    new TestElement(true),
-    new TestElement(false, false),
-    new TestElement(false, true, true),
-  ])
+  for (const target of [new TestElement(true), new TestElement(false, false)])
     doubleClick(trigger, target);
   for (const key of ['ctrlKey', 'metaKey', 'altKey', 'shiftKey'])
     doubleClick(trigger, new TestElement(), { [key]: true });
   assert.equal(
     actions.length,
     replied,
-    'Message content, portals, media and modified clicks keep their existing behaviour',
+    'Portals, media and modified clicks keep their existing behaviour',
   );
   for (const restrictions of [
     { disabled: true },
@@ -437,6 +444,60 @@ try {
     ['reply', 'm1'],
     ['copy', 'm1'],
   ]);
+  doubleClick(groupTrigger, new TestElement(false, true, true));
+  assert.deepEqual(roomActions.at(-1), ['reply', 'm1']);
+  const afterQuickReply = roomActions.length;
+  groupTrigger.props.onClickCapture(event(new TestElement()));
+  groupNodes
+    .find((node) => node.type === 'ContextMenu')
+    .props.onOpenChange(true);
+  groupTrigger.props.onDoubleClick({ ...event(new TestElement()), detail: 2 });
+  assert.equal(
+    roomActions.length,
+    afterQuickReply,
+    'Opening the group menu cancels an in-progress reply gesture',
+  );
+  const swipe = (surface) => {
+    const currentTarget = {
+      ...root,
+      setAttribute() {},
+      removeAttribute() {},
+      toggleAttribute() {},
+      style: { setProperty() {}, removeProperty() {} },
+    };
+    const start = {
+      ...event(new TestElement()),
+      currentTarget,
+      pointerType: 'touch',
+      pointerId: 1,
+      isPrimary: true,
+      cancelable: true,
+      clientX: 140,
+    };
+    surface.props.onPointerDown(start);
+    surface.props.onPointerMove({ ...start, clientX: 60 });
+    surface.props.onPointerUp({ ...start, clientX: 60 });
+  };
+  swipe(groupTrigger);
+  assert.equal(roomActions.length, afterQuickReply + 1);
+  assert.deepEqual(roomActions.at(-1), ['reply', 'm1']);
+  for (const restrictions of [
+    { disabled: true },
+    { canSend: false },
+    { pending: true },
+    { kind: 'secret' },
+    { message: { ...reactedMessage, deletedAt: 1 } },
+  ]) {
+    const locked = nodes(RoomMessageContext({ ...roomProps, ...restrictions }))
+      .find((node) => node.type === 'ContextMenuTrigger');
+    doubleClick(locked, new TestElement());
+    swipe(locked);
+  }
+  assert.equal(
+    roomActions.length,
+    afterQuickReply + 1,
+    'Group swipe and double click obey the same permissions as its reply menu',
+  );
   assert.equal(
     actionItem(groupNodes, 'Удалить у всех'),
     undefined,
