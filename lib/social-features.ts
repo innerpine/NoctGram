@@ -18,6 +18,18 @@ import {
 } from './account-access';
 import { db, clean, ApiError, profile } from '@/lib/server';
 import { ensureWallet, balance } from './star-wallet';
+import { CHANNEL_LIMIT_MESSAGE, MAX_OWNED_CHANNELS } from './channel-limits';
+
+async function assertChannelCapacity(owner: string) {
+  const row = await db()
+    .prepare(
+      "SELECT COUNT(*) AS count FROM users WHERE kind='channel' AND ownerId=? AND deletedAt=0",
+    )
+    .bind(owner)
+    .first<{ count: number }>();
+  if (Number(row?.count || 0) >= MAX_OWNED_CHANNELS)
+    throw new ApiError(409, CHANNEL_LIMIT_MESSAGE, 'CHANNEL_LIMIT');
+}
 
 export async function canPublish(id: string, me: string) {
   return allowed(id, me, 'publish');
@@ -154,6 +166,7 @@ export async function featurePost(
     );
   }
   if (action === 'createChannel') {
+    await assertChannelCapacity(me);
     const name = clean(b.name, 40, true),
       bio = clean(b.bio || '', 300),
       h = handle(b.handle),
@@ -161,10 +174,11 @@ export async function featurePost(
     if (avatar) await assertStaticAvatar(avatar);
     const channelId = 'channel_' + crypto.randomUUID();
     try {
+      // Enforce capacity again inside the write so simultaneous requests cannot exceed it.
       await d.batch([
         d
           .prepare(
-            `WITH input AS(SELECT ? AS actor,? AS avatar) INSERT INTO users(id,name,bio,avatar,kind,ownerId,created) SELECT ?,?,?,i.avatar,'channel',i.actor,? FROM input i WHERE ${mediaAssignment("''", 'i.avatar', 'i.actor')} AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=i.actor AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))`,
+            `WITH input AS(SELECT ? AS actor,? AS avatar) INSERT INTO users(id,name,bio,avatar,kind,ownerId,created) SELECT ?,?,?,i.avatar,'channel',i.actor,? FROM input i WHERE (SELECT COUNT(*) FROM users owned WHERE owned.kind='channel' AND owned.ownerId=i.actor AND owned.deletedAt=0)<${MAX_OWNED_CHANNELS} AND ${mediaAssignment("''", 'i.avatar', 'i.actor')} AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=i.actor AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))`,
           )
           .bind(me, avatar, channelId, name, bio, Date.now()),
         d
@@ -188,8 +202,10 @@ export async function featurePost(
         .prepare('SELECT id FROM users WHERE id=?')
         .bind(channelId)
         .first())
-    )
+    ) {
+      await assertChannelCapacity(me);
       throw new ApiError(409, 'Права на публикацию или вложение изменились');
+    }
     return Response.json(await profile(channelId, me));
   }
   if (action === 'profile') {

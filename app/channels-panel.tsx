@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Search, Camera, Megaphone, X, ArrowUpRight } from 'lucide-react';
 import { request, upload, type Profile } from '@/lib/client';
 import { Avatar, Empty } from './post-card';
+import { MAX_OWNED_CHANNELS } from '@/lib/channel-limits';
 export function ChannelsPanel({
   me,
   onOpen,
@@ -105,6 +106,9 @@ export function ChannelsPanel({
               <X size={18} />
             </button>
           </div>
+          <p className="meta">
+            Максимум {MAX_OWNED_CHANNELS} канала на один аккаунт.
+          </p>
           <fieldset disabled={busy}>
             <div className="row">
               <Avatar person={{ name: name || 'Канал', avatar }} size={56} />
