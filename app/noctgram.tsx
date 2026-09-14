@@ -2049,6 +2049,7 @@ export default function Noctgram({
       className={
         'app-shell' +
         (['music', 'music-services'].includes(page) ? ' music-shell' : '') +
+        (page === 'profile' ? ' profile-shell' : '') +
         (page === 'messages' ? ' messages-shell' : '')
       }
     >
@@ -2406,70 +2407,7 @@ export default function Noctgram({
               </div>
               <div className="profile-info">
                 <div className="profile-avatar-line">
-                  <ProfileAvatar person={profile} size={96} />
-                  <span className="grow" />
-                  {profileEditable ? (
-                    <>
-                      <button
-                        className="secondary"
-                        disabled={
-                          channelRestricted ||
-                          (readOnly && profile?.id !== me?.id)
-                        }
-                        onClick={() => edit()}
-                      >
-                        Редактировать
-                      </button>
-                      {profile.id === me?.id && (
-                        <button
-                          className="icon-button"
-                          aria-label="Настройки мессенджера"
-                          title="Настройки"
-                          onClick={() => {
-                            setSettingsSection('profile');
-                            setModal('settings');
-                          }}
-                        >
-                          <Settings size={20} />
-                        </button>
-                      )}
-                      <button
-                        className="icon-button cosmetic"
-                        aria-label="Оформление профиля"
-                        onClick={() => edit('design')}
-                      >
-                        <PremiumIcon size={21} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        className="primary"
-                        disabled={readOnly || busy}
-                        onClick={() => follow(profile)}
-                      >
-                        {profile.followed ? 'Вы подписаны' : 'Подписаться'}
-                      </button>
-                      {profile.id !== 'noctgram' &&
-                        profile.kind !== 'channel' && (
-                          <button
-                            className="icon-button"
-                            aria-label="Написать сообщение"
-                            onClick={() => openChat(profile)}
-                          >
-                            <Send size={18} />
-                          </button>
-                        )}
-                    </>
-                  )}
-                  {profile.id !== 'noctgram' && profile.id !== me?.id && (
-                    <SendGiftButton
-                      key={profile.id}
-                      recipient={profile}
-                      senderId={me?.id || ''}
-                      disabled={!me || readOnly || channelRestricted || busy}
-                    />
-                  )}
+                  <ProfileAvatar person={profile} size={128} />
                 </div>
                 <div className="profile-identity-row">
                   <div className="profile-identity-main">
@@ -2563,6 +2501,71 @@ export default function Noctgram({
                     'Пока без описания.'
                   )}
                 </p>
+                <div className="profile-actions">
+                  {profileEditable ? (
+                    <>
+                      <button
+                        className="secondary"
+                        disabled={
+                          channelRestricted ||
+                          (readOnly && profile?.id !== me?.id)
+                        }
+                        onClick={() => edit()}
+                      >
+                        <Pencil size={17} aria-hidden="true" /> Редактировать
+                      </button>
+                      {profile.id === me?.id && (
+                        <button
+                          className="icon-button"
+                          aria-label="Настройки мессенджера"
+                          title="Настройки"
+                          onClick={() => {
+                            setSettingsSection('profile');
+                            setModal('settings');
+                          }}
+                        >
+                          <Settings size={20} />
+                        </button>
+                      )}
+                      <button
+                        className="secondary profile-design-action"
+                        aria-label="Оформление профиля"
+                        onClick={() => edit('design')}
+                      >
+                        <PremiumIcon size={21} />
+                        <span>Оформление</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className="primary"
+                        disabled={readOnly || busy}
+                        onClick={() => follow(profile)}
+                      >
+                        {profile.followed ? 'Вы читаете' : 'Читать'}
+                      </button>
+                      {profile.id !== 'noctgram' &&
+                        profile.kind !== 'channel' && (
+                          <button
+                            className="secondary profile-message-action"
+                            aria-label="Написать сообщение"
+                            onClick={() => openChat(profile)}
+                          >
+                            <Mail size={18} aria-hidden="true" /> Написать
+                          </button>
+                        )}
+                    </>
+                  )}
+                  {profile.id !== 'noctgram' && profile.id !== me?.id && (
+                    <SendGiftButton
+                      key={profile.id}
+                      recipient={profile}
+                      senderId={me?.id || ''}
+                      disabled={!me || readOnly || channelRestricted || busy}
+                    />
+                  )}
+                </div>
                 <div className="profile-details">
                   <CalendarDays size={14} /> В Noctgram с{' '}
                   {new Date(profile.created).toLocaleDateString('ru-RU', {
@@ -3139,7 +3142,7 @@ export default function Noctgram({
           </div>
         )}
       </main>
-      {!['messages', 'music', 'music-services'].includes(page) && (
+      {!['profile', 'messages', 'music', 'music-services'].includes(page) && (
         <aside className="right-column">
           <section className="side-card">
             <div className="side-card-heading">

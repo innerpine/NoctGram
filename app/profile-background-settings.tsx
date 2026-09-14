@@ -7,6 +7,11 @@ const modes = [
   ['cover', 'Баннер и аватар'],
   ['custom', 'Своя палитра'],
 ] as const;
+const patterns = [
+  ['none', 'Чистый'],
+  ['stardust', 'Звёздная пыль'],
+  ['orbits', 'Орбиты'],
+] as const;
 export function ProfileBackgroundSettings({
   value,
   onChange,
@@ -21,9 +26,7 @@ export function ProfileBackgroundSettings({
         <strong>Фон профиля</strong>
         <span className="design-premium-label">Noct Premium</span>
       </div>
-      <p>
-        Градиент всей карточки — под твоё оформление, баннер или любимые цвета.
-      </p>
+      <p>Мягкое свечение под твоё оформление, обложку или любимые цвета.</p>
       <fieldset className="background-modes" aria-label="Источник цветов фона">
         {modes.map(([mode, label]) => (
           <button
@@ -77,6 +80,24 @@ export function ProfileBackgroundSettings({
           />
         </label>
       )}
+      <fieldset className="profile-pattern-choices">
+        <legend>Узор</legend>
+        {patterns.map(([pattern, label]) => (
+          <button
+            key={pattern}
+            type="button"
+            aria-pressed={value.pattern === pattern}
+            onClick={() => onChange({ ...value, pattern })}
+          >
+            <span
+              className="profile-pattern-swatch profile-decoration-surface"
+              data-profile-pattern={pattern}
+              aria-hidden="true"
+            />
+            <span>{label}</span>
+          </button>
+        ))}
+      </fieldset>
     </section>
   );
 }

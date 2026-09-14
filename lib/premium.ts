@@ -117,10 +117,17 @@ export async function premiumPost(
   const background =
     b.background === undefined
       ? previousBackground
-      : parseProfileBackground(b.background, previousBackground.musicColor);
+      : parseProfileBackground(
+          b.background,
+          previousBackground.musicColor,
+          previousBackground.pattern,
+        );
   if (!background)
     throw new ApiError(400, 'Проверь цвета и интенсивность фона профиля');
-  if (isChannel && background.mode !== 'none')
+  if (
+    isChannel &&
+    (background.mode !== 'none' || background.pattern !== 'none')
+  )
     throw new ApiError(403, 'Фон доступен личному профилю с Noct Premium');
   // Older clients omit Chrome fields. Keep existing preferences on those saves.
   let chrome =

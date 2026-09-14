@@ -217,6 +217,13 @@ try {
         assert.ok(tabs, 'Person profiles expose the gift tab');
         tabs.props.onValueChange(tab);
         const tree = render();
+        assert.equal(
+          all(tree, 'aside').some(
+            (node) => node.props.className === 'right-column',
+          ),
+          false,
+          'Profile panels keep discovery recommendations out of the workspace',
+        );
         const gifts = all(tree, 'ProfileGifts');
         assert.equal(
           gifts.length,

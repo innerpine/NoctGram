@@ -37,13 +37,19 @@ export function ProfileSurface({
   children: ReactNode;
 }) {
   const surface = useProfileBackground(person);
+  const pattern =
+    person.premium && person.kind !== 'channel'
+      ? readProfileBackground(person.profileBackground).pattern
+      : 'none';
   return (
     <section
       className={
-        'profile-card ' + (person.kind === 'channel' ? 'channel-profile' : '')
+        'profile-card profile-decoration-surface ' +
+        (person.kind === 'channel' ? 'channel-profile' : '')
       }
       data-premium={!!person.premium || (person.boostLevel || 0) > 0}
       data-profile-background={!!surface}
+      data-profile-pattern={pattern}
       style={
         hasProfileDesign(person)
           ? { ...appearanceStyle(person), ...surface }

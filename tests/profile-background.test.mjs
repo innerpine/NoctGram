@@ -138,6 +138,7 @@ const defaults = {
   second: '#3366aa',
   intensity: 30,
   musicColor: 'cover',
+  pattern: 'none',
 };
 const design = {
   theme: 'ember',
@@ -179,6 +180,8 @@ for (const bad of [
   { ...defaults, intensity: 30.5 },
   { ...defaults, musicColor: 'invalid' },
   { ...defaults, musicColor: null },
+  { ...defaults, pattern: 'url(https://invalid)' },
+  { ...defaults, pattern: null },
   null,
 ]) {
   assert.equal(
@@ -271,6 +274,36 @@ assert.equal(
   JSON.parse((await ok('alice', 'profile')).profileBackground).musicColor,
   'cover',
   'Existing clients and profiles default to artwork colours',
+);
+for (const pattern of ['stardust', 'orbits', 'none']) {
+  await ok('alice', 'appearance', {
+    ...design,
+    background: { ...defaults, pattern },
+  });
+  assert.equal(
+    JSON.parse(
+      (await ok('bob', 'profile', undefined, '&id=alice')).profileBackground,
+    ).pattern,
+    pattern,
+    'The visitor receives the selected pattern',
+  );
+}
+await ok('alice', 'appearance', {
+  ...design,
+  background: { ...defaults, pattern: 'orbits' },
+});
+const withoutPattern = { ...defaults };
+delete withoutPattern.pattern;
+await ok('alice', 'appearance', { ...design, background: withoutPattern });
+assert.equal(
+  JSON.parse((await ok('alice', 'profile')).profileBackground).pattern,
+  'orbits',
+  'Saving from an older client preserves the selected pattern',
+);
+await ok('alice', 'appearance', oldClient);
+assert.equal(
+  JSON.parse((await ok('alice', 'profile')).profileBackground).pattern,
+  'orbits',
 );
 console.log(
   'Profile background API: auth, Premium, validation, persistence, visitors, old clients and entitlement loss passed',

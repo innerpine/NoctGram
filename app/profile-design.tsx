@@ -118,8 +118,9 @@ export function ProfileDesign({
   return (
     <div className="profile-design">
       <div
-        className="design-preview"
+        className="design-preview profile-decoration-surface"
         data-profile-background={!!surface}
+        data-profile-pattern={channel ? 'none' : background.pattern}
         style={{ ...appearanceStyle(preview), ...surface }}
       >
         <span className="design-preview-label">Предпросмотр</span>
