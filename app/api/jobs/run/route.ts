@@ -2,6 +2,7 @@ import { setting } from '@/lib/auth-session';
 import { flushPush } from '@/lib/notifications';
 import { expireCalls } from '@/lib/calls';
 import { cleanUploads } from '@/lib/upload-storage';
+import { cleanSpamActivity } from '@/lib/antispam';
 import { settleDueGiveaways } from '@/lib/giveaways';
 export async function POST(req: Request) {
   const secret = setting('NOCT_JOBS_SECRET'),
@@ -12,6 +13,7 @@ export async function POST(req: Request) {
   if (new URL(req.url).searchParams.get('task') === 'giveaways')
     return Response.json({ giveaways });
   await expireCalls();
+  await cleanSpamActivity();
   const push = await flushPush();
   return Response.json({ ...push, giveaways, uploads: await cleanUploads() });
 }

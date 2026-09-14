@@ -1238,18 +1238,24 @@ export default function Noctgram({
       page === 'profile' && profile?.kind === 'channel' ? profile.id : me!.id;
     void run(async () => {
       setPublishError('');
+      let reviewNotice = '';
       try {
-        await request('', {
-          action: 'post',
-          as: publisher,
-          text: draft,
-          media: attachments.map((x) => x.id),
-          poll: poll || [],
-          code: code || '',
-          codeLang,
-          adult,
-          publishAt: scheduledAt ? new Date(scheduledAt).getTime() : 0,
-        });
+        const result = await request<{ queued?: boolean; notice?: string }>(
+          '',
+          {
+            action: 'post',
+            as: publisher,
+            text: draft,
+            media: attachments.map((x) => x.id),
+            poll: poll || [],
+            code: code || '',
+            codeLang,
+            adult,
+            publishAt: scheduledAt ? new Date(scheduledAt).getTime() : 0,
+          },
+        );
+        if (result.queued)
+          reviewNotice = result.notice || 'Публикация отправлена на проверку';
       } catch (error) {
         setPublishError(
           error instanceof Error && error.message
@@ -1267,6 +1273,10 @@ export default function Noctgram({
       setAdult(false);
       setScheduledAt('');
       setScheduleVersion((v) => v + 1);
+      if (reviewNotice) {
+        notify(reviewNotice);
+        return;
+      }
       notify(
         scheduledAt
           ? 'Публикация добавлена в очередь'

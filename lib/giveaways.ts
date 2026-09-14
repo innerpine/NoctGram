@@ -1,4 +1,5 @@
 import { db } from './storage';
+import { assertUnqueuedPublicWrite } from './antispam';
 import { ApiError } from './api-error';
 import { balance, ensureWallet } from './star-wallet';
 import { rateLimit, socialRateLimit } from './rate-limit';
@@ -182,6 +183,7 @@ export async function createGiveaway(
     );
   await socialRateLimit(me, kind === 'channel' ? 'post' : 'message');
   await rateLimit('giveaways', me, 5, 3600);
+  await assertUnqueuedPublicWrite(me, '', targetId);
   await ensureWallet(me);
   const gate = `${mayCreate(kind, '?1', '?2')}
     AND NOT EXISTS(SELECT 1 FROM giveaways WHERE id=?3)

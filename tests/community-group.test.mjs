@@ -64,7 +64,7 @@ const compiled = await build({
         build.onLoad(
           { filter: /.*/, namespace: 'community-test-settings' },
           () => ({
-            contents: "export const setting = () => '1';",
+            contents: "export const setting = () => '1'; export const tokenHash=async value=>value;",
           }),
         );
       },

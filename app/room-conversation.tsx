@@ -1,4 +1,5 @@
 'use client';
+import type { QueuedSubmission } from '@/lib/antispam-types';
 import { RoomMessageGesture } from './room-message-gesture';
 import { MessageReactions } from './message-reactions';
 import type { ReactionEmoji } from '@/lib/message-reactions';
@@ -79,6 +80,7 @@ export function RoomConversation({
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
     [mutationError, setMutationError] = useState(''),
+    [reviewNotice, setReviewNotice] = useState(''),
     [busy, setBusy] = useState(false);
   const [text, setText] = useState(''),
     [reply, setReply] = useState<RoomMessage | null>(null),
@@ -425,7 +427,7 @@ export function RoomConversation({
         });
       }
       if (!alive.current) return;
-      await roomAction({
+      const sent = await roomAction<{ id: string } | QueuedSubmission>({
         actor: me.id,
         action: 'send',
         id: room.id,
@@ -434,6 +436,16 @@ export function RoomConversation({
           ? { ciphertext: item.ciphertext }
           : { text: item.text, replyTo: item.replyTo }),
       });
+      if ('queued' in sent) {
+        if (alive.current) {
+          outgoing.current = null;
+          setPending(false);
+          setText('');
+          setReply(null);
+          setReviewNotice(sent.notice);
+        }
+        return;
+      }
       if (alive.current) {
         follow.current = true;
         pageBefore.current = '';
@@ -998,6 +1010,19 @@ export function RoomConversation({
             </DialogContent>
           </Dialog>
         </>
+      )}
+      {reviewNotice && (
+        <output className="room-review-notice">
+          {reviewNotice}
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Закрыть уведомление о проверке"
+            onClick={() => setReviewNotice('')}
+          >
+            ×
+          </button>
+        </output>
       )}
       {mutationError && (
         <div className="room-error" role="alert">

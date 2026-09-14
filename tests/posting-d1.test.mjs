@@ -244,6 +244,114 @@ void test(
         .prepare(sql)
         .bind(...args)
         .first();
+    await t.test(
+      'antispam quarantine approvals execute with real D1 limits',
+      async () => {
+        const { build } = require('esbuild');
+        const compiled = await build({
+          stdin: {
+            contents: `export * from './lib/antispam'; export * from './lib/antispam-moderation'; export * from './lib/rooms';`,
+            resolveDir: root,
+          },
+          bundle: true,
+          write: false,
+          format: 'esm',
+          platform: 'node',
+          plugins: [
+            {
+              name: 'antispam-real-d1',
+              setup(build) {
+                build.onResolve(
+                  { filter: /^(\.\/|@\/lib\/)(storage|server|auth-session)$/ },
+                  ({ path }) => ({ path, namespace: 'antispam-d1' }),
+                );
+                build.onLoad(
+                  { filter: /.*/, namespace: 'antispam-d1' },
+                  ({ path }) => ({
+                    contents: path.endsWith('auth-session')
+                      ? `export const setting=()=>''; export const tokenHash=async s=>Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))).toString('hex');`
+                      : `export {ApiError,failure} from './lib/api-error'; export const db=()=>globalThis.__antispamRealD1; export const clean=v=>v;`,
+                    resolveDir: root,
+                  }),
+                );
+              },
+            },
+          ],
+        });
+        globalThis.__antispamRealD1 = d;
+        t.after(() => {
+          delete globalThis.__antispamRealD1;
+        });
+        const api = await import(
+          'data:text/javascript;base64,' +
+            Buffer.from(
+              compiled.outputFiles[0].text + '\n//# sourceURL=antispam-d1.mjs',
+            ).toString('base64')
+        );
+        await run(
+          "INSERT INTO users(id,name,created) VALUES('spam-alice','Alice',1),('spam-mod','Moderator',1)",
+        );
+        await run(
+          "INSERT INTO moderators(userId,created) VALUES('spam-mod',1)",
+        );
+        const postId = randomUUID();
+        const queued = await api.reviewSpam({
+          kind: 'post',
+          targetId: postId,
+          actorId: 'spam-alice',
+          contextId: 'spam-alice',
+          payload: { text: 'unixgram.com', media: '[]', poll: '[]' },
+        });
+        assert.equal(
+          await first('SELECT id FROM posts WHERE id=?', postId),
+          null,
+        );
+        await api.spamModerationPost(
+          'spamReview',
+          { id: queued.id, decision: 'approve' },
+          'spam-mod',
+        );
+        assert.equal(
+          (await first('SELECT text FROM posts WHERE id=?', postId)).text,
+          'unixgram.com',
+        );
+        const commentId = randomUUID();
+        const comment = await api.reviewSpam({
+          kind: 'comment',
+          targetId: commentId,
+          actorId: 'spam-alice',
+          contextId: postId,
+          payload: { text: 'unixgram.com' },
+        });
+        await api.spamModerationPost(
+          'spamReview',
+          { id: comment.id, decision: 'approve' },
+          'spam-mod',
+        );
+        assert.ok(await first('SELECT id FROM comments WHERE id=?', commentId));
+        const room = await api.changeRoom('spam-mod', {
+          action: 'create',
+          kind: 'group',
+          name: 'Antispam',
+          memberIds: ['spam-alice'],
+        });
+        const message = await api.changeRoom('spam-alice', {
+          action: 'send',
+          id: room.id,
+          key: randomUUID(),
+          text: 'dW5peGdyYW0uY29t',
+        });
+        await api.spamModerationPost(
+          'spamReview',
+          { id: message.id, decision: 'approve' },
+          'spam-mod',
+        );
+        assert.equal(
+          (await api.readRoom('spam-mod', room.id)).messages.length,
+          1,
+        );
+      },
+    );
     async function fixture() {
       const suffix = randomUUID().replaceAll('-', '').slice(0, 12),
         now = Date.now();

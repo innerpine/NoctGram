@@ -99,7 +99,7 @@ const compiled = await build({
           namespace: 'fixture-settings',
         }));
         build.onLoad({ filter: /.*/, namespace: 'fixture-settings' }, () => ({
-          contents: "export const setting=()=> '1';",
+          contents: "export const setting=()=> '1'; export const tokenHash=async value=>value;",
         }));
         build.onResolve({ filter: /^\.\/storage$/ }, () => ({
           path: 'storage',
@@ -221,6 +221,7 @@ await deny(
   send('alice', group.id, 'foreign reply', {
     replyTo: (await send('carol', other.id, 'private')).id,
   }),
+  404,
 );
 await deny(
   change('bob', { action: 'deleteMessage', id: group.id, messageId: first.id }),

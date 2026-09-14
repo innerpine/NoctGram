@@ -80,7 +80,7 @@ void test(
             }));
             build.onLoad(
               { filter: /.*/, namespace: 'fixture-settings' },
-              () => ({ contents: "export const setting=()=> '1';" }),
+              () => ({ contents: "export const setting=()=> '1'; export const tokenHash=async value=>value;" }),
             );
             build.onResolve({ filter: /^\.\/storage$/ }, () => ({
               path: 'storage',

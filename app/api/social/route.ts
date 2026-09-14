@@ -5,6 +5,11 @@ import { telegramGet, telegramPost } from '@/lib/telegram';
 import { boostsGet, boostsPost } from '@/lib/boosts';
 import { administrationGet, administrationPost } from '@/lib/administration';
 import { socialRateLimit } from '@/lib/rate-limit';
+import { assertSpamIdentity, reviewSpam } from '@/lib/antispam';
+import {
+  spamModerationGet,
+  spamModerationPost,
+} from '@/lib/antispam-moderation';
 import { premiumGet, premiumPost } from '@/lib/premium';
 import { appearanceColumns } from '@/lib/premium-access';
 import { assertMediaRead, mediaPermission } from '@/lib/media-access';
@@ -82,6 +87,8 @@ export async function GET(req: Request) {
     const action = s.get('action') || 'feed';
     const administration = await administrationGet(action, s, me);
     if (administration) return administration;
+    const spam = await spamModerationGet(action, s, me);
+    if (spam) return spam;
     const moderation = await moderationGet(action, s, me);
     if (moderation) return moderation;
     if (action === 'bootstrap' && (await restriction(me))?.mode === 'blocked')
@@ -338,6 +345,8 @@ export async function POST(req: Request) {
     if (privacy) return privacy;
     const story = await storiesPost(action, b, me);
     if (story) return story;
+    const spam = await spamModerationPost(action, b, me);
+    if (spam) return spam;
     const moderation = await moderationPost(action, b, me);
     if (moderation) return moderation;
     if (action === 'archiveChat')
@@ -421,6 +430,7 @@ export async function POST(req: Request) {
     }
     if (action === 'handle') {
       const handle = clean(b.handle, 25, true).toLowerCase().replace(/^@/, '');
+      await assertSpamIdentity(me, handle);
       if (!/^[a-z][a-z0-9_]{3,23}$/.test(handle))
         throw new ApiError(
           400,
@@ -522,6 +532,22 @@ export async function POST(req: Request) {
         verified.push(item);
       }
       const publishAt = scheduleTime(b.publishAt);
+      const held = await reviewSpam({
+        kind: 'post',
+        targetId: postId,
+        actorId: me,
+        contextId: author,
+        payload: {
+          text,
+          media: JSON.stringify(verified),
+          poll: JSON.stringify(poll),
+          code,
+          codeLang,
+          adult: b.adult === true && media.length > 0 ? 1 : 0,
+          publishAt,
+        },
+      });
+      if (held) return Response.json(held, { status: 202 });
       // A nested NOT EXISTS here exceeds D1's depth limit even for empty media.
       // The left join rejects missing, foreign and inaccessible files atomically.
       const inserted = await d
@@ -587,11 +613,20 @@ export async function POST(req: Request) {
             .run();
       } else if (action === 'comment') {
         const commentId = crypto.randomUUID();
+        const text = clean(b.text, 2000, true);
+        const held = await reviewSpam({
+          kind: 'comment',
+          targetId: commentId,
+          actorId: me,
+          contextId: id,
+          payload: { text },
+        });
+        if (held) return Response.json(held, { status: 202 });
         await d
           .prepare(
             'INSERT INTO comments (id,postId,userId,text,created) VALUES (?,?,?,?,?)',
           )
-          .bind(commentId, id, me, clean(b.text, 2000, true), Date.now())
+          .bind(commentId, id, me, text, Date.now())
           .run();
         return Response.json(
           await d

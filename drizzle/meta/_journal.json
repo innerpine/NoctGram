@@ -309,6 +309,13 @@
       "when": 1789321598194,
       "tag": "0045_message_reactions",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "6",
+      "when": 1789413168275,
+      "tag": "0046_antispam",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { appearanceColumns } from '@/lib/premium-access';
+import { assertUnqueuedPublicWrite } from './antispam';
 import { assertMediaRead, mediaPermission } from '@/lib/media-access';
 import { db, clean, ApiError } from './server';
 import {
@@ -94,6 +95,7 @@ export async function storiesPost(
       mediaId = b.mediaId ? clean(b.mediaId, 200, true) : null;
     if (!text && !mediaId)
       throw new ApiError(400, 'Добавь фото, видео или текст');
+    await assertUnqueuedPublicWrite(me, text, target);
     if (mediaId) {
       const media = await d
         .prepare(
