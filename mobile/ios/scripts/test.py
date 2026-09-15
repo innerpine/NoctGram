@@ -18,9 +18,13 @@ derived = temp / 'noctgram-native-tests-derived'
 command = ['xcodebuild', '-quiet', '-project', str(source / 'NoctGram.xcodeproj'), '-scheme', 'NoctGram',
            '-configuration', 'Debug', '-destination', 'platform=iOS Simulator,id=' + device,
            '-derivedDataPath', str(derived), '-resultBundlePath', str(result),
-           '-parallel-testing-enabled', 'NO', 'test', 'CODE_SIGNING_ALLOWED=NO']
+           '-parallel-testing-enabled', 'NO', 'test', 'CODE_SIGNING_ALLOWED=YES',
+           'CODE_SIGN_IDENTITY=-', 'CODE_SIGN_STYLE=Manual',
+           'DEVELOPMENT_TEAM=', 'PROVISIONING_PROFILE_SPECIFIER=']
 completed = subprocess.run(command, cwd=source)
 if completed.returncode:
+    if result.exists():
+        subprocess.run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', str(result)])
     raise SystemExit(completed.returncode)
 app = derived / 'Build/Products/Debug-iphonesimulator/NoctGram.app'
 subprocess.run(['xcrun', 'simctl', 'install', device, str(app)], check=True)

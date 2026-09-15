@@ -32,7 +32,7 @@ final class NativeSession: ObservableObject {
                 return
             }
             if let previousID = user?.string("id"), previousID != person.string("id") {
-                NGImageCache.shared.removeAllObjects()
+                NGImageCache.clear()
                 NGTemporaryMedia.removeAll()
             }
             user = person
@@ -70,7 +70,7 @@ final class NativeSession: ObservableObject {
 
     func expire() {
         api.clearSession()
-        NGImageCache.shared.removeAllObjects()
+        NGImageCache.clear()
         NGTemporaryMedia.removeAll()
         user = nil
         challenge = nil

@@ -73,6 +73,11 @@ struct NGEmptyState: View {
 }
 
 enum NGImageCache {
+    private(set) static var epoch = UUID()
+    static func clear() {
+        epoch = UUID()
+        shared.removeAllObjects()
+    }
     static let shared: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
         cache.totalCostLimit = 24 * 1024 * 1024
@@ -93,6 +98,7 @@ struct NGRemoteImage: View {
             else { NGTheme.surface; ProgressView().tint(NGTheme.muted) }
         }
         .task(id: path) {
+            let cacheEpoch = NGImageCache.epoch
             image = nil
             failed = false
             guard let url = URL(string: path, relativeTo: URL(string: "https://noctgram.com")!)?.absoluteURL,
@@ -107,6 +113,7 @@ struct NGRemoteImage: View {
                     data = try await NativePublicMedia.download(url)
                 }
                 try Task.checkCancellation()
+                guard cacheEpoch == NGImageCache.epoch else { return }
                 guard let source = CGImageSourceCreateWithData(data as CFData, nil),
                       let decoded = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                         kCGImageSourceCreateThumbnailFromImageAlways: true,

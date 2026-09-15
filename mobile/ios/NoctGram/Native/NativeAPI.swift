@@ -312,7 +312,9 @@ private struct NativeSessionKeychain {
         var result: CFTypeRef?
         let status = SecItemCopyMatching(request as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess, let data = result as? Data else { throw KeychainFailure() }
+        guard status == errSecSuccess, let data = result as? Data else {
+            throw KeychainFailure(status: status == errSecSuccess ? errSecDecode : status)
+        }
         return data
     }
     func save(_ data: Data) throws {
@@ -324,13 +326,20 @@ private struct NativeSessionKeychain {
             values.forEach { item[$0.key] = $0.value }
             status = SecItemAdd(item as CFDictionary, nil)
         }
-        guard status == errSecSuccess else { throw KeychainFailure() }
+        guard status == errSecSuccess else { throw KeychainFailure(status: status) }
     }
     func remove() throws {
         let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else { throw KeychainFailure() }
+        guard status == errSecSuccess || status == errSecItemNotFound else { throw KeychainFailure(status: status) }
     }
-    private struct KeychainFailure: Error {}
+    private struct KeychainFailure: Error {
+        init(status: OSStatus) {
+            #if DEBUG
+            // Numeric status only: never log the query, account, cookie or stored data.
+            NSLog("NoctGram Keychain failure (OSStatus %d)", status)
+            #endif
+        }
+    }
 }
 
 /// Bounded streaming prevents a huge/error response from being buffered before applying the limit.
