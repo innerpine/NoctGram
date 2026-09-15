@@ -31,7 +31,7 @@ a{color:#C7ACE8}a:hover{color:#DCC9F2}
 @keyframes ngDrift{from{transform:translate(0,0);opacity:.55}to{transform:translate(.7cqw,-1.2cqw);opacity:.9}}
 @media(prefers-reduced-motion:reduce){[data-liquid]{display:none}}
 </style></helmet>
-<div class="ng-app" data-reduced="{{ reduced }}" data-case-fast="{{ caseFast }}" data-telegram="{{ inTelegram }}" style="width:390px;height:844px;position:relative;overflow:hidden;background:#000;border-radius:38px;font-family:Inter,system-ui,sans-serif;color:#F7F7F5;box-shadow:0 0 0 1px rgba(255,255,255,.1)">
+<div class="ng-app" data-reduced="{{ reduced }}" data-case-fast="{{ caseFast }}" data-telegram="{{ inTelegram }}" data-profile="{{ isProfile }}" style="width:390px;height:844px;position:relative;overflow:hidden;background:#000;border-radius:38px;font-family:Inter,system-ui,sans-serif;color:#F7F7F5;box-shadow:0 0 0 1px rgba(255,255,255,.1)">
 
   <div class="ng-app-bar" style="position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;z-index:40;background:#000">
     <div style="flex:1;display:flex;align-items:center;gap:8px;min-width:0">
@@ -47,7 +47,7 @@ a{color:#C7ACE8}a:hover{color:#DCC9F2}
 
   <div class="ng-scroll" style="position:absolute;top:52px;left:0;right:0;bottom:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:none">
    <div class="ng-content" style="padding:4px 16px 132px">
-    <div class="ng-account-status" role="status"><span>{{ accountLabel }}</span><sc-if value="{{ canRefresh }}"><button onClick="{{ refreshShared }}" aria-label="Обновить аккаунт">↻</button></sc-if></div>
+    <sc-if value="{{ showAccountStatus }}"><div class="ng-account-status" role="status"><span>{{ accountLabel }}</span><sc-if value="{{ canRefresh }}"><button onClick="{{ refreshShared }}" aria-label="Обновить аккаунт">↻</button></sc-if></div></sc-if>
     <sc-if value="{{ needsAuth }}"><div class="ng-auth-card"><img src="assets/noctgram-logo.png" alt=""><h1>Ваши подарки. Ваш NoctGram.</h1><p>Откройте Noct Gifts в Telegram, чтобы использовать свой баланс и коллекцию.</p><button onClick="{{ openTelegram }}">Открыть в Telegram</button></div></sc-if>
     <sc-if value="{{ gamePending }}"><div class="ng-game-notice" role="status">Подтверждаем операцию в NoctGram…</div></sc-if>
     <sc-if value="{{ gameError }}"><div class="ng-game-notice" role="alert"><p>{{ gameError }}</p><sc-if value="{{ gameRetry }}"><button onClick="{{ retryGame }}">Проверить результат</button></sc-if></div></sc-if>
@@ -863,7 +863,8 @@ class Component extends DCLogic {
 
     return {
       isLive:linked,inTelegram:!!window.NoctAccount?.inTelegram,canRefresh:!!window.NoctAccount?.inTelegram,needsAuth:!linked,needsLink:s.accountMode==='unlinked',accountError:s.accountError,openTelegram:()=>window.NoctAccount?.openTelegram(),gamePending:s.gamePending,gameError:s.gameError,gameRetry:s.gameRetry,retryGame:()=>this.retryGame?.(),
-      accountLabel:s.accountMode==='loading'?'Подключаем NoctGram…':linked?'Общий аккаунт NoctGram':s.accountMode==='unlinked'?'Telegram ещё не привязан':s.accountMode==='telegram'?'Вход через Telegram':'Не удалось войти',
+      showAccountStatus:!linked||!!s.accountError,
+      accountLabel:linked?'':s.accountMode==='loading'?'Подключаем NoctGram…':s.accountMode==='unlinked'?'Telegram ещё не привязан':s.accountMode==='telegram'?'Вход через Telegram':'Не удалось войти',
       accountHint:s.sharedLinks?.linkAccountHint||'Войдите в NoctGram и привяжите Telegram в разделе Noct Stars. Затем вернитесь сюда и нажмите обновить.',
       refreshShared:()=>this.refreshAccount?.(),linkShared:()=>window.NoctAccount?.openLink(s.sharedLinks?.linkAccountUrl),
       profileName:s.shared?.user?.name||'Ваш аккаунт',profileHandle:s.shared?.user?.handle?'@'+s.shared.user.handle:'NoctGram',
