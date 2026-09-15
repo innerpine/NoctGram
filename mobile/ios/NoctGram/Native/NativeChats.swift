@@ -853,7 +853,8 @@ private struct NGNativeConversation: View {
                 }
                 ZStack(alignment: .topLeading) {
                     if model.draft.isEmpty { Text("Сообщение").foregroundColor(NGTheme.muted).padding(.top, 8).padding(.leading, 5).allowsHitTesting(false) }
-                    TextEditor(text: $model.draft).frame(height: min(editorHeight, 140)).focused($composerFocused)
+                    TextEditor(text: $model.draft).ngClearScrollBackground()
+                        .frame(height: min(editorHeight, 140)).focused($composerFocused)
                         .opacity(model.draft.isEmpty ? 0.75 : 1).disabled(model.composerLocked)
                         .accessibilityLabel("Текст сообщения")
                         .accessibilityIdentifier("chat.composer")

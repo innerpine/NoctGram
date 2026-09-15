@@ -78,6 +78,7 @@ final class NativeSmokeTests: XCTestCase {
         let app = launchSocial()
         let portrait = app.buttons["media.fixture-portrait-image"]
         XCTAssertTrue(portrait.waitForExistence(timeout: 8))
+        waitForAspectRatio(0.75, of: portrait)
         let author = element("feed.author.fixture-portrait", in: app)
         XCTAssertTrue(author.exists)
         assertHorizontalBounds(portrait, in: app)
@@ -88,18 +89,19 @@ final class NativeSmokeTests: XCTestCase {
         snapshot("Feed portrait and long author", in: app)
 
         let portraitLike = app.buttons["feed.like.fixture-portrait"]
-        reveal(portraitLike, in: app)
+        revealFeed(portraitLike, in: app)
         XCTAssertTrue(portraitLike.isHittable)
         XCTAssertGreaterThanOrEqual(portraitLike.frame.minY, portrait.frame.maxY - 1)
         assertHorizontalBounds(app.buttons["feed.comments.fixture-portrait"], in: app)
         assertHorizontalBounds(app.buttons["feed.save.fixture-portrait"], in: app)
 
         let panorama = app.buttons["media.fixture-landscape-image"]
-        reveal(panorama, in: app)
+        revealFeed(panorama, in: app)
         XCTAssertTrue(panorama.isHittable)
+        waitForAspectRatio(3, of: panorama)
         assertHorizontalBounds(panorama, in: app)
-        XCTAssertGreaterThan(panorama.frame.height, 150)
-        XCTAssertLessThan(panorama.frame.height, app.frame.height * 0.55)
+        XCTAssertGreaterThan(panorama.frame.height, 80)
+        XCTAssertLessThan(panorama.frame.height, panorama.frame.width / 2)
         snapshot("Feed panorama", in: app)
 
         defer { XCUIDevice.shared.orientation = .portrait }
@@ -108,11 +110,12 @@ final class NativeSmokeTests: XCTestCase {
             app.frame.width > app.frame.height
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [landscape], timeout: 5), .completed)
-        reveal(panorama, in: app)
+        revealFeed(panorama, in: app)
+        snapshot("Feed landscape orientation", in: app)
         XCTAssertTrue(panorama.isHittable)
+        waitForAspectRatio(3, of: panorama)
         assertHorizontalBounds(panorama, in: app)
         assertHorizontalBounds(element("feed.post.fixture-landscape", in: app), in: app)
-        snapshot("Feed landscape orientation", in: app)
     }
 
     func testRealRootLoadsDirectAndGroupChatsAndKeepsComposerAboveKeyboard() {
@@ -173,6 +176,30 @@ final class NativeSmokeTests: XCTestCase {
 
     private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    private func waitForAspectRatio(_ ratio: CGFloat, of element: XCUIElement,
+                                   file: StaticString = #filePath, line: UInt = #line) {
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            element.exists && element.frame.height > 0 && abs(element.frame.width / element.frame.height - ratio) < 0.04
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed, file: file, line: line)
+    }
+
+    private func revealFeed(_ element: XCUIElement, in app: XCUIApplication,
+                            file: StaticString = #filePath, line: UInt = #line) {
+        let scroll = app.scrollViews.matching(identifier: "feed.scroll").firstMatch
+        XCTAssertTrue(scroll.exists, file: file, line: line)
+        // Target the scrolling content, not the application frame: its global swipe can hit
+        // the navigation bar after iPhone rotation instead of moving the feed.
+        for _ in 0..<6 {
+            if element.isHittable { return }
+            if element.exists && element.frame.maxY < scroll.frame.minY + 44 {
+                scroll.swipeDown(velocity: .slow)
+            } else {
+                scroll.swipeUp(velocity: .slow)
+            }
+        }
     }
 
     private func assertHorizontalBounds(_ element: XCUIElement, in app: XCUIApplication,

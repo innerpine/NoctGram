@@ -34,6 +34,11 @@ private struct NGGlassModifier: ViewModifier {
 
 extension View {
     func ngGlass(radius: CGFloat = 24) -> some View { modifier(NGGlassModifier(radius: radius)) }
+
+    @ViewBuilder func ngClearScrollBackground() -> some View {
+        if #available(iOS 16.0, *) { scrollContentBackground(.hidden) }
+        else { self }
+    }
 }
 
 struct NGPrimaryButtonStyle: ButtonStyle {
@@ -91,6 +96,7 @@ enum NGImageCache {
 struct NGRemoteImage: View {
     let path: String
     var contentMode: ContentMode = .fill
+    var onAspectRatio: ((CGFloat) -> Void)? = nil
     @State private var image: UIImage?
     @State private var failed = false
     var body: some View {
@@ -111,7 +117,11 @@ struct NGRemoteImage: View {
             failed = false
             guard let url = URL(string: path, relativeTo: URL(string: "https://noctgram.com")!)?.absoluteURL,
                   url.scheme == "https", url.user == nil, url.password == nil else { failed = true; return }
-            if let cached = NGImageCache.shared.object(forKey: url.absoluteString as NSString) { image = cached; return }
+            if let cached = NGImageCache.shared.object(forKey: url.absoluteString as NSString) {
+                image = cached
+                onAspectRatio?(cached.size.width / max(1, cached.size.height))
+                return
+            }
             do {
                 let data: Data
                 if url.host == "noctgram.com", url.port == nil || url.port == 443, url.path.hasPrefix("/api/") {
@@ -132,6 +142,7 @@ struct NGRemoteImage: View {
                 NGImageCache.shared.setObject(value, forKey: url.absoluteString as NSString,
                                              cost: decoded.bytesPerRow * decoded.height)
                 image = value
+                onAspectRatio?(value.size.width / max(1, value.size.height))
             } catch is CancellationError { } catch { if !Task.isCancelled { failed = true } }
         }
     }
@@ -163,18 +174,46 @@ enum NGTemporaryMedia {
     static func removeAll() { try? FileManager.default.removeItem(at: directory) }
 }
 
+@available(iOS 16.0, *)
+private struct NGMediaPreviewLayout: Layout {
+    let aspectRatio: CGFloat
+    let maximumHeight: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let proposedWidth = proposal.width ?? 320
+        let width = proposedWidth.isFinite ? max(1, proposedWidth) : 320
+        return CGSize(width: width, height: min(maximumHeight, width / aspectRatio))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for subview in subviews {
+            subview.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(bounds.size))
+        }
+    }
+}
+
 struct NGMediaView: View {
     let record: NGRecord
     var isPrivate = false
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var showing = false
+    @State private var previewAspectRatio: CGFloat = 4 / 3
     private var path: String { record.string("url", default: "/api/media/" + record.id) }
     private var type: String { record.string("type") }
     private var isImage: Bool { type.hasPrefix("image/") || record.string("kind") == "image" }
     var body: some View {
         Button { showing = true } label: {
             if isImage {
-                    NGRemoteImage(path: path, contentMode: .fit)
-                    .frame(maxWidth: .infinity).aspectRatio(4 / 3, contentMode: .fit)
+                Group {
+                    if #available(iOS 16.0, *) {
+                        NGMediaPreviewLayout(aspectRatio: previewAspectRatio,
+                                             maximumHeight: verticalSizeClass == .compact ? 220 : 480) {
+                            previewImage
+                        }
+                    } else {
+                        previewImage.frame(maxWidth: .infinity).frame(height: 230)
+                    }
+                }
                     .background(NGTheme.surface).clipShape(RoundedRectangle(cornerRadius: 18))
             } else {
                 HStack(spacing: 14) {
@@ -190,7 +229,14 @@ struct NGMediaView: View {
         }
         .buttonStyle(.plain).accessibilityLabel(isImage ? "Открыть фотографию" : "Открыть " + record.string("name", default: "вложение"))
         .accessibilityIdentifier("media." + record.id)
+        .onChange(of: path) { _ in previewAspectRatio = 4 / 3 }
         .fullScreenCover(isPresented: $showing) { NGMediaDetail(record: record, path: path) }
+    }
+
+    private var previewImage: some View {
+        NGRemoteImage(path: path, contentMode: .fill) { ratio in
+            previewAspectRatio = min(3, max(0.75, ratio))
+        }
     }
 }
 

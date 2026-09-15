@@ -89,57 +89,62 @@ struct NGFeedView: View {
     init(api: NoctAPI? = nil) { _feed = StateObject(wrappedValue: NGFeedModel(api: api)) }
 
     var body: some View {
-        List {
-            Picker("Лента", selection: $mode) {
-                Text("Все").tag("all")
-                Text("Подписки").tag("following")
-                Text("Сохранённое").tag("saved")
-            }
-            .pickerStyle(.segmented)
-            .listRowBackground(NGTheme.background)
-            .listRowSeparator(.hidden)
-            if let notice {
-                Text(notice).font(.callout).foregroundColor(NGTheme.accent)
-                    .listRowBackground(NGTheme.background)
-            }
-            if feed.loading && feed.posts.isEmpty {
-                ProgressView().frame(maxWidth: .infinity).padding(32)
-                    .listRowBackground(NGTheme.background)
-            } else if feed.posts.isEmpty && feed.error == nil {
-                NGEmptyState(title: search.isEmpty ? "Пока нет публикаций" : "Ничего не найдено",
-                             message: search.isEmpty ? "Новые мысли и моменты появятся здесь." : "Попробуйте другой запрос.",
-                             systemImage: "square.stack")
-                    .listRowBackground(NGTheme.background)
-            }
-            ForEach(feed.posts) { post in
-                NGPostCard(post: post)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(NGTheme.background)
-            }
-            if let error = feed.error {
-                NGInlineError(message: error) {
-                    Task { await refresh() }
-                }.listRowBackground(NGTheme.background)
-            }
-            if feed.hasMore {
-                Button { Task { await feed.nextPage() } } label: {
-                    HStack {
-                        Spacer()
-                        if feed.loadingMore { ProgressView() } else { Text("Показать ещё") }
-                        Spacer()
-                    }.frame(minHeight: 44)
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                Picker("Лента", selection: $mode) {
+                    Text("Все").tag("all")
+                    Text("Подписки").tag("following")
+                    Text("Сохранённое").tag("saved")
                 }
-                .disabled(feed.loadingMore)
-                .listRowBackground(NGTheme.background)
+                .pickerStyle(.segmented)
+                .padding(.vertical, 4)
+                if let notice {
+                    Text(notice).font(.callout).foregroundColor(NGTheme.accent)
+                }
+                if feed.loading && feed.posts.isEmpty {
+                    ProgressView().frame(maxWidth: .infinity).padding(32)
+                } else if feed.posts.isEmpty && feed.error == nil {
+                    NGEmptyState(title: search.isEmpty ? "Пока нет публикаций" : "Ничего не найдено",
+                                 message: search.isEmpty ? "Новые мысли и моменты появятся здесь." : "Попробуйте другой запрос.",
+                                 systemImage: "square.stack")
+                }
+                ForEach(feed.posts) { post in
+                    NGPostCard(post: post)
+                }
+                if let error = feed.error {
+                    NGInlineError(message: error) {
+                        Task { await refresh() }
+                    }
+                }
+                if feed.hasMore {
+                    Button { Task { await feed.nextPage() } } label: {
+                        HStack {
+                            Spacer()
+                            if feed.loadingMore { ProgressView() } else { Text("Показать ещё") }
+                            Spacer()
+                        }.frame(minHeight: 44)
+                    }
+                    .disabled(feed.loadingMore)
+                }
             }
+            .frame(maxWidth: 600)
+            .padding(16)
+            .frame(maxWidth: .infinity)
         }
-        .listStyle(.plain)
         .background(NGTheme.background)
+        .accessibilityIdentifier("feed.scroll")
         .navigationTitle("Лента")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $search, prompt: "Поиск публикаций")
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                if #available(iOS 16.0, *) { EmptyView() }
+                else {
+                    Button { Task { await refresh() } } label: {
+                        Image(systemName: "arrow.clockwise").frame(width: 44, height: 44)
+                    }.accessibilityLabel("Обновить ленту")
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { composing = true } label: {
                     Image(systemName: "square.and.pencil").frame(width: 44, height: 44)
@@ -549,7 +554,7 @@ private struct NGPostComposer: View {
                 VStack(spacing: 16) {
                     ZStack(alignment: .topLeading) {
                         if text.isEmpty { Text("О чём думаешь?").foregroundColor(NGTheme.muted).padding(.top, 8).padding(.leading, 5) }
-                        TextEditor(text: $text).frame(minHeight: 180).opacity(text.isEmpty ? 0.8 : 1)
+                        TextEditor(text: $text).ngClearScrollBackground().frame(minHeight: 180).opacity(text.isEmpty ? 0.8 : 1)
                             .onChange(of: text) { text = String($0.prefix(5000)) }
                             .disabled(publishing)
                     }
