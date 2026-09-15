@@ -78,15 +78,20 @@ final class NativeSmokeTests: XCTestCase {
         let app = launchSocial()
         let portrait = app.buttons["media.fixture-portrait-image"]
         XCTAssertTrue(portrait.waitForExistence(timeout: 8))
-        waitForAspectRatio(0.75, of: portrait)
         let author = element("feed.author.fixture-portrait", in: app)
         XCTAssertTrue(author.exists)
         assertHorizontalBounds(portrait, in: app)
         assertHorizontalBounds(author, in: app)
-        XCTAssertGreaterThan(portrait.frame.height, 150)
-        XCTAssertLessThan(portrait.frame.height, app.frame.height * 0.55)
         XCTAssertGreaterThanOrEqual(portrait.frame.minY, author.frame.maxY)
         snapshot("Feed portrait and long author", in: app)
+        // The first tall photo initially reaches behind the floating tab bar. XCTest reports
+        // the clipped accessibility frame there; bring the complete preview into the viewport.
+        nudgeFeed(app.scrollViews.matching(identifier: "feed.scroll").firstMatch, up: true)
+        waitForAspectRatio(0.75, of: portrait, in: app)
+        assertHorizontalBounds(portrait, in: app)
+        XCTAssertGreaterThan(portrait.frame.height, 150)
+        XCTAssertLessThan(portrait.frame.height, app.frame.height * 0.55)
+        snapshot("Feed portrait preview fully visible", in: app)
 
         let portraitLike = app.buttons["feed.like.fixture-portrait"]
         revealFeed(portraitLike, in: app)
@@ -98,7 +103,7 @@ final class NativeSmokeTests: XCTestCase {
         let panorama = app.buttons["media.fixture-landscape-image"]
         revealFeed(panorama, in: app)
         XCTAssertTrue(panorama.isHittable)
-        waitForAspectRatio(3, of: panorama)
+        waitForAspectRatio(3, of: panorama, in: app)
         assertHorizontalBounds(panorama, in: app)
         XCTAssertGreaterThan(panorama.frame.height, 80)
         XCTAssertLessThan(panorama.frame.height, panorama.frame.width / 2)
@@ -113,7 +118,7 @@ final class NativeSmokeTests: XCTestCase {
         revealFeed(panorama, in: app)
         snapshot("Feed landscape orientation", in: app)
         XCTAssertTrue(panorama.isHittable)
-        waitForAspectRatio(3, of: panorama)
+        waitForAspectRatio(3, of: panorama, in: app)
         assertHorizontalBounds(panorama, in: app)
         assertHorizontalBounds(element("feed.post.fixture-landscape", in: app), in: app)
     }
@@ -178,12 +183,30 @@ final class NativeSmokeTests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
 
-    private func waitForAspectRatio(_ ratio: CGFloat, of element: XCUIElement,
+    private func waitForAspectRatio(_ ratio: CGFloat, of element: XCUIElement, in app: XCUIApplication,
                                    file: StaticString = #filePath, line: UInt = #line) {
+        let scroll = app.scrollViews.matching(identifier: "feed.scroll").firstMatch
+        // A preview can be tappable while only a strip is visible above the tab bar. If its
+        // accessibility frame is clipped, scroll it into view before checking the full ratio.
+        for _ in 0..<4 {
+            let frame = element.frame
+            if element.exists, frame.height > 0, abs(frame.width / frame.height - ratio) < 0.04 { break }
+            nudgeFeed(scroll, up: frame.minY >= app.navigationBars.firstMatch.frame.maxY)
+        }
         let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             element.exists && element.frame.height > 0 && abs(element.frame.width / element.frame.height - ratio) < 0.04
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 5), .completed, file: file, line: line)
+        let result = XCTWaiter.wait(for: [settled], timeout: 5)
+        let frame = element.frame
+        XCTAssertEqual(result, .completed,
+                       "Expected preview ratio \(ratio); accessibility frame \(frame), ratio \(frame.width / max(1, frame.height)), scroll \(scroll.frame), app \(app.frame)",
+                       file: file, line: line)
+    }
+
+    private func nudgeFeed(_ scroll: XCUIElement, up: Bool) {
+        let start = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.65 : 0.40))
+        let end = scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.40 : 0.65))
+        start.press(forDuration: 0.05, thenDragTo: end)
     }
 
     private func revealFeed(_ element: XCUIElement, in app: XCUIApplication,

@@ -222,21 +222,21 @@ struct NGPostCard: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(post.string("name", default: "Пользователь")).font(.subheadline.weight(.semibold))
                                 .foregroundColor(.primary).lineLimit(2)
-                            if post.string("kind") == "channel" {
-                                Label("Канал", systemImage: "megaphone.fill")
-                                    .font(.caption).foregroundColor(NGTheme.muted)
-                            } else if !post.string("handle").isEmpty {
-                                Text("@" + post.string("handle")).font(.caption).foregroundColor(NGTheme.muted).lineLimit(1)
-                            }
+                            HStack(spacing: 5) {
+                                if post.string("kind") == "channel" {
+                                    Label("Канал", systemImage: "megaphone.fill").lineLimit(1)
+                                    Text("·")
+                                } else if !post.string("handle").isEmpty {
+                                    Text("@" + post.string("handle")).lineLimit(1)
+                                    Text("·")
+                                }
+                                Text(ngRelativeDate(post.double("created")))
+                                    .lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                            }.font(.caption).foregroundColor(NGTheme.muted)
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-                }.buttonStyle(.plain).layoutPriority(1)
+                }.buttonStyle(.plain)
                     .accessibilityIdentifier("feed.author." + post.id)
-                Spacer(minLength: 8)
-                Text(ngRelativeDate(post.double("created")))
-                    .font(.caption).foregroundColor(NGTheme.muted)
-                    .lineLimit(2).multilineTextAlignment(.trailing)
-                    .frame(maxWidth: 76, alignment: .trailing)
             }
             if !post.string("text").isEmpty {
                 Text(post.string("text")).font(.body).textSelection(.enabled)

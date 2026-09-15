@@ -110,7 +110,9 @@ struct NGRemoteImage: View {
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .clipped()
+            .contentShape(Rectangle())
         }
+        .accessibilityHidden(true)
         .task(id: path) {
             let cacheEpoch = NGImageCache.epoch
             image = nil
@@ -215,6 +217,7 @@ struct NGMediaView: View {
                     }
                 }
                     .background(NGTheme.surface).clipShape(RoundedRectangle(cornerRadius: 18))
+                    .contentShape(Rectangle())
             } else {
                 HStack(spacing: 14) {
                     Image(systemName: type.hasPrefix("video/") ? "play.circle.fill" : "doc.fill").font(.title)
