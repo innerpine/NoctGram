@@ -83,6 +83,8 @@ export function telegramTransport(token, signal) {
     'setMyCommands',
     'setMyDescription',
     'setMyShortDescription',
+    'setChatMenuButton',
+    'getChatMenuButton',
   ]);
   return (method, body = {}) => {
     if (!allowed.has(method)) throw new Error('Telegram method is not enabled');

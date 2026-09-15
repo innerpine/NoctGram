@@ -27,7 +27,8 @@ async function ownedGift(me: string, id: string) {
       FROM received_gifts g JOIN users u ON u.id=g.recipient
       LEFT JOIN star_transfers p ON p.id=g.transferId
       LEFT JOIN gift_conversions c ON c.receiptId=g.id
-      WHERE g.id=? AND g.recipient=? AND u.kind='person' AND ${visibleAccount('u')}`)
+      WHERE g.id=? AND g.recipient=? AND u.kind='person' AND ${visibleAccount('u')}
+        AND NOT EXISTS(SELECT 1 FROM gift_consumptions WHERE receiptId=g.id)`)
     .bind(id, me)
     .first<{
       created: number;
@@ -119,6 +120,7 @@ export async function convertGift(
         AND g.created<=?
         AND NOT EXISTS(SELECT 1 FROM gift_upgrades WHERE receiptId=g.id)
         AND NOT EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=g.id)
+        AND NOT EXISTS(SELECT 1 FROM gift_consumptions WHERE receiptId=g.id)
       ON CONFLICT(id) DO NOTHING`)
       .bind(
         transferId,

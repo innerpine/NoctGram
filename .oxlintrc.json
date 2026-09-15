@@ -31,6 +31,8 @@
     "coverage/**",
     "next-env.d.ts",
     "components/ui/**",
+    "noct-gifts/support.js",
+    "noct-gifts/assets/vendor/**",
     "hooks/use-mobile.ts"
   ],
   "rules": {

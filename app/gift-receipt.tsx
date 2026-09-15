@@ -39,6 +39,7 @@ export function GiftReceipt({
   const receiptTitle = useRef<HTMLHeadingElement>(null);
   const restoreFocus = useRef(false);
   const sold = converted || !!receipt.converted || !!sale;
+  const consumed = !!receipt.consumed;
   useEffect(() => {
     if (!converting && restoreFocus.current) {
       restoreFocus.current = false;
@@ -49,7 +50,7 @@ export function GiftReceipt({
   }, [converting]);
   const definition = giftDefinition(receipt.giftId);
   if (!definition) return null;
-  if (converting)
+  if (converting && !consumed && !sold)
     return (
       <GiftConversionPanel
         receipt={receipt}
@@ -63,7 +64,7 @@ export function GiftReceipt({
         }}
       />
     );
-  if (upgrading && !sold)
+  if (upgrading && !sold && !consumed)
     return (
       <GiftUpgradePanel
         receipt={receipt}
@@ -90,7 +91,7 @@ export function GiftReceipt({
             {definition.name}
           </DialogTitle>
           <DialogDescription>
-            {sold
+            {consumed ? 'Использован для апгрейда' : sold
               ? 'Подарок продан'
               : own
                 ? 'Твой подарок'
@@ -99,6 +100,7 @@ export function GiftReceipt({
         </div>
       )}
       <div className="gift-receipt-body">
+        {consumed && <p className="gift-receipt-converted">Этот подарок использован для апгрейда в Noct Gifts.</p>}
         {sold && (
           <output className="gift-receipt-converted">
             <Check size={18} aria-hidden="true" />
@@ -168,7 +170,7 @@ export function GiftReceipt({
             </time>
           </div>
         )}
-        {own && !sold && !unique && canUpgradeGift(receipt.giftId) && (
+        {own && !sold && !consumed && !unique && canUpgradeGift(receipt.giftId) && (
           <button
             className="primary gift-upgrade-submit"
             onClick={() => setUpgrading(true)}
@@ -176,12 +178,12 @@ export function GiftReceipt({
             <Sparkles size={18} /> Улучшить
           </button>
         )}
-        {own && !sold && !unique && !canUpgradeGift(receipt.giftId) && (
+        {own && !sold && !consumed && !unique && !canUpgradeGift(receipt.giftId) && (
           <p className="gift-upgrade-unavailable">
             Для этого подарка улучшение пока недоступно.
           </p>
         )}
-        {own && !sold && !unique && (
+        {own && !sold && !consumed && !unique && (
           <button
             ref={saleButton}
             type="button"
@@ -191,7 +193,7 @@ export function GiftReceipt({
             <StarsIcon size={18} /> Продать за звёзды
           </button>
         )}
-        {!sold && footer}
+        {!sold && !consumed && footer}
       </div>
     </div>
   );

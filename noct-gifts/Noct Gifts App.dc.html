@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><title>Noct Gifts — кейсы и апгрейд</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./assets/vendor/lottie_light.min.js" defer></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="./account-bridge.js" defer></script>
+<script src="./effects.js" defer></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Sans:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"><link rel="stylesheet" href="./motion.css"><style>
+*{box-sizing:border-box}
+button{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+a{color:#C7ACE8}a:hover{color:#DCC9F2}
+::-webkit-scrollbar{width:0;height:0}
+@keyframes ngFade{from{opacity:0}to{opacity:1}}
+@keyframes ngRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ngSheet{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ngPop{0%{opacity:0;transform:scale(.82)}60%{transform:scale(1.04)}100%{opacity:1;transform:scale(1)}}
+@keyframes ngShake{0%,100%{transform:translate(0,0) rotate(0)}20%{transform:translate(-4px,2px) rotate(-2deg)}40%{transform:translate(5px,-2px) rotate(2.4deg)}60%{transform:translate(-5px,-1px) rotate(-2deg)}80%{transform:translate(4px,2px) rotate(1.6deg)}}
+@keyframes ngBreathe{0%,100%{opacity:.5;transform:scale(.96)}50%{opacity:1;transform:scale(1.06)}}
+@keyframes ngSpark{0%{transform:translate(-50%,0) scale(.6);opacity:0}18%{opacity:1}100%{transform:translate(-50%,-128px) scale(.25);opacity:0}}
+@keyframes ngSpin{to{transform:rotate(360deg)}}
+@keyframes ngBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes ngTwinkle{0%,100%{transform:scale(.82) rotate(-9deg);filter:brightness(.7)}50%{transform:scale(1.13) rotate(9deg);filter:brightness(1.25)}}
+@keyframes ngDrift{from{transform:translate(0,0);opacity:.55}to{transform:translate(.7cqw,-1.2cqw);opacity:.9}}
+@media(prefers-reduced-motion:reduce){[data-liquid]{display:none}}
+</style></helmet>
+<div class="ng-app" data-reduced="{{ reduced }}" data-case-fast="{{ caseFast }}" data-telegram="{{ inTelegram }}" style="width:390px;height:844px;position:relative;overflow:hidden;background:#000;border-radius:38px;font-family:Inter,system-ui,sans-serif;color:#F7F7F5;box-shadow:0 0 0 1px rgba(255,255,255,.1)">
+
+  <div class="ng-app-bar" style="position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;gap:10px;padding:0 16px;z-index:40;background:#000">
+    <div style="flex:1;display:flex;align-items:center;gap:8px;min-width:0">
+      <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center"><img src="assets/noctgram-logo.png" alt="" style="width:26px;height:26px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(199,172,232,.35))"></div>
+      <span style="font-family:'Instrument Sans',Inter,sans-serif;font-weight:600;font-size:17px;letter-spacing:-.3px;white-space:nowrap">Noct Gifts</span>
+    </div>
+    <button onClick="{{ goWallet }}" style="height:32px;display:flex;align-items:center;gap:6px;padding:0 10px 0 8px;border:1px solid rgba(255,211,106,.22);border-radius:16px;background:rgba(255,211,106,.08);color:#FFD36A;font-size:14px;font-weight:600;cursor:pointer">
+      <img src="assets/noct-stars.png" alt="" style="width:15px;height:15px;object-fit:contain">{{ balanceFmt }}
+    </button>
+    <button onClick="{{ goWallet }}" aria-label="Пополнить" style="width:32px;height:32px;flex:none;border:1px solid rgba(255,255,255,.14);border-radius:16px;background:rgba(255,255,255,.06);color:#F7F7F5;font-size:19px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding-bottom:2px">+</button>
+    <button aria-label="Закрыть" style="width:28px;height:28px;flex:none;border:0;border-radius:14px;background:rgba(255,255,255,.06);color:#A1A1AA;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+  </div>
+
+  <div class="ng-scroll" style="position:absolute;top:52px;left:0;right:0;bottom:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:none">
+   <div class="ng-content" style="padding:4px 16px 132px">
+    <div class="ng-account-status" role="status"><span>{{ accountLabel }}</span><sc-if value="{{ canRefresh }}"><button onClick="{{ refreshShared }}" aria-label="Обновить аккаунт">↻</button></sc-if></div>
+    <sc-if value="{{ needsAuth }}"><div class="ng-auth-card"><img src="assets/noctgram-logo.png" alt=""><h1>Ваши подарки. Ваш NoctGram.</h1><p>Откройте Noct Gifts в Telegram, чтобы использовать свой баланс и коллекцию.</p><button onClick="{{ openTelegram }}">Открыть в Telegram</button></div></sc-if>
+    <sc-if value="{{ gamePending }}"><div class="ng-game-notice" role="status">Подтверждаем операцию в NoctGram…</div></sc-if>
+    <sc-if value="{{ gameError }}"><div class="ng-game-notice" role="alert"><p>{{ gameError }}</p><sc-if value="{{ gameRetry }}"><button onClick="{{ retryGame }}">Проверить результат</button></sc-if></div></sc-if>
+    <sc-if value="{{ needsLink }}"><div class="ng-account-notice"><strong>Подключите NoctGram</strong><p>{{ accountHint }}</p><button onClick="{{ linkShared }}">Открыть NoctGram</button></div></sc-if>
+    <sc-if value="{{ accountError }}"><p class="ng-account-error">{{ accountError }}</p></sc-if>
+
+    <sc-if value="{{ isCases }}" hint-placeholder-val="{{ true }}">
+      <div style="animation:ngRise 340ms cubic-bezier(.22,1,.36,1) both">
+        <div style="position:relative;background:#0C0C0C;border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:18px 18px 18px;overflow:hidden">
+          <div style="position:absolute;top:-70px;left:50%;transform:translateX(-50%);width:280px;height:200px;background:radial-gradient(ellipse at 50% 50%,rgba(199,172,232,.20),rgba(0,0,0,0) 70%);pointer-events:none"></div>
+          <div style="position:relative;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <span style="font-size:13px;font-weight:500;color:#C7ACE8;letter-spacing:.2px">ГЛАВНЫЙ КЕЙС</span>
+            <span style="font-size:13px;color:#A1A1AA">6 подарков внутри</span>
+          </div>
+          <div style="position:relative;width:176px;height:176px;margin:2px auto 14px">
+            <div style="{{ heroArt.bg }}"></div>
+            <div class="ng-case-image" style="{{ heroArt.obj }}"></div>
+          </div>
+          <div style="position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+            <div style="min-width:0">
+              <div style="font-size:26px;font-weight:600;letter-spacing:-.6px;line-height:1.1">{{ heroCase.n }}</div>
+              <div style="margin-top:6px;display:flex;align-items:center;gap:5px;font-size:15px;color:#FFD36A;font-weight:600"><img src="assets/noct-stars.png" alt="" style="width:15px;height:15px;object-fit:contain">{{ heroCase.priceFmt }}<span style="color:#A1A1AA;font-weight:400"> за открытие</span></div>
+            </div>
+          </div>
+          <button onClick="{{ openHero }}" style="position:relative;margin-top:16px;height:52px;width:100%;border:0;border-radius:16px;background:#C7ACE8;color:#0B0B0D;font-size:16px;font-weight:600;cursor:pointer">Смотреть кейс</button>
+        </div>
+
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin:24px 2px 12px">
+          <h2 style="margin:0;font-size:21px;font-weight:600;letter-spacing:-.4px">Все кейсы</h2>
+          <span style="font-size:13px;color:#A1A1AA">4 кейса</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+          <sc-for list="{{ cases }}" as="c" hint-placeholder-count="4">
+            <button class="ng-case-card" onClick="{{ c.open }}" style="text-align:left;padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:#0C0C0C;cursor:pointer;color:#F7F7F5;display:block;width:100%">
+              <div style="position:relative;width:100%;aspect-ratio:1;margin-bottom:10px">
+                <div style="{{ c.art.bg }}"></div>
+                <div class="ng-case-image" style="{{ c.art.obj }}"></div>
+              </div>
+              <div style="font-size:15px;font-weight:500">{{ c.n }}</div>
+              <div style="margin-top:4px;display:flex;align-items:center;gap:4px;font-size:13px;color:#FFD36A;font-weight:500"><img src="assets/noct-stars.png" alt="" style="width:13px;height:13px;object-fit:contain">{{ c.priceFmt }}</div>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="margin-top:20px;display:flex;align-items:center;gap:10px;padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:#0C0C0C">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:500">Без прокрутки кейса</div>
+            <div style="font-size:13px;color:#A1A1AA;margin-top:2px">Остальные анимации остаются</div>
+          </div>
+          <button onClick="{{ toggleReduced }}" role="switch" aria-label="Без прокрутки кейса" aria-checked="{{ caseFast }}" style="{{ switchTrack }}"><span style="{{ switchKnob }}"></span></button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCase }}">
+      <div style="animation:ngRise 300ms cubic-bezier(.22,1,.36,1) both">
+        <button onClick="{{ goCases }}" style="display:flex;align-items:center;gap:6px;height:36px;padding:0 12px 0 8px;margin:0 0 8px;border:1px solid rgba(255,255,255,.1);border-radius:18px;background:rgba(255,255,255,.04);color:#F7F7F5;font-size:14px;cursor:pointer">‹ Назад</button>
+        <div style="position:relative;padding:8px 0 4px">
+          <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:300px;height:300px;background:radial-gradient(circle at 50% 45%,rgba(199,172,232,.22),rgba(0,0,0,0) 65%);pointer-events:none"></div>
+          <div style="position:relative;width:208px;height:208px;margin:0 auto">
+            <div style="{{ curArt.bg }}"></div>
+            <div class="ng-case-image" style="{{ curArt.obj }}"></div>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:16px">
+          <h1 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-.8px">{{ cur.n }}</h1>
+          <div style="margin-top:8px;font-size:15px;color:#A1A1AA">Одно открытие — <span style="color:#FFD36A;font-weight:600">{{ cur.priceFmt }} Noct Stars</span></div>
+        </div>
+        <div class="ng-inline-cta">
+          <button onClick="{{ ctaAction }}" disabled="{{ ctaDisabled }}" style="{{ ctaStyle }}">{{ ctaLabel }}</button>
+          <div class="ng-case-debit">{{ ctaNoteText }}</div>
+          <sc-if value="{{ ctaSecond }}"><button class="ng-inline-topup" onClick="{{ ctaSecondAction }}">{{ ctaSecondLabel }}</button></sc-if>
+        </div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin:24px 2px 10px">
+          <h2 style="margin:0;font-size:17px;font-weight:600">Состав кейса</h2>
+          <span style="font-size:13px;color:#A1A1AA">сумма шансов 100%</span>
+        </div>
+        <div style="background:#0C0C0C;border:1px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden">
+          <sc-for list="{{ curItems }}" as="it" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid rgba(255,255,255,.06)">
+              <div style="position:relative;width:46px;height:46px;flex:none">
+                <div style="{{ it.art.bg }}"></div>
+                <div style="{{ it.art.obj }}"></div>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ it.n }}</div>
+                <div style="margin-top:3px;font-size:13px;color:#A1A1AA"><span style="{{ it.rarityStyle }}">{{ it.rarity }}</span></div>
+              </div>
+              <div style="text-align:right;flex:none;width:64px">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500">{{ it.chance }}%</div>
+                <div style="margin-top:6px;height:3px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden"><div style="{{ it.barStyle }}"></div></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="margin-top:14px;font-size:13px;color:#A1A1AA;text-align:center">Стоимость и вероятность каждого подарка указаны до открытия</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isOpen }}">
+      <section class="ng-open">
+        <div class="ng-eyebrow">Noct collection</div>
+        <h1>{{ cur.n }}</h1>
+        <p class="ng-open-sub">{{ cur.priceFmt }} Noct Stars · открытие кейса</p>
+        <div class="ng-reel-shell">
+          <div class="{{ reelClass }}" aria-label="Лента подарков" role="img">
+            <div class="ng-reel-track" style="{{ reelTrackStyle }}" aria-hidden="true">
+              <sc-for list="{{ reelCards }}" as="item">
+                <div class="ng-reel-card" style="{{ item.tone }}">
+                  <img src="{{ item.image }}" alt="">
+                  <strong>{{ item.name }}</strong><small>{{ item.rarity }}</small>
+                </div>
+              </sc-for>
+            </div>
+            <div class="ng-reel-selector" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="ng-reel-status" role="status">{{ reelStatus }}</div>
+        <sc-if value="{{ phaseSpin }}">
+          <div class="ng-reel-actions"><button onClick="{{ skip }}">Пропустить анимацию</button></div>
+        </sc-if>
+        <sc-if value="{{ phaseResult }}">
+          <div class="ng-win" key="{{ prizeReceipt }}">
+            <div class="ng-win-gift" role="img" aria-label="{{ prize.n }}">
+              <img src="{{ prizeImage }}" alt="">
+              <ng-gift-motion data-src="{{ prizeAnimation }}" aria-hidden="true"></ng-gift-motion>
+            </div>
+            <h2>{{ prize.n }}</h2>
+            <span style="{{ prize.chipStyle }}">{{ prize.rarity }}</span>
+            <span class="ng-win-number">{{ prize.num }}</span>
+            <button class="ng-win-repeat" onClick="{{ repeatCase }}" disabled="{{ repeatCaseDisabled }}">{{ repeatCaseLabel }}</button>
+            <sc-if value="{{ repeatCaseLow }}">
+              <div class="ng-win-shortfall">{{ repeatCaseShortfall }}</div>
+              <button class="ng-win-topup" onClick="{{ repeatCaseTopup }}">Пополнить баланс</button>
+            </sc-if>
+            <button class="ng-win-inventory" onClick="{{ toGifts }}">В мои подарки</button>
+            <button class="ng-win-secondary" onClick="{{ viewPrize }}">Посмотреть подарок</button>
+          </div>
+        </sc-if>
+        <p class="ng-operation-note">Подарок и баланс общие с вашим NoctGram</p>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ isUpgrade }}">
+      <div style="animation:ngRise 300ms cubic-bezier(.22,1,.36,1) both">
+        <h1 class="ng-upgrade-title" style="margin:4px 0 4px;font-size:24px;font-weight:600;letter-spacing:-.6px">Апгрейд</h1>
+        <p class="ng-upgrade-description">Выберите подарок и цель улучшения.<br>Светлый сектор — ваш шанс.</p>
+
+
+        <div ref="{{ dialRef }}" class="{{ dialClass }}" role="img" aria-label="{{ dialAccessible }}">
+          <div class="ng-dial-glow"></div><div class="ng-dial-rim"></div><div class="ng-dial-body"></div>
+          <div class="ng-dial-ticks"></div>
+          <svg class="ng-dial-svg" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="ng-dial-track" cx="50" cy="50" r="43"></circle>
+            <circle class="ng-dial-sector" cx="50" cy="50" r="43" stroke-dasharray="{{ dialDash }}"></circle>
+          </svg>
+          <div class="ng-dial-core">
+            <img class="ng-dial-watermark" src="assets/noctgram-logo.png" alt="">
+            <sc-if value="{{ dialShowChance }}">
+              <div class="ng-dial-value">{{ dialPercent }}<span class="ng-dial-percent">%</span></div>
+              <div class="ng-dial-label">{{ dialLabel }}</div>
+            </sc-if>
+            <sc-if value="{{ dialFinished }}">
+              <div class="ng-dial-result">
+                <sc-if value="{{ upFail }}">
+                  <span class="ng-dial-result-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M7 7 17 17 M17 7 7 17"></path></svg>
+                  </span>
+                </sc-if>
+                <span class="ng-dial-result-title">{{ dialResultTitle }}</span>
+                <span class="ng-dial-result-note">{{ dialResultNote }}</span>
+              </div>
+            </sc-if>
+          </div>
+          <div class="ng-dial-scale" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span></div>
+          <div class="ng-dial-needle" style="{{ needleStyle }}" aria-hidden="true">
+            <svg class="ng-dial-marker" viewBox="0 0 260 260">
+              <path class="ng-dial-marker-tip" d="M124 2.2 Q130 1.6 136 2.2 Q137 2.3 136.5 3.6 L131.5 15 Q130 17.2 128.5 15 L123.5 3.6 Q123 2.3 124 2.2Z"></path>
+              <path class="ng-dial-marker-arc" d="M114 2 A129 129 0 0 1 146 2"></path>
+            </svg>
+          </div>
+          <ng-upgrade-burst aria-hidden="true"></ng-upgrade-burst>
+        </div>
+
+        <div class="ng-sr-only" role="status" aria-live="polite" aria-atomic="true">{{ dialAnnouncement }}</div>
+
+        <div class="ng-upgrade-selectors" style="position:relative;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <button disabled="{{ upPending }}" onClick="{{ pickFrom }}" style="{{ fromCardStyle }}">
+            <div style="font-size:13px;color:#A1A1AA;margin-bottom:10px">Ваш подарок</div>
+            <sc-if value="{{ hasFrom }}">
+              <div style="position:relative;width:100%;aspect-ratio:1">
+                <div style="{{ fromArt.bg }}"></div>
+                <div style="{{ fromArt.obj }}"></div>
+              </div>
+              <div style="margin-top:10px;font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ fromGift.n }}</div>
+              <div style="margin-top:3px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#A1A1AA">{{ fromGift.num }} · {{ fromGift.valueFmt }} ★</div>
+            </sc-if>
+            <sc-if value="{{ noFrom }}">
+              <div style="width:100%;aspect-ratio:1;border:1px dashed rgba(255,255,255,.16);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#A1A1AA">+</div>
+              <div style="margin-top:10px;font-size:15px;font-weight:500">Выбрать</div>
+              <div style="margin-top:3px;font-size:12px;color:#A1A1AA">из инвентаря</div>
+            </sc-if>
+          </button>
+          <button disabled="{{ upPending }}" onClick="{{ pickTo }}" style="{{ toCardStyle }}">
+            <div style="font-size:13px;color:#A1A1AA;margin-bottom:10px">Желаемый подарок</div>
+            <sc-if value="{{ hasTo }}">
+              <div style="position:relative;width:100%;aspect-ratio:1">
+                <div style="{{ toArt.bg }}"></div>
+                <div style="{{ toArt.obj }}"></div>
+              </div>
+              <div style="margin-top:10px;font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ toGift.n }}</div>
+              <div style="margin-top:3px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#A1A1AA">{{ toGift.valueFmt }} ★</div>
+            </sc-if>
+            <sc-if value="{{ noTo }}">
+              <div style="width:100%;aspect-ratio:1;border:1px dashed rgba(255,255,255,.16);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#A1A1AA">+</div>
+              <div style="margin-top:10px;font-size:15px;font-weight:500">Выбрать</div>
+              <div style="margin-top:3px;font-size:12px;color:#A1A1AA">из каталога</div>
+            </sc-if>
+          </button>
+          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2px;height:64px;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(199,172,232,.5),rgba(255,255,255,0))"></div>
+        </div>
+
+<p class="ng-operation-note">{{ upgradeHint }}</p>
+
+        <div style="margin-top:12px;background:#0C0C0C;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:4px 16px">
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px"><span style="color:#A1A1AA">Стоимость попытки</span><span style="color:#FFD36A;font-weight:600">{{ upgradeCostFmt }} ★</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px"><span style="color:#A1A1AA">При успехе</span><span style="text-align:right;max-width:190px">{{ successText }}</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;font-size:15px"><span style="color:#A1A1AA">При неудаче</span><span style="text-align:right;max-width:190px">{{ failText }}</span></div>
+        </div>
+
+        <sc-if value="{{ upPending }}">
+          <div style="margin-top:14px;display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(199,172,232,.08);border:1px solid rgba(199,172,232,.22);border-radius:18px;animation:ngRise 300ms both">
+            <div style="width:18px;height:18px;flex:none;border-radius:50%;border:2px solid rgba(199,172,232,.3);border-top-color:#C7ACE8;animation:ngSpin 900ms linear infinite"></div>
+            <div style="font-size:15px">Проверяем операцию…</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ upSuccess }}">
+          <div style="margin-top:14px;padding:16px;background:rgba(62,207,142,.07);border:1px solid rgba(62,207,142,.24);border-radius:18px;animation:ngRise 320ms both">
+            <div style="font-size:16px;font-weight:600;color:#3ECF8E">Апгрейд удался</div>
+            <div style="margin-top:6px;font-size:14px;line-height:1.5;color:#A1A1AA">{{ resultText }}</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ upFail }}">
+          <div style="margin-top:14px;padding:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:18px;animation:ngRise 320ms both">
+            <div style="font-size:16px;font-weight:600">Апгрейд не удался</div>
+            <div style="margin-top:6px;font-size:14px;line-height:1.5;color:#A1A1AA">{{ resultText }}</div>
+          </div>
+        </sc-if>
+  <sc-if value="{{ showCta }}">
+    <div class="ng-upgrade-actions">
+      <sc-if value="{{ ctaNote }}">
+        <div style="{{ ctaNoteStyle }}">{{ ctaNoteText }}</div>
+      </sc-if>
+      <button onClick="{{ ctaAction }}" disabled="{{ ctaDisabled }}" style="{{ ctaStyle }}">{{ ctaLabel }}</button>
+      <sc-if value="{{ ctaSecond }}">
+        <button onClick="{{ ctaSecondAction }}" style="margin-top:10px;height:48px;width:100%;border:1px solid rgba(255,255,255,.14);border-radius:16px;background:rgba(255,255,255,.06);color:#F7F7F5;font-size:15px;font-weight:500;cursor:pointer">{{ ctaSecondLabel }}</button>
+      </sc-if>
+    </div>
+  </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isGifts }}">
+      <div style="animation:ngRise 300ms cubic-bezier(.22,1,.36,1) both">
+        <button onClick="{{ goProfile }}" style="display:flex;align-items:center;gap:6px;height:36px;padding:0 12px 0 8px;margin:0 0 10px;border:1px solid rgba(255,255,255,.1);border-radius:18px;background:rgba(255,255,255,.04);color:#F7F7F5;font-size:14px;cursor:pointer">‹ Профиль</button>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin:4px 2px 14px">
+          <h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-.6px">Мои подарки</h1>
+          <span style="font-size:13px;color:#A1A1AA">{{ giftsCount }}</span>
+        </div>
+        <sc-if value="{{ isLive }}">
+          <div class="ng-shared-gifts"><sc-for list="{{ sharedGifts }}" as="g"><button class="ng-gift-card" onClick="{{ g.open }}"><div class="ng-shared-art"><img src="{{ g.image }}" alt=""><ng-gift-motion data-src="{{ g.animation }}" style="position:absolute;inset:0"></ng-gift-motion><span>{{ g.number }}</span></div><strong>{{ g.name }}</strong><small>Из вашего NoctGram</small></button></sc-for></div>
+          <sc-if value="{{ sharedEmpty }}"><p class="ng-account-notice">Подарков пока нет. Полученные подарки появятся здесь и в вашем NoctGram.</p></sc-if>
+          <sc-if value="{{ sharedMore }}"><button class="ng-inline-topup" onClick="{{ loadSharedMore }}">Показать ещё</button></sc-if>
+        </sc-if>
+        <sc-if value="{{ hasGifts }}">
+          <div style="display:flex;gap:8px;overflow:auto;padding:0 0 4px;margin:0 -16px 16px;padding-left:16px;padding-right:16px">
+            <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+              <button onClick="{{ f.pick }}" style="{{ f.style }}">{{ f.label }}</button>
+            </sc-for>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+            <sc-for list="{{ inventory }}" as="g" hint-placeholder-count="4">
+              <button class="ng-gift-card" onClick="{{ g.open }}" style="position:relative;text-align:left;padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:#0C0C0C;cursor:pointer;color:#F7F7F5;width:100%">
+                <div style="position:relative;width:100%;aspect-ratio:1">
+                  <div style="{{ g.art.bg }}"></div>
+                  <ng-gift-motion data-src="{{ g.animation }}" style="{{ g.art.obj }}"></ng-gift-motion>
+                  <div style="{{ g.numStyle }}">{{ g.num }}</div>
+                </div>
+                <div style="margin-top:10px;font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.n }}</div>
+                <div style="margin-top:4px;font-size:13px;color:#A1A1AA"><span style="{{ g.rarityStyle }}">{{ g.rarity }}</span></div>
+              </button>
+            </sc-for>
+          </div>
+          <div style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div>
+              <div style="font-size:13px;color:#A1A1AA">Стоимость коллекции</div>
+              <div style="margin-top:4px;font-size:19px;font-weight:600">{{ collectionFmt }} ★</div>
+            </div>
+            <div style="font-size:13px;color:#A1A1AA;text-align:right;max-width:150px;line-height:1.45">Не входит в баланс и не списывается</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noGifts }}">
+          <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:64px 12px 0;animation:ngFade 360ms both">
+            <div style="position:relative;width:132px;height:132px;display:flex;align-items:center;justify-content:center">
+              <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 50%,rgba(199,172,232,.18),rgba(0,0,0,0) 70%);animation:ngBreathe 4s ease-in-out infinite"></div>
+              <img src="assets/noctgram-logo.png" alt="" style="position:relative;width:64px;height:64px;object-fit:contain;opacity:.6">
+            </div>
+            <h2 style="margin:22px 0 0;font-size:21px;font-weight:600;letter-spacing:-.4px">Здесь пока пусто</h2>
+            <p style="margin:10px 0 0;font-size:15px;line-height:1.55;color:#A1A1AA;max-width:270px">Откройте кейс — выпавшие подарки появятся в коллекции и станут доступны для апгрейда.</p>
+            <button onClick="{{ goCases }}" style="margin-top:26px;height:52px;width:100%;border:0;border-radius:16px;background:#C7ACE8;color:#0B0B0D;font-size:16px;font-weight:600;cursor:pointer">Открыть первый кейс</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isProfile }}">
+      <div style="animation:ngFade 300ms both">
+        <div style="margin:0 -16px;container-type:inline-size">
+          <section style="position:relative;isolation:isolate;overflow:hidden;width:100%;aspect-ratio:1206/763;min-height:225px;text-align:center;background:#000">
+            <div aria-hidden="true" style="position:absolute;inset:0;z-index:-3;overflow:hidden">
+              <img src="{{ profileAvatar }}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 35%;transform:scale(1.3);filter:blur(2px) saturate(.6) brightness(1.3)">
+              <svg data-liquid="1" viewBox="0 0 600 380" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" style="{{ liquidStyle }}">
+                <defs>
+                  <filter id="noct-flow" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB">
+                    <feTurbulence type="fractalNoise" baseFrequency=".008 .002" numOctaves="1" seed="7" result="wave">
+                      <animate attributeName="baseFrequency" values=".008 .002;.012 .0035;.006 .0025;.008 .002" dur="19s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.3333;.6667;1" keySplines=".42 0 .58 1;.42 0 .58 1;.42 0 .58 1"></animate>
+                    </feTurbulence>
+                    <feDisplacementMap in="SourceGraphic" in2="wave" scale="190" xChannelSelector="R" yChannelSelector="G">
+                      <animate attributeName="scale" values="190;240;170;190" dur="23s" repeatCount="indefinite"></animate>
+                    </feDisplacementMap>
+                    <feGaussianBlur stdDeviation="1.8"></feGaussianBlur>
+                  </filter>
+                </defs>
+                <image href="{{ profileAvatar }}" x="-130" y="-260" width="850" height="1150" preserveAspectRatio="none" filter="url(#noct-flow)"></image>
+              </svg>
+            </div>
+            <div aria-hidden="true" style="position:absolute;inset:0;z-index:-2;background:linear-gradient(180deg,rgba(0,0,0,.42) 0%,rgba(0,0,0,.46) 22%,rgba(0,0,0,.78) 49%,rgba(0,0,0,.95) 79%,#000 100%),linear-gradient(90deg,rgba(0,0,0,.76),transparent 24%,transparent 73%,rgba(0,0,0,.8))"></div>
+
+            <div style="position:absolute;top:7.8cqw;left:39.1%;width:21.8%;aspect-ratio:1;isolation:isolate">
+              <img src="{{ profileAvatar }}" alt="" style="display:block;width:100%;height:100%;object-fit:cover;border-radius:50%;border:1px solid rgba(199,172,232,.7);box-shadow:0 0 0 1px rgba(255,255,255,.12),0 0 24px rgba(199,172,232,.25)">
+              <span aria-hidden="true" style="{{ sparkBase }}left:-10%;top:6%;font-size:2.2cqw;opacity:.2;animation-delay:-1s">✦</span>
+              <span aria-hidden="true" style="{{ sparkBase }}left:36%;top:-12%;font-size:2.4cqw;opacity:.26;animation-delay:-3s">✦</span>
+              <span aria-hidden="true" style="{{ sparkBase }}right:-14%;top:13%;font-size:2.3cqw;opacity:.3;animation-delay:-2s">✦</span>
+              <span aria-hidden="true" style="{{ sparkBase }}right:-15%;top:52%;font-size:4.7cqw;opacity:.62;animation-delay:-.5s">✦</span>
+              <span aria-hidden="true" style="{{ sparkBase }}left:0;bottom:5%;font-size:2.8cqw;opacity:.58;animation-delay:-2.5s">✦</span>
+              <span aria-hidden="true" style="{{ sparkBase }}left:40%;bottom:-22%;font-size:1.9cqw;opacity:.23;animation-delay:-4s">✦</span>
+            </div>
+            <span aria-hidden="true" style="{{ dotBase }}left:.75%;top:35.6%;animation-delay:-3s"></span>
+            <span aria-hidden="true" style="{{ dotBase }}left:29.3%;top:.3%;animation-delay:-5s"></span>
+            <span aria-hidden="true" style="{{ dotBase }}left:86%;top:85%;animation-delay:-1s"></span>
+
+            <h1 style="position:absolute;top:32.5cqw;left:0;width:100%;margin:0;color:#F7F7F5;font-size:7.75cqw;font-weight:700;line-height:1.12;letter-spacing:-.26cqw;white-space:nowrap;transform:scaleX(.94)">{{ profileName }}</h1>
+            <p style="position:absolute;top:41.8cqw;left:0;width:100%;margin:0;color:#A1A1AA;font-size:3.7cqw;font-weight:400;line-height:1.2;letter-spacing:-.09cqw">{{ profileHandle }}</p>
+            <button onClick="{{ openNoctGram }}" style="position:absolute;top:49.4cqw;left:27.4%;width:45.2%;z-index:3;display:flex;align-items:center;justify-content:center;border:0;border-radius:999px;background:linear-gradient(#FBFBF9,#F9F2DD);height:10.1cqw;min-height:44px;color:#0B0B0D;font-size:3.3cqw;font-weight:700;white-space:nowrap;box-shadow:0 0 6cqw rgba(246,238,198,.12);cursor:pointer">Открыть NoctGram</button>
+          </section>
+        </div>
+
+        <div style="font-size:13px;color:#A1A1AA;margin:18px 2px 10px">Разделы</div>
+        <div style="background:#0C0C0C;border:1px solid rgba(255,255,255,.08);border-radius:20px;overflow:hidden">
+          <sc-for list="{{ profileRows }}" as="r" hint-placeholder-count="3">
+            <button onClick="{{ r.go }}" style="display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;border:0;border-top:1px solid rgba(255,255,255,.06);background:none;color:#F7F7F5;cursor:pointer;text-align:left">
+              <span style="{{ r.iconStyle }}">{{ r.glyph }}</span>
+              <span style="flex:1;min-width:0;font-size:16px;font-weight:500">{{ r.label }}</span>
+              <span style="{{ r.valueStyle }}">{{ r.value }}</span>
+              <span style="color:#A1A1AA;font-size:17px;flex:none">›</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isWallet }}">
+      <div style="animation:ngRise 300ms cubic-bezier(.22,1,.36,1) both">
+        <div style="position:relative;text-align:center;padding:18px 0 4px">
+          <div style="position:absolute;top:-30px;left:50%;transform:translateX(-50%);width:260px;height:180px;background:radial-gradient(ellipse at 50% 50%,rgba(255,211,106,.16),rgba(0,0,0,0) 70%);pointer-events:none"></div>
+          <button class="ng-star-scene" data-star-scene aria-label="Повторить анимацию Stars" title="Нажми на звезду">
+            <span class="ng-star-particles" aria-hidden="true"><sc-for list="{{ starParticles }}" as="p"><img class="ng-star-particle" src="assets/noct-stars.png" alt="" style="{{ p.style }}"></sc-for></span>
+            <span class="ng-star-float"><img src="assets/noct-stars.png" alt=""></span>
+          </button>
+          <div class="ng-balance" data-balance="{{ balanceFmt }}" aria-label="{{ balanceAccessible }}"><span aria-hidden="true"><sc-for list="{{ balanceDigits }}" as="d"><span class="ng-digit" style="{{ d.style }}">{{ d.value }}</span></sc-for></span></div>
+          <div style="position:relative;margin-top:8px;font-size:15px;color:#FFD36A;font-weight:500">Noct Stars</div>
+          <div style="position:relative;margin-top:4px;font-size:13px;color:#A1A1AA">{{ walletHint }}</div>
+        </div>
+
+        <h2 style="margin:26px 2px 12px;font-size:17px;font-weight:600">Пополнение</h2>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ packs }}" as="p" hint-placeholder-count="3">
+            <button onClick="{{ p.pick }}" style="{{ p.style }}">
+              <div style="flex:1;min-width:0;text-align:left">
+                <div style="font-size:15px;font-weight:500">Заплатите {{ p.tg }} Telegram Stars</div>
+                <div style="margin-top:4px;font-size:14px;color:#FFD36A">получите {{ p.ns }} Noct Stars</div>
+              </div>
+              <div style="{{ p.radio }}"></div>
+            </button>
+          </sc-for>
+        </div>
+        <button onClick="{{ startTopup }}" style="margin-top:14px;height:52px;width:100%;border:0;border-radius:16px;background:#C7ACE8;color:#0B0B0D;font-size:16px;font-weight:600;cursor:pointer">Пополнить</button>
+        <div style="margin-top:10px;font-size:13px;color:#A1A1AA;text-align:center">{{ priceHint }}</div>
+
+        <h2 style="margin:28px 2px 12px;font-size:17px;font-weight:600">История</h2>
+        <div style="background:#0C0C0C;border:1px solid rgba(255,255,255,.08);border-radius:20px;overflow:hidden">
+          <sc-for list="{{ history }}" as="h" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:12px;padding:14px;border-top:1px solid rgba(255,255,255,.06)">
+              <div class="ng-history-icon" style="{{ h.dotStyle }}"><img src="{{ h.icon }}" alt=""></div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ h.title }}</div>
+                <div style="margin-top:3px;font-size:13px;color:#A1A1AA">{{ h.sub }}</div>
+              </div>
+              <div style="{{ h.amountStyle }}">{{ h.amount }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+   </div>
+  </div>
+
+  <nav ref="{{ navRef }}" role="tablist" aria-label="Основная навигация" style="position:absolute;bottom:22px;left:16px;right:16px;height:66px;padding:5px 8px;border:1px solid transparent;border-radius:999px;background:linear-gradient(135deg,rgba(0,0,0,.94),rgba(0,0,0,.88)) padding-box,linear-gradient(180deg,rgba(255,255,255,.6) 0%,rgba(255,255,255,.16) 44%,rgba(255,255,255,.1) 100%) border-box;box-shadow:0 8px 24px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.03);backdrop-filter:blur(22px) saturate(1.15);-webkit-backdrop-filter:blur(22px) saturate(1.15);isolation:isolate;overflow:hidden;display:flex;touch-action:manipulation;z-index:35">
+    <div ref="{{ pillRef }}" aria-hidden="true" style="position:absolute;top:5px;bottom:5px;left:0;width:calc((100% - 16px)/3 + 5px);z-index:0;pointer-events:none;will-change:transform">
+      <div ref="{{ shapeRef }}" style="width:100%;height:100%;border-radius:999px;background:#141416;border:1px solid rgba(255,255,255,.07);transform-origin:center;will-change:transform"></div>
+    </div>
+    <button ref="{{ tabRef0 }}" onClick="{{ goCases }}" role="tab" aria-selected="{{ tab0on }}" style="{{ navCases }}">
+      <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;transform-origin:50% 65%;transition:transform 90ms ease">
+        <svg viewBox="0 0 24 24" fill="none" style="width:26px;height:26px;transform-origin:50% 70%"><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" stroke="currentColor" stroke-width="1.7"></rect><path d="M3.5 11.5h17M12 7.5v12" stroke="currentColor" stroke-width="1.7"></path></svg>
+        <span style="{{ label0 }}">Кейсы</span>
+      </span>
+    </button>
+    <button ref="{{ tabRef1 }}" onClick="{{ goUpgrade }}" role="tab" aria-selected="{{ tab1on }}" style="{{ navUpgrade }}">
+      <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;transform-origin:50% 65%;transition:transform 90ms ease">
+        <svg viewBox="0 0 24 24" fill="none" style="width:26px;height:26px;transform-origin:50% 70%"><path d="M12 19.5V5.5m0 0l-6 6M12 5.5l6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg>
+        <span style="{{ label1 }}">Апгрейд</span>
+      </span>
+    </button>
+    <button ref="{{ tabRef2 }}" onClick="{{ goProfile }}" role="tab" aria-selected="{{ tab2on }}" style="{{ navProfile }}">
+      <span style="display:flex;flex-direction:column;align-items:center;justify-content:center;transform-origin:50% 65%;transition:transform 90ms ease">
+        <svg viewBox="0 0 24 24" fill="none" style="width:26px;height:26px;transform-origin:50% 70%"><circle cx="12" cy="8.6" r="3.7" stroke="currentColor" stroke-width="1.7"></circle><path d="M4.8 19.6c1.3-3.2 3.9-4.8 7.2-4.8s5.9 1.6 7.2 4.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg>
+        <span style="{{ label2 }}">Профиль</span>
+      </span>
+    </button>
+  </nav>
+
+  <sc-if value="{{ sheetOpen }}">
+    <div style="position:absolute;inset:0;z-index:60">
+      <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(0,0,0,.66);animation:ngFade 200ms both"></div>
+      <div class="ng-sheet" data-closing="{{ sheetClosing }}" role="dialog" aria-label="{{ sheetTitle }}" style="position:absolute;left:0;right:0;bottom:0;background:#161616;border-top:1px solid rgba(255,255,255,.1);border-radius:24px 24px 0 0;padding:10px 16px 26px;max-height:76%;overflow:auto;animation:ngSheet 260ms cubic-bezier(.22,1,.36,1) both">
+        <div style="width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);margin:0 auto 14px"></div>
+
+        <sc-if value="{{ sheetSharedGiftOpen }}"><div class="ng-shared-detail"><img src="{{ sharedGift.image }}" alt=""><h2>{{ sharedGift.name }}</h2><p>{{ sharedGiftNumber }}</p><p>{{ sharedGiftStatus }}</p><sc-if value="{{ canUpgradeShared }}"><button class="ng-inline-topup" onClick="{{ useSharedUpgrade }}">Использовать в апгрейде</button></sc-if><button class="ng-inline-topup" onClick="{{ openSharedProfile }}">Открыть NoctGram</button><button class="ng-inline-topup" onClick="{{ closeSheet }}">Закрыть</button></div></sc-if>
+        <sc-if value="{{ sheetGiftOpen }}">
+          <div style="display:flex;gap:14px;align-items:center">
+            <div style="position:relative;width:96px;height:96px;flex:none">
+              <div style="{{ sheetArt.bg }}"></div>
+              <ng-gift-motion data-src="{{ sheetAnimation }}" style="{{ sheetArt.obj }}"></ng-gift-motion>
+            </div>
+            <div style="min-width:0">
+              <div style="font-size:21px;font-weight:600;letter-spacing:-.4px">{{ sheetGift.n }}</div>
+              <div style="margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:13px;color:#A1A1AA">Коллекционный подарок {{ sheetGift.num }}</div>
+              <div style="margin-top:10px"><span style="{{ sheetGift.chipStyle }}">{{ sheetGift.rarity }}</span></div>
+            </div>
+          </div>
+          <div style="margin-top:18px;border-top:1px solid rgba(255,255,255,.08)">
+            <sc-for list="{{ sheetAttrs }}" as="a" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+                <span style="font-size:14px;color:#A1A1AA">{{ a.k }}</span>
+                <span style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:500">{{ a.v }}<span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#A1A1AA;background:rgba(255,255,255,.07);border-radius:6px;padding:2px 6px">{{ a.p }}</span></span>
+              </div>
+            </sc-for>
+          </div>
+          <button onClick="{{ useForUpgrade }}" style="margin-top:18px;height:52px;width:100%;border:0;border-radius:16px;background:#C7ACE8;color:#0B0B0D;font-size:16px;font-weight:600;cursor:pointer">Выбрать для апгрейда</button>
+          <button onClick="{{ closeSheet }}" style="margin-top:10px;height:48px;width:100%;border:1px solid rgba(255,255,255,.14);border-radius:16px;background:rgba(255,255,255,.06);color:#F7F7F5;font-size:15px;font-weight:500;cursor:pointer">Закрыть</button>
+        </sc-if>
+
+        <sc-if value="{{ sheetPickOpen }}">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin:0 2px 14px">
+            <h3 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.3px">{{ pickTitle }}</h3>
+            <span style="font-size:13px;color:#A1A1AA">{{ pickHint }}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+            <sc-for list="{{ pickList }}" as="g" hint-placeholder-count="6">
+              <button onClick="{{ g.choose }}" style="{{ g.style }}">
+                <div style="position:relative;width:100%;aspect-ratio:1">
+                  <div style="{{ g.art.bg }}"></div>
+                  <div style="{{ g.art.obj }}"></div>
+                </div>
+                <div style="margin-top:8px;font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.n }}</div>
+                <div style="margin-top:2px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#A1A1AA">{{ g.sub }}</div>
+              </button>
+            </sc-for>
+          </div>
+          <button onClick="{{ closeSheet }}" style="margin-top:16px;height:48px;width:100%;border:1px solid rgba(255,255,255,.14);border-radius:16px;background:rgba(255,255,255,.06);color:#F7F7F5;font-size:15px;font-weight:500;cursor:pointer">Закрыть</button>
+        </sc-if>
+
+        <sc-if value="{{ sheetPayOpen }}">
+          <h3 style="margin:0 2px 16px;font-size:21px;font-weight:600;letter-spacing:-.4px">Подтвердите пополнение</h3>
+          <sc-if value="{{ isLive }}"><label class="ng-purchase-terms"><input type="checkbox" checked="{{ acceptedTerms }}" onChange="{{ toggleTerms }}"><span>Согласен с покупкой указанного количества Noct Stars по выбранной цене. Оплата откроется в боте NoctGram.</span></label></sc-if>
+          <div style="display:flex;align-items:center;gap:10px;padding:16px;background:#0C0C0C;border:1px solid rgba(255,255,255,.08);border-radius:18px">
+            <div style="flex:1;text-align:center">
+              <div style="font-size:13px;color:#A1A1AA">Заплатите</div>
+              <div style="margin-top:6px;font-size:21px;font-weight:600">{{ payTg }}</div>
+              <div style="margin-top:4px;font-size:12px;color:#A1A1AA">Telegram Stars</div>
+            </div>
+            <div style="color:#C7ACE8;font-size:19px">→</div>
+            <div style="flex:1;text-align:center">
+              <div style="font-size:13px;color:#A1A1AA">Получите</div>
+              <div style="margin-top:6px;font-size:21px;font-weight:600;color:#FFD36A">{{ payNs }}</div>
+              <div style="margin-top:4px;font-size:12px;color:#A1A1AA">Noct Stars</div>
+            </div>
+          </div>
+          <sc-if value="{{ payPending }}">
+            <div style="margin-top:14px;display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(199,172,232,.08);border:1px solid rgba(199,172,232,.22);border-radius:16px">
+              <div style="width:18px;height:18px;flex:none;border-radius:50%;border:2px solid rgba(199,172,232,.3);border-top-color:#C7ACE8;animation:ngSpin 900ms linear infinite"></div>
+              <div style="font-size:15px">Проверяем операцию…</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ payError }}">
+            <div style="margin-top:14px;padding:14px 16px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.28);border-radius:16px">
+              <div style="font-size:15px;font-weight:500;color:#EF4444">Оплата не прошла</div>
+              <div style="margin-top:5px;font-size:14px;line-height:1.5;color:#A1A1AA">Telegram Stars не списаны. Попробуйте ещё раз — баланс не изменился.</div>
+            </div>
+          </sc-if>
+          <button onClick="{{ confirmPay }}" disabled="{{ payPending }}" style="{{ payBtnStyle }}">{{ payBtnLabel }}</button>
+          <button onClick="{{ closeSheet }}" style="margin-top:10px;height:48px;width:100%;border:1px solid rgba(255,255,255,.14);border-radius:16px;background:rgba(255,255,255,.06);color:#F7F7F5;font-size:15px;font-weight:500;cursor:pointer">Отмена</button>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ celebrating }}"><div class="ng-topup-burst" aria-hidden="true"><sc-for list="{{ celebrationParticles }}" as="p"><img src="assets/noct-stars.png" alt="" style="{{ p.style }}"></sc-for></div></sc-if>
+  <sc-if value="{{ toast }}">
+    <div style="position:absolute;left:16px;right:16px;bottom:112px;z-index:80;display:flex;align-items:center;gap:10px;padding:14px 16px;background:#161616;border:1px solid rgba(255,255,255,.12);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.6);animation:ngRise 320ms cubic-bezier(.22,1,.36,1) both">
+      <div style="width:8px;height:8px;border-radius:50%;background:#C7ACE8;flex:none;box-shadow:0 0 10px rgba(199,172,232,.8)"></div>
+      <div style="font-size:15px">{{ toast }}</div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844}}">
+const RAR = {
+  common:{l:'Обычный',c:'#A1A1AA'},
+  rare:{l:'Редкий',c:'#3ECF8E'},
+  epic:{l:'Эпический',c:'#C7ACE8'},
+  legend:{l:'Легендарный',c:'#FFD36A'}
+};
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = {
+      screen:'cases',caseId:'eclipse',phase:'idle',prizeId:null,prizeNum:'',prizeUid:null,prizeGift:null,
+      accountMode:window.NoctAccount?.inTelegram?'loading':'telegram',shared:null,sharedGifts:[],sharedNext:null,sharedLinks:null,accountError:null,acceptedTerms:false,
+      balance:0,inv:[],games:null,caseFast:false,reduced:window.matchMedia('(prefers-reduced-motion: reduce)').matches,empty:false,
+      reel:[],spinStarted:0,dialRoll:0,dialStarted:0,dialChance:null,fromUid:null,fromId:null,fromNum:'',toId:null,upgradeSource:null,
+      filter:'all',sheet:null,sheetId:null,sheetUid:null,sheetNum:'',pick:null,upPhase:'select',pack:0,payPhase:'idle',toast:null,sheetClosing:false,celebration:0,
+      gamePending:false,gameRetry:false,gameError:null,gameResult:null
+    };
+    this.openOp=null;this.upgradeOp=null;
+    this.timers = [];
+    this.dialRef = React.createRef();
+    this.navRef = React.createRef();
+    this.pillRef = React.createRef();
+    this.shapeRef = React.createRef();
+    this.tabRefs = [React.createRef(),React.createRef(),React.createRef()];
+    this.sp = {x:0,v:0,target:0,raf:0,last:0,squash:null,icon:null};
+    this.press = [];
+    this.springFrame = this.springFrame.bind(this);
+  }
+  go(patch){ this.setState(patch); requestAnimationFrame(()=>this.springTo()); }
+  springTo(){
+    const sp = this.sp, i = this.tabIndex(this.state.screen);
+    const next = this.positionFor(i), dist = next - sp.x;
+    if(Math.abs(dist) < .01 && !sp.raf) { this.bounceIcon(i); return; }
+    sp.target = next;
+    if(this.state.reduced){ if(sp.raf) cancelAnimationFrame(sp.raf); sp.raf=0; sp.x=next; sp.v=0; this.paintPill(); return; }
+    this.bouncePill(dist);
+    this.bounceIcon(i);
+    if(!sp.raf){ sp.last = 0; sp.raf = requestAnimationFrame(this.springFrame); }
+  }
+  tabIndex(scr){ return scr==='upgrade' ? 1 : (scr==='profile'||scr==='gifts'||scr==='wallet') ? 2 : 0; }
+  positionFor(i){
+    const b = this.tabRefs[i].current, p = this.pillRef.current;
+    if(!b||!p) return 0;
+    return b.offsetLeft + b.offsetWidth/2 - p.offsetWidth/2;
+  }
+  paintPill(){ const p = this.pillRef.current; if(p) p.style.transform = 'translate3d('+this.sp.x+'px,0,0)'; }
+  syncGeometry(){
+    const sp = this.sp;
+    if(sp.raf) cancelAnimationFrame(sp.raf);
+    sp.raf = 0; sp.last = 0;
+    sp.target = this.positionFor(this.tabIndex(this.state.screen));
+    sp.x = sp.target; sp.v = 0;
+    this.paintPill();
+  }
+  springFrame(now){
+    const sp = this.sp;
+    sp.raf = 0;
+    if(!this.pillRef.current) return;
+    const dt = sp.last ? Math.min((now-sp.last)/1000,.04) : 1/60;
+    sp.last = now;
+    const steps = Math.max(1,Math.ceil(dt/(1/240))), h = dt/steps;
+    for(let i=0;i<steps;i++){
+      sp.v += (400*(sp.target-sp.x) - 21.5*sp.v)*h;
+      sp.x += sp.v*h;
+    }
+    if(Math.abs(sp.target-sp.x)<.06 && Math.abs(sp.v)<.5){ sp.x = sp.target; sp.v = 0; this.paintPill(); sp.last = 0; return; }
+    this.paintPill();
+    sp.raf = requestAnimationFrame(this.springFrame);
+  }
+  bouncePill(distance){
+    const sp = this.sp, shape = this.shapeRef.current, nav = this.navRef.current;
+    if(sp.squash) sp.squash.cancel();
+    if(!shape || !shape.animate || this.state.reduced) return;
+    const stretch = Math.min(.15, .10 + Math.abs(distance)/(nav?nav.clientWidth:340)*.06);
+    sp.squash = shape.animate([
+      {transform:'translateY(0) scale(1,1)',offset:0},
+      {transform:'translateY(1.4px) scale('+(1+stretch)+',.89)',offset:.16},
+      {transform:'translateY(-1.2px) scale(.925,1.035)',offset:.38},
+      {transform:'translateY(.45px) scale(1.025,.985)',offset:.63},
+      {transform:'translateY(-.15px) scale(.99,1.008)',offset:.81},
+      {transform:'translateY(0) scale(1,1)',offset:1}
+    ],{duration:510,easing:'linear'});
+  }
+  bounceIcon(i){
+    const sp = this.sp, btn = this.tabRefs[i].current;
+    const icon = btn && btn.querySelector('svg');
+    if(sp.icon) sp.icon.cancel();
+    if(!icon || !icon.animate || this.state.reduced) return;
+    sp.icon = icon.animate([
+      {transform:'translateY(0) scale(1)',offset:0},
+      {transform:'translateY(-1.6px) scale(1.1)',offset:.28},
+      {transform:'translateY(.5px) scale(.98)',offset:.58},
+      {transform:'translateY(-.2px) scale(1.015)',offset:.8},
+      {transform:'translateY(0) scale(1)',offset:1}
+    ],{duration:420,easing:'ease-out'});
+  }
+  componentDidMount(){
+    this.stopAccount=window.NoctAccount?.connect(this);
+    this.syncGeometry();
+    this.motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.motionChanged = (event)=>{ this.setState({reduced:event.matches}); if(event.matches){ this.finishOpen(); this.finishUpgrade(); } };
+    this.motionPreference.addEventListener('change',this.motionChanged);
+
+    const nav = this.navRef.current;
+    if(nav && window.ResizeObserver){
+      this.ro = new ResizeObserver(()=>this.syncGeometry());
+      this.ro.observe(nav);
+    }
+    this.tabRefs.forEach((r,i)=>{
+      const btn = r.current; if(!btn) return;
+      const content = btn.firstElementChild;
+      const down = (e)=>{ if(e.button===0 && !this.state.reduced && content) content.style.transform='translateY(1px) scale(.95)'; };
+      const up = ()=>{ if(content) content.style.transform=''; };
+      btn.addEventListener('pointerdown',down);
+      ['pointerup','pointercancel','pointerleave','blur'].forEach(n=>btn.addEventListener(n,up));
+      const key = (e)=>{
+        let n = null;
+        if(e.key==='ArrowRight') n=(i+1)%3;
+        if(e.key==='ArrowLeft') n=(i+2)%3;
+        if(e.key==='Home') n=0;
+        if(e.key==='End') n=2;
+        if(n!==null){ e.preventDefault(); this.tabRefs[n].current.focus(); this.tabRefs[n].current.click(); }
+      };
+      btn.addEventListener('keydown',key);
+      this.press.push(()=>{ btn.removeEventListener('pointerdown',down); btn.removeEventListener('keydown',key); ['pointerup','pointercancel','pointerleave','blur'].forEach(n=>btn.removeEventListener(n,up)); });
+    });
+  }
+  componentDidUpdate(prevProps, prevState){
+    if(prevState && prevState.reduced !== this.state.reduced) this.syncGeometry();
+  }
+  componentWillUnmount(){
+    this.stopAccount?.();
+    this.timers.forEach(clearTimeout);
+    this.motionPreference?.removeEventListener('change',this.motionChanged);
+    if(this.sp.raf) cancelAnimationFrame(this.sp.raf);
+    if(this.ro) this.ro.disconnect();
+    this.press.forEach(f=>f());
+  }
+  later(fn,ms){ const t = setTimeout(fn, this.state.reduced ? Math.min(ms,260) : ms); this.timers.push(t); return t; }
+  fmt(n){ return Math.round(n).toLocaleString('ru-RU').replace(/\u00A0/g,' '); }
+  art(t,s,opt){
+    opt = opt||{};
+    const rad = s==='circle' ? '50%' : s==='squircle' ? '30%' : '20%';
+    const rot = s==='diamond' ? ' rotate(45deg)' : '';
+    const size = opt.size || 54;
+    const dot = opt.dot || 24;
+    return {
+      bg:'position:absolute;inset:0;border-radius:'+(opt.radius||'16px')+';background-color:#141414;background-image:radial-gradient(circle at 50% 34%,'+t+'33 0%,rgba(0,0,0,0) 62%),radial-gradient(circle at '+(dot/2)+'px '+(dot/2)+'px,'+t+'24 1.5px,rgba(0,0,0,0) 2px);background-size:auto,'+dot+'px '+dot+'px;border:1px solid rgba(255,255,255,.07)',
+      obj:'position:absolute;left:50%;top:50%;width:'+size+'%;height:'+size+'%;transform:translate(-50%,-50%)'+rot+';border-radius:'+rad+';background:linear-gradient(145deg,#fbfbf9 0%,'+t+' 34%,#5f5f6b 62%,#ffffff 80%,'+t+' 100%);box-shadow:0 0 '+(opt.glow||22)+'px '+t+'55,inset 0 2px 6px rgba(255,255,255,.5),inset 0 -8px 16px rgba(0,0,0,.4)'
+    };
+  }
+  caseArt(id){
+    return {bg:'position:absolute;inset:0;border-radius:16px;background:radial-gradient(ellipse at 50% 64%,#c7ace80d,transparent 72%)',
+      obj:"position:absolute;inset:-3%;background:url('assets/cases/"+id+".svg') center/contain no-repeat"};
+  }
+  giftArt(id,opt){
+    const gift=this.gifts()[id]||{t:'#C7ACE8',s:'circle',image:'assets/noctgram-logo.png'},art=this.art(gift.t,gift.s,opt);
+    art.obj="position:absolute;inset:7%;background:url('"+gift.image+"') center/contain no-repeat;filter:drop-shadow(0 7px 12px "+gift.t+"20)";
+    return art;
+  }
+  gameGifts(){
+    const out={};
+    for(const [alias,g] of Object.entries(this.state.games?.gifts||{}))out[alias]={...g,n:g.name,v:g.price,t:g.color||'#C7ACE8',r:RAR[g.rarity]?g.rarity:'common',s:'circle',image:window.NoctAccount?.asset(g.imageUrl)||'assets/noctgram-logo.png',animation:window.NoctAccount?.asset(g.animationUrl)||''};
+    return out;
+  }
+  gifts(){
+    const out=this.gameGifts();
+    for(const g of [...this.state.sharedGifts,...(this.state.upgradeSource?[this.state.upgradeSource]:[])])out[g.giftId]={...g,n:g.name,v:g.price,t:g.color||'#C7ACE8',r:'common',s:'circle',image:g.image||window.NoctAccount?.asset(g.imageUrl)||'assets/noctgram-logo.png',animation:g.animation||window.NoctAccount?.asset(g.animationUrl)||''};
+    return out;
+  }
+  ownedForUpgrade(){return this.state.sharedGifts.filter(g=>!g.collectible).map(g=>({id:g.giftId,uid:g.id,num:''}));}
+  cases(){return this.state.games?.cases||[];}
+  makeReel(c,prize){
+    const entries=c.items.map(item=>item[0]);if(!entries.length)return [];
+    const list=Array.from({length:40},(_,i)=>entries[(i*7+Math.floor(i/entries.length))%entries.length]);list[34]=prize;return list;
+  }
+  revealCaseResult(operation,gift){
+    const op={id:operation.id};this.openOp=op;
+    const c=this.caseOf(operation.caseId),alias=operation.giftAlias||Object.keys(this.gameGifts()).find(k=>this.gameGifts()[k].giftId===gift.giftId);
+    this.go({screen:'open',caseId:operation.caseId,phase:'spin',prizeId:alias,prizeUid:gift.id,prizeNum:gift.collectible?'#'+gift.collectible.number:'',prizeGift:gift,reel:this.makeReel(c,alias),spinStarted:Date.now(),sheet:null});
+    if(this.state.caseFast)this.finishOpen();else this.later(()=>{if(this.openOp===op)this.finishOpen();},4800);
+  }
+  revealUpgradeResult(operation,gift,source){
+    const op={ok:operation.success,id:operation.id};this.upgradeOp=op;
+    const target=Object.keys(this.gameGifts()).find(k=>this.gameGifts()[k].giftId===operation.targetGiftId);
+    this.go({screen:'upgrade',upPhase:'pending',fromUid:operation.sourceReceiptId,fromId:source?.giftId||null,upgradeSource:source,toId:target||null,
+      dialRoll:operation.roll,dialChance:operation.chance,dialStarted:Date.now(),prizeGift:gift,sheet:null});
+    requestAnimationFrame(()=>{const dial=this.dialRef.current,scroll=dial?.closest('.ng-scroll');if(!scroll||this.upgradeOp!==op||this.state.screen!=='upgrade')return;const top=scroll.scrollTop+dial.getBoundingClientRect().top-scroll.getBoundingClientRect().top-(scroll.clientHeight-dial.clientHeight)/2;scroll.scrollTo({top:Math.max(0,top),behavior:this.state.reduced?'auto':'smooth'});});
+    this.later(()=>{if(this.upgradeOp===op)this.finishUpgrade();},3600);
+  }
+  finishOpen(){
+    if(this.openOp) this.openOp=null;
+    if(this.state.phase==='spin') this.setState({phase:'result'});
+  }
+  finishUpgrade(){
+    const op=this.upgradeOp; if(!op) return;
+    this.upgradeOp=null;
+    const started=this.state.dialStarted;
+    this.setState({upPhase:op.ok?'success':'fail'},()=>{
+      if(!op.ok || this.state.reduced || this.state.screen!=='upgrade') return;
+      requestAnimationFrame(()=>{
+        if(this.state.screen!=='upgrade' || this.state.upPhase!=='success' || this.state.dialStarted!==started || this.state.reduced) return;
+        this.dialRef.current?.querySelector?.('ng-upgrade-burst')?.play?.();
+      });
+    });
+  }
+  chip(r,big){ const c = RAR[r].c; return 'display:inline-block;padding:'+(big?'5px 11px':'3px 8px')+';border-radius:8px;font-size:'+(big?'13px':'12px')+';font-weight:500;color:'+c+';background:'+c+'1F'; }
+  caseOf(id){return this.cases().find(c=>c.id===id)||this.cases()[0]||{id:null,n:'Кейсы',p:0,items:[]};}
+  chanceOf(){const f=this.gifts()[this.state.fromId],t=this.gameGifts()[this.state.toId],rules=this.state.games?.upgrade;if(!f||!t||!rules)return 0;return Math.max(rules.minChance,Math.min(rules.maxChance,Math.round(f.v/t.v*rules.chancePercent)));}
+  costOf(){const t=this.gameGifts()[this.state.toId],rules=this.state.games?.upgrade;return t&&rules?Math.max(20,Math.round(t.v*rules.feePercent/100)):0;}
+  startOpen(){return this.openSharedCase?.();}
+  runUpgrade(){return this.upgradeSharedGift?.();}
+  confirmPay(){return this.payShared?.();}
+
+  renderVals(){
+    const s = this.state, self = this;
+    const linked=s.accountMode==='linked',scr=linked?s.screen:'auth',live=true,G=this.gifts(),CASES=this.cases();
+    const activePacks=(s.shared?.catalog?.products||[]).map(p=>({tg:p.xtr,ns:p.units,sku:p.id}));
+    const cur = this.caseOf(s.caseId);
+    const inv=this.ownedForUpgrade();
+    const filtered = s.filter==='all' ? inv : inv.filter(g=>G[g.id].r===s.filter);
+    const collection = inv.reduce((a,g)=>a+G[g.id].v,0);
+    const chance = s.upPhase==='select' || s.dialChance===null ? this.chanceOf() : s.dialChance;
+    const cost = this.costOf();
+    const from = s.fromId ? G[s.fromId] : null;
+    const to = s.toId ? G[s.toId] : null;
+    const navStyle = (on)=> 'position:relative;z-index:1;flex:1;min-width:0;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;border:0;border-radius:999px;background:transparent;font:inherit;cursor:pointer;user-select:none;color:'+(on?'#C7ACE8':'#B9B9BC')+';transition:color 110ms ease';
+    const labelStyle = (on)=> 'display:block;font-size:12px;font-weight:'+(on?'500':'400')+';line-height:1.2;white-space:nowrap;margin-top:1px';
+    const tabI = this.tabIndex(scr);
+    const cardStyle = (on)=> 'text-align:left;padding:14px;border:1px solid '+(on?'rgba(199,172,232,.45)':'rgba(255,255,255,.08)')+';border-radius:20px;background:#0C0C0C;cursor:pointer;color:#F7F7F5;width:100%;'+(on?'box-shadow:0 0 0 1px rgba(199,172,232,.18),0 0 26px rgba(199,172,232,.1);':'')+'transition:border-color 240ms,box-shadow 240ms';
+
+    const low = s.balance < cur.p;
+    let cta = null;
+    if(scr==='case'){
+      cta = {
+        label: low ? 'Недостаточно Noct Stars' : 'Открыть за '+this.fmt(cur.p)+' Noct Stars',
+        disabled: low,
+        action: low ? ()=>self.go({screen:'wallet'}) : ()=>self.startOpen(),
+        note: true,
+        noteText: low ? 'Не хватает '+this.fmt(cur.p-s.balance)+' ★. На балансе '+this.fmt(s.balance)+' ★.' : 'Спишется '+this.fmt(cur.p)+' ★. Останется '+this.fmt(s.balance-cur.p)+' ★.',
+        noteTone: low ? 'warn' : 'calm',
+        second: low ? 'Пополнить баланс' : null,
+        secondAction: ()=>self.go({screen:'wallet'})
+      };
+    } else if(scr==='upgrade'){
+      const ready = !!(from&&to&&to.v>from.v&&inv.some(g=>g.uid===s.fromUid));
+      if(s.upPhase==='pending') cta = {label:'Выполняем апгрейд…',disabled:true,action:()=>{},note:false};
+      else if(s.upPhase==='success') cta = {label:'В мои подарки',disabled:false,action:()=>self.go({screen:'gifts',upPhase:'select',toId:null}),note:false};
+      else if(s.upPhase==='fail') cta = {label:'Выбрать другой подарок',disabled:false,action:()=>self.setState({upPhase:'select',pick:'inv',sheet:'pick'}),note:false,second:'К подаркам',secondAction:()=>self.go({screen:'gifts',upPhase:'select'})};
+      else cta = {
+        label: ready ? 'Подтвердить апгрейд' : 'Выберите оба подарка',
+        disabled: !ready || s.balance < cost,
+        action: ()=>self.runUpgrade(),
+        note: ready,
+        noteText: s.balance < cost ? 'Не хватает '+this.fmt(cost-s.balance)+' ★ на попытку.' : 'Списание '+this.fmt(cost)+' ★ произойдёт после подтверждения.',
+        noteTone: s.balance < cost ? 'warn' : 'calm'
+      };
+    }
+
+    if(cta){const allowed=scr==='case'?s.shared?.capabilities?.caseOpening:s.shared?.capabilities?.upgrading;if(!allowed||s.gamePending||s.gameRetry){cta.disabled=true;cta.label=s.gamePending?'Подтверждаем операцию…':s.gameRetry?'Проверьте предыдущий запрос':'Сейчас недоступно';}}
+
+    const sparks = (s.reduced || s.phase!=='spin') ? [] : Array.from({length:14},(_,i)=>{
+      const ang = i*(360/14)+(i%2?9:0);
+      const col = i%3===0 ? '#FFD36A' : i%3===1 ? '#C7ACE8' : '#FFFFFF';
+      const sz = 3+(i%3);
+      return {
+        wrap:'position:absolute;left:50%;top:52%;width:0;height:0;transform:rotate('+ang+'deg);pointer-events:none',
+        dot:'position:absolute;width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+col+';box-shadow:0 0 8px '+col+';animation:ngSpark '+(900+i%4*180)+'ms cubic-bezier(.22,1,.36,1) '+(i*70%620)+'ms infinite'
+      };
+    });
+
+    const prize=G[s.prizeId]||{n:s.prizeGift?.name||'Подарок',r:'common',t:'#C7ACE8'};
+    const sheetG = s.sheetId ? G[s.sheetId] : null;
+    const pack = activePacks[s.pack]||{tg:0,ns:0};
+
+    return {
+      isLive:linked,inTelegram:!!window.NoctAccount?.inTelegram,canRefresh:!!window.NoctAccount?.inTelegram,needsAuth:!linked,needsLink:s.accountMode==='unlinked',accountError:s.accountError,openTelegram:()=>window.NoctAccount?.openTelegram(),gamePending:s.gamePending,gameError:s.gameError,gameRetry:s.gameRetry,retryGame:()=>this.retryGame?.(),
+      accountLabel:s.accountMode==='loading'?'Подключаем NoctGram…':linked?'Общий аккаунт NoctGram':s.accountMode==='unlinked'?'Telegram ещё не привязан':s.accountMode==='telegram'?'Вход через Telegram':'Не удалось войти',
+      accountHint:s.sharedLinks?.linkAccountHint||'Войдите в NoctGram и привяжите Telegram в разделе Noct Stars. Затем вернитесь сюда и нажмите обновить.',
+      refreshShared:()=>this.refreshAccount?.(),linkShared:()=>window.NoctAccount?.openLink(s.sharedLinks?.linkAccountUrl),
+      profileName:s.shared?.user?.name||'Ваш аккаунт',profileHandle:s.shared?.user?.handle?'@'+s.shared.user.handle:'NoctGram',
+      profileAvatar:window.NoctAccount?.asset(s.shared?.user?.avatar)||'assets/noctgram-logo.png',
+      balanceFmt:linked?this.fmt(s.balance):'—', balanceAccessible:this.fmt(s.balance)+' Noct Stars',
+      balanceDigits:Array.from(this.fmt(s.balance)).map((value,i)=>({value:value===' '?'\u00a0':value,style:'--digit-delay:'+Math.min(i*35,180)+'ms'})),
+      starParticles:[[-108,-56,15,-42,0],[-58,-76,12,28,.22],[3,-83,13,-24,.45],[64,-66,18,40,.13],[113,-36,12,65,.64],[120,12,15,-38,.36],[84,61,11,54,.78],[35,76,14,-28,.28],[-35,72,11,48,.92],[-94,45,17,-55,.53],[-124,3,11,32,.82],[42,-38,9,-70,1.1]].map(([x,y,size,turn,delay])=>({style:'--fly-x:'+x+'px;--fly-y:'+y+'px;--mid-x:'+x*.58+'px;--mid-y:'+y*.58+'px;--turn:'+turn+'deg;--size:'+size+'px;--delay:'+delay+'s'})),
+      celebrating:s.celebration>0, celebrationAmount:this.fmt(s.celebration),
+      celebrationParticles:Array.from({length:24},(_,i)=>{const a=(-168+(i*47)%156)*Math.PI/180,r=76+(i*31)%91;return{style:'--burst-x:'+Math.cos(a)*r+'px;--burst-y:'+(Math.sin(a)*r-32)+'px;--burst-fall:'+(32+(i*13)%58)+'px;--burst-turn:'+((i%2?1:-1)*(90+(i*29)%220))+'deg;--burst-delay:'+(i%7)*34+'ms;--burst-size:'+(13+(i*7)%15)+'px'};}),
+      isCases: scr==='cases', isCase: scr==='case', isOpen: scr==='open', isUpgrade: scr==='upgrade', isGifts: scr==='gifts', isWallet: scr==='wallet',
+      goCases: ()=>this.go({screen:'cases',sheet:null}),
+      goUpgrade: ()=>this.go({screen:'upgrade',sheet:null}),
+      goGifts: ()=>this.go({screen:'gifts',sheet:null}),
+      goWallet: ()=>this.go({screen:'wallet',sheet:null}),
+      navCases: navStyle(tabI===0), navUpgrade: navStyle(tabI===1), navProfile: navStyle(tabI===2),
+      label0: labelStyle(tabI===0), label1: labelStyle(tabI===1), label2: labelStyle(tabI===2),
+      tab0on: tabI===0?'true':'false', tab1on: tabI===1?'true':'false', tab2on: tabI===2?'true':'false',
+      dialRef:this.dialRef,
+      navRef: this.navRef, pillRef: this.pillRef, shapeRef: this.shapeRef,
+      tabRef0: this.tabRefs[0], tabRef1: this.tabRefs[1], tabRef2: this.tabRefs[2],
+      isProfile: scr==='profile',
+      goProfile: ()=>this.go({screen:'profile',sheet:null}),
+      liquidStyle: 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.7) brightness(1.35) contrast(1.05)'+(s.reduced?';display:none':''),
+      sparkBase: 'position:absolute;display:block;color:#E7E5D4;line-height:1;pointer-events:none;'+(s.reduced?'':'animation:ngTwinkle 5s ease-in-out infinite;'),
+      dotBase: 'position:absolute;width:.85cqw;height:.85cqw;border-radius:50%;background:#fff;box-shadow:0 0 .7cqw rgba(255,255,255,.6),0 0 1.8cqw rgba(255,255,255,.25);opacity:.72;pointer-events:none;'+(s.reduced?'':'animation:ngDrift 8s ease-in-out infinite alternate;'),
+      openNoctGram:()=>window.NoctAccount?.openLink(s.sharedLinks?.siteUrl),
+      profileRows: [
+        {label:'Подарки', glyph:'◈', value:s.sharedGifts.length+(s.sharedNext?'+':'')+' шт.', go:()=>this.go({screen:'gifts',sheet:null})},
+        {label:'Кошелёк', glyph:'★', value:this.fmt(s.balance)+' ★', tone:'gold', go:()=>this.go({screen:'wallet',sheet:null})},
+        {label:'История Stars',glyph:'↑',value:String(s.shared?.history?.length||0), go:()=>this.go({screen:'wallet',sheet:null})}
+      ].map(r=>Object.assign({},r,{
+        iconStyle:'width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);font-size:14px;color:#C7ACE8',
+        valueStyle:'flex:none;font-size:15px;color:'+(r.tone==='gold'?'#FFD36A':'#A1A1AA')
+      })),
+
+      heroCase:{n:this.caseOf('eclipse').n,priceFmt:this.fmt(this.caseOf('eclipse').p)},
+      heroArt: this.caseArt('eclipse'),
+      openHero: ()=>this.go({screen:'case',caseId:'eclipse'}),
+      cases: CASES.map(c=>({n:c.n, priceFmt:this.fmt(c.p), art:this.caseArt(c.id), open:()=>this.go({screen:'case',caseId:c.id})})),
+      toggleReduced: ()=>{ this.setState({caseFast:!s.caseFast}); if(!s.caseFast) this.finishOpen(); },
+      switchTrack: 'position:relative;width:48px;height:28px;flex:none;border:0;border-radius:14px;cursor:pointer;background:'+(s.caseFast?'#C7ACE8':'rgba(255,255,255,.14)')+';transition:background 240ms cubic-bezier(.22,1,.36,1)',
+      switchKnob: 'position:absolute;top:3px;left:'+(s.caseFast?'23px':'3px')+';width:22px;height:22px;border-radius:50%;background:'+(s.caseFast?'#0B0B0D':'#F7F7F5')+';transition:left 260ms cubic-bezier(.22,1,.36,1)',
+
+      cur: {n:cur.n, priceFmt:this.fmt(cur.p)},
+      curArt: this.caseArt(cur.id),
+      curItems: cur.items.map(([id,p])=>({
+        n:G[id].n, chance:String(p).replace('.',','), art:this.giftArt(id,{radius:'11px',dot:14,glow:10}),
+        rarity:RAR[G[id].r].l, rarityStyle:'color:'+RAR[G[id].r].c,
+        barStyle:'height:100%;width:'+Math.max(6,p)+'%;border-radius:2px;background:'+RAR[G[id].r].c+';transform-origin:left;animation:ngBar 420ms cubic-bezier(.22,1,.36,1) both'
+      })),
+
+      reduced:s.reduced, caseFast:s.caseFast,
+      reelClass:'ng-reel '+(s.phase==='spin'?'ng-reel-running':'ng-reel-landed'),
+      reelTrackStyle:'--reel-start:-536px;--reel-end:-4556px;animation-delay:-'+(s.spinStarted?Math.max(0,Date.now()-s.spinStarted):0)+'ms',
+      reelCards:s.reel.filter(id=>G[id]).map(id=>({name:G[id].n,image:G[id].image,rarity:RAR[G[id].r].l,tone:'--gift-tone:'+G[id].t+'36'})),
+      reelStatus:s.phase==='spin'?'Открываем кейс…':s.prizeGift?.available===false?'Подарок уже использован':'Подарок уже в вашей коллекции',
+      prizeImage:s.prizeGift?.image||prize.image||'assets/noctgram-logo.png',
+      prizeReceipt:s.prizeUid||s.prizeId+':'+s.prizeNum,
+      prizeAnimation:s.prizeGift?.animation||prize.animation||'',
+      dialClass:'ng-dial '+(s.upPhase==='pending'?'ng-dial-running':s.upPhase==='success'?'ng-dial-success':s.upPhase==='fail'?'ng-dial-fail':''),
+      dialAccessible:s.upPhase==='success'?'Апгрейд удался. Подарок улучшен.':s.upPhase==='fail'?'Апгрейд не удался. Новый подарок не получен.':'Шанс улучшения '+chance+' процентов',
+      dialShowChance:s.upPhase==='select'||s.upPhase==='pending',
+      dialFinished:s.upPhase==='success'||s.upPhase==='fail',
+      dialResultTitle:s.upPhase==='success'?'Успех!':'Не вышло',
+      dialResultNote:s.upPhase==='success'?'Подарок улучшен':'Апгрейд не удался',
+      dialAnnouncement:s.upPhase==='success'?'Апгрейд удался. Подарок уже в коллекции.':s.upPhase==='fail'?'Апгрейд не удался. Новый подарок не получен.':'',
+      dialDash:(chance/100*270.18)+' 270.18',
+      dialPercent:chance.toFixed(2).replace('.',','),
+      dialLabel:s.upPhase==='pending'?'улучшаем подарок':s.upPhase==='success'?'улучшение удалось':s.upPhase==='fail'?'попытка завершена':chance>=50?'высокий шанс':chance>=25?'средний шанс':chance>0?'низкий шанс':'выберите подарки',
+      needleStyle:'--needle-end:'+(s.dialStarted?1620+s.dialRoll*3.6:180)+'deg;animation-delay:-'+(s.upPhase==='pending'&&s.dialStarted?Math.max(0,Date.now()-s.dialStarted):0)+'ms',
+      phaseSpin: s.phase==='spin', phaseResult: s.phase==='result',
+      glowStyle: 'position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 50%,rgba(199,172,232,.3),rgba(0,0,0,0) 66%);'+(s.reduced?'':'animation:ngBreathe 1.5s ease-in-out infinite'),
+      ringStyle: 'position:absolute;left:50%;top:50%;width:236px;height:236px;transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(199,172,232,.22);border-top-color:rgba(255,211,106,.8);'+(s.reduced?'':'animation:ngSpin 2.4s linear infinite'),
+      shakeStyle: 'position:relative;width:180px;height:180px;'+(s.reduced?'':'animation:ngShake 700ms cubic-bezier(.22,1,.36,1) infinite'),
+      sparks,
+      skip: ()=>this.finishOpen(),
+      prize: {n:prize.n, rarity:RAR[prize.r].l, chipStyle:this.chip(prize.r,true), num:s.prizeNum||'Обычный подарок'},
+      prizeArt: this.giftArt(s.prizeId,{size:56,glow:46,radius:'22px',dot:28}),
+      repeatCaseLabel:s.gamePending?'Подтверждаем…':'Открыть ещё раз · '+this.fmt(cur.p)+' ★',
+      repeatCaseDisabled:!linked||!s.shared?.capabilities?.caseOpening||s.gamePending||s.gameRetry||low||!!this.openOp||!!this.upgradeOp,
+      repeatCaseLow:linked&&low,
+      repeatCaseShortfall:'Не хватает '+this.fmt(Math.max(0,cur.p-s.balance))+' ★',
+      repeatCaseTopup:()=>this.go({screen:'wallet'}),
+      repeatCase:(event)=>{
+        // A result's old click handler cannot charge for a later result,
+        // including when caseFast immediately reveals a committed result.
+        if(event?.detail>1||this.state.screen!=='open'||this.state.phase!=='result'||this.state.caseId!==s.caseId||this.state.prizeUid!==s.prizeUid) return;
+        this.startOpen();
+      },
+      toGifts: ()=>this.go({screen:'gifts',phase:'idle'}),
+      viewPrize: ()=>this.go({screen:'gifts',phase:'idle',sheet:'sharedGift',sharedGift:s.prizeGift}),
+
+      hasFrom: !!from, noFrom: !from, hasTo: !!to, noTo: !to,
+      fromGift: from ? {n:from.n, num:s.fromNum||'без номера', valueFmt:this.fmt(from.v)} : {},
+      toGift: to ? {n:to.n, valueFmt:this.fmt(to.v)} : {},
+      fromArt: from ? this.giftArt(s.fromId,{radius:'14px',dot:18,glow:14}) : {},
+      toArt: to ? this.giftArt(s.toId,{radius:'14px',dot:18,glow:14}) : {},
+      fromCardStyle: cardStyle(!!from), toCardStyle: cardStyle(!!to),
+      pickFrom: ()=>{ if(!this.upgradeOp&&!s.gamePending&&!s.gameRetry) this.setState({sheet:'pick',pick:'inv'}); },
+      pickTo: ()=>{ if(!this.upgradeOp&&!s.gamePending&&!s.gameRetry) this.setState({sheet:'pick',pick:'cat'}); },
+      chance: chance, chanceDash: (chance/100*264)+' 264',
+      chanceColor: chance>=50 ? '#3ECF8E' : chance>=20 ? '#C7ACE8' : '#FFD36A',
+      upgradeHint: from&&to ? 'Из «'+from.n+'» в «'+to.n+'». Шанс рассчитан по разнице стоимости.' : 'Выберите исходный и желаемый подарок, чтобы увидеть шанс.',
+      upgradeCostFmt: this.fmt(cost),
+      successText:to?'«'+to.n+'» в вашем NoctGram':'—',
+      failText: from ? '«'+from.n+'» '+(s.fromNum||'')+' сгорает' : '—',
+      upPending:s.upPhase==='pending'||s.gamePending, upSuccess: s.upPhase==='success', upFail: s.upPhase==='fail',
+      resultText: s.upPhase==='success' ? 'Вы получили «'+(to?to.n:'подарок')+'». Он уже в коллекции, исходный подарок списан.' : 'Исходный подарок сгорел, стоимость попытки списана. Баланс: '+this.fmt(s.balance)+' ★. Новый подарок не получен.',
+
+      giftsCount: live?s.sharedGifts.length+(s.sharedNext?'+':'')+' подарков':filtered.length ? filtered.length+' из '+inv.length+' предметов' : inv.length+' предметов',
+      hasGifts: !live&&inv.length>0, noGifts: !live&&inv.length===0,
+      sharedEmpty:live&&!s.sharedGifts.length&&s.accountMode==='linked',
+      sharedGifts:s.sharedGifts.map(g=>({...g,number:g.collectible?'#'+g.collectible.number:'Обычный',open:()=>this.setState({sheet:'sharedGift',sharedGift:g})})),
+      sharedMore:live&&!!s.sharedNext,loadSharedMore:()=>this.refreshAccount?.(true),
+      sheetSharedGiftOpen:s.sheet==='sharedGift',sharedGift:s.sharedGift||{},sharedGiftStatus:s.sharedGift?.available===false?'Этот подарок уже был использован или передан.':'Этот подарок принадлежит вашему аккаунту NoctGram.',sharedGiftNumber:s.sharedGift?.collectible?'Коллекционный #'+s.sharedGift.collectible.number:'Обычный подарок',
+      canUpgradeShared:!!s.sharedGift&&!s.sharedGift.collectible&&s.sharedGifts.some(g=>g.id===s.sharedGift.id)&&!!s.shared?.capabilities?.upgrading&&!s.gamePending&&!this.upgradeOp,
+      useSharedUpgrade:()=>{const g=this.state.sharedGifts.find(g=>g.id===this.state.sharedGift?.id);if(!g||g.collectible||this.state.gamePending||this.upgradeOp)return;this.go({screen:'upgrade',sheet:null,fromId:g.giftId,fromUid:g.id,fromNum:'',upPhase:'select',dialChance:null,dialStarted:0});},
+      openSharedProfile:()=>window.NoctAccount?.openLink(s.sharedLinks?.siteUrl),
+      filters: [['all','Все'],['common','Обычные'],['rare','Редкие'],['epic','Эпические'],['legend','Легендарные']].map(([k,label])=>({
+        label, pick:()=>this.setState({filter:k}),
+        style:'flex:none;height:34px;padding:0 14px;border-radius:17px;border:1px solid '+(s.filter===k?'rgba(199,172,232,.4)':'rgba(255,255,255,.1)')+';background:'+(s.filter===k?'rgba(199,172,232,.14)':'rgba(255,255,255,.04)')+';color:'+(s.filter===k?'#C7ACE8':'#A1A1AA')+';font-size:14px;cursor:pointer;transition:all 240ms'
+      })),
+      inventory: filtered.map((g,i)=>({
+        animation:G[g.id].animation, n:G[g.id].n, num:g.num||'—', art:this.giftArt(g.id,{radius:'14px',dot:18}),
+        rarity:RAR[G[g.id].r].l, rarityStyle:'color:'+RAR[G[g.id].r].c,
+        numStyle:'position:absolute;top:6px;right:6px;font-family:JetBrains Mono,monospace;font-size:11px;color:'+(g.num?'#F7F7F5':'rgba(0,0,0,0)')+';background:rgba(0,0,0,.5);border-radius:6px;padding:2px 6px;backdrop-filter:blur(4px)',
+        open:()=>this.setState({sheet:'gift',sheetId:g.id,sheetNum:g.num,sheetUid:g.uid})
+      })),
+      collectionFmt: this.fmt(collection),
+
+      packs: activePacks.map((p,i)=>({
+        tg:this.fmt(p.tg), ns:this.fmt(p.ns), pick:()=>this.setState({pack:i}),
+        style:'display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid '+(s.pack===i?'rgba(199,172,232,.45)':'rgba(255,255,255,.08)')+';border-radius:18px;background:#0C0C0C;color:#F7F7F5;cursor:pointer;width:100%;transition:border-color 240ms',
+        radio:'width:22px;height:22px;flex:none;border-radius:50%;border:'+(s.pack===i?'7px solid #C7ACE8':'1.5px solid rgba(255,255,255,.24)')+';transition:border 200ms'
+      })),
+      startTopup: ()=>{if(live&&!s.shared?.catalog?.telegram){this.setState({toast:'Пополнение будет доступно после подключения аккаунта.'});return;}this.setState({sheet:'pay',payPhase:'idle',acceptedTerms:false});},
+      acceptedTerms:s.acceptedTerms,toggleTerms:()=>this.setState({acceptedTerms:!s.acceptedTerms}),
+      history:(s.shared?.history||[]).map(h=>({icon:h.amount>0?'assets/noct-stars.png':'assets/upgrade.svg',title:h.amount>0?'Начисление Stars':'Списание Stars',sub:new Date(h.created).toLocaleDateString('ru-RU'),amount:(h.amount>0?'+':'')+this.fmt(h.amount),tone:h.amount>0?'gold':'plain'})),
+      showCta: !!cta && scr==='upgrade',
+      ctaLabel: cta?cta.label:'', ctaDisabled: cta?!!cta.disabled:false,
+      ctaAction: cta?cta.action:()=>{},
+      ctaStyle: 'height:52px;width:100%;border:0;border-radius:16px;font-size:16px;font-weight:600;transition:opacity 200ms;'+(cta&&cta.disabled?'background:rgba(255,255,255,.1);color:#A1A1AA;cursor:not-allowed':'background:#C7ACE8;color:#0B0B0D;cursor:pointer;box-shadow:0 8px 30px rgba(199,172,232,.16)'),
+      ctaNote: !!(cta&&cta.note),
+      ctaNoteText: cta&&cta.noteText?cta.noteText:'',
+      ctaNoteStyle: 'margin-bottom:10px;text-align:center;font-size:13px;line-height:1.45;color:'+(cta&&cta.noteTone==='warn'?'#FFD36A':'#A1A1AA'),
+      ctaSecond: !!(cta&&cta.second), ctaSecondLabel: cta&&cta.second?cta.second:'', ctaSecondAction: cta&&cta.secondAction?cta.secondAction:()=>{},
+
+      sheetOpen: !!s.sheet,
+      sheetClosing:s.sheetClosing,
+      sheetTitle:s.sheet==='pay'?'Пополнение':s.sheet==='gift'?'Подарок':'Выбор подарка',
+      closeSheet: ()=>{ if(s.sheetClosing) return; this.setState({sheetClosing:true}); this.later(()=>this.setState({sheet:null,sheetClosing:false}),150); },
+      sheetGiftOpen: s.sheet==='gift', sheetPickOpen: s.sheet==='pick', sheetPayOpen: s.sheet==='pay',
+      sheetGift: sheetG ? {n:sheetG.n, num:s.sheetNum||'без номера', rarity:RAR[sheetG.r].l, chipStyle:this.chip(sheetG.r,true)} : {},
+      sheetAnimation:sheetG?.animation||'',
+      sheetArt: sheetG ? this.giftArt(s.sheetId,{radius:'16px',dot:18,glow:26}) : {},
+      sheetAttrs:[],
+      useForUpgrade: ()=>{ if(!this.upgradeOp){ const gift=inv.find(g=>g.uid===s.sheetUid); if(gift) this.setState({fromId:gift.id,fromNum:gift.num,fromUid:gift.uid,sheet:null,screen:'upgrade',upPhase:'select',dialChance:null,dialStarted:0}); } },
+      pickTitle: s.pick==='cat' ? 'Каталог подарков' : 'Ваш инвентарь',
+      pickHint: s.pick==='cat' ? 'цель апгрейда' : 'что обменять',
+      pickList: (s.pick==='cat' ? Object.keys(this.gameGifts()).filter(id=>!from||G[id].v>from.v).map(id=>({id,num:''})) : inv).map(g=>{
+        const gg = G[g.id];
+        const on = s.pick==='cat' ? s.toId===g.id : s.fromUid===g.uid;
+        return {
+          n:gg.n, sub: s.pick==='cat' ? this.fmt(gg.v)+' ★' : (g.num||'—'),
+          art:this.giftArt(g.id,{radius:'12px',dot:14,glow:10}),
+          style:'text-align:left;padding:8px;border:1px solid '+(on?'rgba(199,172,232,.5)':'rgba(255,255,255,.08)')+';border-radius:14px;background:#0C0C0C;color:#F7F7F5;cursor:pointer;width:100%',
+          choose: ()=>{ if(this.upgradeOp||this.state.gamePending||this.state.gameRetry) return; s.pick==='cat' ? this.setState({toId:g.id,sheet:null,upPhase:'select',dialStarted:0,dialChance:null}) : this.setState({fromId:g.id,fromNum:g.num,fromUid:g.uid,sheet:null,upPhase:'select',dialStarted:0,dialChance:null}); }
+        };
+      }),
+      walletHint:'общий баланс с NoctGram',priceHint:'Актуальные пакеты NoctGram · оплата через бота',
+      payTg: this.fmt(pack.tg), payNs: this.fmt(pack.ns),
+      payPending: s.payPhase==='pending', payError: s.payPhase==='error',
+      confirmPay: ()=>this.confirmPay(),
+      payBtnLabel: s.payPhase==='pending' ? 'Проверяем операцию…' : s.payPhase==='error' ? 'Повторить оплату' : 'Оплатить '+this.fmt(pack.tg)+' Telegram Stars',
+      payBtnStyle: 'margin-top:16px;height:52px;width:100%;border:0;border-radius:16px;font-size:16px;font-weight:600;'+(s.payPhase==='pending'?'background:rgba(255,255,255,.1);color:#A1A1AA;cursor:not-allowed':'background:#C7ACE8;color:#0B0B0D;cursor:pointer'),
+      toast: s.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

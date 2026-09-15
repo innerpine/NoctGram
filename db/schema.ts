@@ -1502,3 +1502,9 @@ export const paymentSupport = sqliteTable('payment_support', {
   text: text().notNull(),
   created: integer().notNull(),
 });
+
+export const giftConsumptions = sqliteTable('gift_consumptions', {
+  receiptId: text().primaryKey().references(() => receivedGifts.id, { onDelete: 'cascade' }),
+  transferId: text().notNull().unique().references(() => starTransfers.id),
+  created: integer().notNull(),
+});

@@ -11,10 +11,13 @@ if (args.some((arg) => arg !== '--list') || args.length > 1) {
 }
 // Explicit discovery avoids shell glob differences between Windows and Linux.
 // Integration scripts require a separately prepared isolated Worker and are excluded.
-const files = readdirSync(join(root, 'tests'), { withFileTypes: true })
-  .filter((entry) => entry.isFile() && entry.name.endsWith('.test.mjs'))
-  .map((entry) => join('tests', entry.name))
-  .sort();
+const files = ['tests', 'noct-gifts']
+  .flatMap((directory) =>
+    readdirSync(join(root, directory), { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.test.mjs'))
+      .map((entry) => join(directory, entry.name)),
+  )
+  .sort((a, b) => a.localeCompare(b));
 if (!files.length) {
   console.error('No isolated *.test.mjs files found.');
   process.exit(1);

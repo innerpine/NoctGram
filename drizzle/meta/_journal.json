@@ -316,6 +316,13 @@
       "when": 1789413168275,
       "tag": "0046_antispam",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "6",
+      "when": 1789479558631,
+      "tag": "0047_noct_gifts_live",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,173 @@
+body { margin: 0; background: #08080a; }
+.ng-account-status { min-height: 30px; display:flex; gap:8px; align-items:center; justify-content:center; color:#a1a1aa; font-size:11px; margin-bottom:8px; }
+.ng-account-status button { border:0; background:#ffffff0c; color:#c7ace8; border-radius:50%; width:30px; height:30px; font-size:21px; cursor:pointer; }
+.ng-account-notice { background:#c7ace80c; border:1px solid #c7ace828; border-radius:18px; padding:16px; margin:0 0 18px; font-size:14px; line-height:1.6; }
+.ng-account-notice p,.ng-account-error { color:#b6afbe; font-size:13px; line-height:1.6; }
+.ng-account-notice button { border:0; border-radius:12px; padding:12px 16px; color:#101014; background:#c7ace8; font-weight:600; }
+.ng-account-error { border-left:2px solid #ffd36a; padding:0 12px; }
+.ng-shared-gifts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.ng-shared-gifts button { width:100%; padding:12px; border:1px solid #ffffff14; border-radius:18px; background:#0c0c0c; color:#f7f7f5; text-align:left; }
+.ng-shared-art { position:relative; width:100%; aspect-ratio:1; border-radius:14px; background:radial-gradient(ellipse at 50% 40%,#c7ace814,transparent); }
+.ng-shared-art > img { width:100%;height:100%;object-fit:contain; }
+.ng-shared-art:has(ng-gift-motion svg) > img { opacity:0; }
+.ng-shared-art > span { position:absolute;right:2px;top:2px;background:#0009;padding:4px 6px;border-radius:7px;font:10px 'JetBrains Mono',monospace; }
+.ng-shared-gifts strong { display:block; font-size:14px; font-weight:500; margin:10px 0 5px; }
+.ng-shared-gifts small { color:#a1a1aa; font-size:11px; }
+.ng-shared-detail { text-align:center; }
+.ng-shared-detail > img { width:140px;height:140px;object-fit:contain; }
+.ng-shared-detail p { color:#a1a1aa;font-size:13px;line-height:1.6; }
+.ng-purchase-terms { display:flex; gap:12px; align-items:flex-start; font-size:13px;line-height:1.55;color:#b6b1bc;margin-bottom:18px;cursor:pointer; }
+.ng-purchase-terms input { appearance:auto!important; position:static!important; width:18px!important;height:18px!important; flex:none;accent-color:#c7ace8;margin-top:3px; }
+/* Case artwork: one material language, distinct engraved celestial emblems. */
+.ng-case-image { transition: transform 500ms cubic-bezier(.22,1,.36,1); }
+.ng-case-card:hover .ng-case-image { transform: translateY(-5px) rotate(-3deg); }
+.ng-case-card:active .ng-case-image { transform: translateY(1px) scale(.96); }
+.ng-app button:focus-visible { outline: 2px solid #c7ace8; outline-offset: 3px; }
+.ng-inline-cta { margin-top: 20px; }
+.ng-case-debit { text-align: center; color: #a1a1aa; font-size: 12px; margin-top: 10px; line-height: 1.5; }
+.ng-inline-topup { width: 100%; border: 1px solid #c7ace842; border-radius: 15px; padding: 14px; margin-top: 12px; color: #c7ace8; background: #c7ace811; }
+.ng-history-icon { display: flex; align-items: center; justify-content: center; }
+.ng-history-icon img { width: 22px; height: 22px; object-fit: contain; }
+.ng-history-icon:has(img[src*="cases"]) img { width: 34px; height: 34px; }
+.ng-balance { position: relative; margin-top: 2px; font: 600 46px/1 'Instrument Sans',Inter,sans-serif; letter-spacing: -1.6px; }
+.ng-digit { display: inline-block; animation: ngDigit 500ms cubic-bezier(.34,1.45,.64,1) var(--digit-delay) both; }
+@keyframes ngDigit { from { opacity:0; transform:translateY(8px);filter:blur(2px); } to { opacity:1;transform:translateY(0);filter:blur(0); } }
+.ng-star-scene { position:relative; display:grid; place-items:center; width:280px; height:184px; margin:-18px auto 6px; padding:0; border:0; background:none; cursor:pointer; }
+.ng-star-float { position:relative; z-index:2; display:block; animation:ngStarFloat 5s ease-in-out infinite; transition:scale 350ms cubic-bezier(.22,1,.36,1); }
+.ng-star-float img { width:106px;height:100px;object-fit:contain;filter:drop-shadow(0 12px 26px #ffd36a20); }
+.ng-star-scene:hover .ng-star-float { scale:1.06; }
+.ng-star-scene:active .ng-star-float { scale:.94; }
+.ng-star-particles { position:absolute;inset:0;pointer-events:none; }
+.ng-star-particle { position:absolute;left:calc(50% - var(--size)/2);top:calc(50% - var(--size)/2);width:var(--size);height:var(--size);opacity:0;object-fit:contain;animation:ngStarFlight 4.8s cubic-bezier(.22,1,.36,1) var(--delay) infinite; }
+@keyframes ngStarFloat { 0%,100%{transform:translateY(2px) rotate(-4deg)}50%{transform:translateY(-5px) rotate(5deg)} }
+@keyframes ngStarFlight { 0%,6%{opacity:0;transform:translate(0,0) scale(.15) rotate(0deg)}15%{opacity:.85}36%{opacity:.8;transform:translate(var(--mid-x),var(--mid-y)) scale(1) rotate(var(--turn))}68%,100%{opacity:0;transform:translate(var(--fly-x),var(--fly-y)) scale(.25) rotate(calc(var(--turn)*2))} }
+.ng-topup-burst { position:absolute;left:50%;bottom:155px;z-index:85;pointer-events:none; }
+.ng-topup-burst img { position:absolute;left:0;top:0;width:var(--burst-size);height:var(--burst-size);object-fit:contain;opacity:0;animation:ngTopupFlight 1700ms cubic-bezier(.2,.7,.2,1) var(--burst-delay) both; }
+@keyframes ngTopupFlight { 0%{opacity:0;transform:translate(0,0) scale(.25)}10%{opacity:1}50%{opacity:1;transform:translate(var(--burst-x),var(--burst-y)) rotate(var(--burst-turn)) scale(1)}100%{opacity:0;transform:translate(var(--burst-x),var(--burst-fall)) rotate(calc(var(--burst-turn)*1.5)) scale(.4)} }
+.ng-gift-card { transition:transform 250ms cubic-bezier(.22,1,.36,1),border-color 250ms; animation:ngGiftReveal 420ms cubic-bezier(.22,1,.36,1) both; }
+.ng-gift-card:hover { transform:translateY(-3px);border-color:#c7ace850!important; }
+.ng-gift-card:active { transform:scale(.97); }
+@keyframes ngGiftReveal { from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none} }
+/* Adapted from transitions.dev Modal: scale .96, open 250ms, close 150ms. */
+.ng-sheet { transform-origin:50% 100%;animation:ngModalOpen 250ms cubic-bezier(.22,1,.36,1) both!important; }
+.ng-sheet[data-closing="true"] { animation:ngModalClose 150ms cubic-bezier(.22,1,.36,1) both!important;pointer-events:none; }
+@keyframes ngModalOpen { from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none} }
+@keyframes ngModalClose { from{opacity:1;transform:none}to{opacity:0;transform:translateY(10px) scale(.96)} }
+.ng-app[data-case-fast="true"] .ng-reel-track { animation:none!important; }
+@media (prefers-reduced-motion:reduce) { .ng-star-particles,.ng-topup-burst {display:none} .ng-case-image,.ng-gift-card {transition:none} .ng-scroll {scroll-behavior:auto!important} }
+.ng-app { width: min(390px, 100vw) !important; height: min(844px, calc(100dvh - 16px)) !important; margin: 0 auto; }
+.ng-app[data-telegram="true"] { width:min(480px,100vw)!important; height:var(--tg-viewport-stable-height,100dvh)!important; border-radius:0!important;box-shadow:none!important; }
+.ng-app[data-telegram="true"] .ng-app-bar { top:0!important; }
+.ng-app[data-telegram="true"] .ng-scroll { top:52px!important; }
+.ng-upgrade-actions { position:relative; margin-top:20px; padding-top:16px; border-top:1px solid #ffffff10; }
+.ng-app[data-reduced="true"] * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+.ng-scroll { scroll-behavior: smooth; }
+.ng-open { padding: 26px 0 16px; }
+.ng-eyebrow { text-transform: uppercase; color: #bba5d1; font-size: 11px; font-weight: 600; letter-spacing: 1.9px; text-align: center; }
+.ng-open h1 { margin: 10px 0 6px; font-size: 28px; font-weight: 600; letter-spacing: -.8px; text-align: center; }
+.ng-open-sub { color: #a1a1aa; text-align: center; font-size: 13px; margin: 0 0 27px; }
+.ng-reel-shell { position: relative; margin: 0 -10px; padding: 8px 0; border-radius: 23px; border: 1px solid #c7ace825; background: linear-gradient(180deg,#1b1620,#0c0a0f); box-shadow: inset 0 1px 0 #ffffff0b, 0 14px 55px #0008; }
+.ng-reel { overflow: hidden; position: relative; height: 174px; border-radius: 17px; background: #070609; }
+.ng-reel::before,.ng-reel::after { content: ''; position: absolute; top: 0; bottom: 0; width: 45px; z-index: 3; pointer-events: none; }
+.ng-reel::before { left: 0; background: linear-gradient(90deg,#070609e8,transparent); }
+.ng-reel::after { right: 0; background: linear-gradient(270deg,#070609e8,transparent); }
+.ng-reel-track { display: flex; gap: 10px; width: max-content; position: relative; left: calc(50% - 62px); padding: 8px 0; transform: translate3d(var(--reel-end),0,0); will-change: transform; }
+.ng-reel-running .ng-reel-track { animation: ngReelTravel 4800ms cubic-bezier(.12,.72,.10,1) both; }
+.ng-reel-card { width: 124px; flex: 0 0 124px; height: 158px; position: relative; overflow: hidden; border: 1px solid #ffffff08; border-radius: 14px; padding: 9px; background: radial-gradient(ellipse at 50% 20%,var(--gift-tone),#151019 82%); }
+.ng-reel-card img { display: block; width: 104px; height: 105px; object-fit: contain; filter: drop-shadow(0 5px 10px #0007); }
+.ng-reel-card strong { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; line-height: 17px; font-weight: 600; color: #f5eefb; }
+.ng-reel-card small { display: block; font-size: 10px; color: #b5a8bf; }
+.ng-reel-selector { position: absolute; z-index: 4; pointer-events: none; width: 132px; height: 164px; left: calc(50% - 66px); top: 5px; border-radius: 16px; border: 1px solid #e7d5ff55; background: linear-gradient(150deg,#ead6ff0a,#fff0 45%,#c7ace814); box-shadow: inset 0 0 20px #e7d5ff09, 0 0 22px #0005; }
+.ng-reel-selector::before { content: ''; position: absolute; left: calc(50% - 6px); top: -7px; width: 12px; height: 12px; background: #e9d4ff; clip-path: polygon(0 0,100% 0,50% 85%); filter: drop-shadow(0 0 5px #c7ace8); }
+.ng-reel-selector::after { content: ''; position: absolute; width: 26px; height: 2px; left: calc(50% - 13px); bottom: -1px; background: #dfbaff; box-shadow: 0 0 12px #d9aaff; }
+.ng-reel-landed .ng-reel-selector { border-color: #e6ccff9c; box-shadow: inset 0 0 20px #e7d5ff0a,0 0 25px #c7ace822; animation: ngSelectorLand 420ms cubic-bezier(.2,.8,.2,1) both; }
+.ng-reel-status { height: 40px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; color: #b9adca; }
+.ng-reel-status::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #c7ace8; box-shadow: 0 0 8px #c7ace8; }
+.ng-reel-actions { text-align: center; padding-top: 14px; }
+.ng-reel-actions button { min-height: 44px; padding: 0 18px; color: #c3b5d1; background: #ffffff05; border: 1px solid #ffffff12; border-radius: 14px; font-size: 13px; cursor: pointer; }
+.ng-win { padding: 18px 10px 0; text-align: center; animation: ngRise 420ms cubic-bezier(.22,1,.36,1) both; }
+.ng-win img { display: block; width: 114px; height: 114px; object-fit: contain; margin: 0 auto; filter: drop-shadow(0 0 30px #c7ace842); }
+.ng-win-gift { position:relative; width:114px; height:114px; margin:0 auto; }
+.ng-win-gift > ng-gift-motion { position:absolute; inset:0; filter:drop-shadow(0 0 30px #c7ace842); }
+.ng-win-gift:has(ng-gift-motion[data-ready="true"]) > img { opacity:0; }
+.ng-win h2 { margin: 12px 0 8px; font-size: 22px; font-weight: 600; letter-spacing: -.5px; }
+.ng-win-number { margin-left: 8px; font-size: 12px; color: #ada1b8; }
+.ng-win button { width: 100%; margin-top: 20px; border: 0; border-radius: 16px; height: 50px; background: #c7ace8; color: #100c14; font-size: 15px; font-weight: 600; cursor: pointer; }
+.ng-win .ng-win-repeat:disabled { background:#c7ace814; color:#a899b7; cursor:not-allowed; }
+.ng-win .ng-win-inventory { margin-top:10px; background:#ffffff06; border:1px solid #ffffff16; color:#eee5f5; }
+.ng-win-shortfall { margin-top:9px; color:#cfb9a2; font-size:12px; }
+.ng-win .ng-win-topup { height:40px; margin-top:2px; color:#d2b9e9; background:transparent; font-size:13px; }
+.ng-win .ng-win-secondary { height: 44px; margin-top: 8px; color: #baadc7; background: transparent; font-weight: 400; }
+.ng-upgrade-description { margin: 0 auto 8px; color: #a1a1aa; font-size: 13px; line-height: 1.6; max-width: 295px; text-align: center; }
+.ng-upgrade-title { text-align: center; }
+.ng-dial { position: relative; width: min(260px, calc(100vw - 60px)); aspect-ratio: 1; margin: 12px auto 18px; isolation: isolate; }
+.ng-dial-glow { position: absolute; inset: -17%; border-radius: 50%; background: radial-gradient(circle,#c7ace81a 0,#c7ace80a 45%,transparent 69%); z-index: -1; }
+.ng-dial-rim { position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(145deg,#a08aab6e,#221c2933 30%,#dbbee77a 64%,#27202d55); padding: 1px; box-shadow: 0 18px 40px #0007; }
+.ng-dial-body { position: absolute; inset: 2px; border-radius: 50%; background: radial-gradient(circle at 35% 20%,#201827,#100d14 65%); box-shadow: inset 0 1px 2px #ffffff13; }
+.ng-dial-ticks { position: absolute; inset: 11px; border-radius: 50%; background: repeating-conic-gradient(from 0deg,#c7ace83b 0deg .55deg,transparent .55deg 6deg); mask: radial-gradient(circle,transparent 65%,#000 66%,#000 69%,transparent 70%); }
+.ng-dial-svg { position: absolute; inset: 23px; width: calc(100% - 46px); height: calc(100% - 46px); transform: rotate(90deg); }
+.ng-dial-track { stroke: #332839; fill: none; stroke-width: 10; }
+.ng-dial-sector { stroke: #c7ace8; fill: none; stroke-width: 10; stroke-linecap: butt; filter: drop-shadow(0 0 3px #c7ace844); transition: stroke-dasharray 420ms ease; }
+.ng-dial-core { position: absolute; inset: 45px; border: 1px solid #e7c9ff0d; border-radius: 50%; background: radial-gradient(circle at 40% 25%,#1c1522,#110e15 70%); box-shadow: 0 0 0 5px #0b080d66,inset 0 7px 18px #0003; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; }
+.ng-dial-watermark { position: absolute; width: 104px; height: 104px; object-fit: contain; opacity: .035; filter: grayscale(1); }
+.ng-dial-value { position: relative; font-family: 'Instrument Sans',Inter,sans-serif; font-size: 38px; font-weight: 600; letter-spacing: -1.5px; color: #ddc8f4; font-variant-numeric: tabular-nums; }
+.ng-dial-percent { font-size: 23px; margin-left: 2px; color: #bba5d1; }
+.ng-dial-label { margin-top: 4px; font-size: 11px; color: #ac98bd; }
+.ng-dial-result { position:relative; width:calc(100% - 22px); display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px; animation:ngDialResult 420ms cubic-bezier(.22,1,.36,1) both; }
+.ng-dial-result-icon { display:grid; place-items:center; width:32px; height:32px; margin-bottom:1px; border-radius:50%; color:#a1e1c4; background:#a1e1c412; border:1px solid #a1e1c422; }
+.ng-dial-result-icon svg { width:19px; height:19px; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.ng-dial-result-title { font-size:24px; font-weight:600; letter-spacing:-.7px; line-height:1.15; color:#f0e5fb; white-space:nowrap; }
+.ng-dial-result-note { max-width:112px; font-size:11px; line-height:1.4; color:#b9a8c8; text-wrap:balance; }
+.ng-dial-success .ng-dial-result { gap:8px; }
+.ng-dial-success .ng-dial-result-title { font-size:26px; }
+.ng-dial-success .ng-dial-core { border-color:#d5b6f430; box-shadow:0 0 0 5px #0b080d66,inset 0 7px 18px #0003,0 0 26px #c7ace810; }
+.ng-dial-fail .ng-dial-result-icon { color:#d5a6b6; background:#d5a6b610; border-color:#d5a6b61c; }
+.ng-dial-fail .ng-dial-result-title { color:#e4d5df; }
+ng-upgrade-burst { display:block; position:absolute; inset:-55px -36px -90px; z-index:4; pointer-events:none; overflow:hidden; contain:strict; }
+ng-upgrade-burst canvas { display:block; width:100%; height:100%; }
+.ng-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+@keyframes ngDialResult { from { opacity:0; transform:translateY(6px) scale(.94); } to { opacity:1; transform:translateY(0) scale(1); } }
+.ng-dial-scale { position: absolute; inset: 0; color: #9f8dab; font-family: Inter,sans-serif; font-size: 9px; }
+.ng-dial-scale span { position: absolute; transform: translate(-50%,-50%); }
+.ng-dial-scale span:nth-child(1) { left: 50%; top: 97%; }
+.ng-dial-scale span:nth-child(2) { left: 3.6%; top: 50%; }
+.ng-dial-scale span:nth-child(3) { left: 50%; top: 3.6%; }
+.ng-dial-scale span:nth-child(4) { left: 96.4%; top: 50%; }
+.ng-dial-needle { position: absolute; inset: 0; border-radius: 50%; transform: rotate(var(--needle-end,180deg)); z-index: 3; pointer-events: none; }
+.ng-dial-marker { display:block; width:100%; height:100%; overflow:visible; }
+.ng-dial-marker-tip { fill:#e5cdf7; }
+.ng-dial-marker-arc { fill:none; stroke:#f5e7ff; stroke-width:2.6; stroke-linecap:round; filter:drop-shadow(0 0 5px #d6ade8a6); }
+.ng-dial-running .ng-dial-needle { animation: ngNeedleTravel 3600ms cubic-bezier(.12,.72,.1,1) both; }
+.ng-upgrade-selectors { gap: 12px !important; }
+.ng-upgrade-selectors > button { padding: 10px 12px !important; border-radius: 17px !important; }
+.ng-upgrade-selectors > button > div:first-child { font-size: 11px !important; margin-bottom: 8px !important; }
+.ng-upgrade-selectors > button > div:nth-child(2) { width: 76px !important; height: 76px !important; margin: auto; }
+.ng-upgrade-selectors > button:disabled { cursor: wait; }
+@keyframes ngReelTravel { from { transform: translate3d(var(--reel-start),0,0); } to { transform: translate3d(var(--reel-end),0,0); } }
+@keyframes ngSelectorLand { 0% { transform: translateY(-8px); } 65% { transform: translateY(2px); } 100% { transform: translateY(0); } }
+@keyframes ngNeedleTravel { from { transform: rotate(180deg); } to { transform: rotate(var(--needle-end)); } }
+@media(max-width:430px) { .ng-app { margin: 0 auto; border-radius: 0 !important; height: 100dvh !important; } }
+@media(max-height:760px) {
+  .ng-dial { width: min(210px, calc(100vw - 60px)); margin: 8px auto 14px; }
+  .ng-dial-core { inset: 39px; }
+  .ng-dial-svg { inset: 20px; width: calc(100% - 40px); height: calc(100% - 40px); }
+  .ng-dial-value { font-size: 30px; }
+  .ng-dial-percent { font-size: 18px; }
+  .ng-dial-label { font-size: 10px; }
+  .ng-dial-result { gap:4px; }
+  .ng-dial-result-title { font-size:19px; letter-spacing:-.4px; }
+  .ng-dial-success .ng-dial-result-title { font-size:22px; }
+  .ng-dial-result-icon { width:27px; height:27px; }
+  .ng-dial-result-note { max-width:102px; font-size:10px; }
+  .ng-upgrade-selectors > button > div:nth-child(2) { width: 52px !important; height: 52px !important; }
+}
+@media(prefers-reduced-motion:reduce) { .ng-app * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; } .ng-scroll { scroll-behavior: auto; } }
+
+.ng-auth-card { text-align:center; padding:62px 20px 30px; }
+.ng-auth-card > img { width:64px;height:64px;object-fit:contain;margin-bottom:20px; }
+.ng-auth-card h1 { font-size:25px;line-height:1.15;letter-spacing:-.6px;margin:0 0 14px; }
+.ng-auth-card p { font-size:14px;line-height:1.6;color:#aaa4b4;margin:0 0 24px; }
+.ng-auth-card button,.ng-game-notice button { border:0;border-radius:14px;padding:14px 18px;background:#c7ace8;color:#100c14;font:600 14px Inter,system-ui;cursor:pointer; }
+.ng-game-notice { position:relative;padding:14px 16px;margin:12px 0;border:1px solid #c7ace833;border-radius:16px;background:#211929;color:#dcd0e9;font-size:13px;line-height:1.5; }
+.ng-game-notice p { margin:0 0 12px; }
+.ng-operation-note { text-align:center;font-size:11px;line-height:1.5;color:#a8a0b0;margin:18px 0; }
