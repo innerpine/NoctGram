@@ -1,6 +1,6 @@
 import { giftDefinition } from './gift-catalog';
 
-export const NOCT_GIFTS_GAME_VERSION = '2026-09-15-1';
+export const NOCT_GIFTS_GAME_VERSION = '2026-09-15-2';
 export const NOCT_GIFTS_ALIASES: Record<
   string,
   { id: string; rarity: string }
@@ -103,6 +103,6 @@ export function noctGiftsGameCatalog(origin: string) {
         ];
       }),
     ),
-    upgrade: { feePercent: 35, chancePercent: 88, minChance: 2, maxChance: 92 },
+    upgrade: { feePercent: 0, chancePercent: 88, minChance: 2, maxChance: 92 },
   };
 }

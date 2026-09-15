@@ -104,7 +104,7 @@
         if(error.status===401||error.status===403){clearAccount('error',null,error.message);return;}
         const definite=error.status>=400&&error.status<500&&error.status!==429;
         if(definite)forgetIntent(value);
-        app.setState({gamePending:false,gameRetry:!definite,gameError:definite?error.message:error.message+' Списание могло пройти — проверка повторяет тот же запрос.'});
+        app.setState({gamePending:false,gameRetry:!definite,gameError:definite?error.message:error.message+(value.kind==='upgrade'?' Подарок мог быть использован — проверка повторяет тот же запрос.':' Списание могло пройти — проверка повторяет тот же запрос.')});
       }finally{gameWorking=false;}
     };
     const begin=(kind,body,source=null)=>{

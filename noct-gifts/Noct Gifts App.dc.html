@@ -273,7 +273,7 @@ a{color:#C7ACE8}a:hover{color:#DCC9F2}
 <p class="ng-operation-note">{{ upgradeHint }}</p>
 
         <div style="margin-top:12px;background:#0C0C0C;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:4px 16px">
-          <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px"><span style="color:#A1A1AA">Стоимость попытки</span><span style="color:#FFD36A;font-weight:600">{{ upgradeCostFmt }} ★</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px"><span style="color:#A1A1AA">Расходуется</span><span style="text-align:right;max-width:190px">Выбранный подарок</span></div>
           <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px"><span style="color:#A1A1AA">При успехе</span><span style="text-align:right;max-width:190px">{{ successText }}</span></div>
           <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;font-size:15px"><span style="color:#A1A1AA">При неудаче</span><span style="text-align:right;max-width:190px">{{ failText }}</span></div>
         </div>
@@ -795,7 +795,6 @@ class Component extends DCLogic {
   chip(r,big){ const c = RAR[r].c; return 'display:inline-block;padding:'+(big?'5px 11px':'3px 8px')+';border-radius:8px;font-size:'+(big?'13px':'12px')+';font-weight:500;color:'+c+';background:'+c+'1F'; }
   caseOf(id){return this.cases().find(c=>c.id===id)||this.cases()[0]||{id:null,n:'Кейсы',p:0,items:[]};}
   chanceOf(){const f=this.gifts()[this.state.fromId],t=this.gameGifts()[this.state.toId],rules=this.state.games?.upgrade;if(!f||!t||!rules)return 0;return Math.max(rules.minChance,Math.min(rules.maxChance,Math.round(f.v/t.v*rules.chancePercent)));}
-  costOf(){const t=this.gameGifts()[this.state.toId],rules=this.state.games?.upgrade;return t&&rules?Math.max(20,Math.round(t.v*rules.feePercent/100)):0;}
   startOpen(){return this.openSharedCase?.();}
   runUpgrade(){return this.upgradeSharedGift?.();}
   confirmPay(){return this.payShared?.();}
@@ -809,7 +808,6 @@ class Component extends DCLogic {
     const filtered = s.filter==='all' ? inv : inv.filter(g=>G[g.id].r===s.filter);
     const collection = inv.reduce((a,g)=>a+G[g.id].v,0);
     const chance = s.upPhase==='select' || s.dialChance===null ? this.chanceOf() : s.dialChance;
-    const cost = this.costOf();
     const from = s.fromId ? G[s.fromId] : null;
     const to = s.toId ? G[s.toId] : null;
     const navStyle = (on)=> 'position:relative;z-index:1;flex:1;min-width:0;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;border:0;border-radius:999px;background:transparent;font:inherit;cursor:pointer;user-select:none;color:'+(on?'#C7ACE8':'#B9B9BC')+';transition:color 110ms ease';
@@ -837,11 +835,11 @@ class Component extends DCLogic {
       else if(s.upPhase==='fail') cta = {label:'Выбрать другой подарок',disabled:false,action:()=>self.setState({upPhase:'select',pick:'inv',sheet:'pick'}),note:false,second:'К подаркам',secondAction:()=>self.go({screen:'gifts',upPhase:'select'})};
       else cta = {
         label: ready ? 'Подтвердить апгрейд' : 'Выберите оба подарка',
-        disabled: !ready || s.balance < cost,
+        disabled: !ready,
         action: ()=>self.runUpgrade(),
         note: ready,
-        noteText: s.balance < cost ? 'Не хватает '+this.fmt(cost-s.balance)+' ★ на попытку.' : 'Списание '+this.fmt(cost)+' ★ произойдёт после подтверждения.',
-        noteTone: s.balance < cost ? 'warn' : 'calm'
+        noteText: 'Расходуется только выбранный подарок. Noct Stars не списываются.',
+        noteTone: 'calm'
       };
     }
 
@@ -968,11 +966,10 @@ class Component extends DCLogic {
       chance: chance, chanceDash: (chance/100*264)+' 264',
       chanceColor: chance>=50 ? '#3ECF8E' : chance>=20 ? '#C7ACE8' : '#FFD36A',
       upgradeHint: from&&to ? 'Из «'+from.n+'» в «'+to.n+'». Шанс рассчитан по разнице стоимости.' : 'Выберите исходный и желаемый подарок, чтобы увидеть шанс.',
-      upgradeCostFmt: this.fmt(cost),
       successText:to?'«'+to.n+'» в вашем NoctGram':'—',
       failText: from ? '«'+from.n+'» '+(s.fromNum||'')+' сгорает' : '—',
       upPending:s.upPhase==='pending'||s.gamePending, upSuccess: s.upPhase==='success', upFail: s.upPhase==='fail',
-      resultText: s.upPhase==='success' ? 'Вы получили «'+(to?to.n:'подарок')+'». Он уже в коллекции, исходный подарок списан.' : 'Исходный подарок сгорел, стоимость попытки списана. Баланс: '+this.fmt(s.balance)+' ★. Новый подарок не получен.',
+      resultText: (s.upPhase==='success' ? 'Вы получили «'+(to?to.n:'подарок')+'». Он уже в коллекции, исходный подарок списан.' : 'Исходный подарок сгорел. Новый подарок не получен.')+(s.gameResult?.price>0?' Это результат предыдущей попытки с оплатой '+this.fmt(s.gameResult.price)+' ★.':' Noct Stars не списаны.'),
 
       giftsCount: live?s.sharedGifts.length+(s.sharedNext?'+':'')+' подарков':filtered.length ? filtered.length+' из '+inv.length+' предметов' : inv.length+' предметов',
       hasGifts: !live&&inv.length>0, noGifts: !live&&inv.length===0,
@@ -1002,7 +999,7 @@ class Component extends DCLogic {
       })),
       startTopup: ()=>{if(live&&!s.shared?.catalog?.telegram){this.setState({toast:'Пополнение будет доступно после подключения аккаунта.'});return;}this.setState({sheet:'pay',payPhase:'idle',acceptedTerms:false});},
       acceptedTerms:s.acceptedTerms,toggleTerms:()=>this.setState({acceptedTerms:!s.acceptedTerms}),
-      history:(s.shared?.history||[]).map(h=>({icon:h.amount>0?'assets/noct-stars.png':'assets/upgrade.svg',title:h.amount>0?'Начисление Stars':'Списание Stars',sub:new Date(h.created).toLocaleDateString('ru-RU'),amount:(h.amount>0?'+':'')+this.fmt(h.amount),tone:h.amount>0?'gold':'plain'})),
+      history:(s.shared?.history||[]).map(h=>({icon:h.amount>0?'assets/noct-stars.png':'assets/upgrade.svg',title:h.kind==='gift_risk_upgrade'&&h.amount===0?'Апгрейд подарка':h.amount>0?'Начисление Stars':'Списание Stars',sub:new Date(h.created).toLocaleDateString('ru-RU'),amount:(h.amount>0?'+':'')+this.fmt(h.amount),tone:h.amount>0?'gold':'plain'})),
       showCta: !!cta && scr==='upgrade',
       ctaLabel: cta?cta.label:'', ctaDisabled: cta?!!cta.disabled:false,
       ctaAction: cta?cta.action:()=>{},

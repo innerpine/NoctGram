@@ -190,7 +190,7 @@ const account = (id = 111, extra = {}) =>
   api.noctGiftsAccount({ initData: signed(id), ...extra }, 'https://noct.test');
 
 const play = (kind, extra = {}, telegramId = 111) => api.noctGiftsGame(kind, {
-  initData:signed(telegramId),version:'2026-09-15-1',key:'test-game-request-0001',
+  initData:signed(telegramId),version:'2026-09-15-2',key:'test-game-request-0001',
   ...(kind==='case'?{caseId:'eclipse'}:{receiptId:'gift-1',targetGiftId:'swiss_watch'}),...extra,
 }, 'https://noct.test');
 const count = table => sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
@@ -283,7 +283,7 @@ void test('already awarded drop gifts use the original catalog values without re
   reset();t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
   const win=await play('case'),id=win.gift.id;
   // The pre-release operation format did not include giftPrice.
-  sqlite.prepare("UPDATE star_transfers SET postText=json_remove(postText,'$.operation.giftPrice') WHERE id=?").run(id);
+  sqlite.prepare("UPDATE star_transfers SET postText=json_set(json_remove(postText,'$.operation.giftPrice'),'$.request.version','2026-09-15-1') WHERE id=?").run(id);
   const before=sqlite.prepare('SELECT postText FROM star_transfers WHERE id=?').get(id).postText;
   assert.equal((await api.previewGiftConversion('alice',id)).amount,85);
   assert.equal((await api.convertGift('alice',{id,expectedAmount:85})).balance,265);
@@ -293,7 +293,7 @@ void test('all legacy drop gift prices match the original catalog instead of the
   for(const [caseId,ticket,giftId,price] of [['moon',0,'ion_gem',450],['moon',52,'jelly_bunny',100],['moon',80,'crystal_ball',100],['moon',94,'astral_shard',100],['moon',99,'plush_pepe',1000],['eclipse',34,'swiss_watch',450],['eclipse',62,'witch_hat',50],['eclipse',94,'bonded_ring',250]]){
     reset();t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(ticket);return bytes;});
     const win=await play('case',{caseId});assert.equal(win.gift.giftId,giftId);
-    sqlite.prepare("UPDATE star_transfers SET postText=json_remove(postText,'$.operation.giftPrice') WHERE id=?").run(win.gift.id);
+    sqlite.prepare("UPDATE star_transfers SET postText=json_set(json_remove(postText,'$.operation.giftPrice'),'$.request.version','2026-09-15-1') WHERE id=?").run(win.gift.id);
     assert.equal((await api.previewGiftConversion('alice',win.gift.id)).originalPrice,price);
     t.mock.restoreAll();
   }
@@ -301,10 +301,10 @@ void test('all legacy drop gift prices match the original catalog instead of the
 void test('successful drop upgrade prize sells at gift value, while its spent source cannot sell',async t=>{
   reset();gift(1,'alice');t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
   const win=await play('upgrade'),id=win.gift.id;
-  assert.equal(win.operation.price,158);assert.equal(win.operation.giftPrice,450);
+  assert.equal(win.operation.price,0);assert.equal(win.operation.giftPrice,450);
   assert.equal((await api.previewGiftConversion('alice',id)).amount,382);
   await assert.rejects(api.convertGift('alice',{id:'gift-1',expectedAmount:21}),e=>e.status===404);
-  assert.equal((await api.convertGift('alice',{id,expectedAmount:382})).balance,724);
+  assert.equal((await api.convertGift('alice',{id,expectedAmount:382})).balance,882);
 });
 void test('malformed or mismatched drop outcomes cannot become saleable gifts',async t=>{
   for(const tamper of [
@@ -346,7 +346,7 @@ void test('racing a drop sale and a risk upgrade can consume the gift only once'
     const results=await Promise.allSettled((saleFirst?[sell,upgrade]:[upgrade,sell]).map(run=>run()));
     assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
     assert.equal(count('gift_conversions')+count('gift_consumptions'),1);
-    assert.equal((await account()).balance,count('gift_conversions')?265:22);
+    assert.equal((await account()).balance,count('gift_conversions')?265:180);
     t.mock.restoreAll();
   }
 });
@@ -389,8 +389,8 @@ for(const [ticket,success] of [[0,true],[9999,false]]) void test(`risk upgrade $
   assert.equal(result.operation.success,success);
   // Current catalog: a 75-Star bear toward a 450-Star watch.
   assert.equal(result.operation.chance,15);
-  assert.equal(result.operation.price,158);
-  assert.equal(result.balance,342);
+  assert.equal(result.operation.price,0);
+  assert.equal(result.balance,500);
   assert.equal(count('gift_consumptions'),1);
   assert.equal(count('received_gifts'),success?2:1);
   assert.deepEqual((await play('upgrade')).operation,result.operation);
@@ -400,6 +400,34 @@ for(const [ticket,success] of [[0,true],[9999,false]]) void test(`risk upgrade $
   const profile=await account();
   assert.equal(profile.gifts.some(g=>g.id==='gift-1'),false);
   assert.equal(profile.gifts.length,success?1:0);
+});
+
+for(const [ticket,success] of [[0,true],[9999,false]]) void test(`gift-only upgrade with zero Stars ${success?'succeeds':'fails'} without changing either wallet`,async t=>{
+  reset();gift(1,'alice');sqlite.exec("UPDATE star_transfers SET amount=0 WHERE id='alice-credit'");
+  t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(ticket);return bytes;});
+  const treasuryBefore=sqlite.prepare("SELECT COALESCE(SUM(CASE WHEN recipient='noctgram_gifts' THEN amount ELSE -amount END),0) value FROM star_transfers WHERE sender='noctgram_gifts' OR recipient='noctgram_gifts'").get().value;
+  const result=await play('upgrade');assert.equal(result.operation.success,success);assert.equal(result.operation.price,0);assert.equal(result.balance,0);
+  assert.equal(count('gift_consumptions'),1);assert.equal(count('received_gifts'),success?2:1);
+  assert.equal(sqlite.prepare('SELECT amount FROM star_transfers WHERE id=?').get(result.operation.id).amount,0);
+  assert.equal(sqlite.prepare("SELECT COALESCE(SUM(CASE WHEN recipient='noctgram_gifts' THEN amount ELSE -amount END),0) value FROM star_transfers WHERE sender='noctgram_gifts' OR recipient='noctgram_gifts'").get().value,treasuryBefore);
+  assert.deepEqual(await play('upgrade'),result);assert.equal(count('gift_consumptions'),1);
+  if(success){assert.equal((await api.convertGift('alice',{id:result.gift.id,expectedAmount:382})).balance,382);}
+});
+void test('old paid upgrade replay preserves history without another charge; stale new requests must refresh terms',async t=>{
+  reset();gift(1,'alice');t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
+  const result=await play('upgrade');
+  // Recreate the already committed pre-release operation, including its old fee.
+  sqlite.prepare("UPDATE star_transfers SET amount=158,postText=json_set(postText,'$.operation.price',158,'$.request.version','2026-09-15-1') WHERE id=?").run(result.operation.id);
+  const before=count('star_transfers');const replay=await play('upgrade',{version:'2026-09-15-1'});
+  assert.equal(replay.balance,342);assert.equal(replay.operation.price,158);assert.equal(count('star_transfers'),before);
+  await assert.rejects(play('upgrade',{key:'stale-upgrade-key-0001',version:'2026-09-15-1'}),e=>e.code==='GAME_CATALOG_CHANGED');
+  assert.equal(count('star_transfers'),before);
+});
+void test('zero-fee upgrade support does not allow a free case prize to be sold',async t=>{
+  reset();t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
+  const result=await play('case');
+  sqlite.prepare("UPDATE star_transfers SET amount=0,postText=json_set(postText,'$.operation.price',0) WHERE id=?").run(result.operation.id);
+  assert.equal((await api.previewGiftConversion('alice',result.gift.id)).available,false);
 });
 
 void test('upgrade cannot spend another user gift, a converted gift or a collectible', async t=>{
@@ -475,7 +503,7 @@ void test('replaying an earlier case after its gift is used never restores the c
 
 void test('game routes reject client-selected price and cross-origin writes',async()=>{
   reset();
-  const body={initData:signed(),version:'2026-09-15-1',key:'case-request-0001',caseId:'moon'};
+  const body={initData:signed(),version:'2026-09-15-2',key:'case-request-0001',caseId:'moon'};
   assert.equal((await api.casePost(request('/api/noct-gifts/case',{...body,price:1}))).status,400);
   assert.equal((await api.casePost(request('/api/noct-gifts/case',body,{Origin:'https://evil.test'}))).status,403);
   assert.equal(count('received_gifts'),0);
@@ -504,7 +532,7 @@ void test('parallel upgrades cannot consume the same source twice',async()=>{
   const outcomes=await Promise.allSettled([play('upgrade'),play('upgrade',{key:'another-upgrade-0002'})]);
   assert.equal(outcomes.filter(r=>r.status==='fulfilled').length,1);
   assert.equal(count('gift_consumptions'),1);
-  assert.equal((await account()).balance,342);
+  assert.equal((await account()).balance,500);
 });
 
 void test('auth accepts Telegram HMAC with signature field and ignores unsigned display names for identity', async () => {

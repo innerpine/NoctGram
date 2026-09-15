@@ -234,7 +234,7 @@ export async function noctGiftsGame(
         Math.min(92, Math.round((from.price / to.price) * 88)),
       ),
       roll = gameTicket(10000) / 100;
-    price = Math.max(20, Math.round(to.price * 0.35));
+    price = 0;
     operation = {
       id,
       key,
@@ -249,7 +249,7 @@ export async function noctGiftsGame(
       ...(roll < chance ? { giftId: to.id, giftAlias: alias } : {}),
     };
   }
-  // Keep the won gift's value separate from the case/upgrade fee. Selling later
+  // Keep the won gift's value separate from the operation price. Selling later
   // uses this server-side snapshot even if catalog prices change.
   if (operation.giftId)
     operation.giftPrice = giftDefinition(operation.giftId)!.price;
@@ -274,7 +274,8 @@ export async function noctGiftsGame(
     kind === 'case' ? 'case_open' : 'gift_risk_upgrade',
   ];
   if (kind === 'upgrade') args.push(request.receiptId!);
-  const debit = db()
+  // Upgrade records carry zero Stars; only the source gift is consumed.
+  const operationRecord = db()
     .prepare(`INSERT INTO star_transfers(id,sender,recipient,postText,amount,kind,created)
     SELECT ?1,u.id,'noctgram_gifts',?2,?3,?9,?4 FROM users u
     WHERE u.id=?5 AND u.kind='person' AND u.deletedAt=0 AND u.onboardingComplete=1 AND u.sessionsRevokedAt<=?8
@@ -283,7 +284,7 @@ export async function noctGiftsGame(
     AND ?3 <= (SELECT COALESCE(SUM(CASE WHEN recipient=u.id THEN amount ELSE -amount END),0) FROM star_transfers WHERE recipient=u.id OR sender=u.id)
     ${sourceGate} ON CONFLICT(id) DO NOTHING`)
     .bind(...args);
-  const statements = [debit];
+  const statements = [operationRecord];
   if (kind === 'upgrade')
     statements.push(
       db()
@@ -310,7 +311,7 @@ export async function noctGiftsGame(
   await db().batch(statements);
   saved = await savedOperation(id, me.id);
   if (!saved) {
-    if ((await balance(me.id)) < price)
+    if (kind === 'case' && (await balance(me.id)) < price)
       throw new ApiError(409, 'Не хватает Noct Stars.', 'INSUFFICIENT_STARS');
     throw new ApiError(
       409,

@@ -393,6 +393,13 @@
       "when": 1789496266738,
       "tag": "0055_drop_gift_conversions",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "6",
+      "when": 1789497164411,
+      "tag": "0056_gift_only_upgrades",
+      "breakpoints": true
     }
   ]
 }
