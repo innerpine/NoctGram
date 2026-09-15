@@ -28,6 +28,7 @@
     "out/**",
     "build/**",
     "dist/**",
+    "public/drop/**",
     "coverage/**",
     "next-env.d.ts",
     "components/ui/**",

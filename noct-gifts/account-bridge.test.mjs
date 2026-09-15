@@ -14,14 +14,14 @@ const ownedGift = (id, patch = {}) => ({ id, giftId: 'toy_bear', name: 'Мишк
 const games={version:'2026-09-15-1',cases:[{id:'eclipse',n:'Затмение',p:320,t:'#C7ACE8',s:'diamond',items:[['orb',50],['watch',50]]},{id:'moon',n:'Лунный',p:75,t:'#C7ACE8',s:'circle',items:[['orb',100]]}],gifts:{orb:{giftId:'crystal_ball',name:'Хрустальный шар',price:100,color:'#C7ACE8',rarity:'rare',imageUrl:'/assets/gifts/crystal_ball.webp',animationUrl:'/assets/gifts/crystal_ball.json'},watch:{giftId:'swiss_watch',name:'Часы',price:250,color:'#FFD36A',rarity:'rare',imageUrl:'/assets/gifts/swiss_watch.webp',animationUrl:'/assets/gifts/swiss_watch.json'}},upgrade:{feePercent:35,chancePercent:88,minChance:2,maxChance:92}};
 const linked = (patch = {}) => ({ status: 'linked', authExpiresAt: Date.now()+3600000, user: { id: 'alice', name: 'Alice', handle: 'alice', avatar: '' }, balance: 500, gifts: [ownedGift('canonical-1')], next: null, history: [], links, capabilities: { sharedAccount: true, caseOpening: true, upgrading: true }, games, catalog: { telegram: true, products: [{ id: 'stars500', product: 'stars', title: '500 Noct Stars', xtr: 75, rub: 75, units: 500 },{ id: 'stars1000', product: 'stars', title: '1000 Noct Stars', xtr: 139, rub: 139, units: 1000 }] }, ...patch });
 
-function fixture({ inTelegram = true, storage = new Map(), search = '' } = {}) {
+function fixture({ inTelegram = true, storage = new Map(), search = '', directAssets = false } = {}) {
   const calls = [], pending = [], jobs = new Map(), listeners = new Map(), opened = [];
   let next = 1, clock = 0, uuid = 0, ready = 0;
   const schedule = (fn, ms = 0) => { const id=next++;jobs.set(id,{fn,at:clock+ms});return id; };
   const document = { hidden: false, addEventListener(type,fn){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type).add(fn);}, removeEventListener(type,fn){listeners.get(type)?.delete(fn);} };
   const media = { matches: false, addEventListener(){}, removeEventListener(){} };
   const telegram = { initData: inTelegram ? auth : '', ready(){ready++;}, openTelegramLink(url){opened.push(url);}, openLink(url){opened.push(url);} };
-  const window = { Telegram:{WebApp:telegram}, location:{search,origin:'http://127.0.0.1:4186'}, matchMedia:()=>media, open:url=>opened.push(url) };
+  const window = { NoctGiftsConfig:{directAssets}, Telegram:{WebApp:telegram}, location:{search,origin:'http://127.0.0.1:4186'}, matchMedia:()=>media, open:url=>opened.push(url) };
   class DCLogic { constructor(props){this.props=props;this.state={};} setState(patch,callback){this.state={...this.state,...(typeof patch==='function'?patch(this.state):patch)};callback?.();} }
   const context=vm.createContext({ window,document,location:window.location,DCLogic,React:{createRef:()=>({current:null})},URL,URLSearchParams,Date,Math,console,
     sessionStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},crypto:{randomUUID:()=>`request-id-${++uuid}`},AbortSignal:{timeout:ms=>({timeout:ms})},
@@ -41,6 +41,16 @@ function fixture({ inTelegram = true, storage = new Map(), search = '' } = {}) {
     dispose(){app.componentWillUnmount();},
   };
 }
+
+void test('main-domain mini-app uses original gift assets and the existing authenticated API', async t=>{
+  const f=fixture({directAssets:true});t.after(()=>f.dispose());
+  await f.reply(linked());
+  assert.equal(f.app.state.sharedGifts[0].image,'/assets/gifts/toy_bear.webp');
+  assert.equal(f.app.state.sharedGifts[0].animation,'/assets/gifts/toy_bear.json');
+  assert.equal(f.calls[0].url,'/api/noct-gifts/account');
+  assert.equal(f.calls[0].options.credentials,'omit');
+  assert.equal(f.app.state.accountMode,'linked');
+});
 
 void test('Telegram identity is sent only in bounded JSON POST body; browser credentials are omitted', async t=>{
   const f=fixture();t.after(()=>f.dispose());

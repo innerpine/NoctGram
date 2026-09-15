@@ -63,6 +63,14 @@ const publicWorker = {
       });
     if (request.method === 'GET' || request.method === 'HEAD') {
       const asset = await env.ASSETS.fetch(request);
+      if (url.pathname === '/drop' || url.pathname.startsWith('/drop/')) {
+        const response = new Response(asset.body, asset);
+        response.headers.set('Cache-Control', 'no-cache');
+        response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+        response.headers.set('Referrer-Policy', 'no-referrer');
+        response.headers.set('X-Content-Type-Options', 'nosniff');
+        return response;
+      }
       if (
         asset.status !== 404 ||
         new URL(request.url).pathname.startsWith('/_next/static/')

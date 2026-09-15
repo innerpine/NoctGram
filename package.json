@@ -6,7 +6,9 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "predev": "node scripts/build-noct-gifts.mjs",
     "dev": "vinext dev",
+    "prebuild": "node scripts/build-noct-gifts.mjs",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint",

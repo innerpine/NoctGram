@@ -2,7 +2,8 @@
 (() => {
   const telegram=window.Telegram?.WebApp, inTelegram=!!telegram?.initData;
   const friendlyError=status=>status===401?'Вход истёк. Откройте мини-апп заново.':status===403?'Доступ к аккаунту ограничен.':'Не удалось связаться с NoctGram. Попробуйте ещё раз.';
-  function asset(url) {try{const p=new URL(url,location.origin);if(p.pathname.startsWith('/assets/')&&!p.pathname.includes('..'))return '/noctgram-assets/'+p.pathname.slice(8);}catch{}return '';}
+  const assetPrefix=window.NoctGiftsConfig?.directAssets===true?'/assets/':'/noctgram-assets/';
+  function asset(url) {try{const p=new URL(url,location.origin);if(p.pathname.startsWith('/assets/')&&!p.pathname.includes('..'))return assetPrefix+p.pathname.slice(8);}catch{}return '';}
   const normalizeGift=gift=>({...gift,image:asset(gift.imageUrl)||'assets/noctgram-logo.png',animation:asset(gift.animationUrl)});
   async function request(route,body={}) {
     if(!inTelegram)throw Error('Откройте Noct Gifts в Telegram.');

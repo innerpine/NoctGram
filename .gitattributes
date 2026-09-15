@@ -5,3 +5,7 @@
 app/mascot-drag.ts -text
 app/noct-mascot.tsx -text
 app/features.css -text
+
+# Preserve pinned React integrity hashes on Windows.
+noct-gifts/assets/vendor/react.production.min.js text eol=lf
+noct-gifts/assets/vendor/react-dom.production.min.js text eol=lf

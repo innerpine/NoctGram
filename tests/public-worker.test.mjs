@@ -122,6 +122,38 @@ await test('public entry fails closed before serving assets or application on in
     assert.equal(response.headers.get('cache-control'), 'no-store');
   }
 });
+await test('mini-app assets and missing files never fall through into the main interface', async () => {
+  for (const status of [200, 404]) {
+    const env = {
+      ...settings,
+      ASSETS: { fetch: async () => new Response('mini-app', { status }) },
+    };
+    const response = await worker.fetch(
+      new Request('https://noctgram.com/drop/index.html'),
+      env,
+      {},
+    );
+    assert.equal(response.status, status);
+    assert.equal(await response.text(), 'mini-app');
+    assert.equal(response.headers.get('Cache-Control'), 'no-cache');
+    assert.equal(response.headers.get('Referrer-Policy'), 'no-referrer');
+    assert.equal(response.headers.get('X-Robots-Tag'), 'noindex, nofollow');
+  }
+  const response = await worker.fetch(
+    new Request('https://noctgram.com/drop'),
+    {
+      ...settings,
+      ASSETS: {
+        fetch: async () =>
+          new Response(null, { status: 308, headers: { Location: '/drop/' } }),
+      },
+    },
+    {},
+  );
+  assert.equal(response.status, 308);
+  assert.equal(response.headers.get('Location'), '/drop/');
+});
+
 await test('public requests retain session and body but discard all gateway identity headers', async () => {
   const response = await worker.fetch(
     new Request('https://noctgram.com/api/profile', {
