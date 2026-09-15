@@ -9,6 +9,7 @@ import {
   NOCT_GIFTS_ALIASES,
   NOCT_GIFTS_CASES,
   NOCT_GIFTS_GAME_VERSION,
+  NOCT_GIFTS_UPGRADE_RULES,
 } from './noct-gifts-catalog';
 
 type GameRequest = {
@@ -309,8 +310,14 @@ export async function noctGiftsGame(
       );
     receiptIds.forEach((receipt, index) => {
       const chance = Math.max(
-        2,
-        Math.min(92, Math.round((sources.get(receipt)!.price / to.price) * 88)),
+        NOCT_GIFTS_UPGRADE_RULES.minChance,
+        Math.min(
+          NOCT_GIFTS_UPGRADE_RULES.maxChance,
+          Math.round(
+            (sources.get(receipt)!.price / to.price) *
+              NOCT_GIFTS_UPGRADE_RULES.chancePercent,
+          ),
+        ),
       );
       const roll = gameTicket(10000) / 100;
       operations.push({

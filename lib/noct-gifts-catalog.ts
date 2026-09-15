@@ -1,6 +1,13 @@
 import { giftDefinition } from './gift-catalog';
 
-export const NOCT_GIFTS_GAME_VERSION = '2026-09-15-3';
+export const NOCT_GIFTS_GAME_VERSION = '2026-09-15-4';
+// The advertised rules and the actual draw must use the same values.
+export const NOCT_GIFTS_UPGRADE_RULES = {
+  feePercent: 0,
+  chancePercent: 110,
+  minChance: 3,
+  maxChance: 95,
+} as const;
 export const NOCT_GIFTS_ALIASES: Record<
   string,
   { id: string; rarity: string }
@@ -32,11 +39,11 @@ export const NOCT_GIFTS_CASES: CaseDefinition[] = [
     t: '#C7ACE8',
     s: 'circle',
     items: [
-      ['stardust', 52],
-      ['rabbit', 28],
-      ['orb', 14],
+      ['stardust', 56],
+      ['rabbit', 25],
+      ['orb', 12],
       ['comet', 5],
-      ['throne', 1],
+      ['throne', 2],
     ],
   },
   {
@@ -46,11 +53,11 @@ export const NOCT_GIFTS_CASES: CaseDefinition[] = [
     t: '#3ECF8E',
     s: 'squircle',
     items: [
-      ['rabbit', 40],
-      ['orb', 30],
-      ['watch', 18],
-      ['ring', 9],
-      ['throne', 3],
+      ['rabbit', 36],
+      ['orb', 26],
+      ['watch', 23],
+      ['ring', 11],
+      ['throne', 4],
     ],
   },
   {
@@ -60,12 +67,12 @@ export const NOCT_GIFTS_CASES: CaseDefinition[] = [
     t: '#C7ACE8',
     s: 'diamond',
     items: [
-      ['orb', 34],
-      ['watch', 28],
-      ['mask', 20],
-      ['comet', 12],
-      ['ring', 5],
-      ['throne', 1],
+      ['orb', 31],
+      ['watch', 34],
+      ['mask', 16],
+      ['comet', 10],
+      ['ring', 7],
+      ['throne', 2],
     ],
   },
   {
@@ -75,10 +82,10 @@ export const NOCT_GIFTS_CASES: CaseDefinition[] = [
     t: '#A1A1AA',
     s: 'diamond',
     items: [
-      ['stardust', 60],
-      ['rabbit', 25],
-      ['mask', 12],
-      ['comet', 3],
+      ['stardust', 64],
+      ['rabbit', 24],
+      ['mask', 8],
+      ['comet', 4],
     ],
   },
 ];
@@ -104,6 +111,6 @@ export function noctGiftsGameCatalog(origin: string) {
         ];
       }),
     ),
-    upgrade: { feePercent: 0, chancePercent: 88, minChance: 2, maxChance: 92 },
+    upgrade: NOCT_GIFTS_UPGRADE_RULES,
   };
 }

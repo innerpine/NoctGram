@@ -97,7 +97,7 @@
           if(!draw||draw.kind!==value.kind||draw.key!==(index?value.body.key+':'+(index+1):value.body.key)||typeof draw.id!=='string'||operationIds.has(draw.id)||!Number.isSafeInteger(draw.price)||draw.price<0)invalid();
           operationIds.add(draw.id);
           if(value.kind==='case'&&(draw.caseId!==value.body.caseId||draw.success!==true||!gift))invalid();
-          if(value.kind==='upgrade'&&(draw.sourceReceiptId!==sources[index]||draw.targetGiftId!==value.body.targetGiftId||typeof draw.success!=='boolean'||!Number.isFinite(draw.roll)||!Number.isFinite(draw.chance)||draw.roll<0||draw.roll>=100||draw.chance<2||draw.chance>92||draw.success!==(draw.roll<draw.chance)||(draw.success&&!gift)||(!draw.success&&gift)))invalid();
+          if(value.kind==='upgrade'&&(draw.sourceReceiptId!==sources[index]||draw.targetGiftId!==value.body.targetGiftId||typeof draw.success!=='boolean'||!Number.isFinite(draw.roll)||!Number.isFinite(draw.chance)||draw.roll<0||draw.roll>=100||draw.chance<0||draw.chance>100||draw.success!==(draw.roll<draw.chance)||(draw.success&&!gift)||(!draw.success&&gift)))invalid();
           if(gift){if(typeof gift.id!=='string'||typeof gift.giftId!=='string'||typeof gift.name!=='string'||giftIds.has(gift.id)||(draw.giftId&&draw.giftId!==gift.giftId))invalid();giftIds.add(gift.id);}
           return {operation:draw,gift:gift?normalizeGift(gift):null};
         });

@@ -190,10 +190,56 @@ const account = (id = 111, extra = {}) =>
   api.noctGiftsAccount({ initData: signed(id), ...extra }, 'https://noct.test');
 
 const play = (kind, extra = {}, telegramId = 111) => api.noctGiftsGame(kind, {
-  initData:signed(telegramId),version:'2026-09-15-3',key:'test-game-request-0001',
+  initData:signed(telegramId),version:'2026-09-15-4',key:'test-game-request-0001',
   ...(kind==='case'?{caseId:'eclipse'}:{receiptId:'gift-1',targetGiftId:'swiss_watch'}),...extra,
 }, 'https://noct.test');
 const count = table => sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
+
+void test('every case ticket matches advertised odds and higher-value outcomes improve at unchanged prices',async t=>{
+  const old={moon:{price:75,weights:[52,28,14,5,1]},orbit:{price:150,weights:[40,30,18,9,3]},eclipse:{price:320,weights:[34,28,20,12,5,1]},midnight:{price:60,weights:[60,25,12,3]}};
+  for(const id of Object.keys(old)){
+    reset();sqlite.exec("UPDATE star_transfers SET amount=100000 WHERE id='alice-credit'");
+    const catalog=(await account()).games,box=catalog.cases.find(c=>c.id===id);
+    assert.equal(box.p,old[id].price);assert.equal(box.items.reduce((sum,[,weight])=>sum+weight,0),100);
+    let ticket=0;const won=new Map();
+    t.mock.method(crypto,'getRandomValues',bytes=>{bytes.fill(ticket++);return bytes;});
+    for(let batch=0;batch<10;batch++){
+      const result=await play('case',{caseId:id,count:10,key:'distribution-batch-'+id+'-'+batch});
+      for(const item of result.results)won.set(item.operation.giftAlias,(won.get(item.operation.giftAlias)||0)+1);
+    }
+    assert.equal(ticket,100);assert.deepEqual(Object.fromEntries(won),Object.fromEntries(box.items));
+    const thresholds=[...new Set(box.items.map(([alias])=>catalog.gifts[alias].price))].sort((a,b)=>a-b);
+    for(const price of thresholds.slice(1)){
+      const previous=box.items.reduce((sum,[alias],index)=>sum+(catalog.gifts[alias].price>=price?old[id].weights[index]:0),0);
+      const now=box.items.reduce((sum,[alias,weight])=>sum+(catalog.gifts[alias].price>=price?weight:0),0);
+      assert.ok(now>previous,id+' must improve odds of gifts worth at least '+price);
+    }
+    t.mock.restoreAll();
+  }
+});
+
+for(const [ticket,success] of [[5000,true],[5499,true],[5500,false]])void test(`boosted 50-to-100 upgrade draws correctly at ${ticket/100}%`,async t=>{
+  reset();gift(1,'alice',0,'homemade_cake');
+  t.mock.method(crypto,'getRandomValues',bytes=>{bytes.fill(ticket);return bytes;});
+  const catalog=(await account()).games;
+  assert.deepEqual(catalog.upgrade,{feePercent:0,chancePercent:110,minChance:3,maxChance:95});
+  const result=await play('upgrade',{targetGiftId:'crystal_ball'});
+  assert.equal(result.operation.chance,55);assert.equal(result.operation.success,success);
+  assert.equal(result.operation.price,0);assert.equal(result.balance,500);
+});
+
+void test('previous catalog retries retain their original chance and result without drawing again',async t=>{
+  reset();gift(1,'alice');
+  t.mock.method(crypto,'getRandomValues',bytes=>{bytes.fill(9999);return bytes;});
+  const first=await play('upgrade');
+  sqlite.prepare("UPDATE star_transfers SET postText=json_set(postText,'$.request.version','2026-09-15-3','$.operation.chance',15) WHERE id=?").run(first.operation.id);
+  const before=count('star_transfers');
+  t.mock.method(crypto,'getRandomValues',()=>{throw Error('Replay must not draw');});
+  const retry=await play('upgrade',{version:'2026-09-15-3'});
+  assert.equal(retry.operation.chance,15);assert.equal(retry.operation.success,false);assert.equal(retry.balance,500);
+  assert.equal(count('star_transfers'),before);
+  await assert.rejects(play('upgrade',{version:'2026-09-15-3',key:'stale-new-upgrade-request'}),e=>e.code==='GAME_CATALOG_CHANGED');
+});
 
 for(const amount of [3,5,10]) void test(`${amount} cases are charged together, independently receipted, sellable and idempotent`,async t=>{
   reset();sqlite.exec("UPDATE star_transfers SET amount=10000 WHERE id='alice-credit'");
@@ -235,7 +281,7 @@ for(const amount of [3,5,10]) void test(`${amount} gift upgrades consume every s
   assert.equal(a.gifts.length,Math.ceil(amount/2));
   for(const [i,result] of a.results.entries()){
     assert.equal(result.operation.sourceReceiptId,receiptIds[i]);assert.equal(result.operation.success,i%2===0);
-    assert.equal(result.operation.chance,i%2?20:15);assert.equal(result.operation.price,0);
+    assert.equal(result.operation.chance,i%2?24:18);assert.equal(result.operation.price,0);
     if(result.gift)assert.equal((await api.previewGiftConversion('alice',result.gift.id)).available,true);
   }
   assert.ok((await account()).gifts.some(g=>g.id==='gift-'+(amount+1)));
@@ -375,7 +421,7 @@ void test('already awarded drop gifts use the original catalog values without re
   assert.equal(sqlite.prepare('SELECT postText FROM star_transfers WHERE id=?').get(id).postText,before);
 });
 void test('all legacy drop gift prices match the original catalog instead of the opening fee',async t=>{
-  for(const [caseId,ticket,giftId,price] of [['moon',0,'ion_gem',450],['moon',52,'jelly_bunny',100],['moon',80,'crystal_ball',100],['moon',94,'astral_shard',100],['moon',99,'plush_pepe',1000],['eclipse',34,'swiss_watch',450],['eclipse',62,'witch_hat',50],['eclipse',94,'bonded_ring',250]]){
+  for(const [caseId,ticket,giftId,price] of [['moon',0,'ion_gem',450],['moon',56,'jelly_bunny',100],['moon',81,'crystal_ball',100],['moon',94,'astral_shard',100],['moon',99,'plush_pepe',1000],['eclipse',34,'swiss_watch',450],['eclipse',65,'witch_hat',50],['eclipse',94,'bonded_ring',250]]){
     reset();t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(ticket);return bytes;});
     const win=await play('case',{caseId});assert.equal(win.gift.giftId,giftId);
     sqlite.prepare("UPDATE star_transfers SET postText=json_set(json_remove(postText,'$.operation.giftPrice'),'$.request.version','2026-09-15-1') WHERE id=?").run(win.gift.id);
@@ -473,7 +519,7 @@ for(const [ticket,success] of [[0,true],[9999,false]]) void test(`risk upgrade $
   const result=await play('upgrade');
   assert.equal(result.operation.success,success);
   // Current catalog: a 75-Star bear toward a 450-Star watch.
-  assert.equal(result.operation.chance,15);
+  assert.equal(result.operation.chance,18);
   assert.equal(result.operation.price,0);
   assert.equal(result.balance,500);
   assert.equal(count('gift_consumptions'),1);
@@ -588,7 +634,7 @@ void test('replaying an earlier case after its gift is used never restores the c
 
 void test('game routes reject client-selected price and cross-origin writes',async()=>{
   reset();
-  const body={initData:signed(),version:'2026-09-15-3',key:'case-request-0001',caseId:'moon'};
+  const body={initData:signed(),version:'2026-09-15-4',key:'case-request-0001',caseId:'moon'};
   assert.equal((await api.casePost(request('/api/noct-gifts/case',{...body,price:1}))).status,400);
   assert.equal((await api.casePost(request('/api/noct-gifts/case',body,{Origin:'https://evil.test'}))).status,403);
   assert.equal(count('received_gifts'),0);
