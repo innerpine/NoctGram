@@ -27,6 +27,14 @@ for (const { tag } of JSON.parse(
     await readFile(new URL(`../drizzle/${tag}.sql`, import.meta.url), 'utf8'),
   );
 let afterRead = () => {};
+const avatarObjects = new Map();
+const avatarReads = [];
+let afterAvatarRead = () => {};
+globalThis.__noctGiftsBucket = {async get(key) {
+  avatarReads.push(key);afterAvatarRead();
+  const body=avatarObjects.get(key);
+  return body ? {body, size:body.length} : null;
+}};
 let databaseQueue = Promise.resolve();
 globalThis.__noctGiftsDb = {
   prepare(query) {
@@ -73,7 +81,7 @@ globalThis.__noctGiftsDb = {
 const built = await build({
   stdin: {
     contents:
-      "export * from './lib/noct-gifts-auth'; export * from './lib/noct-gifts-account'; export * from './lib/noct-gifts-games'; export { previewGiftUpgrade, upgradeGift } from './lib/gift-upgrades'; export { previewGiftConversion } from './lib/gift-conversions'; export { POST as casePost } from './app/api/noct-gifts/case/route'; export { POST as upgradePost } from './app/api/noct-gifts/upgrade/route'; export { POST as accountPost } from './app/api/noct-gifts/account/route'; export { POST as topupPost } from './app/api/noct-gifts/topup/route';",
+      "export * from './lib/noct-gifts-auth'; export * from './lib/noct-gifts-account'; export * from './lib/noct-gifts-games'; export { POST as avatarPost } from './app/api/noct-gifts/avatar/route'; export { previewGiftUpgrade, upgradeGift } from './lib/gift-upgrades'; export { previewGiftConversion } from './lib/gift-conversions'; export { POST as casePost } from './app/api/noct-gifts/case/route'; export { POST as upgradePost } from './app/api/noct-gifts/upgrade/route'; export { POST as accountPost } from './app/api/noct-gifts/account/route'; export { POST as topupPost } from './app/api/noct-gifts/topup/route';",
     resolveDir: root,
   },
   platform: 'node',
@@ -98,7 +106,7 @@ const built = await build({
         }));
         b.onLoad({ filter: /.*/, namespace: 'gifts-db-fixture' }, () => ({
           contents:
-            "export const db=()=>globalThis.__noctGiftsDb; export { ApiError } from './lib/api-error'; export const clean=value=>value;",
+            "export const db=()=>globalThis.__noctGiftsDb; export const bucket=()=>globalThis.__noctGiftsBucket; export { ApiError } from './lib/api-error'; export const clean=value=>value;",
           resolveDir: root,
         }));
       },
@@ -126,6 +134,8 @@ const signed = (id = 111, patch = {}, signingToken = token) => {
 };
 function reset() {
   afterRead = () => {};
+  afterAvatarRead = () => {};
+  avatarObjects.clear();avatarReads.length=0;
   for (const table of [
     'payment_receipts',
     'payment_orders',
@@ -143,7 +153,7 @@ function reset() {
     "INSERT OR IGNORE INTO users(id,name,created) VALUES('alice','Alice',1),('bob','Bob',1),('giver','Giver',1)",
   );
   sqlite.exec(
-    "UPDATE users SET deletedAt=0,onboardingComplete=1,kind='person',sessionsRevokedAt=0 WHERE id IN ('alice','bob','giver')",
+    "UPDATE users SET avatar='',deletedAt=0,onboardingComplete=1,kind='person',sessionsRevokedAt=0 WHERE id IN ('alice','bob','giver')",
   );
   sqlite.exec(
     "INSERT OR IGNORE INTO moderation_events(id,userId,moderatorId,mode,reason,created) VALUES('event','alice','giver','blocked','test',1)",
@@ -184,6 +194,58 @@ const play = (kind, extra = {}, telegramId = 111) => api.noctGiftsGame(kind, {
   ...(kind==='case'?{caseId:'eclipse'}:{receiptId:'gift-1',targetGiftId:'swiss_watch'}),...extra,
 }, 'https://noct.test');
 const count = table => sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
+
+function profileImage(owner='alice') {
+  const id='avatar-'+owner;
+  sqlite.prepare("INSERT OR REPLACE INTO uploads(id,userId,type,name,created,state) VALUES(?,?,'image/png','avatar.png',1,'ready')").run(id,owner);
+  sqlite.prepare("UPDATE users SET avatar=? WHERE id=?").run('/api/media/'+id,owner);
+  avatarObjects.set(id,Buffer.from('original-'+owner));
+  return id;
+}
+const avatarRequest = (body={initData:signed()},headers={}) => api.avatarPost(request('/api/noct-gifts/avatar',body,headers));
+void test('Telegram avatar returns the current NoctGram thumbnail privately without website cookies',async()=>{
+  reset();const id=profileImage();avatarObjects.set('avatars/v1/'+id+'/384.webp',Buffer.from('thumbnail'));
+  const result=await avatarRequest();assert.equal(result.status,200);
+  assert.equal(result.headers.get('content-type'),'image/webp');
+  assert.equal(result.headers.get('cache-control'),'private, no-store');
+  assert.equal(result.headers.get('x-content-type-options'),'nosniff');
+  assert.equal(await result.text(),'thumbnail');
+  assert.deepEqual(avatarReads,['avatars/v1/'+id+'/384.webp']);
+  assert.equal((await account()).balance,500);
+});
+void test('legacy avatars fall back to their original image; missing files are not served',async()=>{
+  reset();profileImage();let result=await avatarRequest();
+  assert.equal(result.status,200);assert.equal(result.headers.get('content-type'),'image/png');
+  assert.equal(await result.text(),'original-alice');
+  avatarObjects.clear();result=await avatarRequest();assert.equal(result.status,404);
+});
+void test('avatar requires signed Telegram identity and rejects arbitrary media and foreign origins',async()=>{
+  reset();profileImage();
+  for(const [body,headers,status] of [
+    [{initData:''},{},401],
+    [{initData:signed(333)},{},409],
+    [{initData:signed(),id:'avatar-bob'},{},400],
+    [{initData:signed()},{Origin:'https://foreign.test'},403],
+  ]){
+    const result=await avatarRequest(body,headers);assert.equal(result.status,status);
+    assert.equal(result.headers.get('cache-control'),'private, no-store');
+  }
+  assert.deepEqual(avatarReads,[]);
+});
+void test('avatar cannot expose another owner image, unready upload or non-image',async()=>{
+  reset();profileImage('bob');sqlite.exec("UPDATE users SET avatar='/api/media/avatar-bob' WHERE id='alice'");
+  assert.equal((await avatarRequest()).status,404);
+  profileImage();sqlite.exec("UPDATE uploads SET state='pending' WHERE id='avatar-alice'");
+  assert.equal((await avatarRequest()).status,404);
+  sqlite.exec("UPDATE uploads SET state='ready',type='text/html' WHERE id='avatar-alice'");
+  assert.equal((await avatarRequest()).status,404);
+  assert.deepEqual(avatarReads,[]);
+});
+void test('avatar is withheld if the Telegram link is removed during the storage read',async()=>{
+  reset();profileImage();afterAvatarRead=()=>sqlite.exec("DELETE FROM telegram_links WHERE userId='alice'");
+  const result=await avatarRequest();assert.equal(result.status,401);
+  assert.equal((await result.json()).code,'TELEGRAM_LINK_CHANGED');
+});
 
 void test('case debit and canonical receipt are immediate, idempotent and visible in the NoctGram profile', async t => {
   reset(); t.mock.method(globalThis.crypto,'getRandomValues', bytes=>{bytes.fill(0);return bytes;});

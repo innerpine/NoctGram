@@ -17,12 +17,35 @@
     if(!inTelegram){app.setState({accountMode:'telegram',balance:0,sharedGifts:[],inv:[]});return ()=>{};}
     telegram.ready();telegram.expand?.();telegram.setHeaderColor?.('#000000');telegram.setBackgroundColor?.('#000000');
     let alive=true,epoch=0,refreshing=false,gameWorking=false,timer=null,intent=null;
+    let avatarEpoch=0,avatarKey='',avatarObjectUrl='';
+    const clearAvatar=()=>{avatarEpoch++;avatarKey='';if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);avatarObjectUrl='';app.setState({profileAvatar:''});};
+    const loadAvatar=data=>{
+      const value=data.user.avatar;
+      let source;
+      try{if(!value)throw Error();source=new URL(value,data.links?.siteUrl||location.origin);if(source.username||source.password||!(source.protocol==='https:'||(source.protocol==='http:'&&source.origin===location.origin)))throw Error();}catch{clearAvatar();return;}
+      const key=data.user.id+' '+source.href;
+      if(avatarKey===key)return;
+      clearAvatar();avatarKey=key;
+      if(!/^\/api\/media\/[a-zA-Z0-9_-]+$/.test(source.pathname)){app.setState({profileAvatar:source.href});return;}
+      const token=avatarEpoch;
+      void (async()=>{
+        try{
+          const response=await fetch('/api/noct-gifts/avatar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:telegram.initData}),credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(15000)});
+          if(!response.ok||!/^image\/(?:png|jpeg|webp|gif|avif)(?:;|$)/i.test(response.headers.get('Content-Type')||''))throw Error();
+          const blob=await response.blob();
+          if(!alive||token!==avatarEpoch)return;
+          if(!blob.size||blob.size>16*1024*1024)throw Error();
+          avatarObjectUrl=URL.createObjectURL(blob);app.setState({profileAvatar:avatarObjectUrl});
+        }catch{if(alive&&token===avatarEpoch)avatarKey='';}
+      })();
+    };
     const storageKey=owner=>'noct-gifts-operation-v1:'+owner;
     const saved=owner=>{try{const p=JSON.parse(sessionStorage.getItem(storageKey(owner)));return p?.owner===owner&&['case','upgrade'].includes(p.kind)&&typeof p.body?.key==='string'?p:null;}catch{return null;}};
     const storeIntent=value=>{try{sessionStorage.setItem(storageKey(value.owner),JSON.stringify(value));}catch{throw Error('Не удалось сохранить запрос. Разрешите хранилище мини-аппа и повторите.');}};
     const forgetIntent=value=>{try{sessionStorage.removeItem(storageKey(value.owner));}catch{}if(intent===value)intent=null;};
     app.accountState={key:null,sku:null};
     const clearAccount=(mode,links=null,error=null)=>{
+      clearAvatar();
       epoch++;intent=null;app.accountState={key:null,sku:null};app.openOp=null;app.upgradeOp=null;
       app.setState({accountMode:mode,shared:null,sharedGifts:[],sharedNext:null,sharedGift:null,balance:0,inv:[],games:null,fromId:null,toId:null,fromUid:null,
         screen:'profile',phase:'idle',upPhase:'select',gamePending:false,gameRetry:false,gameError:null,gameResult:null,prizeGift:null,upgradeSource:null,
@@ -39,6 +62,7 @@
           pack:0,payPhase:'idle',acceptedTerms:false,celebration:0,toast:null,gamePending:false,gameRetry:!!intent,gameError:intent?'Остался незавершённый запрос. Проверьте его результат перед новой попыткой.':null});
       }
       app.setState(patch);
+      loadAvatar(data);
     };
     const refresh=async(append=false)=>{
       if(refreshing||gameWorking||!alive)return;
@@ -121,7 +145,7 @@
       }catch(error){if(alive&&app.state.shared?.user?.id===payer){if(error.status===401||error.status===403)clearAccount('error',null,error.message);else app.setState({payPhase:'error',toast:error.message});}}
     };
     const visible=()=>{if(!document.hidden)void refresh();};document.addEventListener('visibilitychange',visible);void refresh();
-    return ()=>{alive=false;epoch++;clearTimeout(timer);document.removeEventListener('visibilitychange',visible);};
+    return ()=>{alive=false;epoch++;avatarEpoch++;if(avatarObjectUrl)URL.revokeObjectURL(avatarObjectUrl);avatarObjectUrl='';clearTimeout(timer);document.removeEventListener('visibilitychange',visible);};
   }
   window.NoctAccount={inTelegram,connect,asset,openTelegram(){const url='https://t.me/noctgramdrop_bot';if(telegram?.openTelegramLink)telegram.openTelegramLink(url);else window.open(url,'_blank','noopener,noreferrer');},openLink(url){try{const u=new URL(url);if(u.protocol==='https:'||(u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname))){if(telegram?.openLink)telegram.openLink(u.href);else window.open(u.href,'_blank','noopener,noreferrer');}}catch{}}};
 })();

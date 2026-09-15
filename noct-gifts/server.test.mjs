@@ -64,6 +64,22 @@ async function fixture(t, options = {}) {
   return { rootDir, upstreamOrigin, server, origin, seen, put, post };
 }
 
+void test('avatar proxy forwards only Telegram authentication and returns private image bytes',async t=>{
+  const f=await fixture(t,{respond(req,res){res.writeHead(200,{'Content-Type':'image/webp','Set-Cookie':'private=1'});res.end('avatar-bytes');}});
+  const result=await f.post('/api/noct-gifts/avatar',{initData:'signed-fixture'},{Cookie:'session=private',Authorization:'Bearer private'});
+  assert.equal(result.status,200);assert.equal(result.body,'avatar-bytes');
+  assert.equal(result.headers['content-type'],'image/webp');
+  assert.match(result.headers['cache-control'],/private.*no-store/);
+  assert.equal(result.headers['set-cookie'],undefined);
+  assert.equal(f.seen[0].path,'/api/noct-gifts/avatar');assert.equal(f.seen[0].body,JSON.stringify({initData:'signed-fixture'}));
+  assert.equal(f.seen[0].headers.cookie,undefined);assert.equal(f.seen[0].headers.authorization,undefined);
+});
+void test('avatar proxy refuses HTML in place of image bytes',async t=>{
+  const f=await fixture(t,{respond(req,res){res.writeHead(200,{'Content-Type':'text/html'});res.end('<script>private</script>');}});
+  const result=await f.post('/api/noct-gifts/avatar');assert.equal(result.status,502);
+  assert.ok(!result.body.includes('<script>'));
+});
+
 void test('serves only the explicit app files and public local assets, including HEAD', async (t) => {
   const f = await fixture(t);
   for (const file of ['index.html', 'Noct Gifts App.dc.html', 'motion.css', 'effects.js', 'account-bridge.js', 'support.js', 'assets/icon.png', 'assets/gifts/gift.json', 'assets/vendor/lottie_light.min.js']) {

@@ -16,6 +16,11 @@ const linked = (patch = {}) => ({ status: 'linked', authExpiresAt: Date.now()+36
 
 function fixture({ inTelegram = true, storage = new Map(), search = '', directAssets = false } = {}) {
   const calls = [], pending = [], jobs = new Map(), listeners = new Map(), opened = [];
+  const created = [], revoked = [];
+  class AvatarURL extends URL {
+    static createObjectURL(blob){created.push(blob);return 'blob:avatar-'+created.length;}
+    static revokeObjectURL(url){revoked.push(url);}
+  }
   let next = 1, clock = 0, uuid = 0, ready = 0;
   const schedule = (fn, ms = 0) => { const id=next++;jobs.set(id,{fn,at:clock+ms});return id; };
   const document = { hidden: false, addEventListener(type,fn){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type).add(fn);}, removeEventListener(type,fn){listeners.get(type)?.delete(fn);} };
@@ -23,7 +28,7 @@ function fixture({ inTelegram = true, storage = new Map(), search = '', directAs
   const telegram = { initData: inTelegram ? auth : '', ready(){ready++;}, openTelegramLink(url){opened.push(url);}, openLink(url){opened.push(url);} };
   const window = { NoctGiftsConfig:{directAssets}, Telegram:{WebApp:telegram}, location:{search,origin:'http://127.0.0.1:4186'}, matchMedia:()=>media, open:url=>opened.push(url) };
   class DCLogic { constructor(props){this.props=props;this.state={};} setState(patch,callback){this.state={...this.state,...(typeof patch==='function'?patch(this.state):patch)};callback?.();} }
-  const context=vm.createContext({ window,document,location:window.location,DCLogic,React:{createRef:()=>({current:null})},URL,URLSearchParams,Date,Math,console,
+  const context=vm.createContext({ window,document,location:window.location,DCLogic,React:{createRef:()=>({current:null})},URL:AvatarURL,URLSearchParams,Date,Math,console,
     sessionStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},crypto:{randomUUID:()=>`request-id-${++uuid}`},AbortSignal:{timeout:ms=>({timeout:ms})},
     setTimeout:schedule,clearTimeout:id=>jobs.delete(id),requestAnimationFrame:fn=>schedule(fn,16),cancelAnimationFrame:id=>jobs.delete(id),
     fetch:(url,options)=>{calls.push({url,options,body:JSON.parse(options.body)});return new Promise((resolve,reject)=>pending.push({resolve,reject}));},
@@ -33,7 +38,8 @@ function fixture({ inTelegram = true, storage = new Map(), search = '', directAs
   const app=new context.App({variant:'cases'});
   app.componentDidMount();
   const flush=()=>new Promise(resolve=>setImmediate(resolve));
-  return {app,calls,opened,window,jobs,listeners,pending,storage,ready:()=>ready,flush,
+  return {app,calls,opened,window,jobs,listeners,pending,storage,created,revoked,ready:()=>ready,flush,
+    async replyImage(index=0,type='image/webp'){assert.ok(pending[index]);pending.splice(index,1)[0].resolve({ok:true,headers:new Headers({'Content-Type':type}),blob:async()=>new Blob(['image'],{type})});await flush();},
     async reply(data,status=200){assert.ok(pending.length,'Expected a pending network request');pending.shift().resolve({ok:status>=200&&status<300,status,json:async()=>data});await flush();},
     async replyAt(index,data,status=200){assert.ok(pending[index]);pending.splice(index,1)[0].resolve({ok:status>=200&&status<300,status,json:async()=>data});await flush();},
     async reject(message='Network failure'){assert.ok(pending.length);pending.shift().reject(new Error(message));await flush();},
@@ -41,6 +47,40 @@ function fixture({ inTelegram = true, storage = new Map(), search = '', directAs
     dispose(){app.componentWillUnmount();},
   };
 }
+
+const withAvatar=(avatar='https://noct.test/api/media/avatar-alice',id='alice')=>linked({user:{id,name:id,handle:id,avatar}});
+void test('profile uses authenticated NoctGram avatar bytes, refreshes changed images and releases blobs',async t=>{
+  const f=fixture();t.after(()=>f.dispose());await f.reply(withAvatar());
+  const call=f.calls.at(-1);assert.equal(call.url,'/api/noct-gifts/avatar');
+  assert.deepEqual(plain(call.body),{initData:auth});assert.equal(call.options.credentials,'omit');
+  assert.equal(call.options.cache,'no-store');await f.replyImage();
+  assert.equal(f.app.renderVals().profileAvatar,'blob:avatar-1');
+  let refresh=f.app.refreshAccount();await f.reply(withAvatar());await refresh;
+  assert.equal(f.calls.filter(c=>c.url.endsWith('/avatar')).length,1);
+  refresh=f.app.refreshAccount();await f.reply(withAvatar('https://noct.test/api/media/new-avatar'));await refresh;
+  assert.deepEqual(f.revoked,['blob:avatar-1']);await f.replyImage();
+  assert.equal(f.app.renderVals().profileAvatar,'blob:avatar-2');
+  f.dispose();assert.ok(f.revoked.includes('blob:avatar-2'));
+});
+void test('late avatar responses cannot replace another account or update an unmounted app',async()=>{
+  const f=fixture();await f.reply(withAvatar());
+  const refresh=f.app.refreshAccount();await f.replyAt(1,withAvatar('https://noct.test/api/media/avatar-bob','bob'));await refresh;
+  await f.replyImage(1);assert.equal(f.app.renderVals().profileAvatar,'blob:avatar-1');
+  await f.replyImage();assert.equal(f.created.length,1);f.dispose();
+  const closed=fixture();await closed.reply(withAvatar());closed.dispose();await closed.replyImage();
+  assert.equal(closed.created.length,0);
+});
+void test('failed avatar download can retry and blank or unsafe avatars use the placeholder',async t=>{
+  const f=fixture();t.after(()=>f.dispose());await f.reply(withAvatar());await f.replyImage(0,'text/html');
+  assert.equal(f.app.renderVals().profileAvatar,'assets/noctgram-logo.png');
+  let refresh=f.app.refreshAccount();await f.reply(withAvatar());await refresh;await f.replyImage();
+  assert.equal(f.app.renderVals().profileAvatar,'blob:avatar-1');
+  for(const source of ['https://noct.test/assets/profile.png','','javascript:alert(1)']){
+    refresh=f.app.refreshAccount();await f.reply(withAvatar(source));await refresh;
+    assert.equal(f.app.renderVals().profileAvatar,source.startsWith('https:')?source:'assets/noctgram-logo.png');
+    assert.equal(f.pending.length,0);
+  }
+});
 
 void test('main-domain mini-app uses original gift assets and the existing authenticated API', async t=>{
   const f=fixture({directAssets:true});t.after(()=>f.dispose());

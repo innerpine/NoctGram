@@ -9,7 +9,7 @@ const STATIC_FILES = new Set([
   '/index.html', '/Noct Gifts App.dc.html',
   '/motion.css', '/effects.js', '/account-bridge.js', '/support.js',
 ]);
-const API_ROUTES = new Set(['/api/noct-gifts/account', '/api/noct-gifts/topup', '/api/noct-gifts/case', '/api/noct-gifts/upgrade']);
+const API_ROUTES = new Set(['/api/noct-gifts/account', '/api/noct-gifts/avatar', '/api/noct-gifts/topup', '/api/noct-gifts/case', '/api/noct-gifts/upgrade']);
 const LOCAL_ASSET_EXTENSIONS = new Set(['.png', '.svg', '.webp', '.json', '.js']);
 const REMOTE_ASSET_EXTENSIONS = new Set(['.png', '.svg', '.webp', '.json', '.tgs']);
 const MIME = {
@@ -203,11 +203,15 @@ export function createNoctGiftsServer({
         }
         const body = await readJsonBody(req, maxBodyBytes, bodyTimeoutMs);
         const result = await upstreamRequest(origin, pathname, {
-          method: 'POST', body, timeoutMs: upstreamTimeoutMs, maxBytes: 1024 * 1024,
+          method: 'POST', body, timeoutMs: upstreamTimeoutMs, maxBytes: pathname === '/api/noct-gifts/avatar' ? 16 * 1024 * 1024 : 1024 * 1024,
         });
         if (result.status < 200 || result.status >= 300) {
           const status = result.status >= 400 && result.status < 500 ? result.status : 502;
           throw new RequestError(status, status === 429 ? 'Too many requests. Please try again later.' : 'NoctGram could not complete this request.');
+        }
+        if (pathname === '/api/noct-gifts/avatar') {
+          if (!/^image\/(?:png|jpeg|webp|gif|avif)(?:\s*;|$)/i.test(result.contentType)) throw new RequestError(502, 'NoctGram returned an invalid image.');
+          res.writeHead(200, {'Content-Type':result.contentType});res.end(result.body);return;
         }
         if (!/^application\/json(?:\s*;|$)/i.test(result.contentType)) throw new RequestError(502, 'NoctGram returned an invalid response.');
         let data;

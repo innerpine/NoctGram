@@ -868,7 +868,7 @@ class Component extends DCLogic {
       accountHint:s.sharedLinks?.linkAccountHint||'Войдите в NoctGram и привяжите Telegram в разделе Noct Stars. Затем вернитесь сюда и нажмите обновить.',
       refreshShared:()=>this.refreshAccount?.(),linkShared:()=>window.NoctAccount?.openLink(s.sharedLinks?.linkAccountUrl),
       profileName:s.shared?.user?.name||'Ваш аккаунт',profileHandle:s.shared?.user?.handle?'@'+s.shared.user.handle:'NoctGram',
-      profileAvatar:window.NoctAccount?.asset(s.shared?.user?.avatar)||'assets/noctgram-logo.png',
+      profileAvatar:s.profileAvatar||'assets/noctgram-logo.png',
       balanceFmt:linked?this.fmt(s.balance):'—', balanceAccessible:this.fmt(s.balance)+' Noct Stars',
       balanceDigits:Array.from(this.fmt(s.balance)).map((value,i)=>({value:value===' '?'\u00a0':value,style:'--digit-delay:'+Math.min(i*35,180)+'ms'})),
       starParticles:[[-108,-56,15,-42,0],[-58,-76,12,28,.22],[3,-83,13,-24,.45],[64,-66,18,40,.13],[113,-36,12,65,.64],[120,12,15,-38,.36],[84,61,11,54,.78],[35,76,14,-28,.28],[-35,72,11,48,.92],[-94,45,17,-55,.53],[-124,3,11,32,.82],[42,-38,9,-70,1.1]].map(([x,y,size,turn,delay])=>({style:'--fly-x:'+x+'px;--fly-y:'+y+'px;--mid-x:'+x*.58+'px;--mid-y:'+y*.58+'px;--turn:'+turn+'deg;--size:'+size+'px;--delay:'+delay+'s'})),
