@@ -25,6 +25,11 @@ SENSITIVE = []
 def run(args, label, *, private=False):
     result = subprocess.run([str(arg) for arg in args], cwd=SOURCE, capture_output=True)
     if result.returncode:
+        if private and label == 'Import signing identity':
+            diagnostic = result.stderr.decode('utf-8', errors='replace').strip()
+            for value in [str(arg) for arg in args if len(str(arg)) > 3] + SENSITIVE:
+                diagnostic = diagnostic.replace(value, '[redacted]')
+            print('Signing import diagnostic: ' + diagnostic[-500:])
         if not private:
             log = (result.stdout + result.stderr).decode('utf-8', errors='replace')
             for value in SENSITIVE:

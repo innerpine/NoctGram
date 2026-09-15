@@ -358,6 +358,12 @@ extension WebViewController: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if response.isForMainFrame, let url = response.response.url,
+           !Self.isTrusted(url) && !allowedOAuth(url) && !Self.isTrustedBlob(url) {
+            decisionHandler(.cancel)
+            showNotice("Переход за пределы NoctGram остановлен.")
+            return
+        }
         if let http = response.response as? HTTPURLResponse, http.statusCode >= 500, response.isForMainFrame {
             decisionHandler(.cancel)
             showError("Сервер временно недоступен. Попробуйте ещё раз чуть позже.")
@@ -396,6 +402,8 @@ extension WebViewController: WKNavigationDelegate {
     private func navigationFailed(_ error: Error) {
         let failure = error as NSError
         if failure.domain == NSURLErrorDomain && failure.code == NSURLErrorCancelled { return }
+        // WebKit reports 102 when a navigation is handed to a download or cancelled by policy.
+        if failure.domain == "WebKitErrorDomain" && failure.code == 102 { return }
         showError("Проверьте подключение к интернету и попробуйте снова.")
     }
 
