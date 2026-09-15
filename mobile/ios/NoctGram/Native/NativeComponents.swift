@@ -55,6 +55,8 @@ struct NGPrimaryButtonStyle: ButtonStyle {
     }
     private func label(_ configuration: Configuration) -> some View {
         configuration.label.font(.headline).padding(.horizontal, 20).frame(minHeight: 52)
+            // Include padding and transparent spacers in the button's touch target.
+            .contentShape(Rectangle())
             .foregroundColor(.black).opacity(configuration.isPressed ? 0.8 : 1)
     }
 }

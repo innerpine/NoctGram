@@ -9,7 +9,7 @@ final class NativeSession: ObservableObject {
     @Published var error: String?
     @Published var emailEnabled = true
     private var restoring = false
-    private let api: NoctAPI
+    let api: NoctAPI
 
     init(api: NoctAPI? = nil) { self.api = api ?? .shared }
 
@@ -80,10 +80,18 @@ final class NativeSession: ObservableObject {
 }
 
 struct NativeRootView: View {
-    @StateObject private var session = NativeSession()
+    @StateObject private var session: NativeSession
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab = 0
     @State private var pickerError: String?
+
+    @MainActor init() {
+        #if DEBUG
+        _session = StateObject(wrappedValue: NativeAuthUITestFixture.makeSession() ?? NativeSession())
+        #else
+        _session = StateObject(wrappedValue: NativeSession())
+        #endif
+    }
 
     var body: some View {
         ZStack {
@@ -128,10 +136,7 @@ struct NativeRootView: View {
         .preferredColorScheme(.dark)
         .task {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--ui-test-login") {
-                session.phase = .signedOut
-                return
-            }
+            if NativeAuthUITestFixture.isEnabled { return }
             #endif
             NGTemporaryMedia.removeAll()
             await session.refresh()

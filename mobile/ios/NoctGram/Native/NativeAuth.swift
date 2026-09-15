@@ -69,17 +69,34 @@ struct NGSignInView: View {
                     if awaitingCode {
                         TimelineView(.periodic(from: .now, by: 1)) { context in
                             let remaining = max(0, Int(resendAt.timeIntervalSince(context.date).rounded(.up)))
-                            Button(remaining > 0 ? "Отправить снова через \(remaining) с" : "Отправить код снова") {
+                            Button {
                                 sendCode()
+                            } label: {
+                                Text(remaining > 0 ? "Отправить снова через \(remaining) с" : "Отправить код снова")
+                                    .frame(maxWidth: .infinity, minHeight: 48)
+                                    .contentShape(Rectangle())
                             }
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .buttonStyle(.plain)
+                            .foregroundColor(NGTheme.accent)
+                            .opacity(busy || remaining > 0 ? 0.45 : 1)
                             .disabled(busy || remaining > 0)
+                            .accessibilityIdentifier("login.resend")
                         }
-                        Button("Изменить почту") {
+                        Button {
                             awaitingCode = false
                             code = ""
                             error = nil
-                        }.frame(maxWidth: .infinity, minHeight: 44).disabled(busy)
+                            focusedField = "email"
+                        } label: {
+                            Text("Изменить почту")
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(NGTheme.accent)
+                        .opacity(busy ? 0.45 : 1)
+                        .disabled(busy)
+                        .accessibilityIdentifier("login.change-email")
                     }
                 }
                 Text("Используй почту своего аккаунта NoctGram. Если аккаунта ещё нет, создадим его после подтверждения.")
@@ -102,28 +119,30 @@ struct NGSignInView: View {
         return parts.count == 2 && parts[1].contains(".") && email.count <= 254
     }
     private func submit() {
-        guard !busy else { return }
+        guard !busy, session.emailEnabled else { return }
         if !awaitingCode { sendCode(); return }
+        guard code.count == 6 else { return }
         busy = true
         error = nil
         focusedField = nil
         Task {
             defer { busy = false }
             do {
-                _ = try await NoctAPI.shared.post("/api/auth/verify", body: ["code": code])
+                _ = try await session.api.post("/api/auth/verify", body: ["code": code])
                 await session.refresh()
             } catch { self.error = error.localizedDescription }
         }
     }
     private func sendCode() {
-        guard validEmail, !busy else { return }
+        guard validEmail, !busy, session.emailEnabled else { return }
         busy = true
         error = nil
+        focusedField = nil
         Task {
             defer { busy = false }
             do {
                 email = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                let result = try await NoctAPI.shared.post("/api/auth/start", body: ["email": email])
+                let result = try await session.api.post("/api/auth/start", body: ["email": email])
                 resendAt = Date(timeIntervalSince1970: result.double("resendAt") / 1000)
                 awaitingCode = true
                 code = ""
@@ -139,35 +158,55 @@ struct NGOnboardingView: View {
     @State private var handle = ""
     @State private var busy = false
     @State private var error: String?
+    @FocusState private var focusedField: String?
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Как тебя представить?"), footer: Text("Юзернейм: 4–24 латинские буквы, цифры или знак _.")) {
                     TextField("Имя", text: $name).textContentType(.nickname)
+                        .focused($focusedField, equals: "name")
+                        .submitLabel(.next).onSubmit { focusedField = "handle" }
+                        .accessibilityIdentifier("onboarding.name")
                         .onChange(of: name) { name = String($0.prefix(40)) }
                     TextField("username", text: $handle)
                         .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                        .focused($focusedField, equals: "handle")
+                        .submitLabel(.go).onSubmit { submit() }
+                        .accessibilityIdentifier("onboarding.handle")
                         .onChange(of: handle) { handle = String($0.lowercased().prefix(24)) }
                 }
-                if let error { Section { Text(error).foregroundColor(.orange) } }
+                if let error { Section { Text(error).foregroundColor(.orange).accessibilityIdentifier("onboarding.error") } }
                 Section {
-                    Button {
-                        busy = true
-                        error = nil
-                        Task {
-                            defer { busy = false }
-                            do {
-                                _ = try await NoctAPI.shared.post("/api/auth/onboarding", body: ["name": name.trimmingCharacters(in: .whitespacesAndNewlines), "handle": handle])
-                                await session.refresh()
-                            } catch { self.error = error.localizedDescription }
-                        }
-                    } label: {
+                    Button(action: submit) {
                         HStack { Text("Начать общение"); Spacer(); if busy { ProgressView() } }
-                    }.disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || handle.range(of: "^[a-z0-9_]{4,24}$", options: .regularExpression) == nil)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .contentShape(Rectangle())
+                    }
+                    .disabled(busy || !validProfile)
+                    .accessibilityIdentifier("onboarding.submit")
                 }
             }
             .navigationTitle("Твой профиль")
-            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button("Выйти") { Task { await session.signOut() } } } }
+            .toolbar { ToolbarItem(placement: .navigationBarLeading) { Button("Выйти") { Task { await session.signOut() } }.accessibilityIdentifier("onboarding.logout") } }
         }.navigationViewStyle(.stack)
+    }
+
+    private var validProfile: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        handle.range(of: "^[a-z0-9_]{4,24}$", options: .regularExpression) != nil
+    }
+
+    private func submit() {
+        guard !busy, validProfile else { return }
+        busy = true
+        error = nil
+        focusedField = nil
+        Task {
+            defer { busy = false }
+            do {
+                _ = try await session.api.post("/api/auth/onboarding", body: ["name": name.trimmingCharacters(in: .whitespacesAndNewlines), "handle": handle])
+                await session.refresh()
+            } catch { self.error = error.localizedDescription }
+        }
     }
 }
