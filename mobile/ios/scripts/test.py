@@ -22,11 +22,16 @@ command = ['xcodebuild', '-quiet', '-project', str(source / 'NoctGram.xcodeproj'
            'CODE_SIGN_IDENTITY=-', 'CODE_SIGN_STYLE=Manual',
            'DEVELOPMENT_TEAM=', 'PROVISIONING_PROFILE_SPECIFIER=']
 completed = subprocess.run(command, cwd=source)
+if result.exists():
+    report = subprocess.run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', str(result)], capture_output=True, text=True)
+    if report.returncode == 0:
+        (temp / 'noctgram-native-summary.json').write_text(report.stdout, encoding='utf-8')
+        print(report.stdout)
 if completed.returncode:
-    if result.exists():
-        subprocess.run(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', str(result)])
     raise SystemExit(completed.returncode)
 app = derived / 'Build/Products/Debug-iphonesimulator/NoctGram.app'
+subprocess.run(['xcrun', 'simctl', 'boot', device], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+subprocess.run(['xcrun', 'simctl', 'bootstatus', device, '-b'], check=True)
 subprocess.run(['xcrun', 'simctl', 'install', device, str(app)], check=True)
 subprocess.run(['xcrun', 'simctl', 'launch', device, 'com.noctgram.ios', '--ui-test-login'], check=True)
 # The UI test above already asserts initial rendering; capture a standalone review image too.

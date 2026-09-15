@@ -34,6 +34,7 @@ jobs:
           path: |
             ${{ runner.temp }}/noctgram-native-tests.xcresult
             ${{ runner.temp }}/noctgram-native-preview.png
+            ${{ runner.temp }}/noctgram-native-summary.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Archive and sign
