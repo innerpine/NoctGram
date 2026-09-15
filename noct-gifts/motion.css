@@ -64,7 +64,7 @@ body { margin: 0; background: #08080a; }
 .ng-app[data-telegram="true"][data-profile="true"] .ng-content { padding-top:0!important; }
 .ng-upgrade-actions { position:relative; margin-top:20px; padding-top:16px; border-top:1px solid #ffffff10; }
 .ng-app[data-reduced="true"] * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
-.ng-scroll { scroll-behavior: smooth; }
+.ng-scroll { scroll-behavior: smooth; scroll-padding-bottom:110px; }
 .ng-open { padding: 26px 0 16px; }
 .ng-eyebrow { text-transform: uppercase; color: #bba5d1; font-size: 11px; font-weight: 600; letter-spacing: 1.9px; text-align: center; }
 .ng-open h1 { margin: 10px 0 6px; font-size: 28px; font-weight: 600; letter-spacing: -.8px; text-align: center; }
@@ -174,3 +174,40 @@ ng-upgrade-burst canvas { display:block; width:100%; height:100%; }
 .ng-game-notice { position:relative;padding:14px 16px;margin:12px 0;border:1px solid #c7ace833;border-radius:16px;background:#211929;color:#dcd0e9;font-size:13px;line-height:1.5; }
 .ng-game-notice p { margin:0 0 12px; }
 .ng-operation-note { text-align:center;font-size:11px;line-height:1.5;color:#a8a0b0;margin:18px 0; }
+/* Batch selection and independent draws. */
+.ng-count-picker{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:5px;margin:18px 0;border:1px solid #ffffff18;border-radius:18px;background:#ffffff06}
+.ng-count-picker button{height:42px;border:1px solid transparent;border-radius:13px;background:transparent;color:#a1a1aa;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:background .18s,color .18s,transform .18s}
+.ng-count-picker button[aria-pressed="true"]{background:#c7ace823;border-color:#c7ace84d;color:#e5d7f5}
+.ng-count-picker button:active{transform:scale(.96)}
+.ng-count-picker button:disabled{cursor:default;opacity:.55}
+.ng-batch-reels,.ng-batch-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%}
+.ng-mini-reel{height:132px;overflow:hidden;position:relative;border:1px solid #ffffff14;border-radius:18px;background:#ffffff04;isolation:isolate}
+.ng-mini-number{position:absolute;left:9px;top:7px;color:#a1a1aa;font-size:11px;z-index:2}
+.ng-mini-track{position:absolute;left:50%;top:12px;display:flex;gap:8px;width:max-content;transform:translate3d(-3860px,0,0)}
+.ng-mini-card{flex:0 0 104px;width:104px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.ng-mini-card img{width:78px;height:78px;object-fit:contain}
+.ng-mini-card strong{font-size:11px;line-height:14px;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.ng-mini-selector{position:absolute;inset:5px auto 5px 50%;width:108px;transform:translateX(-50%);border:1px solid #c7ace850;border-radius:14px;pointer-events:none;background:linear-gradient(180deg,#c7ace809,transparent)}
+.is-running .ng-mini-track{animation:ngBatchReel 4.8s cubic-bezier(.12,.66,.12,1) both}
+@keyframes ngBatchReel{from{transform:translate3d(-276px,0,0)}to{transform:translate3d(-3860px,0,0)}}
+.ng-win .ng-batch-prize{display:flex;align-items:center;flex-direction:column;gap:6px;min-width:0;height:auto;margin:0;padding:14px 8px;border:1px solid #c7ace828;border-radius:18px;background:#ffffff05;color:#f7f7f5;font:inherit;cursor:pointer}
+.ng-win .ng-batch-prize img{width:78px;height:78px;object-fit:contain}
+.ng-batch-prize strong{font-size:13px;line-height:18px}
+.ng-batch-prize small{color:#a1a1aa;font-size:11px}
+.ng-upgrade-batch{margin:16px 0}
+.ng-upgrade-selectors[data-multi="true"] button>div:nth-child(2){width:64px!important;height:64px!important;aspect-ratio:auto!important;margin:auto}
+.ng-upgrade-selectors[data-multi="true"] button>div:first-child{font-size:12px!important}
+.ng-upgrade-batch>p{font-size:13px;color:#a1a1aa;margin:0 0 10px}
+.ng-upgrade-row{display:flex;align-items:center;gap:12px;padding:12px;margin:8px 0;border:1px solid #ffffff14;border-radius:16px;background:#ffffff04}
+.ng-upgrade-row img{width:44px;height:44px;object-fit:contain}
+.ng-upgrade-row>div{min-width:0;flex:1}
+.ng-upgrade-row strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.ng-upgrade-row small{display:block;font-size:11px;color:#a1a1aa;margin-top:4px}
+.ng-upgrade-row b{font-size:14px;color:#c7ace8;flex:none}
+.ng-upgrade-row[data-tone="success"]{border-color:#3ecf8e50}
+.ng-upgrade-row[data-tone="success"] small{color:#3ecf8e}
+.ng-mini-chance{height:3px;overflow:hidden;border-radius:8px;background:#ffffff0c;margin-top:8px}
+.ng-mini-chance i{height:100%;display:block;background:#c7ace8;border-radius:8px}
+.ng-upgrade-row.is-pending .ng-mini-chance i{animation:ngBatchPulse .8s ease-in-out infinite alternate}
+@keyframes ngBatchPulse{to{opacity:.25}}
+@media(prefers-reduced-motion:reduce){.ng-count-picker button{transition:none}.is-running .ng-mini-track,.ng-upgrade-row.is-pending .ng-mini-chance i{animation:none}}

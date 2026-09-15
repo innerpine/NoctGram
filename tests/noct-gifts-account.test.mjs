@@ -190,10 +190,95 @@ const account = (id = 111, extra = {}) =>
   api.noctGiftsAccount({ initData: signed(id), ...extra }, 'https://noct.test');
 
 const play = (kind, extra = {}, telegramId = 111) => api.noctGiftsGame(kind, {
-  initData:signed(telegramId),version:'2026-09-15-2',key:'test-game-request-0001',
+  initData:signed(telegramId),version:'2026-09-15-3',key:'test-game-request-0001',
   ...(kind==='case'?{caseId:'eclipse'}:{receiptId:'gift-1',targetGiftId:'swiss_watch'}),...extra,
 }, 'https://noct.test');
 const count = table => sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
+
+for(const amount of [3,5,10]) void test(`${amount} cases are charged together, independently receipted, sellable and idempotent`,async t=>{
+  reset();sqlite.exec("UPDATE star_transfers SET amount=10000 WHERE id='alice-credit'");
+  t.mock.method(crypto,'getRandomValues',array=>{array.fill(0);return array;});
+  const [a,b]=await Promise.all([play('case',{count:amount}),play('case',{count:amount})]);
+  assert.deepEqual(a,b);assert.equal(a.operation.count,amount);assert.equal(a.operation.price,320*amount);
+  assert.equal(a.balance,10000-320*amount);assert.equal(a.results.length,amount);assert.equal(a.gifts.length,amount);
+  assert.equal(new Set(a.gifts.map(g=>g.id)).size,amount);assert.equal(count('received_gifts'),amount);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM star_transfers WHERE kind='case_open'").get().n,amount);
+  for(const item of a.results){
+    assert.equal(item.operation.price,320);assert.equal(item.gift.id,item.operation.id);
+    const preview=await api.previewGiftConversion('alice',item.gift.id);
+    assert.equal(preview.available,true);assert.equal(preview.amount,Math.floor(item.gift.price*.85));
+  }
+  await assert.rejects(play('case',{count:amount===3?5:3}),e=>e.code==='GAME_KEY_CONFLICT');
+  assert.equal(count('received_gifts'),amount);
+});
+
+void test('case batch cannot partially debit, including failure after some prize inserts',async()=>{
+  reset();await assert.rejects(play('case',{count:3}),e=>e.code==='INSUFFICIENT_STARS');
+  assert.equal((await account()).balance,500);assert.equal(count('received_gifts'),0);
+  sqlite.exec("UPDATE star_transfers SET amount=10000 WHERE id='alice-credit'");
+  sqlite.exec("CREATE TEMP TRIGGER fail_batch_prize BEFORE INSERT ON received_gifts WHEN NEW.id LIKE '%:3' BEGIN SELECT RAISE(ABORT,'simulated third receipt failure'); END");
+  try{await assert.rejects(play('case',{count:5}));}finally{sqlite.exec('DROP TRIGGER fail_batch_prize');}
+  assert.equal((await account()).balance,10000);assert.equal(count('received_gifts'),0);
+  assert.equal(count('star_transfers'),2);
+  assert.equal((await play('case',{count:5})).results.length,5);
+});
+
+for(const amount of [3,5,10]) void test(`${amount} gift upgrades consume every selected receipt once with no Stars`,async t=>{
+  reset();sqlite.exec("UPDATE star_transfers SET amount=0 WHERE id='alice-credit'");
+  for(let i=1;i<=amount+1;i++)gift(i,'alice',0,i%2?'toy_bear':'crystal_ball');
+  const receiptIds=Array.from({length:amount},(_,i)=>'gift-'+(i+1));let ticket=0;
+  t.mock.method(crypto,'getRandomValues',array=>{array.fill(ticket++%2?9999:0);return array;});
+  const body={receiptId:undefined,receiptIds};
+  const a=await play('upgrade',body),b=await play('upgrade',body);
+  assert.deepEqual(a,b);assert.equal(a.balance,0);assert.equal(a.operation.price,0);
+  assert.equal(a.results.length,amount);assert.equal(count('gift_consumptions'),amount);
+  assert.equal(a.gifts.length,Math.ceil(amount/2));
+  for(const [i,result] of a.results.entries()){
+    assert.equal(result.operation.sourceReceiptId,receiptIds[i]);assert.equal(result.operation.success,i%2===0);
+    assert.equal(result.operation.chance,i%2?20:15);assert.equal(result.operation.price,0);
+    if(result.gift)assert.equal((await api.previewGiftConversion('alice',result.gift.id)).available,true);
+  }
+  assert.ok((await account()).gifts.some(g=>g.id==='gift-'+(amount+1)));
+  await assert.rejects(play('upgrade',{...body,key:'another-batch-key-0001'}),e=>e.code==='GIFT_NOT_AVAILABLE');
+  assert.equal(count('gift_consumptions'),amount);assert.equal((await account()).balance,0);
+});
+
+void test('batch upgrade rejects duplicate, foreign, unavailable and more expensive sources as a whole',async()=>{
+  for(const mode of ['duplicate','foreign','missing','too-expensive']){
+    reset();gift(1,'alice');gift(2,'alice');gift(3,mode==='foreign'?'bob':'alice',0,mode==='too-expensive'?'swiss_watch':'toy_bear');
+    const receiptIds=['gift-1','gift-2',mode==='duplicate'?'gift-1':mode==='missing'?'missing':'gift-3'];
+    await assert.rejects(play('upgrade',{receiptId:undefined,receiptIds}));
+    assert.equal(count('gift_consumptions'),0,mode);assert.equal((await account()).balance,500,mode);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM star_transfers WHERE kind='gift_risk_upgrade'").get().n,0,mode);
+  }
+});
+
+void test('batch upgrade transaction rolls all consumptions back if any consumption fails',async()=>{
+  reset();for(let i=1;i<=3;i++)gift(i,'alice');
+  const body={receiptId:undefined,receiptIds:['gift-1','gift-2','gift-3']};
+  sqlite.exec("CREATE TEMP TRIGGER fail_batch_source BEFORE INSERT ON gift_consumptions WHEN NEW.receiptId='gift-3' BEGIN SELECT RAISE(ABORT,'simulated consumption failure'); END");
+  try{await assert.rejects(play('upgrade',body));}finally{sqlite.exec('DROP TRIGGER fail_batch_source');}
+  assert.equal(count('gift_consumptions'),0);assert.equal(count('received_gifts'),3);assert.equal((await account()).balance,500);
+  assert.equal((await play('upgrade',body)).results.length,3);
+});
+
+void test('overlapping upgrade batches cannot spend the shared gift twice',async()=>{
+  reset();for(let i=1;i<=5;i++)gift(i,'alice');
+  const result=await Promise.allSettled([
+    play('upgrade',{receiptId:undefined,receiptIds:['gift-1','gift-2','gift-3']}),
+    play('upgrade',{key:'another-upgrade-batch',receiptId:undefined,receiptIds:['gift-3','gift-4','gift-5']})
+  ]);
+  assert.equal(result.filter(r=>r.status==='fulfilled').length,1);assert.equal(count('gift_consumptions'),3);
+  assert.equal((await account()).balance,500);
+});
+
+void test('invalid batch quantities never reach a charge or gift consumption',async()=>{
+  reset();gift(1,'alice');
+  for(const n of [0,2,4,11,'3',3.5,null])await assert.rejects(play('case',{count:n}),e=>e.code==='INVALID_GAME_REQUEST');
+  for(const receiptIds of [[],['gift-1','gift-2'],Array(11).fill('gift-1'),'gift-1'])await assert.rejects(play('upgrade',{receiptId:undefined,receiptIds}),e=>e.code==='INVALID_GAME_REQUEST');
+  await assert.rejects(play('upgrade',{receiptIds:['gift-1']}),e=>e.code==='INVALID_GAME_REQUEST');
+  assert.equal((await account()).balance,500);assert.equal(count('gift_consumptions'),0);
+});
 
 function profileImage(owner='alice') {
   const id='avatar-'+owner;
@@ -503,7 +588,7 @@ void test('replaying an earlier case after its gift is used never restores the c
 
 void test('game routes reject client-selected price and cross-origin writes',async()=>{
   reset();
-  const body={initData:signed(),version:'2026-09-15-2',key:'case-request-0001',caseId:'moon'};
+  const body={initData:signed(),version:'2026-09-15-3',key:'case-request-0001',caseId:'moon'};
   assert.equal((await api.casePost(request('/api/noct-gifts/case',{...body,price:1}))).status,400);
   assert.equal((await api.casePost(request('/api/noct-gifts/case',body,{Origin:'https://evil.test'}))).status,403);
   assert.equal(count('received_gifts'),0);

@@ -1,6 +1,6 @@
 import { giftDefinition } from './gift-catalog';
 
-export const NOCT_GIFTS_GAME_VERSION = '2026-09-15-2';
+export const NOCT_GIFTS_GAME_VERSION = '2026-09-15-3';
 export const NOCT_GIFTS_ALIASES: Record<
   string,
   { id: string; rarity: string }
@@ -85,6 +85,7 @@ export const NOCT_GIFTS_CASES: CaseDefinition[] = [
 export function noctGiftsGameCatalog(origin: string) {
   return {
     version: NOCT_GIFTS_GAME_VERSION,
+    counts: [1, 3, 5, 10],
     cases: NOCT_GIFTS_CASES,
     gifts: Object.fromEntries(
       Object.entries(NOCT_GIFTS_ALIASES).map(([alias, entry]) => {

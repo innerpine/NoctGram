@@ -8,6 +8,7 @@ export async function POST(req: Request) {
       'initData',
       'key',
       'caseId',
+      'count',
       'version',
     ]);
     return Response.json(

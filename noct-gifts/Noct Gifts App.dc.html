@@ -116,6 +116,7 @@ a{color:#C7ACE8}a:hover{color:#DCC9F2}
           <h1 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-.8px">{{ cur.n }}</h1>
           <div style="margin-top:8px;font-size:15px;color:#A1A1AA">Одно открытие — <span style="color:#FFD36A;font-weight:600">{{ cur.priceFmt }} Noct Stars</span></div>
         </div>
+        <div class="ng-count-picker" role="group" aria-label="Количество открытий"><sc-for list="{{ caseCounts }}" as="option"><button aria-pressed="{{ option.on }}" disabled="{{ option.disabled }}" onClick="{{ option.choose }}">{{ option.label }}</button></sc-for></div>
         <div class="ng-inline-cta">
           <button onClick="{{ ctaAction }}" disabled="{{ ctaDisabled }}" style="{{ ctaStyle }}">{{ ctaLabel }}</button>
           <div class="ng-case-debit">{{ ctaNoteText }}</div>
@@ -151,8 +152,8 @@ a{color:#C7ACE8}a:hover{color:#DCC9F2}
       <section class="ng-open">
         <div class="ng-eyebrow">Noct collection</div>
         <h1>{{ cur.n }}</h1>
-        <p class="ng-open-sub">{{ cur.priceFmt }} Noct Stars · открытие кейса</p>
-        <div class="ng-reel-shell">
+        <p class="ng-open-sub">{{ openPrice }} Noct Stars · {{ openCountLabel }}</p>
+        <sc-if value="{{ singleCase }}"><div class="ng-reel-shell">
           <div class="{{ reelClass }}" aria-label="Лента подарков" role="img">
             <div class="ng-reel-track" style="{{ reelTrackStyle }}" aria-hidden="true">
               <sc-for list="{{ reelCards }}" as="item">
@@ -165,26 +166,29 @@ a{color:#C7ACE8}a:hover{color:#DCC9F2}
             <div class="ng-reel-selector" aria-hidden="true"></div>
           </div>
         </div>
+        </sc-if>
+        <sc-if value="{{ showBatchReels }}"><div class="{{ batchReelClass }}"><sc-for list="{{ batchCards }}" as="draw"><div class="ng-mini-reel" aria-label="Открытие кейса"><span class="ng-mini-number">{{ draw.index }}</span><div class="ng-mini-track" style="{{ draw.track }}"><sc-for list="{{ draw.cards }}" as="card"><div class="ng-mini-card"><img src="{{ card.image }}" alt=""><strong>{{ card.name }}</strong></div></sc-for></div><div class="ng-mini-selector"></div></div></sc-for></div></sc-if>
         <div class="ng-reel-status" role="status">{{ reelStatus }}</div>
         <sc-if value="{{ phaseSpin }}">
           <div class="ng-reel-actions"><button onClick="{{ skip }}">Пропустить анимацию</button></div>
         </sc-if>
         <sc-if value="{{ phaseResult }}">
           <div class="ng-win" key="{{ prizeReceipt }}">
-            <div class="ng-win-gift" role="img" aria-label="{{ prize.n }}">
+            <sc-if value="{{ singleCase }}"><div class="ng-win-gift" role="img" aria-label="{{ prize.n }}">
               <img src="{{ prizeImage }}" alt="">
               <ng-gift-motion data-src="{{ prizeAnimation }}" aria-hidden="true"></ng-gift-motion>
             </div>
             <h2>{{ prize.n }}</h2>
             <span style="{{ prize.chipStyle }}">{{ prize.rarity }}</span>
             <span class="ng-win-number">{{ prize.num }}</span>
+            </sc-if><sc-if value="{{ multiCase }}"><div class="ng-batch-results"><sc-for list="{{ batchCards }}" as="draw"><button class="ng-batch-prize" onClick="{{ draw.open }}"><img src="{{ draw.image }}" alt=""><strong>{{ draw.name }}</strong><small>{{ draw.status }}</small></button></sc-for></div></sc-if>
             <button class="ng-win-repeat" onClick="{{ repeatCase }}" disabled="{{ repeatCaseDisabled }}">{{ repeatCaseLabel }}</button>
             <sc-if value="{{ repeatCaseLow }}">
               <div class="ng-win-shortfall">{{ repeatCaseShortfall }}</div>
               <button class="ng-win-topup" onClick="{{ repeatCaseTopup }}">Пополнить баланс</button>
             </sc-if>
             <button class="ng-win-inventory" onClick="{{ toGifts }}">В мои подарки</button>
-            <button class="ng-win-secondary" onClick="{{ viewPrize }}">Посмотреть подарок</button>
+            <sc-if value="{{ singleCase }}"><button class="ng-win-secondary" onClick="{{ viewPrize }}">Посмотреть подарок</button></sc-if>
           </div>
         </sc-if>
         <p class="ng-operation-note">Подарок и баланс общие с вашим NoctGram</p>
@@ -194,10 +198,11 @@ a{color:#C7ACE8}a:hover{color:#DCC9F2}
     <sc-if value="{{ isUpgrade }}">
       <div style="animation:ngRise 300ms cubic-bezier(.22,1,.36,1) both">
         <h1 class="ng-upgrade-title" style="margin:4px 0 4px;font-size:24px;font-weight:600;letter-spacing:-.6px">Апгрейд</h1>
-        <p class="ng-upgrade-description">Выберите подарок и цель улучшения.<br>Светлый сектор — ваш шанс.</p>
+        <p class="ng-upgrade-description">{{ upgradeDescription }}</p>
+<div class="ng-count-picker" role="group" aria-label="Количество подарков"><sc-for list="{{ upgradeCounts }}" as="option"><button aria-pressed="{{ option.on }}" disabled="{{ option.disabled }}" onClick="{{ option.choose }}">{{ option.label }}</button></sc-for></div>
 
 
-        <div ref="{{ dialRef }}" class="{{ dialClass }}" role="img" aria-label="{{ dialAccessible }}">
+        <sc-if value="{{ singleUpgrade }}"><div ref="{{ dialRef }}" class="{{ dialClass }}" role="img" aria-label="{{ dialAccessible }}">
           <div class="ng-dial-glow"></div><div class="ng-dial-rim"></div><div class="ng-dial-body"></div>
           <div class="ng-dial-ticks"></div>
           <svg class="ng-dial-svg" viewBox="0 0 100 100" aria-hidden="true">
@@ -232,11 +237,12 @@ a{color:#C7ACE8}a:hover{color:#DCC9F2}
           <ng-upgrade-burst aria-hidden="true"></ng-upgrade-burst>
         </div>
 
-        <div class="ng-sr-only" role="status" aria-live="polite" aria-atomic="true">{{ dialAnnouncement }}</div>
+        </sc-if><div class="ng-sr-only" role="status" aria-live="polite" aria-atomic="true">{{ dialAnnouncement }}</div>
+        
 
-        <div class="ng-upgrade-selectors" style="position:relative;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div data-multi="{{ multiUpgrade }}" class="ng-upgrade-selectors" style="position:relative;display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <button disabled="{{ upPending }}" onClick="{{ pickFrom }}" style="{{ fromCardStyle }}">
-            <div style="font-size:13px;color:#A1A1AA;margin-bottom:10px">Ваш подарок</div>
+            <div style="font-size:13px;color:#A1A1AA;margin-bottom:10px">{{ upgradeSourceLabel }}</div>
             <sc-if value="{{ hasFrom }}">
               <div style="position:relative;width:100%;aspect-ratio:1">
                 <div style="{{ fromArt.bg }}"></div>
@@ -270,10 +276,11 @@ a{color:#C7ACE8}a:hover{color:#DCC9F2}
           <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2px;height:64px;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(199,172,232,.5),rgba(255,255,255,0))"></div>
         </div>
 
+<sc-if value="{{ multiUpgrade }}"><div class="ng-upgrade-batch"><p>{{ upgradeSelected }}</p><sc-for list="{{ upgradeRows }}" as="row"><div class="{{ row.rowClass }}" data-tone="{{ row.tone }}"><img src="{{ row.image }}" alt=""><div><strong>{{ row.name }}</strong><small>{{ row.status }}</small><div class="ng-mini-chance"><i style="{{ row.progress }}"></i></div></div><b>{{ row.chance }}</b></div></sc-for></div></sc-if>
 <p class="ng-operation-note">{{ upgradeHint }}</p>
 
         <div style="margin-top:12px;background:#0C0C0C;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:4px 16px">
-          <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px"><span style="color:#A1A1AA">Расходуется</span><span style="text-align:right;max-width:190px">Выбранный подарок</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px"><span style="color:#A1A1AA">Расходуется</span><span style="text-align:right;max-width:190px">{{ upgradeStake }}</span></div>
           <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:15px"><span style="color:#A1A1AA">При успехе</span><span style="text-align:right;max-width:190px">{{ successText }}</span></div>
           <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;font-size:15px"><span style="color:#A1A1AA">При неудаче</span><span style="text-align:right;max-width:190px">{{ failText }}</span></div>
         </div>
@@ -286,7 +293,7 @@ a{color:#C7ACE8}a:hover{color:#DCC9F2}
         </sc-if>
         <sc-if value="{{ upSuccess }}">
           <div style="margin-top:14px;padding:16px;background:rgba(62,207,142,.07);border:1px solid rgba(62,207,142,.24);border-radius:18px;animation:ngRise 320ms both">
-            <div style="font-size:16px;font-weight:600;color:#3ECF8E">Апгрейд удался</div>
+            <div style="font-size:16px;font-weight:600;color:#3ECF8E">Результат апгрейда</div>
             <div style="margin-top:6px;font-size:14px;line-height:1.5;color:#A1A1AA">{{ resultText }}</div>
           </div>
         </sc-if>
@@ -538,6 +545,7 @@ a{color:#C7ACE8}a:hover{color:#DCC9F2}
               </button>
             </sc-for>
           </div>
+          <sc-if value="{{ pickMore }}"><button class="ng-inline-topup" onClick="{{ loadSharedMore }}">Ещё подарки</button></sc-if>
           <button onClick="{{ closeSheet }}" style="margin-top:16px;height:48px;width:100%;border:1px solid rgba(255,255,255,.14);border-radius:16px;background:rgba(255,255,255,.06);color:#F7F7F5;font-size:15px;font-weight:500;cursor:pointer">Закрыть</button>
         </sc-if>
 
@@ -599,6 +607,7 @@ class Component extends DCLogic {
       screen:'cases',caseId:'eclipse',phase:'idle',prizeId:null,prizeNum:'',prizeUid:null,prizeGift:null,
       accountMode:window.NoctAccount?.inTelegram?'loading':'telegram',shared:null,sharedGifts:[],sharedNext:null,sharedLinks:null,accountError:null,acceptedTerms:false,
       balance:0,inv:[],games:null,caseFast:false,reduced:window.matchMedia('(prefers-reduced-motion: reduce)').matches,empty:false,
+      caseCount:1,upgradeCount:1,selectedUpgradeIds:[],batchResults:[],upgradeSources:[],
       reel:[],spinStarted:0,dialRoll:0,dialStarted:0,dialChance:null,fromUid:null,fromId:null,fromNum:'',toId:null,upgradeSource:null,
       filter:'all',sheet:null,sheetId:null,sheetUid:null,sheetNum:'',pick:null,upPhase:'select',pack:0,payPhase:'idle',toast:null,sheetClosing:false,celebration:0,
       gamePending:false,gameRetry:false,gameError:null,gameResult:null
@@ -753,28 +762,53 @@ class Component extends DCLogic {
   }
   gifts(){
     const out=this.gameGifts();
-    for(const g of [...this.state.sharedGifts,...(this.state.upgradeSource?[this.state.upgradeSource]:[])])out[g.giftId]={...g,n:g.name,v:g.price,t:g.color||'#C7ACE8',r:'common',s:'circle',image:g.image||window.NoctAccount?.asset(g.imageUrl)||'assets/noctgram-logo.png',animation:g.animation||window.NoctAccount?.asset(g.animationUrl)||''};
+    for(const g of [...this.state.sharedGifts,...(this.state.upgradeSource?[this.state.upgradeSource]:[]),...this.state.upgradeSources])out[g.giftId]={...g,n:g.name,v:g.price,t:g.color||'#C7ACE8',r:'common',s:'circle',image:g.image||window.NoctAccount?.asset(g.imageUrl)||'assets/noctgram-logo.png',animation:g.animation||window.NoctAccount?.asset(g.animationUrl)||''};
     return out;
   }
   ownedForUpgrade(){return this.state.sharedGifts.filter(g=>!g.collectible).map(g=>({id:g.giftId,uid:g.id,num:''}));}
+  selectedUpgradeGifts(){
+    const ids=this.state.upgradeCount===1 ? [this.state.fromUid] : this.state.selectedUpgradeIds;
+    return ids.map(id=>this.state.sharedGifts.find(g=>g.id===id&&!g.collectible)).filter(Boolean);
+  }
+  batchLocked(){return !!(this.openOp||this.upgradeOp||this.state.gamePending||this.state.gameRetry);}
+  setBatchCount(kind,count){
+    if(this.batchLocked()||![1,3,5,10].includes(count))return;
+    if(kind==='case'){this.setState({caseCount:count});return;}
+    const sources=this.selectedUpgradeGifts().slice(0,count),first=sources[0];
+    this.setState({upgradeCount:count,selectedUpgradeIds:sources.map(g=>g.id),fromUid:first?.id||null,fromId:first?.giftId||null,
+      batchResults:[],upgradeSources:[],upgradeSource:null,upPhase:'select',dialStarted:0,dialChance:null});
+  }
+  chooseUpgradeSource(g){
+    if(this.batchLocked())return;
+    let sources=this.selectedUpgradeGifts();
+    const gift=this.state.sharedGifts.find(item=>item.id===g.uid&&!item.collectible);if(!gift)return;
+    if(this.state.upgradeCount===1)sources=[gift];
+    else if(sources.some(item=>item.id===gift.id))sources=sources.filter(item=>item.id!==gift.id);
+    else if(sources.length<this.state.upgradeCount)sources.push(gift);else return;
+    const first=sources[0],target=this.gameGifts()[this.state.toId];
+    this.setState({selectedUpgradeIds:sources.map(item=>item.id),fromUid:first?.id||null,fromId:first?.giftId||null,fromNum:'',
+      toId:target&&sources.some(item=>item.price>=target.v)?null:this.state.toId,
+      sheet:sources.length===this.state.upgradeCount?null:'pick',upPhase:'select',dialStarted:0,dialChance:null,batchResults:[],upgradeSources:[]});
+  }
   cases(){return this.state.games?.cases||[];}
   makeReel(c,prize){
     const entries=c.items.map(item=>item[0]);if(!entries.length)return [];
     const list=Array.from({length:40},(_,i)=>entries[(i*7+Math.floor(i/entries.length))%entries.length]);list[34]=prize;return list;
   }
-  revealCaseResult(operation,gift){
+  revealCaseResult(operation,gift,results=[{operation,gift}]){
     const op={id:operation.id};this.openOp=op;
     const c=this.caseOf(operation.caseId),alias=operation.giftAlias||Object.keys(this.gameGifts()).find(k=>this.gameGifts()[k].giftId===gift.giftId);
-    this.go({screen:'open',caseId:operation.caseId,phase:'spin',prizeId:alias,prizeUid:gift.id,prizeNum:gift.collectible?'#'+gift.collectible.number:'',prizeGift:gift,reel:this.makeReel(c,alias),spinStarted:Date.now(),sheet:null});
-    if(this.state.caseFast)this.finishOpen();else this.later(()=>{if(this.openOp===op)this.finishOpen();},4800);
+    this.go({screen:'open',caseCount:results.length,batchResults:results.map(item=>({...item,reel:this.makeReel(c,item.operation.giftAlias)})),caseId:operation.caseId,phase:'spin',prizeId:alias,prizeUid:gift.id,prizeNum:gift.collectible?'#'+gift.collectible.number:'',prizeGift:gift,reel:this.makeReel(c,alias),spinStarted:Date.now(),sheet:null});
+    if(this.state.caseFast||this.state.reduced)this.finishOpen();else this.later(()=>{if(this.openOp===op)this.finishOpen();},4800);
   }
-  revealUpgradeResult(operation,gift,source){
-    const op={ok:operation.success,id:operation.id};this.upgradeOp=op;
+  revealUpgradeResult(operation,gift,source,results=[{operation,gift}]){
+    const sources=Array.isArray(source)?source:source?[source]:[];source=sources[0];
+    const op={ok:results.some(item=>item.operation.success),id:operation.id};this.upgradeOp=op;
     const target=Object.keys(this.gameGifts()).find(k=>this.gameGifts()[k].giftId===operation.targetGiftId);
-    this.go({screen:'upgrade',upPhase:'pending',fromUid:operation.sourceReceiptId,fromId:source?.giftId||null,upgradeSource:source,toId:target||null,
+    this.go({screen:'upgrade',upgradeCount:results.length,selectedUpgradeIds:[],upgradeSources:sources,batchResults:results,upPhase:'pending',fromUid:operation.sourceReceiptId,fromId:source?.giftId||null,upgradeSource:source,toId:target||null,
       dialRoll:operation.roll,dialChance:operation.chance,dialStarted:Date.now(),prizeGift:gift,sheet:null});
     requestAnimationFrame(()=>{const dial=this.dialRef.current,scroll=dial?.closest('.ng-scroll');if(!scroll||this.upgradeOp!==op||this.state.screen!=='upgrade')return;const top=scroll.scrollTop+dial.getBoundingClientRect().top-scroll.getBoundingClientRect().top-(scroll.clientHeight-dial.clientHeight)/2;scroll.scrollTo({top:Math.max(0,top),behavior:this.state.reduced?'auto':'smooth'});});
-    this.later(()=>{if(this.upgradeOp===op)this.finishUpgrade();},3600);
+    if(this.state.reduced)this.finishUpgrade();else this.later(()=>{if(this.upgradeOp===op)this.finishUpgrade();},3600);
   }
   finishOpen(){
     if(this.openOp) this.openOp=null;
@@ -815,30 +849,44 @@ class Component extends DCLogic {
     const tabI = this.tabIndex(scr);
     const cardStyle = (on)=> 'text-align:left;padding:14px;border:1px solid '+(on?'rgba(199,172,232,.45)':'rgba(255,255,255,.08)')+';border-radius:20px;background:#0C0C0C;cursor:pointer;color:#F7F7F5;width:100%;'+(on?'box-shadow:0 0 0 1px rgba(199,172,232,.18),0 0 26px rgba(199,172,232,.1);':'')+'transition:border-color 240ms,box-shadow 240ms';
 
-    const low = s.balance < cur.p;
+    const caseTotal=cur.p*s.caseCount,low=s.balance<caseTotal;
+    const selected=this.selectedUpgradeGifts(),multiUpgrade=s.upgradeCount>1;
+    const upgradeSources=s.upPhase==='select'?selected:s.upgradeSources;
+    const sourceMax=Math.max(0,...selected.map(g=>g.price)),giftUnit=s.upgradeCount===3?'подарка':'подарков';
+    const countOptions=kind=>[1,3,5,10].map(count=>({label:'×'+count,on:(kind==='case'?s.caseCount:s.upgradeCount)===count?'true':'false',disabled:this.batchLocked(),choose:()=>this.setBatchCount(kind,count)}));
+    const batchCards=(s.batchResults||[]).map((item,index)=>{
+      const g=item.gift,source=s.upgradeSources.find(g=>g.id===item.operation.sourceReceiptId);
+      const pending=scr==='open'?s.phase==='spin':s.upPhase==='pending';
+      return {key:item.operation.id,index:index+1,name:pending?'Открываем…':g?.name||'Не удалось',image:g?.image||source?.image||'assets/noctgram-logo.png',
+        status:pending?'Определяем результат':g?(g.available===false?'Уже использован':'В коллекции'):'Исходный подарок списан',
+        tone:pending?'pending':g?'success':'fail',open:()=>{if(g&&!pending)this.setState({sheet:'sharedGift',sharedGift:g});},
+        cards:(item.reel||[]).filter(id=>G[id]).map(id=>({name:G[id].n,image:G[id].image})),
+        track:'animation-delay:-'+(s.spinStarted?Math.max(0,Date.now()-s.spinStarted):0)+'ms',
+        source:source?.name||'Подарок',chance:item.operation.chance};
+    });
     let cta = null;
     if(scr==='case'){
       cta = {
-        label: low ? 'Недостаточно Noct Stars' : 'Открыть за '+this.fmt(cur.p)+' Noct Stars',
+        label: low ? 'Недостаточно Noct Stars' : 'Открыть'+(s.caseCount>1?' ×'+s.caseCount:'')+' за '+this.fmt(caseTotal)+' Noct Stars',
         disabled: low,
         action: low ? ()=>self.go({screen:'wallet'}) : ()=>self.startOpen(),
         note: true,
-        noteText: low ? 'Не хватает '+this.fmt(cur.p-s.balance)+' ★. На балансе '+this.fmt(s.balance)+' ★.' : 'Спишется '+this.fmt(cur.p)+' ★. Останется '+this.fmt(s.balance-cur.p)+' ★.',
+        noteText: low ? 'Не хватает '+this.fmt(caseTotal-s.balance)+' ★. На балансе '+this.fmt(s.balance)+' ★.' : 'Спишется '+this.fmt(caseTotal)+' ★. Останется '+this.fmt(s.balance-caseTotal)+' ★.',
         noteTone: low ? 'warn' : 'calm',
         second: low ? 'Пополнить баланс' : null,
         secondAction: ()=>self.go({screen:'wallet'})
       };
     } else if(scr==='upgrade'){
-      const ready = !!(from&&to&&to.v>from.v&&inv.some(g=>g.uid===s.fromUid));
+      const ready = !!(to&&selected.length===s.upgradeCount&&to.v>sourceMax);
       if(s.upPhase==='pending') cta = {label:'Выполняем апгрейд…',disabled:true,action:()=>{},note:false};
       else if(s.upPhase==='success') cta = {label:'В мои подарки',disabled:false,action:()=>self.go({screen:'gifts',upPhase:'select',toId:null}),note:false};
       else if(s.upPhase==='fail') cta = {label:'Выбрать другой подарок',disabled:false,action:()=>self.setState({upPhase:'select',pick:'inv',sheet:'pick'}),note:false,second:'К подаркам',secondAction:()=>self.go({screen:'gifts',upPhase:'select'})};
       else cta = {
-        label: ready ? 'Подтвердить апгрейд' : 'Выберите оба подарка',
+        label:ready?(multiUpgrade?'Улучшить ×'+s.upgradeCount:'Подтвердить апгрейд'):(multiUpgrade?'Выберите '+s.upgradeCount+' '+giftUnit+' и цель':'Выберите оба подарка'),
         disabled: !ready,
         action: ()=>self.runUpgrade(),
         note: ready,
-        noteText: 'Расходуется только выбранный подарок. Noct Stars не списываются.',
+        noteText:multiUpgrade?'Расходуются '+s.upgradeCount+' выбранных '+giftUnit+'. Noct Stars не списываются.':'Расходуется только выбранный подарок. Noct Stars не списываются.',
         noteTone: 'calm'
       };
     }
@@ -906,7 +954,22 @@ class Component extends DCLogic {
       switchTrack: 'position:relative;width:48px;height:28px;flex:none;border:0;border-radius:14px;cursor:pointer;background:'+(s.caseFast?'#C7ACE8':'rgba(255,255,255,.14)')+';transition:background 240ms cubic-bezier(.22,1,.36,1)',
       switchKnob: 'position:absolute;top:3px;left:'+(s.caseFast?'23px':'3px')+';width:22px;height:22px;border-radius:50%;background:'+(s.caseFast?'#0B0B0D':'#F7F7F5')+';transition:left 260ms cubic-bezier(.22,1,.36,1)',
 
-      cur: {n:cur.n, priceFmt:this.fmt(cur.p)},
+      caseCounts:countOptions('case'),upgradeCounts:countOptions('upgrade'),
+      showBatchReels:s.caseCount>1&&s.phase==='spin',multiCase:s.caseCount>1,singleCase:s.caseCount===1,multiUpgrade,singleUpgrade:!multiUpgrade,batchCards,
+      batchReelClass:'ng-batch-reels '+(s.phase==='spin'?'is-running':'is-landed'),
+      batchOutcome:s.upPhase!=='select',
+      upgradeSelected:s.upPhase==='select'?'Выбрано '+selected.length+' из '+s.upgradeCount:'Попыток: '+s.upgradeCount,
+      upgradeSourceLabel:multiUpgrade?'Ваши подарки':'Ваш подарок',
+      upgradeStake:multiUpgrade?s.upgradeCount+' '+giftUnit:'Выбранный подарок',
+      upgradeDescription:multiUpgrade?'Выберите разные подарки и одну цель. У каждого подарка свой шанс.':'Выберите подарок и цель улучшения. Светлый сектор — ваш шанс.',
+      upgradeRows:upgradeSources.map((g,index)=>{const result=s.batchResults[index],rules=s.games?.upgrade;
+        const p=s.upPhase==='select'?(to&&rules?Math.max(rules.minChance,Math.min(rules.maxChance,Math.round(g.price/to.v*rules.chancePercent))):null):result?.operation.chance;
+        const finished=s.upPhase==='success'||s.upPhase==='fail';
+        return {id:g.id,name:g.name,image:g.image||'assets/noctgram-logo.png',chance:p===null?'Выберите цель':p+'%',
+          status:finished?(result?.operation.success?'Успех':'Не удалось'):s.upPhase==='pending'?'Улучшаем…':this.fmt(g.price)+' ★',
+          tone:finished?(result?.operation.success?'success':'fail'):'pending',
+          progress:'width:'+(p||0)+'%',rowClass:'ng-upgrade-row '+(s.upPhase==='pending'?'is-pending':'')};}),
+      cur: {n:cur.n, priceFmt:this.fmt(cur.p)},openPrice:this.fmt(caseTotal),openCountLabel:s.caseCount>1?s.caseCount+(s.caseCount===3?' открытия':' открытий'):'открытие кейса',
       curArt: this.caseArt(cur.id),
       curItems: cur.items.map(([id,p])=>({
         n:G[id].n, chance:String(p).replace('.',','), art:this.giftArt(id,{radius:'11px',dot:14,glow:10}),
@@ -918,7 +981,7 @@ class Component extends DCLogic {
       reelClass:'ng-reel '+(s.phase==='spin'?'ng-reel-running':'ng-reel-landed'),
       reelTrackStyle:'--reel-start:-536px;--reel-end:-4556px;animation-delay:-'+(s.spinStarted?Math.max(0,Date.now()-s.spinStarted):0)+'ms',
       reelCards:s.reel.filter(id=>G[id]).map(id=>({name:G[id].n,image:G[id].image,rarity:RAR[G[id].r].l,tone:'--gift-tone:'+G[id].t+'36'})),
-      reelStatus:s.phase==='spin'?'Открываем кейс…':s.prizeGift?.available===false?'Подарок уже использован':'Подарок уже в вашей коллекции',
+      reelStatus:s.caseCount>1?(s.phase==='spin'?'Открываем '+s.caseCount+(s.caseCount===3?' кейса…':' кейсов…'):'Получено подарков: '+s.batchResults.length):s.phase==='spin'?'Открываем кейс…':s.prizeGift?.available===false?'Подарок уже использован':'Подарок уже в вашей коллекции',
       prizeImage:s.prizeGift?.image||prize.image||'assets/noctgram-logo.png',
       prizeReceipt:s.prizeUid||s.prizeId+':'+s.prizeNum,
       prizeAnimation:s.prizeGift?.animation||prize.animation||'',
@@ -941,10 +1004,10 @@ class Component extends DCLogic {
       skip: ()=>this.finishOpen(),
       prize: {n:prize.n, rarity:RAR[prize.r].l, chipStyle:this.chip(prize.r,true), num:s.prizeNum||'Обычный подарок'},
       prizeArt: this.giftArt(s.prizeId,{size:56,glow:46,radius:'22px',dot:28}),
-      repeatCaseLabel:s.gamePending?'Подтверждаем…':'Открыть ещё раз · '+this.fmt(cur.p)+' ★',
+      repeatCaseLabel:s.gamePending?'Подтверждаем…':'Открыть ещё'+(s.caseCount>1?' ×'+s.caseCount:' раз')+' · '+this.fmt(caseTotal)+' ★',
       repeatCaseDisabled:!linked||!s.shared?.capabilities?.caseOpening||s.gamePending||s.gameRetry||low||!!this.openOp||!!this.upgradeOp,
       repeatCaseLow:linked&&low,
-      repeatCaseShortfall:'Не хватает '+this.fmt(Math.max(0,cur.p-s.balance))+' ★',
+      repeatCaseShortfall:'Не хватает '+this.fmt(Math.max(0,caseTotal-s.balance))+' ★',
       repeatCaseTopup:()=>this.go({screen:'wallet'}),
       repeatCase:(event)=>{
         // A result's old click handler cannot charge for a later result,
@@ -956,7 +1019,7 @@ class Component extends DCLogic {
       viewPrize: ()=>this.go({screen:'gifts',phase:'idle',sheet:'sharedGift',sharedGift:s.prizeGift}),
 
       hasFrom: !!from, noFrom: !from, hasTo: !!to, noTo: !to,
-      fromGift: from ? {n:from.n, num:s.fromNum||'без номера', valueFmt:this.fmt(from.v)} : {},
+      fromGift: from ? {n:multiUpgrade?(s.upPhase==='select'?'Выбрано '+selected.length+' из '+s.upgradeCount:'Использовано: '+s.upgradeCount):from.n, num:multiUpgrade?'Общая стоимость':s.fromNum||'без номера', valueFmt:this.fmt(multiUpgrade?upgradeSources.reduce((sum,g)=>sum+g.price,0):from.v)} : {},
       toGift: to ? {n:to.n, valueFmt:this.fmt(to.v)} : {},
       fromArt: from ? this.giftArt(s.fromId,{radius:'14px',dot:18,glow:14}) : {},
       toArt: to ? this.giftArt(s.toId,{radius:'14px',dot:18,glow:14}) : {},
@@ -965,11 +1028,11 @@ class Component extends DCLogic {
       pickTo: ()=>{ if(!this.upgradeOp&&!s.gamePending&&!s.gameRetry) this.setState({sheet:'pick',pick:'cat'}); },
       chance: chance, chanceDash: (chance/100*264)+' 264',
       chanceColor: chance>=50 ? '#3ECF8E' : chance>=20 ? '#C7ACE8' : '#FFD36A',
-      upgradeHint: from&&to ? 'Из «'+from.n+'» в «'+to.n+'». Шанс рассчитан по разнице стоимости.' : 'Выберите исходный и желаемый подарок, чтобы увидеть шанс.',
+      upgradeHint:multiUpgrade?'Каждый выбранный подарок участвует в отдельной попытке. Все выбранные подарки расходуются.':from&&to ? 'Из «'+from.n+'» в «'+to.n+'». Шанс рассчитан по разнице стоимости.' : 'Выберите исходный и желаемый подарок, чтобы увидеть шанс.',
       successText:to?'«'+to.n+'» в вашем NoctGram':'—',
-      failText: from ? '«'+from.n+'» '+(s.fromNum||'')+' сгорает' : '—',
+      failText:multiUpgrade?'Подарок этой попытки сгорает':from ? '«'+from.n+'» '+(s.fromNum||'')+' сгорает' : '—',
       upPending:s.upPhase==='pending'||s.gamePending, upSuccess: s.upPhase==='success', upFail: s.upPhase==='fail',
-      resultText: (s.upPhase==='success' ? 'Вы получили «'+(to?to.n:'подарок')+'». Он уже в коллекции, исходный подарок списан.' : 'Исходный подарок сгорел. Новый подарок не получен.')+(s.gameResult?.price>0?' Это результат предыдущей попытки с оплатой '+this.fmt(s.gameResult.price)+' ★.':' Noct Stars не списаны.'),
+      resultText:multiUpgrade?'Успешных улучшений: '+s.batchResults.filter(item=>item.operation.success).length+' из '+s.batchResults.length+'. Все выбранные подарки списаны. Noct Stars не списаны.':(s.upPhase==='success' ? 'Вы получили «'+(to?to.n:'подарок')+'». Он уже в коллекции, исходный подарок списан.' : 'Исходный подарок сгорел. Новый подарок не получен.')+(s.gameResult?.price>0?' Это результат предыдущей попытки с оплатой '+this.fmt(s.gameResult.price)+' ★.':' Noct Stars не списаны.'),
 
       giftsCount: live?s.sharedGifts.length+(s.sharedNext?'+':'')+' подарков':filtered.length ? filtered.length+' из '+inv.length+' предметов' : inv.length+' предметов',
       hasGifts: !live&&inv.length>0, noGifts: !live&&inv.length===0,
@@ -978,7 +1041,7 @@ class Component extends DCLogic {
       sharedMore:live&&!!s.sharedNext,loadSharedMore:()=>this.refreshAccount?.(true),
       sheetSharedGiftOpen:s.sheet==='sharedGift',sharedGift:s.sharedGift||{},sharedGiftStatus:s.sharedGift?.available===false?'Этот подарок уже был использован или передан.':'Этот подарок принадлежит вашему аккаунту NoctGram.',sharedGiftNumber:s.sharedGift?.collectible?'Коллекционный #'+s.sharedGift.collectible.number:'Обычный подарок',
       canUpgradeShared:!!s.sharedGift&&!s.sharedGift.collectible&&s.sharedGifts.some(g=>g.id===s.sharedGift.id)&&!!s.shared?.capabilities?.upgrading&&!s.gamePending&&!this.upgradeOp,
-      useSharedUpgrade:()=>{const g=this.state.sharedGifts.find(g=>g.id===this.state.sharedGift?.id);if(!g||g.collectible||this.state.gamePending||this.upgradeOp)return;this.go({screen:'upgrade',sheet:null,fromId:g.giftId,fromUid:g.id,fromNum:'',upPhase:'select',dialChance:null,dialStarted:0});},
+      useSharedUpgrade:()=>{const g=this.state.sharedGifts.find(g=>g.id===this.state.sharedGift?.id);if(!g||g.collectible||this.state.gamePending||this.upgradeOp)return;this.go({screen:'upgrade',upgradeCount:1,selectedUpgradeIds:[],batchResults:[],upgradeSources:[],sheet:null,fromId:g.giftId,fromUid:g.id,fromNum:'',upPhase:'select',dialChance:null,dialStarted:0});},
       openSharedProfile:()=>window.NoctAccount?.openLink(s.sharedLinks?.siteUrl),
       filters: [['all','Все'],['common','Обычные'],['rare','Редкие'],['epic','Эпические'],['legend','Легендарные']].map(([k,label])=>({
         label, pick:()=>this.setState({filter:k}),
@@ -1018,17 +1081,17 @@ class Component extends DCLogic {
       sheetAnimation:sheetG?.animation||'',
       sheetArt: sheetG ? this.giftArt(s.sheetId,{radius:'16px',dot:18,glow:26}) : {},
       sheetAttrs:[],
-      useForUpgrade: ()=>{ if(!this.upgradeOp){ const gift=inv.find(g=>g.uid===s.sheetUid); if(gift) this.setState({fromId:gift.id,fromNum:gift.num,fromUid:gift.uid,sheet:null,screen:'upgrade',upPhase:'select',dialChance:null,dialStarted:0}); } },
+      useForUpgrade: ()=>{ if(!this.upgradeOp){ const gift=inv.find(g=>g.uid===s.sheetUid); if(gift) this.setState({upgradeCount:1,selectedUpgradeIds:[],batchResults:[],upgradeSources:[],fromId:gift.id,fromNum:gift.num,fromUid:gift.uid,sheet:null,screen:'upgrade',upPhase:'select',dialChance:null,dialStarted:0}); } },
       pickTitle: s.pick==='cat' ? 'Каталог подарков' : 'Ваш инвентарь',
-      pickHint: s.pick==='cat' ? 'цель апгрейда' : 'что обменять',
-      pickList: (s.pick==='cat' ? Object.keys(this.gameGifts()).filter(id=>!from||G[id].v>from.v).map(id=>({id,num:''})) : inv).map(g=>{
+      pickMore:s.pick==='inv'&&!!s.sharedNext,pickHint: s.pick==='cat' ? 'цель апгрейда' : multiUpgrade?'Выбрано '+selected.length+' из '+s.upgradeCount:'что обменять',
+      pickList: (s.pick==='cat' ? Object.keys(this.gameGifts()).filter(id=>G[id].v>sourceMax).map(id=>({id,num:''})) : inv).map(g=>{
         const gg = G[g.id];
-        const on = s.pick==='cat' ? s.toId===g.id : s.fromUid===g.uid;
+        const on = s.pick==='cat' ? s.toId===g.id : selected.some(item=>item.id===g.uid);
         return {
-          n:gg.n, sub: s.pick==='cat' ? this.fmt(gg.v)+' ★' : (g.num||'—'),
+          n:gg.n, sub: s.pick==='cat' ? this.fmt(gg.v)+' ★' : (on?'✓ Выбран':this.fmt(gg.v)+' ★'),
           art:this.giftArt(g.id,{radius:'12px',dot:14,glow:10}),
           style:'text-align:left;padding:8px;border:1px solid '+(on?'rgba(199,172,232,.5)':'rgba(255,255,255,.08)')+';border-radius:14px;background:#0C0C0C;color:#F7F7F5;cursor:pointer;width:100%',
-          choose: ()=>{ if(this.upgradeOp||this.state.gamePending||this.state.gameRetry) return; s.pick==='cat' ? this.setState({toId:g.id,sheet:null,upPhase:'select',dialStarted:0,dialChance:null}) : this.setState({fromId:g.id,fromNum:g.num,fromUid:g.uid,sheet:null,upPhase:'select',dialStarted:0,dialChance:null}); }
+          choose: ()=>{ if(this.upgradeOp||this.state.gamePending||this.state.gameRetry) return; s.pick==='cat' ? this.setState({toId:g.id,sheet:null,upPhase:'select',dialStarted:0,dialChance:null}) : this.chooseUpgradeSource(g); }
         };
       }),
       walletHint:'общий баланс с NoctGram',priceHint:'Актуальные пакеты NoctGram · оплата через бота',

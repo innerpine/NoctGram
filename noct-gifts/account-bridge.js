@@ -48,7 +48,7 @@
       clearAvatar();
       epoch++;intent=null;app.accountState={key:null,sku:null};app.openOp=null;app.upgradeOp=null;
       app.setState({accountMode:mode,shared:null,sharedGifts:[],sharedNext:null,sharedGift:null,balance:0,inv:[],games:null,fromId:null,toId:null,fromUid:null,
-        screen:'profile',phase:'idle',upPhase:'select',gamePending:false,gameRetry:false,gameError:null,gameResult:null,prizeGift:null,upgradeSource:null,
+        screen:'profile',phase:'idle',upPhase:'select',gamePending:false,gameRetry:false,gameError:null,gameResult:null,prizeGift:null,upgradeSource:null,caseCount:1,upgradeCount:1,selectedUpgradeIds:[],upgradeSources:[],batchResults:[],
         sheet:null,payPhase:'idle',acceptedTerms:false,accountError:error,sharedLinks:links,celebration:0,toast:null});
     };
     const applyAccount=(data,append)=>{
@@ -58,7 +58,7 @@
       const patch={accountMode:'linked',accountError:null,shared:data,games:data.games||null,sharedGifts:[...seen.values()],sharedNext:data.next,sharedLinks:data.links,balance:data.balance};
       if(!same){
         app.openOp=null;app.upgradeOp=null;app.accountState={key:null,sku:null};intent=saved(data.user.id);
-        Object.assign(patch,{screen:'cases',phase:'idle',upPhase:'select',fromId:null,toId:null,fromUid:null,upgradeSource:null,prizeGift:null,gameResult:null,sheet:null,sharedGift:null,
+        Object.assign(patch,{screen:'cases',phase:'idle',upPhase:'select',fromId:null,toId:null,fromUid:null,upgradeSource:null,caseCount:1,upgradeCount:1,selectedUpgradeIds:[],upgradeSources:[],batchResults:[],prizeGift:null,gameResult:null,sheet:null,sharedGift:null,
           pack:0,payPhase:'idle',acceptedTerms:false,celebration:0,toast:null,gamePending:false,gameRetry:!!intent,gameError:intent?'Остался незавершённый запрос. Проверьте его результат перед новой попыткой.':null});
       }
       app.setState(patch);
@@ -86,19 +86,33 @@
         if(!alive||app.state.accountMode!=='linked'||app.state.shared?.user?.id!==owner)return;
         if(data.userId!==owner){clearAccount('error',null,'Аккаунт изменился. Обновите подключение к NoctGram.');return;}
         if(data.operation?.key!==value.body.key||data.operation?.kind!==value.kind||!Number.isSafeInteger(data.balance)||data.balance<0)throw Error('Не удалось подтвердить результат. Повторите проверку этого запроса.');
-        const op=data.operation;
-        if(value.kind==='case'&&(op.caseId!==value.body.caseId||!op.success||!data.gift))throw Error('Не удалось подтвердить выпавший подарок. Повторите проверку.');
-        if(value.kind==='upgrade'&&(op.sourceReceiptId!==value.body.receiptId||op.targetGiftId!==value.body.targetGiftId||typeof op.success!=='boolean'||!Number.isFinite(op.roll)||!Number.isFinite(op.chance)||(op.success&&!data.gift)))throw Error('Не удалось подтвердить апгрейд. Повторите проверку.');
-        if(data.gift&&(typeof data.gift.id!=='string'||typeof data.gift.giftId!=='string'||typeof data.gift.name!=='string'))throw Error('Не удалось проверить подарок. Повторите проверку результата.');
-        const gift=data.gift?normalizeGift(data.gift):null;
+        const op=data.operation,sources=value.body.receiptIds||[value.body.receiptId];
+        const count=value.kind==='case'?(value.body.count||1):sources.length;
+        const raw=data.results||[{operation:op,gift:data.gift}];
+        const invalid=()=>{throw Error('Не удалось подтвердить все результаты. Повторите проверку этого запроса.');};
+        if(!Array.isArray(raw)||raw.length!==count||(count>1&&op.count!==count))invalid();
+        const operationIds=new Set(),giftIds=new Set();
+        const results=raw.map((item,index)=>{
+          const draw=item?.operation,gift=item?.gift;
+          if(!draw||draw.kind!==value.kind||draw.key!==(index?value.body.key+':'+(index+1):value.body.key)||typeof draw.id!=='string'||operationIds.has(draw.id)||!Number.isSafeInteger(draw.price)||draw.price<0)invalid();
+          operationIds.add(draw.id);
+          if(value.kind==='case'&&(draw.caseId!==value.body.caseId||draw.success!==true||!gift))invalid();
+          if(value.kind==='upgrade'&&(draw.sourceReceiptId!==sources[index]||draw.targetGiftId!==value.body.targetGiftId||typeof draw.success!=='boolean'||!Number.isFinite(draw.roll)||!Number.isFinite(draw.chance)||draw.roll<0||draw.roll>=100||draw.chance<2||draw.chance>92||draw.success!==(draw.roll<draw.chance)||(draw.success&&!gift)||(!draw.success&&gift)))invalid();
+          if(gift){if(typeof gift.id!=='string'||typeof gift.giftId!=='string'||typeof gift.name!=='string'||giftIds.has(gift.id)||(draw.giftId&&draw.giftId!==gift.giftId))invalid();giftIds.add(gift.id);}
+          return {operation:draw,gift:gift?normalizeGift(gift):null};
+        });
+        if(op.id!==results[0].operation.id||op.price!==results.reduce((sum,item)=>sum+item.operation.price,0))invalid();
+        const gift=results[0].gift;
         const seen=new Map(app.state.sharedGifts.map(g=>[g.id,g]));
-        if(value.kind==='upgrade')seen.delete(op.sourceReceiptId);
-        if(gift&&gift.available!==false)seen.set(gift.id,gift);
-        if(gift?.available===false)seen.delete(gift.id);
+        for(const {operation,gift} of results){
+          if(value.kind==='upgrade')seen.delete(operation.sourceReceiptId);
+          if(gift&&gift.available!==false)seen.set(gift.id,gift);
+          if(gift?.available===false)seen.delete(gift.id);
+        }
         app.setState({balance:data.balance,sharedGifts:[...seen.values()],shared:{...app.state.shared,balance:data.balance},gamePending:false,gameRetry:false,gameError:null,gameResult:op});
         forgetIntent(value);
-        if(value.kind==='case')app.revealCaseResult(op,gift);
-        else app.revealUpgradeResult(op,gift,value.source);
+        if(value.kind==='case')app.revealCaseResult(op,gift,results);
+        else app.revealUpgradeResult(op,gift,value.source,results);
       }catch(error){
         if(!alive||app.state.shared?.user?.id!==owner)return;
         if(error.status===401||error.status===403){clearAccount('error',null,error.message);return;}
@@ -118,13 +132,15 @@
     app.openSharedCase=()=>{
       const c=app.caseOf(app.state.caseId);
       if(!app.state.shared?.capabilities?.caseOpening||!c.id){app.setState({gameError:'Открытие кейсов сейчас недоступно.'});return;}
-      return begin('case',{caseId:c.id});
+      const count=app.state.caseCount;
+      if(![1,3,5,10].includes(count)||app.state.balance<c.p*count){app.setState({gameError:'Не хватает Noct Stars на все открытия.'});return;}
+      return begin('case',{caseId:c.id,...(count>1?{count}:{})});
     };
     app.upgradeSharedGift=()=>{
-      const source=app.state.sharedGifts.find(g=>g.id===app.state.fromUid),target=app.gameGifts()[app.state.toId];
+      const sources=app.selectedUpgradeGifts(),target=app.gameGifts()[app.state.toId];
       if(!app.state.shared?.capabilities?.upgrading){app.setState({gameError:'Апгрейд сейчас недоступен.'});return;}
-      if(!source||source.collectible||!target||target.v<=source.price){app.setState({gameError:'Выберите обычный подарок и более дорогую цель.'});return;}
-      return begin('upgrade',{receiptId:source.id,targetGiftId:target.giftId},source);
+      if(![1,3,5,10].includes(app.state.upgradeCount)||sources.length!==app.state.upgradeCount||new Set(sources.map(g=>g.id)).size!==sources.length||!target||sources.some(g=>target.v<=g.price)){app.setState({gameError:'Выберите нужное количество обычных подарков и более дорогую цель.'});return;}
+      return begin('upgrade',{...(sources.length>1?{receiptIds:sources.map(g=>g.id)}:{receiptId:sources[0].id}),targetGiftId:target.giftId},sources.length>1?sources:sources[0]);
     };
     app.retryGame=()=>{if(intent)return runIntent(intent);};
     app.payShared=async()=>{
