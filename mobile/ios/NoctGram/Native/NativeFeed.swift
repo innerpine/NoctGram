@@ -8,6 +8,7 @@ func ngReadAccessRevoked(_ error: Error) -> Bool {
 
 @MainActor
 final class NGFeedModel: ObservableObject {
+    private let api: NoctAPI
     @Published var posts: [NGRecord] = []
     @Published var loading = false
     @Published var loadingMore = false
@@ -15,6 +16,8 @@ final class NGFeedModel: ObservableObject {
     @Published var error: String?
     private var generation = 0
     private var parameters: [String: String] = [:]
+
+    init(api: NoctAPI? = nil) { self.api = api ?? .shared }
 
     func reload(mode: String = "all", search: String = "", userID: String? = nil) async {
         generation += 1
@@ -28,7 +31,7 @@ final class NGFeedModel: ObservableObject {
         error = nil
         defer { if generation == request { loading = false } }
         do {
-            let result = try await NoctAPI.shared.get("/api/social", query: query)
+            let result = try await api.get("/api/social", query: query)
             try Task.checkCancellation()
             guard generation == request else { return }
             posts = result.objects("items")
@@ -51,7 +54,7 @@ final class NGFeedModel: ObservableObject {
         error = nil
         defer { if generation == request { loadingMore = false } }
         do {
-            let result = try await NoctAPI.shared.get("/api/social", query: query)
+            let result = try await api.get("/api/social", query: query)
             try Task.checkCancellation()
             guard generation == request else { return }
             let page = result.objects("items")
@@ -77,11 +80,13 @@ final class NGFeedModel: ObservableObject {
 
 @MainActor
 struct NGFeedView: View {
-    @StateObject private var feed = NGFeedModel()
+    @StateObject private var feed: NGFeedModel
     @State private var mode = "all"
     @State private var search = ""
     @State private var composing = false
     @State private var notice: String?
+
+    init(api: NoctAPI? = nil) { _feed = StateObject(wrappedValue: NGFeedModel(api: api)) }
 
     var body: some View {
         List {
@@ -132,6 +137,7 @@ struct NGFeedView: View {
         .listStyle(.plain)
         .background(NGTheme.background)
         .navigationTitle("Лента")
+        .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $search, prompt: "Поиск публикаций")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -180,6 +186,7 @@ func ngRelativeDate(_ milliseconds: Double) -> String {
 
 @MainActor
 struct NGPostCard: View {
+    @EnvironmentObject private var session: NativeSession
     let post: NGRecord
     var opensDetail = true
     @State private var likedOverride: Bool?
@@ -203,29 +210,33 @@ struct NGPostCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
                 NavigationLink(destination: NGProfileView(userID: post.string("userId"))) {
                     HStack(spacing: 10) {
                         NGAvatar(url: post.string("avatar"), name: post.string("name"), size: 42)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(post.string("name", default: "Пользователь")).font(.subheadline.weight(.semibold))
-                                .foregroundColor(.primary)
+                                .foregroundColor(.primary).lineLimit(2)
                             if post.string("kind") == "channel" {
                                 Label("Канал", systemImage: "megaphone.fill")
                                     .font(.caption).foregroundColor(NGTheme.muted)
                             } else if !post.string("handle").isEmpty {
-                                Text("@" + post.string("handle")).font(.caption).foregroundColor(NGTheme.muted)
+                                Text("@" + post.string("handle")).font(.caption).foregroundColor(NGTheme.muted).lineLimit(1)
                             }
                         }
-                    }
-                }.buttonStyle(.plain)
+                    }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                }.buttonStyle(.plain).layoutPriority(1)
+                    .accessibilityIdentifier("feed.author." + post.id)
                 Spacer(minLength: 8)
                 Text(ngRelativeDate(post.double("created")))
                     .font(.caption).foregroundColor(NGTheme.muted)
+                    .lineLimit(2).multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 76, alignment: .trailing)
             }
             if !post.string("text").isEmpty {
                 Text(post.string("text")).font(.body).textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if post.bool("adult") && !revealingMedia && !post.objects("media").isEmpty {
                 Button { revealingMedia = true } label: {
@@ -271,12 +282,12 @@ struct NGPostCard: View {
                     Label("\(likes)", systemImage: liked ? "heart.fill" : "heart")
                         .foregroundColor(liked ? NGTheme.accent : NGTheme.muted)
                         .frame(minWidth: 44, minHeight: 44)
-                }.disabled(actionInFlight)
+                }.disabled(actionInFlight).accessibilityIdentifier("feed.like." + post.id)
                 if opensDetail {
                     NavigationLink(destination: NGPostDetailView(post: post)) {
                         Label("\(post.int("comments"))", systemImage: "bubble.right")
                             .foregroundColor(NGTheme.muted).frame(minWidth: 44, minHeight: 44)
-                    }.accessibilityLabel("Комментарии: \(post.int("comments"))")
+                    }.accessibilityLabel("Комментарии: \(post.int("comments"))").accessibilityIdentifier("feed.comments." + post.id)
                 }
                 Spacer()
                 Button { toggle("save", value: !saved) } label: {
@@ -285,12 +296,16 @@ struct NGPostCard: View {
                         .frame(width: 44, height: 44)
                 }
                 .accessibilityLabel(saved ? "Убрать из сохранённого" : "Сохранить публикацию")
+                .accessibilityIdentifier("feed.save." + post.id)
                 .disabled(actionInFlight)
             }.buttonStyle(.plain)
             if let error { NGInlineError(message: error) }
         }
         .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(NGTheme.surface, in: RoundedRectangle(cornerRadius: 24))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("feed.post." + post.id)
         .onChange(of: post.snapshotID) { _ in
             likedOverride = nil
             savedOverride = nil
@@ -305,7 +320,7 @@ struct NGPostCard: View {
         Task {
             defer { actionInFlight = false }
             do {
-                _ = try await NoctAPI.shared.post("/api/social", body: ["action": action, "id": post.id, "value": value])
+                _ = try await session.api.post("/api/social", body: ["action": action, "id": post.id, "value": value])
                 if action == "like" { likedOverride = value } else { savedOverride = value }
             } catch { self.error = error.localizedDescription }
         }
@@ -318,7 +333,7 @@ struct NGPostCard: View {
         Task {
             defer { voting = false }
             do {
-                _ = try await NoctAPI.shared.post("/api/social", body: ["action": "vote", "id": post.id, "option": option])
+                _ = try await session.api.post("/api/social", body: ["action": "vote", "id": post.id, "option": option])
                 var updated = poll.raw
                 let previous = voted
                 updated["voted"] = option
@@ -327,7 +342,7 @@ struct NGPostCard: View {
                     return ["option": index, "count": max(0, count - (previous == index ? 1 : 0) + (option == index ? 1 : 0))]
                 }
                 pollOverride = NGRecord(updated)
-                do { pollOverride = try await NoctAPI.shared.get("/api/social", query: ["action": "post", "id": post.id]) }
+                do { pollOverride = try await session.api.get("/api/social", query: ["action": "post", "id": post.id]) }
                 catch { self.error = "Голос сохранён. Не удалось обновить результаты: " + error.localizedDescription }
             } catch { self.error = error.localizedDescription }
         }
@@ -336,6 +351,7 @@ struct NGPostCard: View {
 
 @MainActor
 struct NGPostDetailView: View {
+    @EnvironmentObject private var session: NativeSession
     @State private var post: NGRecord
     @State private var comments: [NGRecord] = []
     @State private var draft = ""
@@ -426,8 +442,8 @@ struct NGPostDetailView: View {
         error = nil
         defer { if request == generation { loading = false } }
         do {
-            async let detail = NoctAPI.shared.get("/api/social", query: ["action": "post", "id": post.id])
-            async let replies = NoctAPI.shared.get("/api/social", query: ["action": "comments", "post": post.id])
+            async let detail = session.api.get("/api/social", query: ["action": "post", "id": post.id])
+            async let replies = session.api.get("/api/social", query: ["action": "comments", "post": post.id])
             let (newPost, page) = try await (detail, replies)
             try Task.checkCancellation()
             guard request == generation else { return }
@@ -449,7 +465,7 @@ struct NGPostDetailView: View {
         loadingOlder = true
         defer { loadingOlder = false }
         do {
-            let result = try await NoctAPI.shared.get("/api/social", query: [
+            let result = try await session.api.get("/api/social", query: [
                 "action": "comments", "post": post.id, "before": first.string("created"), "beforeId": first.id
             ])
             try Task.checkCancellation()
@@ -483,7 +499,7 @@ struct NGPostDetailView: View {
         Task {
             defer { sending = false }
             do {
-                let result = try await NoctAPI.shared.post("/api/social", body: ["action": "comment", "id": post.id, "text": text])
+                let result = try await session.api.post("/api/social", body: ["action": "comment", "id": post.id, "text": text])
                 draft = ""
                 if result.bool("queued") {
                     notice = result.string("notice", default: "Комментарий отправлен на проверку.")
@@ -529,38 +545,42 @@ private struct NGPostComposer: View {
                 }.accessibilityLabel("Опубликовать")
                     .disabled(publishing || (text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && photos.isEmpty))
             }
-            ZStack(alignment: .topLeading) {
-                if text.isEmpty { Text("О чём думаешь?").foregroundColor(NGTheme.muted).padding(.top, 8).padding(.leading, 5) }
-                TextEditor(text: $text).frame(minHeight: 180).opacity(text.isEmpty ? 0.8 : 1)
-                    .onChange(of: text) { text = String($0.prefix(5000)) }
-                    .disabled(publishing)
-            }
-            if !photos.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(photos) { photo in
-                            if let image = UIImage(data: photo.data) {
-                                Image(uiImage: image).resizable().scaledToFill()
-                                    .frame(width: 112, height: 112).clipped()
-                                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                                    .overlay(alignment: .topTrailing) {
-                                        Button { photos.removeAll { $0.id == photo.id } } label: {
-                                            Image(systemName: "xmark").frame(width: 44, height: 44)
-                                                .background(.ultraThinMaterial, in: Circle())
-                                        }.accessibilityLabel("Удалить фото").disabled(publishing)
+            ScrollView {
+                VStack(spacing: 16) {
+                    ZStack(alignment: .topLeading) {
+                        if text.isEmpty { Text("О чём думаешь?").foregroundColor(NGTheme.muted).padding(.top, 8).padding(.leading, 5) }
+                        TextEditor(text: $text).frame(minHeight: 180).opacity(text.isEmpty ? 0.8 : 1)
+                            .onChange(of: text) { text = String($0.prefix(5000)) }
+                            .disabled(publishing)
+                    }
+                    if !photos.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(photos) { photo in
+                                    if let image = UIImage(data: photo.data) {
+                                        Image(uiImage: image).resizable().scaledToFill()
+                                            .frame(width: 112, height: 112).clipped()
+                                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                                            .overlay(alignment: .topTrailing) {
+                                                Button { photos.removeAll { $0.id == photo.id } } label: {
+                                                    Image(systemName: "xmark").frame(width: 44, height: 44)
+                                                        .background(.ultraThinMaterial, in: Circle())
+                                                }.accessibilityLabel("Удалить фото").disabled(publishing)
+                                            }
                                     }
+                                }
                             }
                         }
                     }
+                    HStack {
+                        Button { picking = true } label: { Label("Фото", systemImage: "photo").frame(minHeight: 44) }
+                            .disabled(publishing || photos.count >= 4)
+                        Spacer()
+                        Text("\(text.count)/5000").font(.caption).foregroundColor(NGTheme.muted)
+                    }
+                    if let error { NGInlineError(message: error) }
                 }
             }
-            HStack {
-                Button { picking = true } label: { Label("Фото", systemImage: "photo").frame(minHeight: 44) }
-                    .disabled(publishing || photos.count >= 4)
-                Spacer()
-                Text("\(text.count)/5000").font(.caption).foregroundColor(NGTheme.muted)
-            }
-            if let error { NGInlineError(message: error) }
         }
         .padding(20).background(NGTheme.background.ignoresSafeArea())
         .interactiveDismissDisabled(publishing)
@@ -581,12 +601,12 @@ private struct NGPostComposer: View {
             do {
                 for index in photos.indices where photos[index].uploadID == nil {
                     let photo = photos[index]
-                    let upload = try await NoctAPI.shared.upload(data: photo.data, fileName: photo.name, mimeType: photo.mime, chat: false)
+                    let upload = try await session.api.upload(data: photo.data, fileName: photo.name, mimeType: photo.mime, chat: false)
                     guard session.user?.string("id") == ownerID else { throw CancellationError() }
                     photos[index].uploadID = upload.string("id")
                 }
                 guard session.user?.string("id") == ownerID else { throw CancellationError() }
-                let result = try await NoctAPI.shared.post("/api/social", body: [
+                let result = try await session.api.post("/api/social", body: [
                     "action": "post", "actor": ownerID, "text": text.trimmingCharacters(in: .whitespacesAndNewlines),
                     "media": photos.compactMap(\.uploadID)
                 ])

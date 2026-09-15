@@ -74,6 +74,122 @@ final class NativeSmokeTests: XCTestCase {
         waitForLabel("Проверка регистрации: 1", identifier: "onboarding.error", in: app)
     }
 
+    func testSignedInFeedContainsPortraitAndPanoramaInsideCard() {
+        let app = launchSocial()
+        let portrait = app.buttons["media.fixture-portrait-image"]
+        XCTAssertTrue(portrait.waitForExistence(timeout: 8))
+        let author = element("feed.author.fixture-portrait", in: app)
+        XCTAssertTrue(author.exists)
+        assertHorizontalBounds(portrait, in: app)
+        assertHorizontalBounds(author, in: app)
+        XCTAssertGreaterThan(portrait.frame.height, 150)
+        XCTAssertLessThan(portrait.frame.height, app.frame.height * 0.55)
+        XCTAssertGreaterThanOrEqual(portrait.frame.minY, author.frame.maxY)
+        snapshot("Feed portrait and long author", in: app)
+
+        let portraitLike = app.buttons["feed.like.fixture-portrait"]
+        reveal(portraitLike, in: app)
+        XCTAssertTrue(portraitLike.isHittable)
+        XCTAssertGreaterThanOrEqual(portraitLike.frame.minY, portrait.frame.maxY - 1)
+        assertHorizontalBounds(app.buttons["feed.comments.fixture-portrait"], in: app)
+        assertHorizontalBounds(app.buttons["feed.save.fixture-portrait"], in: app)
+
+        let panorama = app.buttons["media.fixture-landscape-image"]
+        reveal(panorama, in: app)
+        XCTAssertTrue(panorama.isHittable)
+        assertHorizontalBounds(panorama, in: app)
+        XCTAssertGreaterThan(panorama.frame.height, 150)
+        XCTAssertLessThan(panorama.frame.height, app.frame.height * 0.55)
+        snapshot("Feed panorama", in: app)
+
+        defer { XCUIDevice.shared.orientation = .portrait }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let landscape = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.frame.width > app.frame.height
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [landscape], timeout: 5), .completed)
+        reveal(panorama, in: app)
+        XCTAssertTrue(panorama.isHittable)
+        assertHorizontalBounds(panorama, in: app)
+        assertHorizontalBounds(element("feed.post.fixture-landscape", in: app), in: app)
+        snapshot("Feed landscape orientation", in: app)
+    }
+
+    func testRealRootLoadsDirectAndGroupChatsAndKeepsComposerAboveKeyboard() {
+        let app = launchSocial()
+        XCTAssertTrue(app.buttons["media.fixture-portrait-image"].waitForExistence(timeout: 8))
+        let messagesTab = app.tabBars.buttons["Сообщения"]
+        XCTAssertTrue(messagesTab.exists)
+        messagesTab.tap()
+        let friend = element("chats.row.fixture-friend", in: app)
+        XCTAssertTrue(friend.waitForExistence(timeout: 5), "The real app scene must activate chat loading.")
+        XCTAssertTrue(element("chats.row.fixture-room", in: app).exists)
+        snapshot("Loaded chats", in: app)
+        friend.tap()
+
+        let directMessage = element("chat.message.fixture-dm-message", in: app)
+        XCTAssertTrue(directMessage.waitForExistence(timeout: 5), "A personal conversation must leave the initial spinner.")
+        let composer = app.textViews["chat.composer"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        XCTAssertTrue(composer.isEnabled)
+        snapshot("Direct conversation", in: app)
+        composer.tap()
+        composer.typeText("Checking the keyboard")
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        let send = app.buttons["chat.send"]
+        XCTAssertTrue(send.isEnabled)
+        assertHorizontalBounds(composer, in: app)
+        assertHorizontalBounds(send, in: app)
+        XCTAssertLessThanOrEqual(composer.frame.maxY, keyboard.frame.minY + 1)
+        XCTAssertLessThanOrEqual(send.frame.maxY, keyboard.frame.minY + 1)
+        XCTAssertLessThanOrEqual(directMessage.frame.maxY, composer.frame.minY + 1)
+        snapshot("Direct conversation with keyboard", in: app)
+
+        // No message is sent: fixture keyboard edits stay local. Exercise actual background/foreground handling.
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(directMessage.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Загрузка сообщений"].exists)
+        app.navigationBars.buttons["Чаты"].tap()
+        let room = element("chats.row.fixture-room", in: app)
+        XCTAssertTrue(room.waitForExistence(timeout: 5))
+        room.tap()
+        let roomMessage = element("chat.message.fixture-room-message", in: app)
+        XCTAssertTrue(roomMessage.waitForExistence(timeout: 5), "A group must leave the initial spinner.")
+        XCTAssertTrue(app.textViews["chat.composer"].isEnabled)
+        XCTAssertFalse(app.staticTexts["Загрузка сообщений"].exists)
+        assertHorizontalBounds(roomMessage, in: app)
+        snapshot("Group conversation", in: app)
+    }
+
+    private func launchSocial() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-social"]
+        app.launch()
+        XCTAssertEqual(app.webViews.count, 0)
+        return app
+    }
+
+    private func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    private func assertHorizontalBounds(_ element: XCUIElement, in app: XCUIApplication,
+                                        file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(element.exists, file: file, line: line)
+        XCTAssertGreaterThan(element.frame.width, 0, file: file, line: line)
+        XCTAssertGreaterThanOrEqual(element.frame.minX, app.frame.minX - 1, file: file, line: line)
+        XCTAssertLessThanOrEqual(element.frame.maxX, app.frame.maxX + 1, file: file, line: line)
+    }
+
+    private func snapshot(_ name: String, in app: XCUIApplication) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     private func tapMargin(_ button: XCUIElement, x: CGFloat, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(button.waitForExistence(timeout: 5), file: file, line: line)
         XCTAssertTrue(button.isEnabled, file: file, line: line)

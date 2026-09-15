@@ -94,10 +94,16 @@ struct NGRemoteImage: View {
     @State private var image: UIImage?
     @State private var failed = false
     var body: some View {
-        ZStack {
-            if let image { Image(uiImage: image).resizable().aspectRatio(contentMode: contentMode) }
-            else if failed { Image(systemName: "photo").foregroundColor(NGTheme.muted) }
-            else { NGTheme.surface; ProgressView().tint(NGTheme.muted) }
+        GeometryReader { geometry in
+            ZStack {
+                if let image {
+                    Image(uiImage: image).resizable().aspectRatio(contentMode: contentMode)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                } else if failed { Image(systemName: "photo").foregroundColor(NGTheme.muted) }
+                else { NGTheme.surface; ProgressView().tint(NGTheme.muted) }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
         }
         .task(id: path) {
             let cacheEpoch = NGImageCache.epoch
@@ -167,8 +173,8 @@ struct NGMediaView: View {
     var body: some View {
         Button { showing = true } label: {
             if isImage {
-                NGRemoteImage(path: path, contentMode: .fit)
-                    .frame(maxWidth: .infinity).frame(height: 230)
+                    NGRemoteImage(path: path, contentMode: .fit)
+                    .frame(maxWidth: .infinity).aspectRatio(4 / 3, contentMode: .fit)
                     .background(NGTheme.surface).clipShape(RoundedRectangle(cornerRadius: 18))
             } else {
                 HStack(spacing: 14) {
@@ -183,6 +189,7 @@ struct NGMediaView: View {
             }
         }
         .buttonStyle(.plain).accessibilityLabel(isImage ? "Открыть фотографию" : "Открыть " + record.string("name", default: "вложение"))
+        .accessibilityIdentifier("media." + record.id)
         .fullScreenCover(isPresented: $showing) { NGMediaDetail(record: record, path: path) }
     }
 }

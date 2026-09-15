@@ -87,7 +87,7 @@ struct NativeRootView: View {
 
     @MainActor init() {
         #if DEBUG
-        _session = StateObject(wrappedValue: NativeAuthUITestFixture.makeSession() ?? NativeSession())
+        _session = StateObject(wrappedValue: NativeSocialUITestFixture.makeSession() ?? NativeAuthUITestFixture.makeSession() ?? NativeSession())
         #else
         _session = StateObject(wrappedValue: NativeSession())
         #endif
@@ -109,10 +109,10 @@ struct NativeRootView: View {
                 NGOnboardingView()
             case .signedIn:
                 TabView(selection: $selectedTab) {
-                    NavigationView { NGFeedView() }
+                    NavigationView { NGFeedView(api: session.api) }
                         .navigationViewStyle(.stack)
                         .tabItem { Label("Лента", systemImage: "square.stack.fill") }.tag(0)
-                    NavigationView { NGChatsView() }
+                    NavigationView { NGChatsView(api: session.api) }
                         .navigationViewStyle(.stack)
                         .tabItem { Label("Сообщения", systemImage: "bubble.left.and.bubble.right.fill") }.tag(1)
                     NavigationView { NGActivityView() }

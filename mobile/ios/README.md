@@ -1,6 +1,6 @@
 # NoctGram for iPhone
 
-SwiftUI client for the existing NoctGram account and server at https://noctgram.com. iOS 15 or later. UIKit hosts SwiftUI; the app opens native screens. The earlier WKWebView implementation remains in the source tree, but is not the application entry point. This release is for registered test devices.
+SwiftUI client for the existing NoctGram account and server at https://noctgram.com. iOS 15 or later. A SwiftUI App and WindowGroup own the window, safe areas and scene lifecycle used by chat polling. The earlier WKWebView implementation remains in the source tree, but is not the application entry point. This release is for registered test devices.
 
 ## Build
 

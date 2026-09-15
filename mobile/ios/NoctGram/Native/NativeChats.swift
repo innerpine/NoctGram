@@ -4,7 +4,7 @@ import UIKit
 
 private let ngChatReactionEmoji = ["👍", "❤️", "😂", "🔥", "🎉", "🤯", "😢", "👎"]
 
-private struct NGChatListItem: Identifiable {
+struct NGChatListItem: Identifiable {
     let record: NGRecord
     let isRoom: Bool
     var id: String { (isRoom ? "room:" : "person:") + record.id }
@@ -16,59 +16,86 @@ private struct NGChatListItem: Identifiable {
 }
 
 @MainActor
-private final class NGChatsModel: ObservableObject {
+final class NGChatsModel: ObservableObject {
     @Published var items: [NGChatListItem] = []
     @Published var people: [NGRecord] = []
     @Published var foundRooms: [NGRecord] = []
     @Published var loading = false
     @Published var searching = false
     @Published var error: String?
+    let api: NoctAPI
     private var owner = ""
+    private var refreshSerial = 0
+    private var searchSerial = 0
+    private var archived = false
+
+    init(api: NoctAPI? = nil) { self.api = api ?? .shared }
 
     func reset(owner: String) {
         guard self.owner != owner else { return }
         self.owner = owner
+        refreshSerial += 1; searchSerial += 1
         items = []; people = []; foundRooms = []; error = nil
+        loading = false; searching = false
     }
 
     func refresh(owner: String, archived: Bool) async {
         reset(owner: owner)
         guard !owner.isEmpty, !Task.isCancelled else { return }
+        if self.archived != archived { items = []; self.archived = archived }
+        refreshSerial += 1
+        let ticket = refreshSerial
         if items.isEmpty { loading = true }
-        defer { loading = false }
-        do {
-            async let direct = NoctAPI.shared.get("/api/social", query: ["action": "threads", "archived": archived ? "1" : "0", "actor": owner])
-            async let groups = NoctAPI.shared.get("/api/rooms", query: ["action": "list", "archived": archived ? "1" : "0", "actor": owner])
-            let (directResult, roomResult) = try await (direct, groups)
-            try Task.checkCancellation()
-            guard self.owner == owner else { return }
-            let combined = directResult.objects("items").map { NGChatListItem(record: $0, isRoom: false) }
-                + roomResult.objects("rooms").map { NGChatListItem(record: $0, isRoom: true) }
-            items = combined.sorted { $0.time == $1.time ? $0.id < $1.id : $0.time > $1.time }
-            error = nil
-        } catch {
-            if !Task.isCancelled && self.owner == owner { self.error = error.localizedDescription }
+        defer { if self.owner == owner && ticket == refreshSerial { loading = false } }
+        async let direct = ngChatFetch(api, path: "/api/social", query: ["action": "threads", "archived": archived ? "1" : "0", "actor": owner], key: "items")
+        async let groups = ngChatFetch(api, path: "/api/rooms", query: ["action": "list", "archived": archived ? "1" : "0", "actor": owner], key: "rooms")
+        let results = await [direct, groups]
+        guard !Task.isCancelled, self.owner == owner, ticket == refreshSerial else { return }
+        if let failure = results.compactMap(ngChatFailure).first(where: { ($0 as? NoctAPIError)?.isUnauthorized == true }) {
+            items = []; error = failure.localizedDescription; return
         }
+        var problems: [String] = []
+        for (index, result) in results.enumerated() {
+            let isRoom = index == 1
+            switch result {
+            case .success(let records):
+                items.removeAll { $0.isRoom == isRoom }
+                items.append(contentsOf: records.map { NGChatListItem(record: $0, isRoom: isRoom) })
+            case .failure(let failure):
+                if let apiError = failure as? NoctAPIError, [403, 404].contains(apiError.status) {
+                    items.removeAll { $0.isRoom == isRoom }
+                }
+                problems.append((isRoom ? "Группы: " : "Диалоги: ") + failure.localizedDescription)
+            }
+        }
+        items.sort { $0.time == $1.time ? $0.id < $1.id : $0.time > $1.time }
+        error = problems.isEmpty ? nil : problems.joined(separator: "\n")
     }
 
     func search(_ query: String, owner: String) async {
+        reset(owner: owner)
+        searchSerial += 1
+        let ticket = searchSerial
         people = []; foundRooms = []
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard term.count >= 2, !owner.isEmpty else { searching = false; return }
         searching = true
-        defer { if !Task.isCancelled { searching = false } }
+        defer { if self.owner == owner && ticket == searchSerial { searching = false } }
         do {
             try await Task.sleep(nanoseconds: 350_000_000)
-            async let users = NoctAPI.shared.get("/api/social", query: ["action": "people", "q": term, "actor": owner])
-            async let rooms = NoctAPI.shared.get("/api/rooms", query: ["action": "search", "q": term, "actor": owner])
-            let (usersResult, roomsResult) = try await (users, rooms)
+            async let users = ngChatFetch(api, path: "/api/social", query: ["action": "people", "q": term, "actor": owner], key: "items")
+            async let rooms = ngChatFetch(api, path: "/api/rooms", query: ["action": "search", "q": term, "actor": owner], key: "rooms")
+            let results = await [users, rooms]
             try Task.checkCancellation()
-            guard self.owner == owner else { return }
-            people = usersResult.objects("items")
-            foundRooms = roomsResult.objects("rooms").filter { $0.string("kind") != "secret" }
-            error = nil
+            guard self.owner == owner, ticket == searchSerial else { return }
+            let failures = results.compactMap(ngChatFailure)
+            if !failures.contains(where: { ($0 as? NoctAPIError)?.isUnauthorized == true }) {
+                if case .success(let records) = results[0] { people = records }
+                if case .success(let records) = results[1] { foundRooms = records.filter { $0.string("kind") != "secret" } }
+            }
+            error = failures.isEmpty ? nil : failures.map(\.localizedDescription).joined(separator: "\n")
         } catch {
-            if !Task.isCancelled && self.owner == owner { self.error = error.localizedDescription }
+            if !Task.isCancelled && self.owner == owner && ticket == searchSerial { self.error = error.localizedDescription }
         }
     }
 
@@ -76,9 +103,9 @@ private final class NGChatsModel: ObservableObject {
         guard !owner.isEmpty, self.owner == owner else { return }
         do {
             if item.isRoom {
-                _ = try await NoctAPI.shared.post("/api/rooms", body: ["action": "archive", "id": item.record.id, "archived": archived, "actor": owner])
+                _ = try await api.post("/api/rooms", body: ["action": "archive", "id": item.record.id, "archived": archived, "actor": owner])
             } else {
-                _ = try await NoctAPI.shared.post("/api/social", body: ["action": "archiveChat", "peer": item.record.id, "archived": archived, "actor": owner])
+                _ = try await api.post("/api/social", body: ["action": "archiveChat", "peer": item.record.id, "archived": archived, "actor": owner])
             }
             guard self.owner == owner else { return }
             items.removeAll { $0.id == item.id }
@@ -86,14 +113,37 @@ private final class NGChatsModel: ObservableObject {
     }
 }
 
+private func ngChatRecords(_ result: NGRecord, key: String) throws -> [NGRecord] {
+    guard let values = result.raw[key] as? [[String: Any]],
+          values.allSatisfy({ !NGRecord($0).string("id").isEmpty }) else {
+        throw NoctAPIError(code: "INVALID_CHAT_RESPONSE", message: "Сервер вернул некорректный список сообщений. Потяните экран вниз, чтобы повторить загрузку.")
+    }
+    return values.map { NGRecord($0) }
+}
+
+@MainActor
+private func ngChatFetch(_ api: NoctAPI, path: String, query: [String: String], key: String) async -> Result<[NGRecord], Error> {
+    do { return .success(try ngChatRecords(await api.get(path, query: query), key: key)) }
+    catch { return .failure(error) }
+}
+
+private func ngChatFailure(_ result: Result<[NGRecord], Error>) -> Error? {
+    if case .failure(let error) = result { return error }
+    return nil
+}
+
 @MainActor
 struct NGChatsView: View {
     @EnvironmentObject private var session: NativeSession
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var model = NGChatsModel()
+    @StateObject private var model: NGChatsModel
     @State private var query = ""
     @State private var archived = false
     @State private var visible = false
+
+    init(api: NoctAPI? = nil) {
+        _model = StateObject(wrappedValue: NGChatsModel(api: api))
+    }
 
     private var owner: String { session.user?.id ?? "" }
     private var taskID: String { "\(owner):\(visible):\(scenePhase == .active):\(archived)" }
@@ -165,7 +215,7 @@ struct NGChatsView: View {
         if !model.people.isEmpty {
             Section("Люди") {
                 ForEach(model.people, id: \.id) { person in
-                    NavigationLink(destination: NGConversationView(person: person)) {
+                    NavigationLink(destination: NGConversationView(person: person, api: model.api)) {
                         NGChatPersonRow(person: person, subtitle: "@" + person.string("handle"))
                     }.listRowBackground(NGTheme.surface)
                 }
@@ -174,7 +224,7 @@ struct NGChatsView: View {
         if !model.foundRooms.isEmpty {
             Section("Публичные группы") {
                 ForEach(model.foundRooms, id: \.id) { room in
-                    NavigationLink(destination: NGRoomConversationView(room: room)) {
+                    NavigationLink(destination: NGRoomConversationView(room: room, api: model.api)) {
                         NGChatPersonRow(person: room, subtitle: "\(room.int("memberCount")) участников")
                     }.listRowBackground(NGTheme.surface)
                 }
@@ -184,9 +234,13 @@ struct NGChatsView: View {
 
     @ViewBuilder private func chatLink(_ item: NGChatListItem) -> some View {
         if item.isRoom {
-            NavigationLink(destination: NGRoomConversationView(room: item.record)) { NGChatSummaryRow(item: item) }
+            NavigationLink(destination: NGRoomConversationView(room: item.record, api: model.api)) {
+                NGChatSummaryRow(item: item).accessibilityIdentifier("chats.row." + item.record.id)
+            }
         } else {
-            NavigationLink(destination: NGConversationView(person: item.record)) { NGChatSummaryRow(item: item) }
+            NavigationLink(destination: NGConversationView(person: item.record, api: model.api)) {
+                NGChatSummaryRow(item: item).accessibilityIdentifier("chats.row." + item.record.id)
+            }
         }
     }
 }
@@ -244,9 +298,10 @@ private struct NGChatPendingSend {
 }
 
 @MainActor
-private final class NGConversationModel: ObservableObject {
+final class NGConversationModel: ObservableObject {
     let target: NGRecord
     let isRoom: Bool
+    let api: NoctAPI
     @Published var messages: [NGRecord] = []
     @Published var detail: NGRecord?
     @Published var draft = ""
@@ -270,8 +325,9 @@ private final class NGConversationModel: ObservableObject {
     private var reacting = Set<String>()
     private var loadedEarlier = false
 
-    init(target: NGRecord, isRoom: Bool) {
+    init(target: NGRecord, isRoom: Bool, api: NoctAPI? = nil) {
         self.target = target; self.isRoom = isRoom
+        self.api = api ?? .shared
         self.needsJoin = isRoom && target.raw["joined"] != nil && !target.bool("joined")
     }
 
@@ -297,31 +353,48 @@ private final class NGConversationModel: ObservableObject {
         guard !needsJoin else { loading = false; return }
         refreshSerial += 1
         let ticket = refreshSerial
+        defer { if self.owner == owner && ticket == refreshSerial { loading = false } }
         do {
             if isRoom {
-                let result = try await NoctAPI.shared.get("/api/rooms", query: ["action": "room", "id": target.id, "actor": owner])
+                let result = try await api.get("/api/rooms", query: ["action": "room", "id": target.id, "actor": owner])
                 try Task.checkCancellation()
                 guard active, self.owner == owner, ticket == refreshSerial else { return }
                 guard result.string("kind") != "secret" else { detail = result; messages = []; canSend = false; loading = false; return }
-                guard result.string("me") == owner else { return }
+                try validateRoom(result, owner: owner)
+                let page = try ngChatRecords(result, key: "messages")
                 detail = result; canSend = result.bool("canSend")
-                let page = result.objects("messages")
                 replaceLatest(page)
+                loading = false; error = nil
                 if !loadedEarlier { nextCursor = result.string("nextCursor") }
                 if let latest = page.last, latest.id != readThrough, active {
                     try Task.checkCancellation()
-                    _ = try await NoctAPI.shared.post("/api/rooms", body: ["action": "read", "id": target.id, "through": latest.id, "actor": owner])
-                    if active && self.owner == owner { readThrough = latest.id }
+                    do {
+                        _ = try await api.post("/api/rooms", body: ["action": "read", "id": target.id, "through": latest.id, "actor": owner])
+                        if active && self.owner == owner { readThrough = latest.id }
+                    } catch {
+                        // A read-receipt outage must not discard an already authorized history response.
+                        if let apiError = error as? NoctAPIError, [401, 403, 404].contains(apiError.status) { throw error }
+                        if active && self.owner == owner && !Task.isCancelled {
+                            self.error = "Не удалось отметить сообщения прочитанными. " + error.localizedDescription
+                        }
+                    }
                 }
             } else {
                 // This endpoint marks incoming messages read. Never call it for a hidden conversation.
-                async let conversation = NoctAPI.shared.get("/api/social", query: ["action": "messages", "peer": target.id, "actor": owner])
-                async let access = NoctAPI.shared.get("/api/social", query: ["action": "messageAccess", "peer": target.id, "actor": owner])
-                let (result, permission) = try await (conversation, access)
+                async let conversation = ngChatFetch(api, path: "/api/social", query: ["action": "messages", "peer": target.id, "actor": owner], key: "items")
+                async let access = messageAccess(owner: owner)
+                let (result, permission) = await (conversation, access)
                 try Task.checkCancellation()
                 guard active, self.owner == owner, ticket == refreshSerial else { return }
-                messages = result.objects("items")
-                canSend = permission.bool("allowed")
+                if case .failure(let failure) = permission,
+                   let apiError = failure as? NoctAPIError, [401, 403, 404].contains(apiError.status) { throw failure }
+                messages = try result.get()
+                switch permission {
+                case .success(let allowed): canSend = allowed; error = nil
+                case .failure(let failure):
+                    canSend = false
+                    error = "Не удалось проверить возможность отправки. " + failure.localizedDescription
+                }
             }
             guard self.owner == owner, !Task.isCancelled else { return }
             if let pending = pending {
@@ -330,12 +403,32 @@ private final class NGConversationModel: ObservableObject {
             }
             loading = false
         } catch {
-            if active && !Task.isCancelled && self.owner == owner {
+            if active && !Task.isCancelled && self.owner == owner && ticket == refreshSerial {
                 self.error = error.localizedDescription; loading = false
                 if let apiError = error as? NoctAPIError, [401, 403, 404].contains(apiError.status) {
                     messages = []; canSend = false; detail = nil; nextCursor = ""
                 }
             }
+        }
+    }
+
+    private func messageAccess(owner: String) async -> Result<Bool, Error> {
+        do {
+            let permission = try await api.get("/api/social", query: ["action": "messageAccess", "peer": target.id, "actor": owner])
+            guard permission.raw["allowed"] is NSNumber else {
+                throw NoctAPIError(code: "INVALID_CHAT_ACCESS", message: "Сервер не подтвердил права отправки сообщений.")
+            }
+            return .success(permission.bool("allowed"))
+        } catch { return .failure(error) }
+    }
+
+    private func validateRoom(_ result: NGRecord, owner: String) throws {
+        guard result.string("me") == owner else {
+            throw NoctAPIError(status: 401, code: "CHAT_ACCOUNT_CHANGED", message: "Аккаунт изменился. Откройте чат снова.")
+        }
+        guard result.string("id") == target.id, result.string("kind") == "group",
+              result.raw["canSend"] is NSNumber else {
+            throw NoctAPIError(code: "INVALID_CHAT_RESPONSE", message: "Не удалось прочитать ответ сервера. Потяните экран вниз, чтобы повторить загрузку.")
         }
     }
 
@@ -361,9 +454,12 @@ private final class NGConversationModel: ObservableObject {
         loadingEarlier = true
         defer { if self.owner == owner { loadingEarlier = false } }
         do {
-            let result = try await NoctAPI.shared.get("/api/rooms", query: ["action": "room", "id": target.id, "before": nextCursor, "actor": owner])
-            guard active, self.owner == owner, result.string("me") == owner, result.string("kind") != "secret" else { return }
-            merge(result.objects("messages")); nextCursor = result.string("nextCursor"); loadedEarlier = true
+            let result = try await api.get("/api/rooms", query: ["action": "room", "id": target.id, "before": nextCursor, "actor": owner])
+            try Task.checkCancellation()
+            guard active, self.owner == owner else { return }
+            guard result.string("kind") != "secret" else { detail = result; messages = []; canSend = false; return }
+            try validateRoom(result, owner: owner)
+            merge(try ngChatRecords(result, key: "messages")); nextCursor = result.string("nextCursor"); loadedEarlier = true
         } catch { if active && self.owner == owner { self.error = error.localizedDescription } }
     }
 
@@ -372,7 +468,7 @@ private final class NGConversationModel: ObservableObject {
         sending = true
         defer { if self.owner == owner { sending = false } }
         do {
-            _ = try await NoctAPI.shared.post("/api/rooms", body: ["action": "join", "id": target.id, "actor": owner])
+            _ = try await api.post("/api/rooms", body: ["action": "join", "id": target.id, "actor": owner])
             guard self.owner == owner else { return }
             needsJoin = false
             await refresh(owner: owner)
@@ -387,7 +483,7 @@ private final class NGConversationModel: ObservableObject {
         uploading = true
         defer { if self.owner == owner { uploading = false } }
         do {
-            let result = try await NoctAPI.shared.upload(data: data, fileName: fileName, mimeType: mimeType, chat: true, peer: target.id)
+            let result = try await api.upload(data: data, fileName: fileName, mimeType: mimeType, chat: true, peer: target.id)
             guard self.owner == owner else { return }
             guard !result.string("id").isEmpty else {
                 throw NoctAPIError(code: "INVALID_UPLOAD", message: "Сервер не подтвердил загрузку файла.")
@@ -399,7 +495,7 @@ private final class NGConversationModel: ObservableObject {
     func removeUpload(_ upload: NGRecord, owner: String) async {
         guard !sending, pending == nil, self.owner == owner else { return }
         do {
-            _ = try await NoctAPI.shared.delete("/api/chat-upload", body: ["id": upload.id])
+            _ = try await api.delete("/api/chat-upload", body: ["id": upload.id])
             if self.owner == owner { uploads.removeAll { $0.id == upload.id } }
         } catch { if self.owner == owner { self.error = error.localizedDescription } }
     }
@@ -418,9 +514,9 @@ private final class NGConversationModel: ObservableObject {
         var body: [String: Any] = ["action": isRoom ? "send" : "message", "id": target.id, "text": snapshot.text, "key": snapshot.key, "actor": owner]
         if let replyID = snapshot.replyID { body["replyTo"] = replyID }
         // Published main accepts group text only; do not send even an empty attachments array there.
-        if !isRoom { body["attachments"] = snapshot.attachments }
+        if !isRoom { body["attachments"] = snapshot.attachments; body["expectedSender"] = owner }
         do {
-            let result = try await NoctAPI.shared.post(isRoom ? "/api/rooms" : "/api/social", body: body)
+            let result = try await api.post(isRoom ? "/api/rooms" : "/api/social", body: body)
             guard self.owner == owner else { return }
             finishDraft()
             if result.bool("queued") { notice = "Сообщение отправлено на проверку. Оно появится после одобрения." }
@@ -446,7 +542,7 @@ private final class NGConversationModel: ObservableObject {
         finishDraft()
         for file in files where self.owner == owner {
             // The server refuses to discard any upload already bound to an accepted message.
-            _ = try? await NoctAPI.shared.delete("/api/chat-upload", body: ["id": file.id])
+            _ = try? await api.delete("/api/chat-upload", body: ["id": file.id])
         }
     }
 
@@ -463,9 +559,9 @@ private final class NGConversationModel: ObservableObject {
         if removing { reactionValue = NSNull() }
         do {
             if isRoom {
-                _ = try await NoctAPI.shared.post("/api/rooms", body: ["action": "reaction", "id": target.id, "messageId": message.id, "emoji": reactionValue, "actor": owner])
+                _ = try await api.post("/api/rooms", body: ["action": "reaction", "id": target.id, "messageId": message.id, "emoji": reactionValue, "actor": owner])
             } else {
-                _ = try await NoctAPI.shared.post("/api/social", body: ["action": "messageReaction", "id": message.id, "peer": target.id, "emoji": reactionValue, "actor": owner])
+                _ = try await api.post("/api/social", body: ["action": "messageReaction", "id": message.id, "peer": target.id, "emoji": reactionValue, "actor": owner, "expectedSender": owner])
             }
             if self.owner == owner { applyReaction(messageID: message.id, emoji: removing ? nil : emoji) }
             if active { await refresh(owner: owner) }
@@ -492,13 +588,15 @@ private final class NGConversationModel: ObservableObject {
 @MainActor
 struct NGConversationView: View {
     let person: NGRecord
-    var body: some View { NGNativeConversation(target: person, isRoom: false) }
+    var api: NoctAPI? = nil
+    var body: some View { NGNativeConversation(target: person, isRoom: false, api: api) }
 }
 
 @MainActor
 struct NGRoomConversationView: View {
     let room: NGRecord
-    var body: some View { NGNativeConversation(target: room, isRoom: true) }
+    var api: NoctAPI? = nil
+    var body: some View { NGNativeConversation(target: room, isRoom: true, api: api) }
 }
 
 private enum NGChatSheet: String, Identifiable {
@@ -522,8 +620,8 @@ private struct NGNativeConversation: View {
     @FocusState private var composerFocused: Bool
     @ScaledMetric(relativeTo: .body) private var editorHeight: CGFloat = 58
 
-    init(target: NGRecord, isRoom: Bool) {
-        _model = StateObject(wrappedValue: NGConversationModel(target: target, isRoom: isRoom))
+    init(target: NGRecord, isRoom: Bool, api: NoctAPI? = nil) {
+        _model = StateObject(wrappedValue: NGConversationModel(target: target, isRoom: isRoom, api: api))
     }
 
     private var owner: String { session.user?.id ?? "" }
@@ -630,13 +728,22 @@ private struct NGNativeConversation: View {
                     }.disabled(model.loadingEarlier).listRowBackground(Color.clear)
                 }
                 if !model.loading && model.messages.isEmpty {
-                    NGEmptyState(title: "Начните разговор", message: "Отправьте первое сообщение.", systemImage: "bubble.left")
-                        .listRowBackground(Color.clear)
+                    if let error = model.error {
+                        VStack(spacing: 12) {
+                            NGEmptyState(title: "Не удалось загрузить переписку", message: error, systemImage: "wifi.exclamationmark")
+                            Button("Повторить загрузку") { Task { await model.refresh(owner: owner) } }
+                                .frame(minHeight: 44)
+                        }.listRowBackground(Color.clear)
+                    } else {
+                        NGEmptyState(title: "Начните разговор", message: "Отправьте первое сообщение.", systemImage: "bubble.left")
+                            .listRowBackground(Color.clear)
+                    }
                 }
                 ForEach(model.messages, id: \.id) { message in
                     NGChatMessageBubble(message: message, own: message.string("sender") == owner, isRoom: model.isRoom, quote: quotedMessage(message)) { emoji in
                         Task { await model.react(message, emoji: emoji, owner: owner) }
                     }
+                    .accessibilityIdentifier("chat.message." + message.id)
                     .id(message.id)
                     .listRowInsets(EdgeInsets(top: 5, leading: 12, bottom: 5, trailing: 12))
                     .listRowSeparator(.hidden)
@@ -706,11 +813,12 @@ private struct NGNativeConversation: View {
             }
             if let reply = model.reply {
                 HStack(spacing: 8) {
-                    Rectangle().fill(NGTheme.accent).frame(width: 3)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Ответ на сообщение").font(.caption.bold()).foregroundColor(NGTheme.accent)
                         Text(ngChatMessageSummary(reply)).font(.caption).lineLimit(2)
                     }
+                    .padding(.leading, 10)
+                    .overlay(alignment: .leading) { RoundedRectangle(cornerRadius: 2).fill(NGTheme.accent).frame(width: 3) }
                     Spacer()
                     Button { model.reply = nil } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }
                         .disabled(model.sending || model.retryPending).accessibilityLabel("Отменить ответ")
@@ -748,6 +856,7 @@ private struct NGNativeConversation: View {
                     TextEditor(text: $model.draft).frame(height: min(editorHeight, 140)).focused($composerFocused)
                         .opacity(model.draft.isEmpty ? 0.75 : 1).disabled(model.composerLocked)
                         .accessibilityLabel("Текст сообщения")
+                        .accessibilityIdentifier("chat.composer")
                 }
                 Button {
                     composerFocused = false
@@ -755,7 +864,7 @@ private struct NGNativeConversation: View {
                 } label: {
                     Group { if model.sending { ProgressView() } else { Image(systemName: "arrow.up").font(.headline) } }
                         .frame(width: 44, height: 44).background(NGTheme.accent.opacity(model.sendEnabled ? 1 : 0.25), in: Circle()).foregroundColor(.black)
-                }.disabled(!model.sendEnabled).accessibilityLabel("Отправить сообщение")
+                }.disabled(!model.sendEnabled).accessibilityLabel("Отправить сообщение").accessibilityIdentifier("chat.send")
             }
             if model.draft.utf16.count > 3800 {
                 Text("\(model.draft.utf16.count) / 4000").font(.caption).foregroundColor(model.draft.utf16.count > 4000 ? .orange : NGTheme.muted).frame(maxWidth: .infinity, alignment: .trailing)

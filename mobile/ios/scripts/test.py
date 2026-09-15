@@ -12,7 +12,8 @@ phones = [d for runtime, rows in devices['devices'].items() if 'iOS' in runtime
           for d in rows if 'iPhone' in d['name'] and d.get('isAvailable')]
 if not phones:
     raise RuntimeError('No iPhone simulator is installed on the runner.')
-device = phones[0]['udid']
+# Match the reported device when available; other installed iPhones remain a usable fallback.
+device = next((phone for phone in phones if phone['name'] == 'iPhone 17 Pro'), phones[0])['udid']
 result = temp / 'noctgram-native-tests.xcresult'
 derived = temp / 'noctgram-native-tests-derived'
 command = ['xcodebuild', '-quiet', '-project', str(source / 'NoctGram.xcodeproj'), '-scheme', 'NoctGram',
@@ -27,6 +28,12 @@ if result.exists():
     if report.returncode == 0:
         (temp / 'noctgram-native-summary.json').write_text(report.stdout, encoding='utf-8')
         print(report.stdout)
+    # Keep actual test screenshots (feed, chats and keyboard), including failed-run evidence.
+    review = temp / 'noctgram-native-review'
+    exported = subprocess.run(['xcrun', 'xcresulttool', 'export', 'attachments', '--path', str(result),
+                               '--output-path', str(review)], capture_output=True, text=True)
+    if exported.returncode:
+        print('Attachment export unavailable; screenshots remain in the xcresult bundle:', exported.stderr)
 if completed.returncode:
     raise SystemExit(completed.returncode)
 app = derived / 'Build/Products/Debug-iphonesimulator/NoctGram.app'
@@ -38,3 +45,7 @@ subprocess.run(['xcrun', 'simctl', 'launch', device, 'com.noctgram.ios', '--ui-t
 import time
 time.sleep(3)
 subprocess.run(['xcrun', 'simctl', 'io', device, 'screenshot', str(temp / 'noctgram-native-preview.png')], check=True)
+subprocess.run(['xcrun', 'simctl', 'terminate', device, 'com.noctgram.ios'], check=True)
+subprocess.run(['xcrun', 'simctl', 'launch', device, 'com.noctgram.ios', '--ui-test-social'], check=True)
+time.sleep(3)
+subprocess.run(['xcrun', 'simctl', 'io', device, 'screenshot', str(temp / 'noctgram-native-feed-preview.png')], check=True)
