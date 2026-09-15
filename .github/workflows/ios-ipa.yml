@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    runs-on: macos-15
-    timeout-minutes: 25
+    runs-on: macos-26
+    timeout-minutes: 30
     environment: noctgram-ios
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +24,18 @@ jobs:
         run: xcodebuild -version
       - name: Install XcodeGen
         run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+      - name: Native unit and interface checks
+        run: python3 mobile/ios/scripts/test.py
+      - name: Save interface check results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: NoctGram-native-checks
+          path: |
+            ${{ runner.temp }}/noctgram-native-tests.xcresult
+            ${{ runner.temp }}/noctgram-native-preview.png
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Archive and sign
         env:
           NOCT_IOS_CERTIFICATE_P12: ${{ secrets.NOCT_IOS_CERTIFICATE_P12 }}

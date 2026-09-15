@@ -1,4 +1,5 @@
 import UIKit
+import SwiftUI
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -11,7 +12,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         let window = UIWindow(frame: UIScreen.main.bounds)
         window.overrideUserInterfaceStyle = .dark
         window.backgroundColor = .black
-        window.rootViewController = WebViewController()
+        window.rootViewController = UIHostingController(rootView: NativeRootView())
         self.window = window
         window.makeKeyAndVisible()
         return true

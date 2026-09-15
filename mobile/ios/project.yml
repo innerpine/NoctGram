@@ -6,7 +6,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: '5.0'
-    MARKETING_VERSION: '1.0.0'
+    MARKETING_VERSION: '1.1.0'
     CURRENT_PROJECT_VERSION: '1'
     IPHONEOS_DEPLOYMENT_TARGET: '15.0'
     ENABLE_USER_SCRIPT_SANDBOXING: YES
@@ -28,6 +28,26 @@ targets:
         SUPPORTS_MACCATALYST: NO
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         ENABLE_BITCODE: NO
+  NoctGramTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [NoctGramTests]
+    dependencies:
+      - target: NoctGram
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.noctgram.ios.tests
+  NoctGramUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [NoctGramUITests]
+    dependencies:
+      - target: NoctGram
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.noctgram.ios.uitests
 schemes:
   NoctGram:
     build:
@@ -37,3 +57,5 @@ schemes:
       config: Debug
     archive:
       config: Release
+    test:
+      targets: [NoctGramTests, NoctGramUITests]

@@ -1,6 +1,6 @@
 # NoctGram for iPhone
 
-Native UIKit/WKWebView client for https://noctgram.com, built with Xcode on a GitHub-hosted macOS runner. The website, API and database remain on the existing server. This first version is for installing on registered test devices.
+SwiftUI client for the existing NoctGram account and server at https://noctgram.com. iOS 15 or later. UIKit hosts SwiftUI; the app opens native screens. The earlier WKWebView implementation remains in the source tree, but is not the application entry point. This release is for registered test devices.
 
 ## Build
 
@@ -16,6 +16,24 @@ XcodeGen generates the project from project.yml. For a local Mac build use `xcod
 
 ## Included
 
-Persistent login, the current NoctGram web UI, safe area, inline media, camera/microphone prompts, external Telegram links, download/share handling and a retry screen when the network fails. The interface receives website updates from noctgram.com without rebuilding the wrapper.
+Version 1.1 includes email-code sign-in, onboarding, feed/search/following/saved views, publications with media, likes and comments, profiles and editing, received gifts and the existing Stars wallet, personal/group conversations, replies, reactions, archive, group discovery and in-app events. The shared community group comes from the same server list as the website. Camera capture, music-provider integration, stories and advanced creator/admin tools are not included yet.
 
-Native APNs notifications, PushKit/CallKit background calls and an App Store submission are separate work. A signed build does not prove behavior on a physical iPhone: check login, keyboard, attachments, audio calls, payments and any music-provider OAuth on your device before sharing it more broadly. Safari and WKWebView do not share all session cookies.
+Personal messages support photos, videos and documents through the authenticated API. The main-branch group API currently accepts text only; this client does not bypass that restriction. Media files are downloaded with bounded size, stored temporarily with file protection and removed when their viewer closes or the account signs out. Photo/document pickers and media playback use native system components.
+
+The private ephemeral URLSession cookie jar persists session credentials in Keychain (WhenUnlockedThisDeviceOnly), never UserDefaults. API redirects are restricted to the exact HTTPS origin. Sign out cancels pending requests and clears credentials/cache. Safari/WKWebView sessions are not imported: use the email linked to your NoctGram account to sign in once.
+
+On iOS 26, system navigation uses Liquid Glass and selected action panels use glassEffect. Earlier systems use materials. Reduce Transparency uses opaque controls. Content cards stay opaque for readability; fonts use Dynamic Type and controls provide VoiceOver labels.
+
+No server migration is required for this feature set. Server balances, permissions and moderation remain authoritative. There are no seeded gifts/balances and no automatic purchases. This first native release does not yet match every web feature: APNs notifications, PushKit/CallKit background calls, compatible secret-chat encryption/key transfer and an App Store submission remain separate work. Secret chats never fall back to plaintext.
+
+## Native checks
+
+The workflow runs on macOS 26 with Xcode 26 or newer. No personal Mac is needed. NoctGramTests checks API decoding, request restrictions, uploads, cookies and errors with an injected URLProtocol. NoctGramUITests checks native login and validation, and captures a screenshot. Tests never request email codes, send production messages or spend Stars. The login launch flag is compiled only in Debug and never creates an authenticated session. NoctGram-native-checks contains simulator diagnostics and a preview; artifacts expire after seven days.
+
+A build and simulator checks do not prove authenticated behavior on the physical iPhone. Check login and second launch, keyboard/reply gestures, a photo in a test conversation, profiles/gifts and logout. This release replaces the earlier wrapper when installed with the same profile/bundle ID.
+
+## APNs prerequisite
+
+The supplied profile permits production push, but the distribution .p12 is not a server APNs credential. The Apple Developer account owner must supply an APNs key or provider certificate, and the server needs authenticated device registration and delivery. VoIP pushes require CallKit and must represent real incoming calls. The app does not request notification permission before that service is available.
+
+References: [Apple: adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass), [Apple: responding to VoIP notifications](https://developer.apple.com/documentation/pushkit/responding-to-voip-notifications-from-pushkit).
