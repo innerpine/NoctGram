@@ -300,7 +300,11 @@ export function StarsPanel({
             )}
             <div>
               <strong>
-                {t.kind === 'giveaway_debit' ? (
+                {t.kind === 'case_open' ? (
+                  'Открытие кейса Noct Gifts'
+                ) : t.kind === 'gift_risk_upgrade' ? (
+                  'Апгрейд Noct Gifts'
+                ) : t.kind === 'giveaway_debit' ? (
                   'Оплата розыгрыша'
                 ) : t.kind === 'giveaway_prize' ? (
                   'Победа в розыгрыше'
@@ -329,7 +333,9 @@ export function StarsPanel({
                 )}
               </strong>
               <span>
-                {t.kind.startsWith('giveaway_')
+                {t.kind === 'case_open' ? 'Подарок в профиле NoctGram'
+                  : t.kind === 'gift_risk_upgrade' ? 'Попытка улучшения подарка'
+                  : t.kind.startsWith('giveaway_')
                   ? t.kind === 'giveaway_debit'
                     ? 'Призы оплачены'
                     : t.kind === 'giveaway_prize'

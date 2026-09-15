@@ -49,35 +49,58 @@ export const antispamSettings = sqliteTable('antispam_settings', {
   raidUntil: integer().notNull().default(0),
   updated: integer().notNull().default(0),
 });
-export const antispamActivity = sqliteTable('antispam_activity', {
-  id: text().primaryKey(),
-  actorId: text().notNull().references(() => users.id, { onDelete: 'cascade' }),
-  fingerprint: text().notNull(),
-  created: integer().notNull(),
-}, (t) => [index('antispam_activity_lookup').on(t.fingerprint, t.created), index('antispam_activity_cleanup').on(t.created)]);
-export const antispamQueue = sqliteTable('antispam_queue', {
-  id: text().primaryKey(),
-  kind: text().notNull(),
-  targetId: text().notNull(),
-  actorId: text().notNull().references(() => users.id, { onDelete: 'cascade' }),
-  contextId: text().notNull(),
-  text: text().notNull(),
-  payload: text().notNull(),
-  reasons: text().notNull(),
-  digest: text().notNull(),
-  status: text().notNull().default('pending'),
-  created: integer().notNull(),
-  reviewedAt: integer().notNull().default(0),
-  reviewedBy: text().references(() => users.id, { onDelete: 'set null' }),
-  note: text().notNull().default(''),
-}, (t) => [
-  index('antispam_queue_status').on(t.status, t.created, t.id),
-  index('antispam_queue_actor').on(t.actorId, t.status),
-  uniqueIndex('antispam_queue_pending_digest').on(t.digest).where(sql`${t.status}='pending'`),
-  check('antispam_queue_kind', sql`${t.kind} IN ('post','comment','group')`),
-  check('antispam_queue_state', sql`${t.status} IN ('pending','approved','rejected')`),
-  check('antispam_queue_json', sql`json_valid(${t.payload}) AND json_valid(${t.reasons})`),
-]);
+export const antispamActivity = sqliteTable(
+  'antispam_activity',
+  {
+    id: text().primaryKey(),
+    actorId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    fingerprint: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    index('antispam_activity_lookup').on(t.fingerprint, t.created),
+    index('antispam_activity_cleanup').on(t.created),
+  ],
+);
+export const antispamQueue = sqliteTable(
+  'antispam_queue',
+  {
+    id: text().primaryKey(),
+    kind: text().notNull(),
+    targetId: text().notNull(),
+    actorId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    contextId: text().notNull(),
+    text: text().notNull(),
+    payload: text().notNull(),
+    reasons: text().notNull(),
+    digest: text().notNull(),
+    status: text().notNull().default('pending'),
+    created: integer().notNull(),
+    reviewedAt: integer().notNull().default(0),
+    reviewedBy: text().references(() => users.id, { onDelete: 'set null' }),
+    note: text().notNull().default(''),
+  },
+  (t) => [
+    index('antispam_queue_status').on(t.status, t.created, t.id),
+    index('antispam_queue_actor').on(t.actorId, t.status),
+    uniqueIndex('antispam_queue_pending_digest')
+      .on(t.digest)
+      .where(sql`${t.status}='pending'`),
+    check('antispam_queue_kind', sql`${t.kind} IN ('post','comment','group')`),
+    check(
+      'antispam_queue_state',
+      sql`${t.status} IN ('pending','approved','rejected')`,
+    ),
+    check(
+      'antispam_queue_json',
+      sql`json_valid(${t.payload}) AND json_valid(${t.reasons})`,
+    ),
+  ],
+);
 export const userPresencePrivacy = sqliteTable(
   'user_presence_privacy',
   {
@@ -1621,3 +1644,14 @@ export const accessBlockRules = sqliteTable(
     check('access_rule_kind', sql`${t.kind} IN ('ip','device')`),
   ],
 );
+
+export const giftConsumptions = sqliteTable('gift_consumptions', {
+  receiptId: text()
+    .primaryKey()
+    .references(() => receivedGifts.id, { onDelete: 'cascade' }),
+  transferId: text()
+    .notNull()
+    .unique()
+    .references(() => starTransfers.id),
+  created: integer().notNull(),
+});

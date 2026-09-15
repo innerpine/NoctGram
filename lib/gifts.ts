@@ -133,6 +133,7 @@ export async function listGifts(
     LEFT JOIN gift_upgrades c ON c.receiptId=g.id
     WHERE g.recipient=? AND (g.hidden=0 OR ?=1)
       AND NOT EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=g.id)
+      AND NOT EXISTS(SELECT 1 FROM gift_consumptions WHERE receiptId=g.id)
       AND (c.receiptId IS NOT NULL OR (${visibleAccount('u')} AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker IN (?,g.recipient) AND blocked=u.id) OR(blocker=u.id AND blocked IN (?,g.recipient)))))
       AND (?='' OR g.id=? OR ('collectible:'||c.family||':'||c.number)=?)
       AND (?='' OR (g.created,g.id)<(SELECT bg.created,bg.id FROM received_gifts bg LEFT JOIN gift_upgrades bc ON bc.receiptId=bg.id WHERE (bg.id=? OR ('collectible:'||bc.family||':'||bc.number)=?) AND bg.recipient=?))
@@ -226,6 +227,7 @@ export async function giftVisibility(
     .prepare(
       `UPDATE received_gifts SET hidden=? WHERE id=?
         AND NOT EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=received_gifts.id)
+        AND NOT EXISTS(SELECT 1 FROM gift_consumptions WHERE receiptId=received_gifts.id)
         AND EXISTS(SELECT 1 FROM users u WHERE u.id=received_gifts.recipient AND ${visibleAccount('u')}
           AND (u.id=? OR (u.kind='channel' AND (u.ownerId=? OR EXISTS(
             SELECT 1 FROM channel_members cm WHERE cm.channelId=u.id AND cm.userId=? AND cm.role='admin'))

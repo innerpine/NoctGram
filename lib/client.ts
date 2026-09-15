@@ -133,6 +133,7 @@ export type Message = {
     message: string;
     collectible?: import('./gift-collectibles').GiftCollectible | null;
     converted?: boolean;
+    consumed?: boolean;
   };
 };
 export const welcome: Post[] = [

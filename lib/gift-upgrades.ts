@@ -21,7 +21,8 @@ async function ownedGift(me: string, id: string) {
   const gift = await db()
     .prepare(`SELECT g.giftId FROM received_gifts g JOIN users u ON u.id=g.recipient
       WHERE g.id=? AND g.recipient=? AND u.kind='person' AND ${visibleAccount('u')}
-        AND NOT EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=g.id)`)
+        AND NOT EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=g.id)
+        AND NOT EXISTS(SELECT 1 FROM gift_consumptions WHERE receiptId=g.id)`)
     .bind(id, me)
     .first<{ giftId: string }>();
   if (!gift) throw new ApiError(404, 'Подарок не найден');
@@ -110,6 +111,7 @@ export async function upgradeGift(
         AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=u.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
         AND NOT EXISTS(SELECT 1 FROM gift_upgrades WHERE receiptId=g.id)
         AND NOT EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=g.id)
+        AND NOT EXISTS(SELECT 1 FROM gift_consumptions WHERE receiptId=g.id)
         AND ? <= (SELECT COALESCE(SUM(CASE WHEN recipient=u.id THEN amount ELSE -amount END),0) FROM star_transfers WHERE recipient=u.id OR sender=u.id)
       ON CONFLICT(id) DO NOTHING`)
       .bind(

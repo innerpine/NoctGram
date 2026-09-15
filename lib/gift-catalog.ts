@@ -213,4 +213,5 @@ export type ReceivedGift = {
   senderHandle: string;
   collectible?: GiftCollectible | null;
   converted?: { amount: number; created: number } | null;
+  consumed?: boolean;
 };

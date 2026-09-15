@@ -51,6 +51,7 @@ export function ChatGift({
   const recipient = outgoing ? peer : me;
   const collectible = upgraded || message.gift.collectible;
   const sold = !!conversion || !!message.gift.converted;
+  const consumed = !!message.gift.consumed;
   const style = { '--gift-color': gift.color } as CSSProperties;
   const time = new Date(message.created).toLocaleTimeString('ru-RU', {
     hour: '2-digit',
@@ -84,9 +85,9 @@ export function ChatGift({
           <GiftAnimation id={gift.id} />
         )}
         <h3>{gift.name}</h3>
-        {sold && (
+        {(sold || consumed) && (
           <span className="chat-gift-sold">
-            <Check size={13} aria-hidden="true" /> Подарок продан
+            <Check size={13} aria-hidden="true" /> {consumed ? 'Использован для апгрейда' : 'Подарок продан'}
           </span>
         )}
         {collectible && (
@@ -152,6 +153,7 @@ export function ChatGift({
               senderHandle: sender.handle,
               collectible,
               converted: conversion,
+              consumed,
             }}
             footer={
               <>

@@ -64,7 +64,8 @@ export async function readConversation(
       g.id AS receiptId,g.giftId AS giftType,g.message AS giftMessage,t.amount AS giftPrice,
       gc.family AS collectibleFamily,gc.number AS collectibleNumber,gc.attributes AS collectibleAttributes,
       gc.keepOriginal AS collectibleKeepOriginal,gc.created AS collectibleCreated,
-      EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=g.id) AS giftConverted
+      EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=g.id) AS giftConverted,
+      EXISTS(SELECT 1 FROM gift_consumptions WHERE receiptId=g.id) AS giftConsumed
     FROM chosen m
     LEFT JOIN message_pins p ON p.messageId=m.id
     LEFT JOIN messages rp ON rp.id=m.replyTo AND ${messagePair('rp', 'm.sender', 'm.recipient')} AND ${messageVisible('rp', '(SELECT me FROM scope)')}
@@ -83,6 +84,7 @@ export async function readConversation(
         giftMessage: string | null;
         giftPrice: number | null;
         giftConverted: number;
+        giftConsumed: number;
         collectibleFamily: string | null;
         collectibleNumber: number;
         collectibleAttributes: string | null;
@@ -102,6 +104,7 @@ export async function readConversation(
       giftMessage,
       giftPrice,
       giftConverted,
+      giftConsumed,
       collectibleFamily,
       collectibleNumber,
       collectibleAttributes,
@@ -138,6 +141,7 @@ export async function readConversation(
               message: giftMessage || '',
               price: giftPrice,
               ...(giftConverted ? { converted: true } : {}),
+              ...(giftConsumed ? { consumed: true } : {}),
               collectible:
                 collectibleFamily && collectibleAttributes
                   ? {
