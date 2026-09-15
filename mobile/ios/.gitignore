@@ -1,0 +1,10 @@
+# Generated locally or in CI; signing files are never source assets.
+*.xcodeproj/
+build/
+*.ipa
+*.xcarchive/
+*.p12
+*.pfx
+*.mobileprovision
+.env*
+!.env.example

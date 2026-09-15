@@ -1,0 +1,42 @@
+name: Build NoctGram IPA
+on:
+  push:
+    branches: ['markdev/noctgram-ios-*']
+    paths:
+      - 'mobile/ios/**'
+      - '.github/workflows/ios-ipa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: noctgram-ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 25
+    environment: noctgram-ios
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: xcodebuild -version
+      - name: Install XcodeGen
+        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+      - name: Archive and sign
+        env:
+          NOCT_IOS_CERTIFICATE_P12: ${{ secrets.NOCT_IOS_CERTIFICATE_P12 }}
+          NOCT_IOS_PROFILE: ${{ secrets.NOCT_IOS_PROFILE }}
+          NOCT_IOS_P12_PASSWORD: ${{ secrets.NOCT_IOS_P12_PASSWORD }}
+          NOCT_IOS_OUTPUT: ${{ runner.temp }}/noctgram-ipa-output
+        run: python3 mobile/ios/scripts/build.py
+      - name: Save IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: NoctGram-iPhone
+          path: |
+            ${{ runner.temp }}/noctgram-ipa-output/NoctGram.ipa
+            ${{ runner.temp }}/noctgram-ipa-output/BUILD-INFO.txt
+          if-no-files-found: error
+          retention-days: 7
