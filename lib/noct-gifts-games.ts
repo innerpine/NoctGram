@@ -28,6 +28,7 @@ type GameOperation = {
   success: boolean;
   giftAlias?: string;
   giftId?: string;
+  giftPrice?: number;
   caseId?: string;
   sourceReceiptId?: string;
   targetGiftId?: string;
@@ -248,6 +249,10 @@ export async function noctGiftsGame(
       ...(roll < chance ? { giftId: to.id, giftAlias: alias } : {}),
     };
   }
+  // Keep the won gift's value separate from the case/upgrade fee. Selling later
+  // uses this server-side snapshot even if catalog prices change.
+  if (operation.giftId)
+    operation.giftPrice = giftDefinition(operation.giftId)!.price;
   const payload = JSON.stringify({ request, operation });
   // All eligibility and balance conditions are repeated in the write transaction.
   const sourceGate =

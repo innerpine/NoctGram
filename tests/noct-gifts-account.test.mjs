@@ -81,7 +81,7 @@ globalThis.__noctGiftsDb = {
 const built = await build({
   stdin: {
     contents:
-      "export * from './lib/noct-gifts-auth'; export * from './lib/noct-gifts-account'; export * from './lib/noct-gifts-games'; export { POST as avatarPost } from './app/api/noct-gifts/avatar/route'; export { previewGiftUpgrade, upgradeGift } from './lib/gift-upgrades'; export { previewGiftConversion } from './lib/gift-conversions'; export { POST as casePost } from './app/api/noct-gifts/case/route'; export { POST as upgradePost } from './app/api/noct-gifts/upgrade/route'; export { POST as accountPost } from './app/api/noct-gifts/account/route'; export { POST as topupPost } from './app/api/noct-gifts/topup/route';",
+      "export * from './lib/noct-gifts-auth'; export * from './lib/noct-gifts-account'; export * from './lib/noct-gifts-games'; export { POST as avatarPost } from './app/api/noct-gifts/avatar/route'; export { previewGiftUpgrade, upgradeGift } from './lib/gift-upgrades'; export { previewGiftConversion, convertGift } from './lib/gift-conversions'; export { POST as casePost } from './app/api/noct-gifts/case/route'; export { POST as upgradePost } from './app/api/noct-gifts/upgrade/route'; export { POST as accountPost } from './app/api/noct-gifts/account/route'; export { POST as topupPost } from './app/api/noct-gifts/topup/route';",
     resolveDir: root,
   },
   platform: 'node',
@@ -259,9 +259,96 @@ void test('case debit and canonical receipt are immediate, idempotent and visibl
   assert.deepEqual(replay,first);
   assert.equal(count('received_gifts'),1);
   assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM star_transfers WHERE kind='case_open'").get().n,1);
-  assert.equal((await api.previewGiftConversion('alice',first.gift.id)).available,false);
+  assert.equal((await api.previewGiftConversion('alice',first.gift.id)).available,true);
   await assert.rejects(play('case',{caseId:'moon'}),e=>e.code==='GAME_KEY_CONFLICT');
   await assert.rejects(play('upgrade'),e=>e.code==='GAME_KEY_CONFLICT');
+});
+
+void test('drop sale uses won gift value, credits once and disappears from the shared inventory',async t=>{
+  reset();t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
+  const win=await play('case'),id=win.gift.id;
+  assert.equal(win.operation.price,320);assert.equal(win.operation.giftPrice,100);
+  const quote=await api.previewGiftConversion('alice',id);
+  assert.equal(quote.available,true);assert.equal(quote.originalPrice,100);assert.equal(quote.amount,85);assert.equal(quote.fee,15);
+  await assert.rejects(api.convertGift('bob',{id,expectedAmount:85}),e=>e.status===404);
+  await assert.rejects(api.convertGift('alice',{id,expectedAmount:272}),e=>e.status===409);
+  const results=await Promise.all([api.convertGift('alice',{id,expectedAmount:85}),api.convertGift('alice',{id,expectedAmount:85})]);
+  assert.deepEqual(results[0],results[1]);assert.equal(results[0].balance,265);
+  assert.equal(count('gift_conversions'),1);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM star_transfers WHERE kind='gift_conversion'").get().n,1);
+  assert.ok(!(await account()).gifts.some(g=>g.id===id));
+  const replay=await play('case');assert.equal(replay.gift.available,false);assert.equal(replay.balance,265);
+});
+void test('already awarded drop gifts use the original catalog values without rewriting history',async t=>{
+  reset();t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
+  const win=await play('case'),id=win.gift.id;
+  // The pre-release operation format did not include giftPrice.
+  sqlite.prepare("UPDATE star_transfers SET postText=json_remove(postText,'$.operation.giftPrice') WHERE id=?").run(id);
+  const before=sqlite.prepare('SELECT postText FROM star_transfers WHERE id=?').get(id).postText;
+  assert.equal((await api.previewGiftConversion('alice',id)).amount,85);
+  assert.equal((await api.convertGift('alice',{id,expectedAmount:85})).balance,265);
+  assert.equal(sqlite.prepare('SELECT postText FROM star_transfers WHERE id=?').get(id).postText,before);
+});
+void test('all legacy drop gift prices match the original catalog instead of the opening fee',async t=>{
+  for(const [caseId,ticket,giftId,price] of [['moon',0,'ion_gem',450],['moon',52,'jelly_bunny',100],['moon',80,'crystal_ball',100],['moon',94,'astral_shard',100],['moon',99,'plush_pepe',1000],['eclipse',34,'swiss_watch',450],['eclipse',62,'witch_hat',50],['eclipse',94,'bonded_ring',250]]){
+    reset();t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(ticket);return bytes;});
+    const win=await play('case',{caseId});assert.equal(win.gift.giftId,giftId);
+    sqlite.prepare("UPDATE star_transfers SET postText=json_remove(postText,'$.operation.giftPrice') WHERE id=?").run(win.gift.id);
+    assert.equal((await api.previewGiftConversion('alice',win.gift.id)).originalPrice,price);
+    t.mock.restoreAll();
+  }
+});
+void test('successful drop upgrade prize sells at gift value, while its spent source cannot sell',async t=>{
+  reset();gift(1,'alice');t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
+  const win=await play('upgrade'),id=win.gift.id;
+  assert.equal(win.operation.price,158);assert.equal(win.operation.giftPrice,450);
+  assert.equal((await api.previewGiftConversion('alice',id)).amount,382);
+  await assert.rejects(api.convertGift('alice',{id:'gift-1',expectedAmount:21}),e=>e.status===404);
+  assert.equal((await api.convertGift('alice',{id,expectedAmount:382})).balance,724);
+});
+void test('malformed or mismatched drop outcomes cannot become saleable gifts',async t=>{
+  for(const tamper of [
+    p=>({...p,operation:{...p.operation,success:false}}),
+    p=>({...p,operation:{...p.operation,giftId:'plush_pepe'}}),
+    p=>({...p,operation:{...p.operation,price:1}}),
+    p=>({...p,operation:{...p.operation,id:'another-operation'}}),
+    p=>({...p,operation:{...p.operation,giftPrice:'100'}}),
+    p=>({...p,operation:{...p.operation,giftPrice:-10}}),
+    ()=>null,
+  ]){
+    reset();t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
+    const win=await play('case'),id=win.gift.id;
+    const payload=tamper(JSON.parse(sqlite.prepare('SELECT postText FROM star_transfers WHERE id=?').get(id).postText));
+    sqlite.prepare('UPDATE star_transfers SET postText=? WHERE id=?').run(payload?JSON.stringify(payload):'{invalid',id);
+    assert.equal((await api.previewGiftConversion('alice',id)).available,false);
+    await assert.rejects(api.convertGift('alice',{id,expectedAmount:85}),e=>e.status===409);
+    assert.equal(count('gift_conversions'),0);assert.equal((await account()).balance,180);
+    t.mock.restoreAll();
+  }
+});
+void test('database conversion guard independently checks the drop valuation and persisted outcome',async t=>{
+  reset();t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
+  const win=await play('case'),id=win.gift.id;
+  await api.convertGift('alice',{id,expectedAmount:85});
+  const row=sqlite.prepare('SELECT * FROM gift_conversions WHERE receiptId=?').get(id);
+  sqlite.prepare('DELETE FROM gift_conversions WHERE receiptId=?').run(id);
+  for(const edit of ["'$.operation.giftPrice',200","'$.operation.giftPrice',100,'$.operation.success',0"]){
+    sqlite.prepare('UPDATE star_transfers SET postText=json_set(postText,'+edit+') WHERE id=?').run(id);
+    assert.throws(()=>sqlite.prepare('INSERT INTO gift_conversions(receiptId,transferId,amount,created) VALUES(?,?,?,?)').run(row.receiptId,row.transferId,row.amount,row.created),/INVALID_GIFT_CONVERSION_PAYMENT/);
+  }
+});
+void test('racing a drop sale and a risk upgrade can consume the gift only once',async t=>{
+  for(const saleFirst of [true,false]){
+    reset();t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
+    const win=await play('case'),id=win.gift.id;
+    const sell=()=>api.convertGift('alice',{id,expectedAmount:85});
+    const upgrade=()=>play('upgrade',{receiptId:id,key:'race-upgrade-request-0001'});
+    const results=await Promise.allSettled((saleFirst?[sell,upgrade]:[upgrade,sell]).map(run=>run()));
+    assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+    assert.equal(count('gift_conversions')+count('gift_consumptions'),1);
+    assert.equal((await account()).balance,count('gift_conversions')?265:22);
+    t.mock.restoreAll();
+  }
 });
 
 void test('case rejects insufficient funds, changed catalog, bad identity and readonly accounts without minting', async () => {

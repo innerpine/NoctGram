@@ -18,14 +18,14 @@ function receiptId(value: unknown) {
 
 async function ownedGift(me: string, id: string) {
   const gift = await db()
-    .prepare(`SELECT g.created,COALESCE(p.amount,0) AS originalPrice,
-      (p.kind='gift' AND p.sender=g.sender AND p.recipient='noctgram_gifts') AS paid,
+    .prepare(`SELECT g.created,COALESCE(s.originalPrice,0) AS originalPrice,
+      (s.receiptId IS NOT NULL) AS paid,
       EXISTS(SELECT 1 FROM gift_upgrades WHERE receiptId=g.id) AS upgraded,
       EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=u.id
         AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000)) AS restricted,
       c.amount AS convertedAmount,c.created AS convertedAt
       FROM received_gifts g JOIN users u ON u.id=g.recipient
-      LEFT JOIN star_transfers p ON p.id=g.transferId
+      LEFT JOIN gift_conversion_sources s ON s.receiptId=g.id
       LEFT JOIN gift_conversions c ON c.receiptId=g.id
       WHERE g.id=? AND g.recipient=? AND u.kind='person' AND ${visibleAccount('u')}
         AND NOT EXISTS(SELECT 1 FROM gift_consumptions WHERE receiptId=g.id)`)
@@ -56,7 +56,7 @@ function quote(
       : gift.upgraded
         ? 'Коллекционные подарки нельзя продать за звёзды.'
         : !gift.paid || amount <= 0
-          ? 'Этот подарок нельзя продать: нет оплаченной покупки.'
+          ? 'Этот подарок нельзя продать: не подтверждено его получение.'
           : gift.restricted
             ? 'Продажа недоступна из-за ограничений аккаунта.'
             : now < gift.created
@@ -110,13 +110,11 @@ export async function convertGift(
   await db().batch([
     db()
       .prepare(`INSERT INTO star_transfers(id,sender,recipient,postText,amount,kind,created)
-      SELECT ?,'noctgram_gifts',u.id,?,(p.amount / 100)*85 + ((p.amount % 100)*85)/100,'gift_conversion',?
-      FROM received_gifts g JOIN users u ON u.id=g.recipient JOIN star_transfers p ON p.id=g.transferId
+      SELECT ?,'noctgram_gifts',u.id,?,(s.originalPrice / 100)*85 + ((s.originalPrice % 100)*85)/100,'gift_conversion',?
+      FROM received_gifts g JOIN users u ON u.id=g.recipient JOIN gift_conversion_sources s ON s.receiptId=g.id
       WHERE g.id=? AND g.recipient=? AND u.kind='person' AND ${visibleAccount('u')}
         AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=u.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
-        AND p.kind='gift' AND p.sender=g.sender AND p.recipient='noctgram_gifts'
-        AND typeof(p.amount)='integer' AND p.amount BETWEEN 1 AND 9007199254740991
-        AND (p.amount / 100)*85 + ((p.amount % 100)*85)/100 = ?
+        AND (s.originalPrice / 100)*85 + ((s.originalPrice % 100)*85)/100 = ?
         AND g.created<=?
         AND NOT EXISTS(SELECT 1 FROM gift_upgrades WHERE receiptId=g.id)
         AND NOT EXISTS(SELECT 1 FROM gift_conversions WHERE receiptId=g.id)
