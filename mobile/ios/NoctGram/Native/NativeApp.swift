@@ -9,27 +9,38 @@ final class NativeSession: ObservableObject {
     @Published var error: String?
     @Published var emailEnabled = true
     private var restoring = false
+    private let api: NoctAPI
+
+    init(api: NoctAPI? = nil) { self.api = api ?? .shared }
 
     func refresh() async {
         guard !restoring else { return }
         restoring = true
         defer { restoring = false }
         do {
-            let status = try await NoctAPI.shared.get("/api/auth/session")
+            let status = try await api.get("/api/auth/session")
             emailEnabled = status.bool("emailEnabled")
             challenge = status.object("challenge")
             guard let person = status.object("user"), !person.string("id").isEmpty else {
+                if user != nil || api.hasSession {
+                    expire()
+                    return
+                }
                 user = nil
                 phase = .signedOut
                 error = nil
                 return
+            }
+            if let previousID = user?.string("id"), previousID != person.string("id") {
+                NGImageCache.shared.removeAllObjects()
+                NGTemporaryMedia.removeAll()
             }
             user = person
             guard person.bool("onboardingComplete") else {
                 phase = .onboarding
                 return
             }
-            let result = try await NoctAPI.shared.get("/api/social", query: ["action": "bootstrap"])
+            let result = try await api.get("/api/social", query: ["action": "bootstrap"])
             guard let me = result.object("me"), !me.string("id").isEmpty else {
                 throw NSError(domain: "NoctGram", code: 0,
                               userInfo: [NSLocalizedDescriptionKey: "Сервер не вернул профиль. Попробуйте ещё раз."])
@@ -50,7 +61,7 @@ final class NativeSession: ObservableObject {
 
     func signOut() async {
         do {
-            _ = try await NoctAPI.shared.post("/api/auth/logout", body: [:])
+            _ = try await api.post("/api/auth/logout", body: [:])
         } catch {
             // Always remove this device's credentials, including when it is offline.
         }
@@ -58,7 +69,7 @@ final class NativeSession: ObservableObject {
     }
 
     func expire() {
-        NoctAPI.shared.clearSession()
+        api.clearSession()
         NGImageCache.shared.removeAllObjects()
         NGTemporaryMedia.removeAll()
         user = nil

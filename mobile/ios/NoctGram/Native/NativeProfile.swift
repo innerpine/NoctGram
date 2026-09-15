@@ -25,6 +25,8 @@ struct NGProfileView: View {
     @State private var walletGeneration = 0
     @State private var confirmSignOut = false
     @State private var signingOut = false
+    @State private var profileUnavailable = false
+    @State private var profileGeneration = 0
 
     private var targetID: String { userID ?? session.user?.id ?? "" }
     private var isOwn: Bool { targetID == session.user?.id }
@@ -45,6 +47,9 @@ struct NGProfileView: View {
                 if tab == "posts" { postRows }
                 else if tab == "gifts" { giftRows }
                 else if isOwn { walletRows }
+            } else if profileUnavailable {
+                NGEmptyState(title: "Профиль недоступен", message: "Аккаунт удалён или доступ к нему изменился.", systemImage: "lock")
+                    .listRowBackground(NGTheme.background)
             } else if loading {
                 ProgressView().frame(maxWidth: .infinity).padding(32).listRowBackground(NGTheme.background)
             }
@@ -58,8 +63,8 @@ struct NGProfileView: View {
         .navigationTitle(isOwn ? "Профиль" : profile?.string("name", default: "Профиль") ?? "Профиль")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if isOwn {
-                ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if isOwn && !profileUnavailable {
                     Menu {
                         Button { editing = true } label: { Label("Редактировать профиль", systemImage: "pencil") }
                         Button(role: .destructive) { confirmSignOut = true } label: {
@@ -253,21 +258,43 @@ struct NGProfileView: View {
 
     private func loadProfile() async {
         guard !targetID.isEmpty else { return }
+        profileGeneration += 1
+        let request = profileGeneration
         loading = true
         error = nil
         let requestedID = targetID
-        defer { loading = false }
+        defer { if request == profileGeneration { loading = false } }
         do {
             let result = try await NoctAPI.shared.get("/api/social", query: ["action": "profile", "id": requestedID])
             try Task.checkCancellation()
-            guard requestedID == targetID else { return }
+            guard request == profileGeneration, requestedID == targetID else { return }
+            profileUnavailable = false
             profile = result
         } catch is CancellationError {
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            guard request == profileGeneration, requestedID == targetID else { return }
+            if ngReadAccessRevoked(error) {
+                profileUnavailable = true
+                profile = nil
+                editing = false
+                feed.clearContent()
+                giftGeneration += 1
+                walletGeneration += 1
+                gifts = []
+                giftCursor = ""
+                giftsLoaded = false
+                giftLoading = false
+                wallet = nil
+                transactions = []
+                walletHasMore = false
+                walletLoading = false
+            }
+            self.error = error.localizedDescription
+        }
     }
 
     private func loadTab() async {
-        guard !targetID.isEmpty else { return }
+        guard !profileUnavailable, !targetID.isEmpty else { return }
         switch tab {
         case "gifts": await loadGifts()
         case "wallet": if isOwn { await loadWallet() }
@@ -319,7 +346,15 @@ struct NGProfileView: View {
             giftCursor = response.string("next")
             giftsLoaded = true
         } catch is CancellationError {
-        } catch { if giftGeneration == request { self.error = error.localizedDescription } }
+        } catch {
+            guard giftGeneration == request else { return }
+            if ngReadAccessRevoked(error) {
+                gifts = []
+                giftCursor = ""
+                giftsLoaded = false
+            }
+            self.error = error.localizedDescription
+        }
     }
 
     private func loadWallet(more: Bool = false) async {
@@ -345,7 +380,15 @@ struct NGProfileView: View {
             wallet = result
             walletHasMore = page.count == 50
         } catch is CancellationError {
-        } catch { if request == walletGeneration { self.error = error.localizedDescription } }
+        } catch {
+            guard request == walletGeneration else { return }
+            if ngReadAccessRevoked(error) {
+                wallet = nil
+                transactions = []
+                walletHasMore = false
+            }
+            self.error = error.localizedDescription
+        }
     }
 }
 

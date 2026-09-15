@@ -104,16 +104,7 @@ struct NGRemoteImage: View {
                     data = try await NoctAPI.shared.download(url.absoluteString, maxBytes: 25 * 1024 * 1024)
                 } else {
                     // External avatars have no access to the authenticated API cookie jar.
-                    let configuration = URLSessionConfiguration.ephemeral
-                    configuration.httpShouldSetCookies = false
-                    configuration.urlCache = nil
-                    configuration.timeoutIntervalForRequest = 20
-                    let session = URLSession(configuration: configuration)
-                    defer { session.invalidateAndCancel() }
-                    let (bytes, response) = try await session.data(from: url)
-                    guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-                          bytes.count <= 10 * 1024 * 1024 else { failed = true; return }
-                    data = bytes
+                    data = try await NativePublicMedia.download(url)
                 }
                 try Task.checkCancellation()
                 guard let source = CGImageSourceCreateWithData(data as CFData, nil),

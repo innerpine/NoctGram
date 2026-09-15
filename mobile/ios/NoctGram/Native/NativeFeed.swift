@@ -1,6 +1,11 @@
 import SwiftUI
 import UIKit
 
+func ngReadAccessRevoked(_ error: Error) -> Bool {
+    guard let response = error as? NoctAPIError else { return false }
+    return [401, 403, 404].contains(response.status)
+}
+
 @MainActor
 final class NGFeedModel: ObservableObject {
     @Published var posts: [NGRecord] = []
@@ -31,6 +36,7 @@ final class NGFeedModel: ObservableObject {
         } catch is CancellationError {
         } catch {
             guard generation == request else { return }
+            if ngReadAccessRevoked(error) { clearContent() }
             self.error = error.localizedDescription
         }
     }
@@ -55,8 +61,17 @@ final class NGFeedModel: ObservableObject {
         } catch is CancellationError {
         } catch {
             guard generation == request else { return }
+            if ngReadAccessRevoked(error) { clearContent() }
             self.error = error.localizedDescription
         }
+    }
+
+    func clearContent() {
+        generation += 1
+        posts = []
+        hasMore = false
+        loading = false
+        loadingMore = false
     }
 }
 
@@ -276,9 +291,11 @@ struct NGPostCard: View {
         }
         .padding(16)
         .background(NGTheme.surface, in: RoundedRectangle(cornerRadius: 24))
-        .onChange(of: post.bool("liked")) { _ in likedOverride = nil }
-        .onChange(of: post.bool("saved")) { _ in savedOverride = nil }
-        .onChange(of: post.string("voted")) { _ in pollOverride = nil }
+        .onChange(of: post.snapshotID) { _ in
+            likedOverride = nil
+            savedOverride = nil
+            pollOverride = nil
+        }
     }
 
     private func toggle(_ action: String, value: Bool) {
@@ -329,11 +346,16 @@ struct NGPostDetailView: View {
     @State private var error: String?
     @State private var notice: String?
     @State private var generation = 0
+    @State private var contentUnavailable = false
 
     init(post: NGRecord) { _post = State(initialValue: post) }
 
     var body: some View {
         List {
+            if contentUnavailable {
+                NGEmptyState(title: "Публикация недоступна", message: "Она удалена или доступ к ней изменился.", systemImage: "lock")
+                    .listRowBackground(NGTheme.background)
+            } else {
             NGPostCard(post: post, opensDetail: false)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 16, trailing: 16))
                 .listRowSeparator(.hidden)
@@ -367,6 +389,7 @@ struct NGPostDetailView: View {
                     }.padding(.vertical, 6).listRowBackground(NGTheme.background)
                 }
             }
+            }
             if let notice { Text(notice).font(.callout).foregroundColor(NGTheme.accent).listRowBackground(NGTheme.background) }
             if let error { NGInlineError(message: error).listRowBackground(NGTheme.background) }
         }
@@ -375,6 +398,7 @@ struct NGPostDetailView: View {
         .navigationTitle("Публикация")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
+            if !contentUnavailable {
             HStack(alignment: .bottom, spacing: 10) {
                 TextField("Написать комментарий", text: $draft)
                     .padding(12).background(NGTheme.surface, in: Capsule())
@@ -389,6 +413,7 @@ struct NGPostDetailView: View {
                 .accessibilityLabel("Отправить комментарий")
                 .disabled(sending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }.padding(10).ngGlass(radius: 28).padding(.horizontal, 12).padding(.bottom, 8)
+            }
         }
         .task { await refresh() }
         .refreshable { await refresh() }
@@ -406,15 +431,20 @@ struct NGPostDetailView: View {
             let (newPost, page) = try await (detail, replies)
             try Task.checkCancellation()
             guard request == generation else { return }
+            contentUnavailable = false
             post = newPost
             comments = page.objects("items")
             hasOlder = comments.count == 50
         } catch is CancellationError {
-        } catch { if request == generation { self.error = error.localizedDescription } }
+        } catch {
+            guard request == generation else { return }
+            if ngReadAccessRevoked(error) { revokeContent() }
+            self.error = error.localizedDescription
+        }
     }
 
     private func loadOlder() async {
-        guard !loadingOlder, !loading, let first = comments.first else { return }
+        guard !contentUnavailable, !loadingOlder, !loading, let first = comments.first else { return }
         let request = generation
         loadingOlder = true
         defer { loadingOlder = false }
@@ -429,12 +459,24 @@ struct NGPostDetailView: View {
             comments = page.filter { !existing.contains($0.id) } + comments
             hasOlder = page.count == 50
         } catch is CancellationError {
-        } catch { if request == generation { self.error = error.localizedDescription } }
+        } catch {
+            guard request == generation else { return }
+            if ngReadAccessRevoked(error) { revokeContent() }
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func revokeContent() {
+        contentUnavailable = true
+        comments = []
+        draft = ""
+        notice = nil
+        hasOlder = false
     }
 
     private func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !sending, !text.isEmpty else { return }
+        guard !contentUnavailable, !sending, !text.isEmpty else { return }
         sending = true
         error = nil
         notice = nil

@@ -12,6 +12,9 @@ struct NGRecord: Identifiable {
 
     init(raw: [String: Any]) { self.init(raw) }
 
+    /// Changes with each decoded server snapshot, even when selected fields are unchanged.
+    var snapshotID: String { fallbackID }
+
     var id: String {
         let value = string("id")
         return value.isEmpty ? fallbackID : value

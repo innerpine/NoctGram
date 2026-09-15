@@ -42,10 +42,9 @@ struct NGActivityView: View {
             await load()
         }
         .toolbar {
-            if rows.contains(where: { !$0.bool("read") }) {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Прочитано") { Task { await markRead() } }
-                }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Прочитано") { Task { await markRead() } }
+                    .disabled(!rows.contains(where: { !$0.bool("read") }))
             }
         }
     }
