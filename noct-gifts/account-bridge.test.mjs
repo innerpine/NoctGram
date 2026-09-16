@@ -11,7 +11,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const auth = 'auth_date=12345&user=%7B%22id%22%3A111%7D&hash=synthetic-auth';
 const links = { siteUrl: 'https://noct.test/', linkAccountUrl: 'https://noct.test/', linkAccountHint: 'Noct Stars → Telegram' };
 const ownedGift = (id, patch = {}) => ({ id, giftId: 'toy_bear', name: 'Мишка', price: 25, color: '#daa27a', imageUrl: 'https://noct.test/assets/gifts/toy_bear.webp', animationUrl: 'https://noct.test/assets/gifts/toy_bear.json', hidden: false, created: 1, collectible: null, ...patch });
-const games={version:'2026-09-15-4',cases:[{id:'eclipse',n:'Затмение',p:320,t:'#C7ACE8',s:'diamond',items:[['orb',50],['watch',50]]},{id:'moon',n:'Лунный',p:75,t:'#C7ACE8',s:'circle',items:[['orb',100]]}],gifts:{orb:{giftId:'crystal_ball',name:'Хрустальный шар',price:100,color:'#C7ACE8',rarity:'rare',imageUrl:'/assets/gifts/crystal_ball.webp',animationUrl:'/assets/gifts/crystal_ball.json'},watch:{giftId:'swiss_watch',name:'Часы',price:250,color:'#FFD36A',rarity:'rare',imageUrl:'/assets/gifts/swiss_watch.webp',animationUrl:'/assets/gifts/swiss_watch.json'}},upgrade:{feePercent:0,chancePercent:110,minChance:3,maxChance:95}};
+const games={version:'2026-09-16-1',cases:[{id:'eclipse',n:'Затмение',p:320,t:'#C7ACE8',s:'diamond',items:[['orb',50],['watch',50]]},{id:'moon',n:'Лунный',p:75,t:'#C7ACE8',s:'circle',items:[['orb',100]]}],gifts:{orb:{giftId:'crystal_ball',name:'Хрустальный шар',price:100,color:'#C7ACE8',rarity:'rare',imageUrl:'/assets/gifts/crystal_ball.webp',animationUrl:'/assets/gifts/crystal_ball.json'},watch:{giftId:'swiss_watch',name:'Часы',price:250,color:'#FFD36A',rarity:'rare',imageUrl:'/assets/gifts/swiss_watch.webp',animationUrl:'/assets/gifts/swiss_watch.json'}},upgrade:{feePercent:0,chancePercent:80,minChance:1,maxChance:85}};
 const linked = (patch = {}) => ({ status: 'linked', authExpiresAt: Date.now()+3600000, user: { id: 'alice', name: 'Alice', handle: 'alice', avatar: '' }, balance: 500, gifts: [ownedGift('canonical-1')], next: null, history: [], links, capabilities: { sharedAccount: true, caseOpening: true, upgrading: true }, games, catalog: { telegram: true, products: [{ id: 'stars500', product: 'stars', title: '500 Noct Stars', xtr: 75, rub: 75, units: 500 },{ id: 'stars1000', product: 'stars', title: '1000 Noct Stars', xtr: 139, rub: 139, units: 1000 }] }, ...patch });
 
 function fixture({ inTelegram = true, storage = new Map(), search = '', directAssets = false } = {}) {
@@ -165,8 +165,8 @@ void test('unmount ignores a late account response and removes listeners',async(
 });
 const caseResult=(body,{balance=180,id='won-1',available=true,userId='alice'}={})=>({userId,operation:{id:'operation-'+id,key:body.key,kind:'case',caseId:body.caseId,giftAlias:'orb',success:true,price:320,created:1},balance,gift:ownedGift(id,{giftId:'crystal_ball',name:'Хрустальный шар',price:100,available})});
 const upgradeResult=(body,{success=true,balance=500,id='upgraded-1'}={})=>({userId:'alice',operation:{id:'operation-'+id,key:body.key,kind:'upgrade',sourceReceiptId:body.receiptId,targetGiftId:body.targetGiftId,giftAlias:success?'watch':null,chance:9,roll:success?2:90,success,price:0,created:1},balance,gift:success?ownedGift(id,{giftId:'swiss_watch',name:'Часы',price:250,available:true}):null});
-void test('client accepts the increased cap and preserves low chances in older operation receipts',async t=>{
-  for(const chance of [2,95]){
+void test('client accepts new limits and preserves probabilities from older operation receipts',async t=>{
+  for(const chance of [1,2,85,95]){
     const f=fixture();t.after(()=>f.dispose());await f.reply(linked());
     f.app.go({screen:'upgrade',fromUid:'canonical-1',fromId:'toy_bear',toId:'watch'});
     const pending=f.app.runUpgrade(),body=f.calls.at(-1).body,response=upgradeResult(body);
@@ -218,7 +218,7 @@ for(const amount of [3,5,10])void test(`upgrade ${amount} selects distinct gifts
   await f.reply(linked({gifts,balance:0}));f.app.go({screen:'upgrade'});f.app.setBatchCount('upgrade',amount);
   for(let i=0;i<amount;i++)f.app.chooseUpgradeSource({uid:'source-'+i});
   f.app.setState({toId:'watch'});assert.equal(f.app.renderVals().ctaDisabled,false);assert.equal(f.app.renderVals().upgradeRows.length,amount);
-  assert.ok(f.app.renderVals().upgradeRows.every(row=>row.chance==='11%'));
+  assert.ok(f.app.renderVals().upgradeRows.every(row=>row.chance==='8%'));
   const upgrading=f.app.runUpgrade(),body=f.calls.at(-1).body;
   assert.equal(body.receiptId,undefined);assert.equal(body.receiptIds.length,amount);
   f.app.setBatchCount('upgrade',1);f.app.runUpgrade();assert.equal(f.pending.length,1);
@@ -234,7 +234,7 @@ void test('batch source selection can toggle, preserves independent prices and r
   f.app.chooseUpgradeSource({uid:'a'});f.app.chooseUpgradeSource({uid:'a'});assert.equal(f.app.selectedUpgradeGifts().length,0);
   for(const uid of ['a','b','c'])f.app.chooseUpgradeSource({uid});assert.equal(f.app.state.toId,null);
   assert.equal(f.app.renderVals().ctaDisabled,true);f.app.setState({toId:'watch'});
-  assert.deepEqual(plain(f.app.renderVals().upgradeRows.map(row=>row.chance)),['11%','66%','11%']);
+  assert.deepEqual(plain(f.app.renderVals().upgradeRows.map(row=>row.chance)),['8%','48%','8%']);
   assert.equal(f.app.renderVals().ctaDisabled,false);
 });
 
@@ -286,7 +286,7 @@ void test('same-owner refresh preserves upgrade selections and any ordinary cano
   f.app.setState({screen:'upgrade',fromUid:'canonical-1',fromId:'toy_bear',toId:'watch'});
   const refresh=f.app.refreshAccount();await f.reply(linked());await refresh;
   assert.equal(f.app.state.fromUid,'canonical-1');assert.equal(f.app.state.toId,'watch');
-  assert.equal(f.app.chanceOf(),11);assert.match(f.app.renderVals().ctaNoteText,/Noct Stars не списываются/);
+  assert.equal(f.app.chanceOf(),8);assert.match(f.app.renderVals().ctaNoteText,/Noct Stars не списываются/);
   const before=plain(f.app.state.sharedGifts),upgrade=f.app.runUpgrade(),body=f.calls.at(-1).body;
   assert.equal(body.receiptId,'canonical-1');assert.equal(body.targetGiftId,'swiss_watch');assert.equal(body.version,games.version);
   assert.deepEqual(plain(f.app.state.sharedGifts),before);assert.equal(f.app.state.balance,500);

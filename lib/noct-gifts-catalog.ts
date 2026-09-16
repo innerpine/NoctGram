@@ -1,12 +1,12 @@
 import { giftDefinition } from './gift-catalog';
 
-export const NOCT_GIFTS_GAME_VERSION = '2026-09-15-4';
+export const NOCT_GIFTS_GAME_VERSION = '2026-09-16-1';
 // The advertised rules and the actual draw must use the same values.
 export const NOCT_GIFTS_UPGRADE_RULES = {
   feePercent: 0,
-  chancePercent: 110,
-  minChance: 3,
-  maxChance: 95,
+  chancePercent: 80,
+  minChance: 1,
+  maxChance: 85,
 } as const;
 export const NOCT_GIFTS_ALIASES: Record<
   string,
@@ -30,6 +30,7 @@ type CaseDefinition = {
   items: [string, number][];
 };
 // Explicit case-only distribution, including the archived gifts used in the design.
+// Balance uses canonical gift values and their 85% sale proceeds, not rarity labels.
 // This does not reopen their direct purchase or invent collectible serial numbers.
 export const NOCT_GIFTS_CASES: CaseDefinition[] = [
   {
@@ -39,11 +40,12 @@ export const NOCT_GIFTS_CASES: CaseDefinition[] = [
     t: '#C7ACE8',
     s: 'circle',
     items: [
-      ['stardust', 56],
-      ['rabbit', 25],
-      ['orb', 12],
-      ['comet', 5],
-      ['throne', 2],
+      ['mask', 70],
+      ['rabbit', 15],
+      ['orb', 8],
+      ['comet', 4],
+      ['stardust', 2],
+      ['throne', 1],
     ],
   },
   {
@@ -53,11 +55,11 @@ export const NOCT_GIFTS_CASES: CaseDefinition[] = [
     t: '#3ECF8E',
     s: 'squircle',
     items: [
-      ['rabbit', 36],
-      ['orb', 26],
-      ['watch', 23],
-      ['ring', 11],
-      ['throne', 4],
+      ['rabbit', 44],
+      ['orb', 40],
+      ['watch', 10],
+      ['ring', 5],
+      ['throne', 1],
     ],
   },
   {
@@ -67,12 +69,12 @@ export const NOCT_GIFTS_CASES: CaseDefinition[] = [
     t: '#C7ACE8',
     s: 'diamond',
     items: [
-      ['orb', 31],
-      ['watch', 34],
-      ['mask', 16],
-      ['comet', 10],
-      ['ring', 7],
-      ['throne', 2],
+      ['orb', 35],
+      ['watch', 30],
+      ['mask', 17],
+      ['comet', 11],
+      ['ring', 6],
+      ['throne', 1],
     ],
   },
   {
@@ -82,10 +84,10 @@ export const NOCT_GIFTS_CASES: CaseDefinition[] = [
     t: '#A1A1AA',
     s: 'diamond',
     items: [
-      ['stardust', 64],
-      ['rabbit', 24],
-      ['mask', 8],
-      ['comet', 4],
+      ['mask', 84],
+      ['rabbit', 10],
+      ['comet', 5],
+      ['stardust', 1],
     ],
   },
 ];

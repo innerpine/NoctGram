@@ -5,7 +5,7 @@ import vm from 'node:vm';
 const html=await readFile(new URL('./Noct Gifts App.dc.html',import.meta.url),'utf8');
 const script=html.match(/<script\b(?=[^>]*\bdata-dc-script\b)[^>]*>([\s\S]*?)<\/script>/i)[1];
 const plain=value=>JSON.parse(JSON.stringify(value));
-const games={version:'test-catalog',cases:[{id:'eclipse',n:'Затмение',p:320,items:[['orb',50],['watch',50]]}],gifts:{orb:{giftId:'crystal_ball',name:'Хрустальный шар',price:100,color:'#C7ACE8',rarity:'rare',imageUrl:'/assets/gifts/crystal_ball.webp',animationUrl:'/assets/gifts/crystal_ball.json'},watch:{giftId:'swiss_watch',name:'Часы',price:250,color:'#FFD36A',rarity:'rare',imageUrl:'/assets/gifts/swiss_watch.webp',animationUrl:'/assets/gifts/swiss_watch.json'}},upgrade:{feePercent:0,chancePercent:110,minChance:3,maxChance:95}};
+const games={version:'test-catalog',cases:[{id:'eclipse',n:'Затмение',p:320,items:[['orb',50],['watch',50]]}],gifts:{orb:{giftId:'crystal_ball',name:'Хрустальный шар',price:100,color:'#C7ACE8',rarity:'rare',imageUrl:'/assets/gifts/crystal_ball.webp',animationUrl:'/assets/gifts/crystal_ball.json'},watch:{giftId:'swiss_watch',name:'Часы',price:250,color:'#FFD36A',rarity:'rare',imageUrl:'/assets/gifts/swiss_watch.webp',animationUrl:'/assets/gifts/swiss_watch.json'}},upgrade:{feePercent:0,chancePercent:80,minChance:1,maxChance:85}};
 const source={id:'receipt-source',giftId:'ordinary_bear',name:'Мишка',price:25,color:'#daa27a',image:'/assets/gifts/toy_bear.webp',animation:'/assets/gifts/toy_bear.json',collectible:null};
 const gift={id:'receipt-won',giftId:'crystal_ball',name:'Хрустальный шар',price:100,image:'/assets/gifts/crystal_ball.webp',animation:'/assets/gifts/crystal_ball.json',collectible:null};
 const caseOp=(id='case-1')=>({id,kind:'case',caseId:'eclipse',giftAlias:'orb',success:true,price:320});
@@ -71,7 +71,7 @@ void test('repeat rejects an old receipt handler and a double click after instan
   app.renderVals().repeatCase({detail:1});assert.equal(opens,2);f.dispose();
 });
 void test('a source outside the case catalog uses its canonical price and source receipt identity',()=>{
-  const f=fixture(),{app}=f;assert.equal(app.chanceOf(),11);app.setState({screen:'upgrade',balance:0});assert.equal(app.renderVals().ctaDisabled,false);assert.match(app.renderVals().ctaNoteText,/Noct Stars не списываются/);assert.equal(app.renderVals().fromGift.n,'Мишка');
+  const f=fixture(),{app}=f;assert.equal(app.chanceOf(),8);app.setState({screen:'upgrade',balance:0});assert.equal(app.renderVals().ctaDisabled,false);assert.match(app.renderVals().ctaNoteText,/Noct Stars не списываются/);assert.equal(app.renderVals().fromGift.n,'Мишка');
   app.renderVals().pickFrom();const choices=app.renderVals().pickList;assert.equal(choices.length,1);choices[0].choose();assert.equal(app.state.fromUid,source.id);
   app.setState({gamePending:true});const before=app.state.toId;app.renderVals().pickTo();assert.equal(app.state.toId,before);f.dispose();
 });

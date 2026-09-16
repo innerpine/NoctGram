@@ -190,41 +190,47 @@ const account = (id = 111, extra = {}) =>
   api.noctGiftsAccount({ initData: signed(id), ...extra }, 'https://noct.test');
 
 const play = (kind, extra = {}, telegramId = 111) => api.noctGiftsGame(kind, {
-  initData:signed(telegramId),version:'2026-09-15-4',key:'test-game-request-0001',
+  initData:signed(telegramId),version:'2026-09-16-1',key:'test-game-request-0001',
   ...(kind==='case'?{caseId:'eclipse'}:{receiptId:'gift-1',targetGiftId:'swiss_watch'}),...extra,
 }, 'https://noct.test');
 const count = table => sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
 
-void test('every case ticket matches advertised odds and higher-value outcomes improve at unchanged prices',async t=>{
-  const old={moon:{price:75,weights:[52,28,14,5,1]},orbit:{price:150,weights:[40,30,18,9,3]},eclipse:{price:320,weights:[34,28,20,12,5,1]},midnight:{price:60,weights:[60,25,12,3]}};
+void test('case draws match displayed odds, lower costly outcomes and prevent positive expected sale returns',async t=>{
+  const old={moon:{price:75,weights:{stardust:56,rabbit:25,orb:12,comet:5,throne:2}},orbit:{price:150,weights:{rabbit:36,orb:26,watch:23,ring:11,throne:4}},eclipse:{price:320,weights:{orb:31,watch:34,mask:16,comet:10,ring:7,throne:2}},midnight:{price:60,weights:{stardust:64,rabbit:24,mask:8,comet:4}}};
   for(const id of Object.keys(old)){
     reset();sqlite.exec("UPDATE star_transfers SET amount=100000 WHERE id='alice-credit'");
     const catalog=(await account()).games,box=catalog.cases.find(c=>c.id===id);
     assert.equal(box.p,old[id].price);assert.equal(box.items.reduce((sum,[,weight])=>sum+weight,0),100);
-    let ticket=0;const won=new Map();
+    let ticket=0,saleTotal=0;const won=new Map();
     t.mock.method(crypto,'getRandomValues',bytes=>{bytes.fill(ticket++);return bytes;});
     for(let batch=0;batch<10;batch++){
       const result=await play('case',{caseId:id,count:10,key:'distribution-batch-'+id+'-'+batch});
-      for(const item of result.results)won.set(item.operation.giftAlias,(won.get(item.operation.giftAlias)||0)+1);
+      for(const item of result.results){
+        won.set(item.operation.giftAlias,(won.get(item.operation.giftAlias)||0)+1);
+        const quote=await api.previewGiftConversion('alice',item.gift.id);
+        assert.equal(quote.available,true);saleTotal+=quote.amount;
+      }
     }
     assert.equal(ticket,100);assert.deepEqual(Object.fromEntries(won),Object.fromEntries(box.items));
+    assert.ok(saleTotal<=box.p*100*.95,id+' must not create Stars on average when all gifts are sold');
+    assert.ok(box.items.some(([alias])=>catalog.gifts[alias].price<box.p),id+' must have an ordinary low-value outcome');
     const thresholds=[...new Set(box.items.map(([alias])=>catalog.gifts[alias].price))].sort((a,b)=>a-b);
     for(const price of thresholds.slice(1)){
-      const previous=box.items.reduce((sum,[alias],index)=>sum+(catalog.gifts[alias].price>=price?old[id].weights[index]:0),0);
+      const previous=Object.entries(old[id].weights).reduce((sum,[alias,weight])=>sum+(catalog.gifts[alias].price>=price?weight:0),0);
       const now=box.items.reduce((sum,[alias,weight])=>sum+(catalog.gifts[alias].price>=price?weight:0),0);
-      assert.ok(now>previous,id+' must improve odds of gifts worth at least '+price);
+      assert.ok(now<previous,id+' must lower odds of gifts worth at least '+price);
     }
     t.mock.restoreAll();
   }
 });
 
-for(const [ticket,success] of [[5000,true],[5499,true],[5500,false]])void test(`boosted 50-to-100 upgrade draws correctly at ${ticket/100}%`,async t=>{
+for(const [ticket,success] of [[3500,true],[3999,true],[4000,false]])void test(`balanced 50-to-100 upgrade draws correctly at ${ticket/100}%`,async t=>{
   reset();gift(1,'alice',0,'homemade_cake');
   t.mock.method(crypto,'getRandomValues',bytes=>{bytes.fill(ticket);return bytes;});
   const catalog=(await account()).games;
-  assert.deepEqual(catalog.upgrade,{feePercent:0,chancePercent:110,minChance:3,maxChance:95});
+  assert.deepEqual(catalog.upgrade,{feePercent:0,chancePercent:80,minChance:1,maxChance:85});
   const result=await play('upgrade',{targetGiftId:'crystal_ball'});
-  assert.equal(result.operation.chance,55);assert.equal(result.operation.success,success);
+  assert.equal(result.operation.chance,40);assert.equal(result.operation.success,success);
   assert.equal(result.operation.price,0);assert.equal(result.balance,500);
 });
 
@@ -281,7 +287,7 @@ for(const amount of [3,5,10]) void test(`${amount} gift upgrades consume every s
   assert.equal(a.gifts.length,Math.ceil(amount/2));
   for(const [i,result] of a.results.entries()){
     assert.equal(result.operation.sourceReceiptId,receiptIds[i]);assert.equal(result.operation.success,i%2===0);
-    assert.equal(result.operation.chance,i%2?24:18);assert.equal(result.operation.price,0);
+    assert.equal(result.operation.chance,i%2?18:13);assert.equal(result.operation.price,0);
     if(result.gift)assert.equal((await api.previewGiftConversion('alice',result.gift.id)).available,true);
   }
   assert.ok((await account()).gifts.some(g=>g.id==='gift-'+(amount+1)));
@@ -421,8 +427,10 @@ void test('already awarded drop gifts use the original catalog values without re
   assert.equal(sqlite.prepare('SELECT postText FROM star_transfers WHERE id=?').get(id).postText,before);
 });
 void test('all legacy drop gift prices match the original catalog instead of the opening fee',async t=>{
-  for(const [caseId,ticket,giftId,price] of [['moon',0,'ion_gem',450],['moon',56,'jelly_bunny',100],['moon',81,'crystal_ball',100],['moon',94,'astral_shard',100],['moon',99,'plush_pepe',1000],['eclipse',34,'swiss_watch',450],['eclipse',65,'witch_hat',50],['eclipse',94,'bonded_ring',250]]){
-    reset();t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(ticket);return bytes;});
+  for(const [caseId,giftId,price] of [['moon','ion_gem',450],['moon','jelly_bunny',100],['moon','crystal_ball',100],['moon','astral_shard',100],['moon','plush_pepe',1000],['eclipse','swiss_watch',450],['eclipse','witch_hat',50],['eclipse','bonded_ring',250]]){
+    reset();const catalog=(await account()).games,box=catalog.cases.find(c=>c.id===caseId);let ticket=0;
+    for(const [alias,weight] of box.items){if(catalog.gifts[alias].giftId===giftId)break;ticket+=weight;}
+    t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(ticket);return bytes;});
     const win=await play('case',{caseId});assert.equal(win.gift.giftId,giftId);
     sqlite.prepare("UPDATE star_transfers SET postText=json_set(json_remove(postText,'$.operation.giftPrice'),'$.request.version','2026-09-15-1') WHERE id=?").run(win.gift.id);
     assert.equal((await api.previewGiftConversion('alice',win.gift.id)).originalPrice,price);
@@ -519,7 +527,7 @@ for(const [ticket,success] of [[0,true],[9999,false]]) void test(`risk upgrade $
   const result=await play('upgrade');
   assert.equal(result.operation.success,success);
   // Current catalog: a 75-Star bear toward a 450-Star watch.
-  assert.equal(result.operation.chance,18);
+  assert.equal(result.operation.chance,13);
   assert.equal(result.operation.price,0);
   assert.equal(result.balance,500);
   assert.equal(count('gift_consumptions'),1);
@@ -591,13 +599,16 @@ void test('upgrade cannot spend another user gift, a converted gift or a collect
 
 void test('case replay preserves a subsequent collectible upgrade and its canonical model artwork', async t=>{
   reset();
-  t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
+  const box=(await account()).games.cases.find(c=>c.id==='moon');let ticket=0;
+  for(const [alias,weight] of box.items){if(alias==='stardust')break;ticket+=weight;}
+  t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(ticket);return bytes;});
   const previousTestMode = globalThis.__noctGiftsSettings.NOCT_STARS_TEST_MODE;
   globalThis.__noctGiftsSettings.NOCT_STARS_TEST_MODE = '0';
   t.after(() => { globalThis.__noctGiftsSettings.NOCT_STARS_TEST_MODE = previousTestMode; });
   const first = await play('case',{caseId:'moon'});
   assert.equal(first.gift.giftId,'ion_gem');
   assert.equal(first.gift.collectible,null);
+  t.mock.method(globalThis.crypto,'getRandomValues',bytes=>{bytes.fill(0);return bytes;});
   const upgraded = await api.upgradeGift('alice', {
     id:first.gift.id, expectedPrice:25, keepOriginal:true,
   });
@@ -634,7 +645,7 @@ void test('replaying an earlier case after its gift is used never restores the c
 
 void test('game routes reject client-selected price and cross-origin writes',async()=>{
   reset();
-  const body={initData:signed(),version:'2026-09-15-4',key:'case-request-0001',caseId:'moon'};
+  const body={initData:signed(),version:'2026-09-16-1',key:'case-request-0001',caseId:'moon'};
   assert.equal((await api.casePost(request('/api/noct-gifts/case',{...body,price:1}))).status,400);
   assert.equal((await api.casePost(request('/api/noct-gifts/case',body,{Origin:'https://evil.test'}))).status,403);
   assert.equal(count('received_gifts'),0);
