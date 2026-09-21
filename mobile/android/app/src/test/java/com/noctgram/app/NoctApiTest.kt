@@ -93,6 +93,29 @@ class NoctApiTest {
         assertEquals("INVALID_RESPONSE", (runCatching { html.get("/api/social") }.exceptionOrNull() as ApiException).code)
     }
 
+    @Test fun `uploads are multipart, bound to a chat when asked, and refuse unsafe input`() = runBlocking {
+        val transport = FakeTransport { json(200, "{\"id\":\"file1\"}") }
+        val api = NoctApi(MemorySessionStore(), transport)
+        assertEquals("file1", api.upload(byteArrayOf(1, 2, 3), "C:\\photos\\me\"1.png", "image/png", chatPeer = "bob").getString("id"))
+        val sent = transport.seen.single()
+        assertEquals("https://noctgram.com/api/chat-upload", sent.url)
+        assertTrue(sent.headers.getValue("Content-Type").startsWith("multipart/form-data; boundary=NoctGram-"))
+        val body = String(sent.body!!, Charsets.ISO_8859_1)
+        // Only the file name survives: no path, no quote that could break the header.
+        assertTrue(body.contains("filename=\"me1.png\""))
+        assertTrue(body.contains("name=\"peer\"\r\n\r\nbob\r\n"))
+        assertEquals("https://noctgram.com/api/upload", run {
+            api.upload(byteArrayOf(1), "a.jpg", "image/jpeg")
+            transport.seen.last().url
+        })
+        for (bad in listOf<suspend () -> Any>(
+            { api.upload(ByteArray(0), "a.jpg", "image/jpeg") },
+            { api.upload(byteArrayOf(1), "a.jpg", "not a mime") },
+            { api.upload(byteArrayOf(1), "a.jpg", "image/jpeg", chatPeer = "bob\r\nX: y") },
+        )) assertTrue(runCatching { bad() }.exceptionOrNull() is ApiException)
+        assertEquals(2, transport.seen.size)
+    }
+
     @Test fun `timestamps are compact`() {
         val now = 10L * 24 * 60 * 60_000
         assertEquals("сейчас", relativeTime(now - 20_000, now))

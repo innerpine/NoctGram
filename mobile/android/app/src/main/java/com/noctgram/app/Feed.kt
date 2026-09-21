@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,8 +19,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,9 +39,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
@@ -67,12 +71,16 @@ class FeedState(private val api: NoctApi, private val scope: CoroutineScope) {
     private var generation = 0
 
     fun reload(mode: String = "all", userId: String? = null) {
-        val request = ++generation
         query = buildMap {
             put("action", "feed")
             put("mode", mode)
             userId?.let { put("user", it) }
         }
+        refresh()
+    }
+
+    fun refresh() {
+        val request = ++generation
         loading = true
         error = ""
         scope.launch {
@@ -145,9 +153,14 @@ fun JSONObject.objects(name: String): List<JSONObject> =
 fun FeedScreen(model: AppModel) {
     val feed = model.homeFeed
     var mode by rememberSaveable { mutableStateOf("all") }
-    LaunchedEffect(mode) { feed.reload(mode) }
+    // A new own post (revision) belongs at the top of the feed at once.
+    LaunchedEffect(mode, model.revision) { feed.reload(mode) }
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(16.dp, 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(16.dp, 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             for ((id, label) in listOf("all" to "Для вас", "following" to "Подписки")) Text(
                 label,
                 color = if (mode == id) Foreground else Muted,
@@ -157,23 +170,32 @@ fun FeedScreen(model: AppModel) {
                     .clickable { mode = id }
                     .padding(16.dp, 8.dp),
             )
+            Spacer(Modifier.weight(1f))
+            Row(
+                Modifier.clip(RoundedCornerShape(50)).background(Foreground).clickable { model.open(Screen.Composer) }.padding(14.dp, 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = null, tint = Background, modifier = Modifier.size(16.dp))
+                Text("Написать", color = Background, fontWeight = FontWeight.Medium)
+            }
         }
-        PullToRefreshBox(isRefreshing = feed.loading, onRefresh = { feed.reload(mode) }, modifier = Modifier.fillMaxSize()) {
+        PullToRefreshBox(isRefreshing = feed.loading, onRefresh = feed::refresh, modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 16.dp),
+                contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, TabBarSpace),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) { posts(model.api, feed, emptyText = if (mode == "following") "Подпишитесь на авторов — их публикации появятся здесь." else "Публикаций пока нет.") }
+            ) { posts(model, feed, emptyText = if (mode == "following") "Подпишитесь на авторов — их публикации появятся здесь." else "Публикаций пока нет.") }
         }
     }
 }
 
 /** The cards plus the states around them; shared by the feed and the profile. */
-fun LazyListScope.posts(api: NoctApi, feed: FeedState, emptyText: String) {
+fun LazyListScope.posts(model: AppModel, feed: FeedState, emptyText: String) {
     if (feed.error.isNotEmpty()) item { Text(feed.error, color = Danger, modifier = Modifier.padding(vertical = 8.dp)) }
     if (feed.posts.isEmpty() && !feed.loading && feed.error.isEmpty())
         item { Text(emptyText, color = Muted, modifier = Modifier.padding(vertical = 32.dp)) }
-    items(feed.posts, key = { it.optString("id") }) { post -> PostCard(api, feed, post) }
+    items(feed.posts, key = { it.optString("id") }) { post -> PostCard(model, feed, post) }
     if (feed.hasMore) item {
         LaunchedEffect(feed.posts.size) { feed.nextPage() }
         Text("Загружаем…", color = Muted, modifier = Modifier.fillMaxWidth().padding(16.dp))
@@ -181,41 +203,60 @@ fun LazyListScope.posts(api: NoctApi, feed: FeedState, emptyText: String) {
 }
 
 @Composable
-private fun PostCard(api: NoctApi, feed: FeedState, post: JSONObject) = Column(
+fun PostCard(model: AppModel, feed: FeedState?, post: JSONObject) = Column(
     Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Card)
         .border(1.dp, Hairline, RoundedCornerShape(16.dp)).padding(20.dp),
     verticalArrangement = Arrangement.spacedBy(12.dp),
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Avatar(api, post.optString("avatar"), post.optString("name"), 40.dp)
+    Row(
+        Modifier.clip(RoundedCornerShape(12.dp)).clickable { model.open(Screen.Profile(post.optString("userId"))) },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Avatar(model.api, post.optString("avatar"), post.optString("name"), 40.dp)
         Column(Modifier.weight(1f)) {
-            Text(post.optString("name"), fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            DisplayName(post)
             Text("@${post.optString("handle")} · ${relativeTime(post.optLong("created"))}", color = Muted, fontSize = 13.sp, maxLines = 1)
         }
     }
     post.optString("text").takeIf { it.isNotBlank() }?.let { Text(it, color = Body, lineHeight = 24.sp) }
-    post.optString("code").takeIf { it.isNotBlank() }?.let {
-        Text(
-            it, fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = Body,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Background)
-                .horizontalScroll(rememberScrollState()).padding(12.dp),
-        )
-    }
-    Media(api, post)
+    post.optString("code").takeIf { it.isNotBlank() }?.let { CodeBlock(it, post.optString("codeLang")) }
+    Media(model.api, post)
     Poll(post)
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    if (feed != null) Row(verticalAlignment = Alignment.CenterVertically) {
         val liked = feed.isLiked(post)
         // The server count predates the tap; shift it by the difference the user just made.
         val likes = post.optInt("likes") + (if (liked) 1 else 0) - (if (post.optInt("liked") != 0) 1 else 0)
-        Icon(
+        Counter(
             if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-            contentDescription = if (liked) "Убрать лайк" else "Нравится",
-            tint = if (liked) Danger else Muted,
-            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable { feed.toggleLike(post) }.padding(8.dp),
-        )
-        Text(groupedNumber(likes.toLong()), color = Muted, fontSize = 13.sp)
-        Text("· ${groupedNumber(post.optLong("comments"))} комм. · ${groupedNumber(post.optLong("views"))} просм.", color = Muted, fontSize = 13.sp)
+            likes.toLong(), if (liked) "Убрать лайк" else "Нравится", if (liked) Danger else Muted,
+        ) { feed.toggleLike(post) }
+        Counter(Glyphs.Comment, post.optLong("comments"), "Комментарии", Muted) { model.open(Screen.Comments(post)) }
+        Spacer(Modifier.weight(1f))
+        Text("${groupedNumber(post.optLong("views"))} просм.", color = Muted, fontSize = 13.sp)
     }
+}
+
+@Composable
+private fun Counter(icon: ImageVector, count: Long, label: String, tint: Color, onClick: () -> Unit) = Row(
+    Modifier.clip(CircleShape).clickable(onClickLabel = label, onClick = onClick).padding(8.dp, 8.dp, 14.dp, 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
+) {
+    Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(20.dp))
+    Text(groupedNumber(count), color = Muted, fontSize = 13.sp)
+}
+
+@Composable
+fun CodeBlock(code: String, language: String) = Column(
+    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Background).border(1.dp, Hairline, RoundedCornerShape(12.dp)),
+) {
+    if (language.isNotBlank() && language != "text")
+        Text(language, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(12.dp, 8.dp, 12.dp, 0.dp))
+    Text(
+        code, fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = Body, softWrap = false,
+        modifier = Modifier.horizontalScroll(rememberScrollState()).padding(12.dp),
+    )
 }
 
 @Composable
@@ -231,7 +272,7 @@ private fun Media(api: NoctApi, post: JSONObject) {
             when {
                 !revealed -> Box(frame.background(Segment).clickable { revealed = true }, Alignment.Center) { Text("18+ · Показать", color = Body) }
                 item.optString("type").startsWith("image/") -> NetImage(api, "/api/media/" + item.optString("id"), frame)
-                // ponytail: no video player in the base; add Media3 when videos matter in the app.
+                // ponytail: no video player yet; add Media3 when videos matter in the app.
                 else -> Box(frame.background(Segment), Alignment.Center) { Text("Видео · откройте на noctgram.com", color = Muted) }
             }
         }

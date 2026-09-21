@@ -92,10 +92,37 @@ class NoctApi(
 
     suspend fun get(path: String, query: Map<String, String> = emptyMap()) = json("GET", path, query, null)
     suspend fun post(path: String, body: JSONObject) = json("POST", path, emptyMap(), body)
+    suspend fun delete(path: String, body: JSONObject) = json("DELETE", path, emptyMap(), body)
+
+    /**
+     * Uploads one file as multipart/form-data: to /api/upload for posts and the
+     * profile, or to /api/chat-upload (bound to a peer or a room) for messages.
+     */
+    suspend fun upload(bytes: ByteArray, fileName: String, mime: String, chatPeer: String? = null, room: String? = null): JSONObject {
+        if (bytes.isEmpty() || bytes.size > MEDIA_LIMIT)
+            throw ApiException(413, "UPLOAD_SIZE", "Выберите файл размером до 25 МБ.")
+        if (!MIME.matches(mime)) throw ApiException(400, "INVALID_MIME_TYPE", "Не удалось определить формат файла.")
+        val boundary = "NoctGram-" + java.util.UUID.randomUUID()
+        // The name goes into a header: no quotes, control characters or path parts.
+        val name = fileName.substringAfterLast('/').substringAfterLast('\\')
+            .filter { it >= ' ' && it != '"' }.take(180).ifEmpty { "attachment" }
+        val body = ByteArrayOutputStream()
+        fun text(value: String) = body.write(value.toByteArray(Charsets.UTF_8))
+        text("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"$name\"\r\nContent-Type: $mime\r\n\r\n")
+        body.write(bytes)
+        text("\r\n")
+        for ((field, value) in listOf("peer" to chatPeer, "room" to room)) if (value != null) {
+            if (value.length > 200 || value.any { it < ' ' }) throw ApiException(400, "INVALID_PEER", "Некорректный получатель.")
+            text("--$boundary\r\nContent-Disposition: form-data; name=\"$field\"\r\n\r\n$value\r\n")
+        }
+        text("--$boundary--\r\n")
+        val path = if (chatPeer != null || room != null) "/api/chat-upload" else "/api/upload"
+        return parse(send("POST", path, emptyMap(), body.toByteArray(), "multipart/form-data; boundary=$boundary", "application/json", JSON_LIMIT))
+    }
 
     /** Media is served only to the signed-in account, so images go through here too. */
     suspend fun download(path: String, maxBytes: Int = MEDIA_LIMIT): ByteArray =
-        send("GET", path.removePrefix(ORIGIN), emptyMap(), null, "*/*", maxBytes).body
+        send("GET", path.removePrefix(ORIGIN), emptyMap(), null, null, "*/*", maxBytes).body
 
     fun clearSession() {
         generation.incrementAndGet()
@@ -103,8 +130,11 @@ class NoctApi(
         store.write(emptyList())
     }
 
-    private suspend fun json(method: String, path: String, query: Map<String, String>, body: JSONObject?): JSONObject {
-        val response = send(method, path, query, body, "application/json", JSON_LIMIT)
+    private suspend fun json(method: String, path: String, query: Map<String, String>, body: JSONObject?) = parse(
+        send(method, path, query, body?.toString()?.toByteArray(), body?.let { "application/json" }, "application/json", JSON_LIMIT),
+    )
+
+    private fun parse(response: HttpResponse): JSONObject {
         if (response.status == 204 && response.body.isEmpty()) return JSONObject()
         val value = response.takeIf { it.header("Content-Type").orEmpty().contains("json", true) }
             ?.let { runCatching { JSONTokener(String(it.body, Charsets.UTF_8)).nextValue() }.getOrNull() }
@@ -120,7 +150,8 @@ class NoctApi(
         method: String,
         path: String,
         query: Map<String, String>,
-        body: JSONObject?,
+        body: ByteArray?,
+        contentType: String?,
         accept: String,
         maxBytes: Int,
     ): HttpResponse = withContext(Dispatchers.IO) {
@@ -136,9 +167,9 @@ class NoctApi(
             cookies.values.filter { it.valid(now()) }.joinToString("; ") { "${it.name}=${it.value}" }
         }
         if (cookie.isNotEmpty()) headers["Cookie"] = cookie
-        if (body != null) headers["Content-Type"] = "application/json"
+        if (contentType != null) headers["Content-Type"] = contentType
         val response = try {
-            transport.send(HttpRequest(method, apiUrl(path, query), headers, body?.toString()?.toByteArray()), maxBytes)
+            transport.send(HttpRequest(method, apiUrl(path, query), headers, body), maxBytes)
         } catch (_: SocketTimeoutException) {
             throw ApiException(0, "TIMEOUT", "Сервер не ответил вовремя. Повторите запрос.")
         } catch (_: IOException) {
@@ -173,6 +204,7 @@ class NoctApi(
         // A wrong code is a 401 too, and must not sign the device out.
         private val AUTH_STEPS = setOf("/api/auth/start", "/api/auth/verify")
         private val SAFE_PATH = Regex("^/api/[A-Za-z0-9._~/-]+$")
+        private val MIME = Regex("^[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+$")
 
         /** Builds the request URL, refusing anything that is not a plain /api/ path on our origin. */
         fun apiUrl(path: String, query: Map<String, String> = emptyMap()): String {
