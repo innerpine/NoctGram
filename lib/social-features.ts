@@ -227,7 +227,11 @@ export async function featurePost(
     const name = clean(b.name, 40, true),
       bio = clean(b.bio, 300),
       avatar = await validImage(b.avatar, me, current?.avatar),
-      cover = await validImage(b.cover, me, current?.cover);
+      // 'liquid' is the «Жидкое» banner drawn from the avatar, not an upload (lib/profile-cover.ts).
+      cover =
+        b.cover === 'liquid'
+          ? 'liquid'
+          : await validImage(b.cover, me, current?.cover);
     if (avatar && avatar !== current?.avatar) await assertStaticAvatar(avatar);
     const statements = [];
     await assertSpamIdentity(
@@ -243,7 +247,12 @@ export async function featurePost(
     );
     // mediaAssignment repeats its expressions; use an input CTE to bind each value once.
     const eligibility = `WITH input AS(SELECT ? AS actor,? AS avatar,? AS cover),eligible AS(SELECT u.id FROM users u,input i WHERE u.id=? AND ${mediaAssignment('u.avatar', 'i.avatar', 'i.actor')} AND ${mediaAssignment('u.cover', 'i.cover', 'i.actor')})`;
-    const eligibilityArgs = [me, avatar, cover, target];
+    const eligibilityArgs = [
+      me,
+      avatar,
+      cover === 'liquid' ? '' : cover,
+      target,
+    ];
     if (b.mainHandle !== undefined && rights.canManageMembers) {
       const limit = profileHandleLimit(current?.kind);
       const limitMessage =

@@ -1,6 +1,7 @@
 'use client';
 import type { Profile } from './client';
 import { readProfileBackground } from './profile-background';
+import { coverImage } from './profile-cover';
 import { preloadImagePalette } from './use-image-palette';
 import { avatarSource } from './avatar-variants';
 
@@ -36,7 +37,8 @@ function preloadImage(url: string) {
 
 export async function prepareProfileVisuals(person: Profile) {
   const background = readProfileBackground(person.profileBackground);
-  const paletteImage = person.cover || person.avatar;
+  const cover = coverImage(person.cover);
+  const paletteImage = cover || person.avatar;
   const density =
     typeof window === 'undefined' ? 2 : window.devicePixelRatio || 1;
   const avatar = avatarSource(
@@ -44,7 +46,7 @@ export async function prepareProfileVisuals(person: Profile) {
     density <= 1 ? 96 : density <= 2 ? 192 : 384,
   );
   await Promise.all([
-    ...[...new Set([person.cover, avatar].filter(Boolean))].map(preloadImage),
+    ...[...new Set([cover, avatar].filter(Boolean))].map(preloadImage),
     person.premium && background.mode === 'cover' && paletteImage
       ? preloadImagePalette(paletteImage)
       : undefined,

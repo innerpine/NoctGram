@@ -104,6 +104,7 @@ try {
               '@/lib/profile-cover-cache',
               '@/lib/app-history',
               '@/lib/channel-limits',
+              '@/lib/profile-cover',
             ].includes(path)
               ? undefined
               : { path, namespace: 'boundary' },

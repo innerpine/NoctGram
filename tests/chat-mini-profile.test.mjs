@@ -80,7 +80,9 @@ const { outputFiles } = await build({
              export const useLayoutEffect = () => {};`
               : `export const Dialog='Dialog', DialogContent='DialogContent', DialogDescription='DialogDescription', DialogTitle='DialogTitle',
              Avatar='Avatar', DisplayName='DisplayName', GiftAnimation='GiftAnimation', ChatEmojiText='ChatEmojiText',
-             ProfileLink='ProfileLink', ChatPeerPresence='ChatPeerPresence', ChatVideoPlayer='ChatVideoPlayer';
+             ProfileLink='ProfileLink', ChatPeerPresence='ChatPeerPresence', ChatVideoPlayer='ChatVideoPlayer',
+             LiquidCover='LiquidCover', LIQUID_COVER='liquid';
+             export const coverImage=cover=>cover && cover !== 'liquid' ? cover : '';
              export const appearanceStyle=()=>({}), useProfileBackground=person=>person.profileBackground ? {'--surface-first':'#ffaa88'} : undefined, giftDefinition=()=>null, chatFileSize=()=>'';
              export const prepareProfileVisuals=(...args)=>globalThis.__miniProfilePrepare(...args);
              export const chatRequest=(...args)=>globalThis.__miniProfileRequest(...args);`,

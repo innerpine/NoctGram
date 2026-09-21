@@ -692,3 +692,38 @@
   object-fit: cover;
   border-radius: inherit;
 }
+
+/* «Жидкое»: a canvas that fills the cover; it fades in once the avatar is drawn. */
+.profile-cover,
+.edit-cover {
+  position: relative;
+}
+.liquid-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 600ms var(--motion);
+}
+.liquid-cover[data-ready='true'] {
+  opacity: 0.85;
+}
+.edit-cover:has(.liquid-cover) {
+  height: 85px;
+  border-radius: 8px;
+  background: #0c0c0c;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-cover {
+    transition: none;
+  }
+}
+.noct-dialog .secondary[aria-pressed='true'] {
+  border-color: #ffffff66;
+  background: #ffffff14;
+  color: #fff;
+}
