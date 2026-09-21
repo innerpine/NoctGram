@@ -102,6 +102,7 @@ try {
               '@/lib/feed-snapshots',
               '@/lib/chat-snapshots',
               '@/lib/profile-cover-cache',
+              '@/lib/profile-cover',
             ].includes(path)
               ? undefined
               : { path, namespace: 'boundary' },

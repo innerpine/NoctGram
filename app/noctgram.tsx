@@ -38,6 +38,8 @@ import { Settings } from 'lucide-react';
 import { Music2 } from 'lucide-react';
 import { Ban, Store } from 'lucide-react';
 import { formatMarketNumber } from '@/lib/market-policy';
+import { LIQUID_COVER, coverImage } from '@/lib/profile-cover';
+import { LiquidCover } from './liquid-cover';
 import {
   type CSSProperties,
   useCallback,
@@ -348,9 +350,10 @@ export default function Noctgram({
     accountBlocked || !me ? '' : me.id + ':' + privacyVersion,
   );
   useEffect(() => {
-    if (!me?.cover || accountBlocked) return;
+    const cover = coverImage(me?.cover);
+    if (!cover || accountBlocked) return;
     let active = true;
-    void coverImages.current.prepare(me.cover).then((src) => {
+    void coverImages.current.prepare(cover).then((src) => {
       if (src && active) setCoverRevision((value) => value + 1);
     });
     return () => {
@@ -1018,14 +1021,11 @@ export default function Noctgram({
               ...(id ? { id } : { handle: next.handle || '' }),
             }),
         );
-        if (
-          person.cover &&
-          !person.blocked &&
-          !coverImages.current.get(person.cover)
-        ) {
+        const cover = coverImage(person.cover);
+        if (cover && !person.blocked && !coverImages.current.get(cover)) {
           setOpeningProfile(person.id);
           try {
-            await coverImages.current.prepare(person.cover);
+            await coverImages.current.prepare(cover);
           } finally {
             if (chatPreparation.current === preparation) setOpeningProfile('');
           }
@@ -2278,13 +2278,16 @@ export default function Noctgram({
               <div
                 className="profile-cover"
                 style={
-                  profile.cover
+                  coverImage(profile.cover)
                     ? {
                         backgroundImage: `url(${coverImages.current.get(profile.cover) || profile.cover})`,
                       }
                     : undefined
                 }
               >
+                {profile.cover === LIQUID_COVER && profile.avatar && (
+                  <LiquidCover src={profile.avatar} />
+                )}
                 <button
                   className="back-button"
                   aria-label="Вернуться в ленту"
@@ -2302,7 +2305,10 @@ export default function Noctgram({
                     <Camera size={17} />
                   </button>
                 )}
-                {!profile.cover && <span className="cover-monogram">n.</span>}
+                {!coverImage(profile.cover) &&
+                  !(profile.cover === LIQUID_COVER && profile.avatar) && (
+                    <span className="cover-monogram">n.</span>
+                  )}
               </div>
               <div className="profile-info">
                 <div className="profile-avatar-line">
@@ -3436,10 +3442,29 @@ export default function Noctgram({
                           }}
                         />
                       </label>
+                      <button
+                        type="button"
+                        className="secondary"
+                        aria-pressed={editCover === LIQUID_COVER}
+                        title="Живой фон из цветов аватарки вместо своей обложки"
+                        onClick={() => setEditCover(LIQUID_COVER)}
+                      >
+                        Жидкое
+                      </button>
                     </div>
+                    {editCover === LIQUID_COVER && !editAvatar && (
+                      <p className="meta">
+                        «Жидкое» строится из аватарки — добавьте её, и фон
+                        появится.
+                      </p>
+                    )}
                     {editCover && (
                       <div className="edit-cover">
-                        <img src={editCover} alt="Новая обложка" />
+                        {editCover === LIQUID_COVER ? (
+                          <LiquidCover src={editAvatar} />
+                        ) : (
+                          <img src={editCover} alt="Новая обложка" />
+                        )}
                         <button
                           type="button"
                           aria-label="Убрать обложку"

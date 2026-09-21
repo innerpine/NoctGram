@@ -1,6 +1,7 @@
 'use client';
 import type { Profile } from './client';
 import { readProfileBackground } from './profile-background';
+import { coverImage } from './profile-cover';
 import { preloadImagePalette } from './use-image-palette';
 
 // Cache only image preparation, never private profile/presence responses.
@@ -35,11 +36,10 @@ function preloadImage(url: string) {
 
 export async function prepareProfileVisuals(person: Profile) {
   const background = readProfileBackground(person.profileBackground);
-  const paletteImage = person.cover || person.avatar;
+  const cover = coverImage(person.cover);
+  const paletteImage = cover || person.avatar;
   await Promise.all([
-    ...[...new Set([person.cover, person.avatar].filter(Boolean))].map(
-      preloadImage,
-    ),
+    ...[...new Set([cover, person.avatar].filter(Boolean))].map(preloadImage),
     person.premium && background.mode === 'cover' && paletteImage
       ? preloadImagePalette(paletteImage)
       : undefined,

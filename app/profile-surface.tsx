@@ -5,13 +5,14 @@ import { hasProfileDesign, themeFor } from '@/lib/appearance';
 import { readProfileBackground } from '@/lib/profile-background';
 import { useImagePalette } from '@/lib/use-image-palette';
 import { appearanceStyle } from './profile-identity';
+import { coverImage } from '@/lib/profile-cover';
 export function useProfileBackground(person: Partial<Profile>) {
   const background = readProfileBackground(person.profileBackground);
   const active =
     !!person.premium && person.kind !== 'channel' && background.mode !== 'none';
   const palette = useImagePalette(
     active && background.mode === 'cover'
-      ? person.cover || person.avatar || ''
+      ? coverImage(person.cover) || person.avatar || ''
       : '',
   );
   const theme = themeFor(person).colors;

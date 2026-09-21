@@ -44,6 +44,8 @@ import { ProfileLink } from './profile-link';
 import { ChatPeerPresence } from './chat-peer-presence';
 import { useProfileBackground } from './profile-surface';
 import { prepareProfileVisuals } from '@/lib/profile-visuals';
+import { LIQUID_COVER, coverImage } from '@/lib/profile-cover';
+import { LiquidCover } from './liquid-cover';
 import { ChatVideoPlayer } from './chat-video-player';
 
 const sections = [
@@ -457,9 +459,12 @@ function PeerProfileBody({
             <>
               <div className="peer-profile-hero">
                 <div className="peer-profile-cover">
-                  {person?.cover && (
+                  {person?.cover === LIQUID_COVER && person.avatar && (
+                    <LiquidCover src={person.avatar} />
+                  )}
+                  {coverImage(person?.cover) && (
                     <img
-                      src={person.cover}
+                      src={coverImage(person?.cover)}
                       alt=""
                       decoding="async"
                       onError={(event) => {
