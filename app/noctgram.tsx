@@ -2222,14 +2222,16 @@ export default function Noctgram({
             >
               <StarsIcon size={22} />
             </AppLink>
-            <a
+            <AppLink
               className="icon-button mobile-market-link"
               title="Маркет"
               aria-label="Открыть Маркет"
               href="/market"
+              // Market is a standalone page outside the in-app history.
+              onNavigate={() => window.location.assign('/market')}
             >
               <Store size={20} />
-            </a>
+            </AppLink>
             <AppLink
               className="icon-button"
               aria-label="Найти в Noctgram"
