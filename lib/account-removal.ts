@@ -186,6 +186,19 @@ export async function deleteAccount(
         .prepare(`DELETE FROM ${table} WHERE userId=? AND ${gate}`)
         .bind(me, ...args),
     );
+  // Noct Market: withdraw the account's lots; its numbers return to the system unlisted.
+  statements.push(
+    d
+      .prepare(
+        `UPDATE market_listings SET status='cancelled',closed=? WHERE sellerId=? AND status='active' AND ${gate}`,
+      )
+      .bind(now, me, ...args),
+    d
+      .prepare(
+        `UPDATE market_numbers SET ownerId=NULL,displayed=0 WHERE ownerId=? AND ${gate}`,
+      )
+      .bind(me, ...args),
+  );
   for (const table of ['profile_appearance', 'premium_entitlements', 'handles'])
     statements.push(
       d

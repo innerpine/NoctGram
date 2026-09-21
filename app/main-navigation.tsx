@@ -1,6 +1,14 @@
 'use client';
 import { useLayoutEffect, useRef } from 'react';
-import { Home, Search, Mail, Megaphone, Music2, UserRound } from 'lucide-react';
+import {
+  Home,
+  Search,
+  Mail,
+  Megaphone,
+  Music2,
+  Store,
+  UserRound,
+} from 'lucide-react';
 import { createMobileNavigation } from '@/lib/mobile-navigation';
 import { AppLink } from './app-link';
 
@@ -10,6 +18,7 @@ const items = [
   ['messages', 'Сообщения', Mail],
   ['channels', 'Каналы', Megaphone],
   ['music', 'Музыка', Music2],
+  ['market', 'Маркет', Store],
   ['profile', 'Профиль', UserRound],
 ] as const;
 
@@ -57,8 +66,11 @@ export function MainNavigation({
             aria-current={selected ? 'page' : undefined}
             aria-label={label}
             aria-busy={(id === 'profile' && openingProfile) || undefined}
-            href={href(id)}
-            onNavigate={() => navigate(id)}
+            // Market is a standalone page outside the in-app history.
+            href={id === 'market' ? '/market' : href(id)}
+            onNavigate={() =>
+              id === 'market' ? window.location.assign('/market') : navigate(id)
+            }
           >
             <span className="nav-item-content">
               <Icon size={21} className="nav-item-icon" aria-hidden="true" />

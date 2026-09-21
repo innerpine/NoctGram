@@ -34,7 +34,8 @@ import { Phone } from 'lucide-react';
 import { MusicAccountGuard } from './music-provider';
 import { MusicActivityStatus } from './music-activity';
 import { Settings } from 'lucide-react';
-import { Ban } from 'lucide-react';
+import { Ban, Store } from 'lucide-react';
+import { formatMarketNumber } from '@/lib/market-policy';
 import {
   type CSSProperties,
   type ComponentProps,
@@ -2221,6 +2222,14 @@ export default function Noctgram({
             >
               <StarsIcon size={22} />
             </AppLink>
+            <a
+              className="icon-button mobile-market-link"
+              title="Маркет"
+              aria-label="Открыть Маркет"
+              href="/market"
+            >
+              <Store size={20} />
+            </a>
             <AppLink
               className="icon-button"
               aria-label="Найти в Noctgram"
@@ -2500,6 +2509,27 @@ export default function Noctgram({
                         </>
                       )}
                     </div>
+                    {profile.anonymousNumber && (
+                      <div className="profile-aliases profile-number">
+                        <span className="aliases-prefix">Анонимный номер</span>
+                        <span className="profile-alias">
+                          <button
+                            title="Скопировать анонимный номер"
+                            onClick={() => {
+                              const number = formatMarketNumber(
+                                profile.anonymousNumber || '',
+                              );
+                              void navigator.clipboard
+                                .writeText(number)
+                                .then(() => notify('Номер скопирован'))
+                                .catch(() => notify(number));
+                            }}
+                          >
+                            {formatMarketNumber(profile.anonymousNumber)}
+                          </button>
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <MusicActivityStatus
                     person={profile}

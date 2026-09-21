@@ -18,6 +18,8 @@ import {
   Activity,
   Users,
   ShieldBan,
+  MinusCircle,
+  Store,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { request, type Person } from '@/lib/client';
@@ -26,6 +28,7 @@ import { StaffSelect } from './staff-select';
 import { GratitudeBadge } from './gratitude-badge';
 import { ProfileRecognitions } from './profile-recognitions';
 import { AdminGiftForm } from './admin-gift-form';
+import { AdminMarketForm } from './admin-market-form';
 import { giftDefinition } from '@/lib/gift-catalog';
 const AdminOnlinePanel = lazy(() => import('./admin-online-panel'));
 const AdminAccessPanel = lazy(() => import('./admin-access-panel'));
@@ -45,6 +48,7 @@ type Event = Person & {
 };
 const actions = [
   { value: 'stars', label: 'Выдать Stars', icon: Star },
+  { value: 'starsDebit', label: 'Отнять Stars', icon: MinusCircle },
   { value: 'premium', label: 'Выдать Premium', icon: Sparkles },
   { value: 'collectible', label: 'Выдать подарки', icon: Gift },
   { value: 'verified', label: 'Верификация', icon: BadgeCheck },
@@ -132,7 +136,9 @@ function AdministrationAccounts({
   const [query, setQuery] = useState(''),
     [people, setPeople] = useState<AdminPerson[]>([]),
     [events, setEvents] = useState<Event[]>([]),
-    [selected, setSelected] = useState<AdminPerson | null>(null);
+    [selected, setSelected] = useState<AdminPerson | null>(null),
+    [sort, setSort] = useState('recent'),
+    [more, setMore] = useState(false);
   const [kind, setKind] = useState('stars'),
     [amount, setAmount] = useState('1000'),
     [reason, setReason] = useState(''),
@@ -152,13 +158,14 @@ function AdministrationAccounts({
     let live = true;
     setLoading(true);
     const t = setTimeout(() => {
-      void request<{ people: AdminPerson[]; events: Event[] }>(
-        '?action=administration&q=' + encodeURIComponent(query),
+      void request<{ people: AdminPerson[]; more: boolean; events: Event[] }>(
+        `?action=administration&sort=${sort}&q=` + encodeURIComponent(query),
       )
         .then((r) => {
           if (live) {
             setError('');
             setPeople(r.people);
+            setMore(r.more);
             setEvents(r.events);
             setSelected((old) =>
               old ? r.people.find((p) => p.id === old.id) || old : null,
@@ -176,7 +183,25 @@ function AdministrationAccounts({
       live = false;
       clearTimeout(t);
     };
-  }, [query, version, active]);
+  }, [query, version, active, sort]);
+  const loadMore = async () => {
+    setLoading(true);
+    try {
+      const r = await request<{ people: AdminPerson[]; more: boolean }>(
+        `?action=administration&sort=balance&offset=${people.length}&q=` +
+          encodeURIComponent(query),
+      );
+      setPeople((old) => [
+        ...old,
+        ...r.people.filter((p) => !old.some((o) => o.id === p.id)),
+      ]);
+      setMore(r.more);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
   const submit = async () => {
     if (!selected || lock.current) return;
     lock.current = true;
@@ -225,9 +250,11 @@ function AdministrationAccounts({
   const submitLabel =
     kind === 'stars'
       ? 'Выдать Stars'
-      : kind === 'premium'
-        ? 'Выдать Premium'
-        : stateOptions.find((o) => o.value === amount)?.label || 'Сохранить';
+      : kind === 'starsDebit'
+        ? 'Отнять Stars'
+        : kind === 'premium'
+          ? 'Выдать Premium'
+          : stateOptions.find((o) => o.value === amount)?.label || 'Сохранить';
   return (
     <section className="administration-panel">
       <div className="account-section-heading">
@@ -256,6 +283,12 @@ function AdministrationAccounts({
       {notice && <output className="moderation-notice">{notice}</output>}
       {!selected ? (
         <>
+          <Tabs value={sort} onValueChange={(v) => setSort(String(v))}>
+            <TabsList className="stars-tabs" aria-label="Порядок аккаунтов">
+              <TabsTrigger value="recent">Недавние</TabsTrigger>
+              <TabsTrigger value="balance">Самые богатые</TabsTrigger>
+            </TabsList>
+          </Tabs>
           <label className="staff-search">
             <Search size={17} />
             <input
@@ -286,6 +319,12 @@ function AdministrationAccounts({
                   <DisplayName person={p} />
                   <small>@{p.handle}</small>
                 </span>
+                {p.kind !== 'channel' && (
+                  <span className="admin-person-balance">
+                    <Star size={13} />
+                    {p.balance.toLocaleString('ru-RU')}
+                  </span>
+                )}
                 <span className="staff-status">{roleLabel(p)}</span>
                 <ChevronRight size={16} />
               </button>
@@ -296,6 +335,21 @@ function AdministrationAccounts({
               Никого не нашли. Попробуйте другой юзернейм.
             </p>
           )}
+          {more && (
+            <button
+              className="account-text-button"
+              disabled={loading}
+              onClick={() => void loadMore()}
+            >
+              Показать ещё
+            </button>
+          )}
+          <details className="admin-market-issue">
+            <summary>
+              <Store size={16} /> Выпустить лоты Маркета
+            </summary>
+            <AdminMarketForm onIssued={() => setVersion((v) => v + 1)} />
+          </details>
         </>
       ) : (
         <form
@@ -347,18 +401,41 @@ function AdministrationAccounts({
                 onChange={(v) => {
                   setKind(v);
                   setAmount(
-                    v === 'stars' ? '1000' : v === 'premium' ? '30' : '1',
+                    v === 'stars' || v === 'starsDebit'
+                      ? '1000'
+                      : v === 'premium'
+                        ? '30'
+                        : '1',
                   );
                   setNotice('');
                 }}
               />
-              {kind === 'stars' || kind === 'premium' ? (
+              {kind === 'stars' ||
+              kind === 'starsDebit' ||
+              kind === 'premium' ? (
                 <label className="account-field">
-                  {kind === 'stars' ? 'Количество Stars' : 'Дней Premium'}
+                  <span className="staff-field-caption">
+                    {kind === 'premium' ? 'Дней Premium' : 'Количество Stars'}
+                    {kind === 'starsDebit' && (
+                      <button
+                        type="button"
+                        className="account-text-button"
+                        onClick={() =>
+                          setAmount(
+                            String(
+                              Math.min(Math.max(selected.balance, 0), 1000000),
+                            ),
+                          )
+                        }
+                      >
+                        Всё
+                      </button>
+                    )}
+                  </span>
                   <input
                     type="number"
                     min={1}
-                    max={kind === 'stars' ? 1000000 : 365}
+                    max={kind === 'premium' ? 365 : 1000000}
                     step={1}
                     required
                     value={amount}
@@ -415,13 +492,15 @@ function AdministrationAccounts({
                     onChange={(e) => setReason(e.target.value)}
                     rows={3}
                     placeholder={
-                      kind === 'stars' || kind === 'premium'
-                        ? 'Например, награда за помощь в тестировании'
-                        : kind === 'verified'
-                          ? 'Например, подтверждён официальный аккаунт автора'
-                          : kind === 'gratitude'
-                            ? 'За что благодарим или почему снимаем знак'
-                            : 'Например, назначение в команду модерации'
+                      kind === 'starsDebit'
+                        ? 'Например, возврат ошибочного начисления'
+                        : kind === 'stars' || kind === 'premium'
+                          ? 'Например, награда за помощь в тестировании'
+                          : kind === 'verified'
+                            ? 'Например, подтверждён официальный аккаунт автора'
+                            : kind === 'gratitude'
+                              ? 'За что благодарим или почему снимаем знак'
+                              : 'Например, назначение в команду модерации'
                     }
                   />
                 </label>
@@ -432,15 +511,17 @@ function AdministrationAccounts({
                   <div>
                     <strong>После подтверждения</strong>
                     <p>
-                      {kind === 'stars'
-                        ? `@${selected.handle} получит ${Number(amount || 0).toLocaleString('ru-RU')} Stars.`
-                        : kind === 'premium'
-                          ? `Premium для @${selected.handle} будет продлён на ${amount} дн.`
-                          : kind === 'verified'
-                            ? `${amount === '1' ? 'Подтвердить' : 'Снять подтверждение'} @${selected.handle}.`
-                            : kind === 'gratitude'
-                              ? `${amount === '1' ? 'Выдать знак «С благодарностью» пользователю' : 'Снять знак «С благодарностью» у'} @${selected.handle}.`
-                              : `${amount === '1' ? 'Назначить модератором' : 'Снять роль модератора у'} @${selected.handle}.`}
+                      {kind === 'starsDebit'
+                        ? `У @${selected.handle} спишется ${Number(amount || 0).toLocaleString('ru-RU')} Stars. Баланс не может стать отрицательным.`
+                        : kind === 'stars'
+                          ? `@${selected.handle} получит ${Number(amount || 0).toLocaleString('ru-RU')} Stars.`
+                          : kind === 'premium'
+                            ? `Premium для @${selected.handle} будет продлён на ${amount} дн.`
+                            : kind === 'verified'
+                              ? `${amount === '1' ? 'Подтвердить' : 'Снять подтверждение'} @${selected.handle}.`
+                              : kind === 'gratitude'
+                                ? `${amount === '1' ? 'Выдать знак «С благодарностью» пользователю' : 'Снять знак «С благодарностью» у'} @${selected.handle}.`
+                                : `${amount === '1' ? 'Назначить модератором' : 'Снять роль модератора у'} @${selected.handle}.`}
                     </p>
                   </div>
                 </div>
@@ -468,21 +549,29 @@ function AdministrationAccounts({
             <div>
               <strong>
                 {actions.find((a) => a.value === e.action)?.label ||
-                  'Изменение аккаунта'}{' '}
+                  (e.action === 'marketIssue'
+                    ? 'Выпуск лотов Маркета'
+                    : 'Изменение аккаунта')}{' '}
                 {e.action === 'stars'
                   ? `+${e.amount.toLocaleString('ru-RU')}`
-                  : e.action === 'premium'
-                    ? `+${e.amount} дн.`
-                    : e.action === 'collectible'
+                  : e.action === 'starsDebit'
+                    ? `−${e.amount.toLocaleString('ru-RU')}`
+                    : e.action === 'marketIssue'
                       ? `· ${e.amount} шт.`
-                      : e.amount
-                        ? '· включено'
-                        : '· снято'}
+                      : e.action === 'premium'
+                        ? `+${e.amount} дн.`
+                        : e.action === 'collectible'
+                          ? `· ${e.amount} шт.`
+                          : e.amount
+                            ? '· включено'
+                            : '· снято'}
               </strong>
               <time>{new Date(e.created).toLocaleString('ru-RU')}</time>
             </div>
             <p>
-              {e.actorName} → {e.handle ? '@' + e.handle : e.name}
+              {e.action === 'marketIssue'
+                ? e.actorName
+                : `${e.actorName} → ${e.handle ? '@' + e.handle : e.name}`}
             </p>
             <small>{e.reason}</small>
             {e.action === 'collectible' && (

@@ -49,6 +49,7 @@ import './staff-panel.css';
 import './admin-access.css';
 import './antispam.css';
 import './channel-boosts.css';
+import './market.css';
 import './viewport.css';
 import './mobile-navigation.css';
 import './profile-workspace.css';

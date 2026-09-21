@@ -1,7 +1,8 @@
 .mobile-nav-pill {
   display: none;
 }
-.page-header .mobile-stars-link {
+.page-header .mobile-stars-link,
+.page-header .mobile-market-link {
   display: none;
 }
 .sidebar nav a .nav-item-content {
@@ -9,7 +10,8 @@
 }
 
 @media (max-width: 500px) {
-  .page-header .mobile-stars-link {
+  .page-header .mobile-stars-link,
+  .page-header .mobile-market-link {
     display: flex;
   }
   .page-header .icon-button {
