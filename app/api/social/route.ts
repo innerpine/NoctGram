@@ -77,6 +77,13 @@ import { messageVisible } from '@/lib/chat-access';
 import { readChatTheme, saveChatTheme } from '@/lib/chat-theme-settings';
 import { readChatLibrary } from '@/lib/chat-library-server';
 export const dynamic = 'force-dynamic';
+// A listed username that was removed or promoted to main is no longer for sale.
+const staleUsernameLots = (d: D1Database, me: string) =>
+  d
+    .prepare(
+      "UPDATE market_listings SET status='cancelled',closed=? WHERE kind='username' AND status='active' AND sellerId=? AND NOT EXISTS(SELECT 1 FROM handles h WHERE h.handle=market_listings.assetId AND h.userId=market_listings.sellerId AND h.main=0)",
+    )
+    .bind(Date.now(), me);
 export async function GET(req: Request) {
   try {
     const me = await viewer();
@@ -469,6 +476,7 @@ export async function POST(req: Request) {
               'UPDATE handles SET main=CASE WHEN handle=? THEN 1 ELSE 0 END WHERE userId=? AND EXISTS (SELECT 1 FROM handles WHERE handle=? AND userId=?)',
             )
             .bind(handle, me, handle, me),
+          staleUsernameLots(d, me),
         ]);
       } catch {
         throw new ApiError(409, 'Юзернейм занят. Выберите другой.');
@@ -484,10 +492,12 @@ export async function POST(req: Request) {
     }
     if (action === 'removeHandle') {
       const h = clean(b.handle, 24, true);
-      await d
-        .prepare('DELETE FROM handles WHERE handle=? AND userId=? AND main=0')
-        .bind(h, me)
-        .run();
+      await d.batch([
+        d
+          .prepare('DELETE FROM handles WHERE handle=? AND userId=? AND main=0')
+          .bind(h, me),
+        staleUsernameLots(d, me),
+      ]);
       return Response.json(await profile(me, me));
     }
     if (action === 'post') {

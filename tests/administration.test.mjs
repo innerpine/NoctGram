@@ -707,3 +707,76 @@ scenario(
     assert.equal(f.count('admin_events'), 30);
   },
 );
+
+const starsOf = (f, id) =>
+  Number(
+    f.sql
+      .prepare(
+        'SELECT COALESCE(SUM(CASE WHEN recipient=? THEN amount ELSE -amount END),0) AS n FROM star_transfers WHERE recipient=? OR sender=?',
+      )
+      .get(id, id, id).n,
+  );
+scenario(
+  'stars debit goes to the treasury, never below zero, and audits only real debits',
+  async (f) => {
+    assert.equal((await f.post(f.body({ amount: 500 }))).status, 200);
+    const over = await f.post(f.body({ kind: 'starsDebit', amount: 501 }));
+    assert.equal(over.status, 409);
+    assert.match(over.body.error, /500/);
+    assert.equal(f.count('admin_events'), 1);
+    assert.equal(starsOf(f, 'user_a'), 500);
+    const debit = f.body({ kind: 'starsDebit', amount: 200 });
+    assert.equal((await f.post(debit)).status, 200);
+    assert.deepEqual((await f.post(debit)).body, { ok: true, replayed: true });
+    assert.equal(starsOf(f, 'user_a'), 300);
+    assert.equal(f.count('admin_events'), 2);
+    assert.deepEqual(
+      {
+        ...f.sql
+          .prepare(
+            "SELECT sender,recipient,amount FROM star_transfers WHERE kind='admin_debit'",
+          )
+          .get(),
+      },
+      { sender: 'user_a', recipient: 'noctgram_gifts', amount: 200 },
+    );
+    for (const [patch, actor, status] of [
+      [{ target: 'channel_a', amount: 1 }, OWNER, 400],
+      [{ amount: 0 }, OWNER, 400],
+      [{ amount: 1 }, 'moderator', 403],
+    ])
+      assert.equal(
+        (await f.post(f.body({ kind: 'starsDebit', ...patch }), actor)).status,
+        status,
+      );
+    assert.equal(starsOf(f, 'user_a'), 300);
+    assert.deepEqual(f.sql.prepare('PRAGMA foreign_key_check').all(), []);
+  },
+);
+scenario(
+  'rich list orders personal accounts by balance and paginates',
+  async (f) => {
+    await f.post(f.body({ target: 'user_b', amount: 900 }));
+    await f.post(f.body({ target: 'user_a', amount: 300 }));
+    const get = async (query) =>
+      (
+        await f.admin.administrationGet(
+          'administration',
+          new URLSearchParams(query),
+          OWNER,
+        )
+      ).json();
+    const top = await get('sort=balance');
+    assert.deepEqual(
+      top.people.slice(0, 2).map((p) => [p.id, p.balance]),
+      [
+        ['user_b', 900],
+        ['user_a', 300],
+      ],
+    );
+    assert.ok(top.people.every((p) => p.kind === 'person'));
+    assert.equal(top.more, false);
+    assert.equal((await get('sort=balance&offset=1')).people[0].id, 'user_a');
+    assert.ok((await get('')).people.some((p) => p.kind === 'channel'));
+  },
+);

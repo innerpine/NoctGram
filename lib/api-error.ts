@@ -40,6 +40,8 @@ export function failure(e: unknown) {
       );
     else if (text.includes('ACCOUNT_DELETED'))
       e = new ApiError(401, 'Аккаунт удалён.');
+    else if (text.includes('HANDLE_RESERVED'))
+      e = new ApiError(409, 'Этот юзернейм продаётся в Маркете.');
   }
   if (e instanceof ApiError)
     return Response.json(

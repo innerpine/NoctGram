@@ -36,7 +36,8 @@ import { MusicAccountGuard } from './music-provider';
 import { MusicActivityStatus } from './music-activity';
 import { Settings } from 'lucide-react';
 import { Music2 } from 'lucide-react';
-import { Ban } from 'lucide-react';
+import { Ban, Store } from 'lucide-react';
+import { formatMarketNumber } from '@/lib/market-policy';
 import {
   type CSSProperties,
   useCallback,
@@ -1911,6 +1912,7 @@ export default function Noctgram({
             ['messages', 'Сообщения', Mail],
             ['channels', 'Каналы', Megaphone],
             ['music', 'Музыка', Music2],
+            ['market', 'Маркет', Store],
             ['profile', 'Профиль', UserRound],
           ].map(([id, label, Icon]) => {
             const NavIcon = Icon as typeof Home;
@@ -1925,7 +1927,12 @@ export default function Noctgram({
                 aria-current={selected ? 'page' : undefined}
                 aria-label={String(label)}
                 aria-busy={(id === 'profile' && !!openingProfile) || undefined}
-                onClick={() => navigate(String(id))}
+                onClick={() =>
+                  // Market is a standalone page outside the in-app history.
+                  id === 'market'
+                    ? window.location.assign('/market')
+                    : navigate(String(id))
+                }
               >
                 <NavIcon size={21} />
                 <span>{String(label)}</span>
@@ -2430,6 +2437,27 @@ export default function Noctgram({
                         </>
                       )}
                     </div>
+                    {profile.anonymousNumber && (
+                      <div className="profile-aliases profile-number">
+                        <span className="aliases-prefix">Анонимный номер</span>
+                        <span className="profile-alias">
+                          <button
+                            title="Скопировать анонимный номер"
+                            onClick={() => {
+                              const number = formatMarketNumber(
+                                profile.anonymousNumber || '',
+                              );
+                              void navigator.clipboard
+                                .writeText(number)
+                                .then(() => notify('Номер скопирован'))
+                                .catch(() => notify(number));
+                            }}
+                          >
+                            {formatMarketNumber(profile.anonymousNumber)}
+                          </button>
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <MusicActivityStatus
                     person={profile}

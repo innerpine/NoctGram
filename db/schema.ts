@@ -1508,3 +1508,56 @@ export const giftConsumptions = sqliteTable('gift_consumptions', {
   transferId: text().notNull().unique().references(() => starTransfers.id),
   created: integer().notNull(),
 });
+
+// Noct Market. System lots have no seller; a sold listing is the sale-history row.
+export const marketNumbers = sqliteTable(
+  'market_numbers',
+  {
+    number: text().primaryKey(),
+    ownerId: text().references(() => users.id),
+    displayed: integer().notNull().default(0),
+    created: integer().notNull(),
+  },
+  (t) => [
+    uniqueIndex('market_numbers_displayed')
+      .on(t.ownerId)
+      .where(sql`${t.displayed} = 1`),
+    check(
+      'market_numbers_format',
+      sql`${t.number} GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'`,
+    ),
+    check('market_numbers_displayed_flag', sql`${t.displayed} IN (0,1)`),
+  ],
+);
+export const marketListings = sqliteTable(
+  'market_listings',
+  {
+    id: text().primaryKey(),
+    kind: text().notNull(),
+    assetId: text().notNull(),
+    sellerId: text().references(() => users.id),
+    price: integer().notNull(),
+    status: text().notNull().default('active'),
+    buyerId: text().references(() => users.id),
+    fee: integer().notNull().default(0),
+    created: integer().notNull(),
+    closed: integer().notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex('market_active_asset')
+      .on(t.kind, t.assetId)
+      .where(sql`${t.status} = 'active'`),
+    index('market_catalog').on(t.kind, t.status, t.price),
+    index('market_history').on(t.kind, t.assetId, t.closed),
+    index('market_seller').on(t.sellerId, t.status),
+    check('market_listings_kind', sql`${t.kind} IN ('number','username','gift')`),
+    check(
+      'market_listings_status',
+      sql`${t.status} IN ('active','sold','cancelled')`,
+    ),
+    check(
+      'market_listings_price',
+      sql`typeof(${t.price})='integer' AND ${t.price}>0`,
+    ),
+  ],
+);

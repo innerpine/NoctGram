@@ -111,7 +111,7 @@ export async function featureGet(
     const before = Number(s.get('before')) || Date.now() + 1;
     const rows = await d
       .prepare(
-        `WITH viewer AS(SELECT ? AS id) SELECT t.*,COALESCE(g.giftId,c.family,sold.giftId) AS giftId,c.number AS giftNumber,a.id AS actorId,COALESCE(a.name,'Noct Stars') AS name,COALESCE(a.avatar,'') AS avatar,${appearanceColumns('a')} FROM star_transfers t CROSS JOIN viewer v LEFT JOIN received_gifts g ON g.transferId=t.id LEFT JOIN gift_upgrades c ON c.transferId=t.id LEFT JOIN gift_conversions conversion ON conversion.transferId=t.id LEFT JOIN received_gifts sold ON sold.id=conversion.receiptId LEFT JOIN users a ON a.id=CASE WHEN t.kind IN ('gift_upgrade','gift_conversion') THEN NULL WHEN t.kind='gift' THEN g.recipient WHEN t.sender=v.id THEN t.recipient ELSE t.sender END WHERE (t.sender=v.id OR t.recipient=v.id) AND (t.created<? OR(t.created=? AND t.id<?)) ORDER BY t.created DESC,t.id DESC LIMIT 50`,
+        `WITH viewer AS(SELECT ? AS id) SELECT t.*,COALESCE(g.giftId,c.family,sold.giftId) AS giftId,c.number AS giftNumber,a.id AS actorId,COALESCE(a.name,'Noct Stars') AS name,COALESCE(a.avatar,'') AS avatar,${appearanceColumns('a')} FROM star_transfers t CROSS JOIN viewer v LEFT JOIN received_gifts g ON g.transferId=t.id LEFT JOIN gift_upgrades c ON c.transferId=t.id LEFT JOIN gift_conversions conversion ON conversion.transferId=t.id LEFT JOIN received_gifts sold ON sold.id=conversion.receiptId LEFT JOIN users a ON a.id=CASE WHEN t.kind IN ('gift_upgrade','gift_conversion') THEN NULL WHEN t.kind='gift' THEN COALESCE(CASE WHEN json_valid(t.postText) THEN json_extract(t.postText,'$.recipient') END,g.recipient) WHEN t.sender=v.id THEN t.recipient ELSE t.sender END WHERE (t.sender=v.id OR t.recipient=v.id) AND (t.created<? OR(t.created=? AND t.id<?)) ORDER BY t.created DESC,t.id DESC LIMIT 50`,
       )
       .bind(me, before, before, s.get('beforeId') || '')
       .all();
@@ -259,6 +259,14 @@ export async function featurePost(
             )
             .bind(...eligibilityArgs, h, i === 0 ? 1 : 0, target, me, me, me),
         ),
+      );
+      // A listed username that was dropped or promoted to main is no longer for sale.
+      statements.push(
+        d
+          .prepare(
+            "UPDATE market_listings SET status='cancelled',closed=? WHERE kind='username' AND status='active' AND sellerId=? AND NOT EXISTS(SELECT 1 FROM handles h WHERE h.handle=market_listings.assetId AND h.userId=market_listings.sellerId AND h.main=0)",
+          )
+          .bind(Date.now(), target),
       );
     }
     statements.push(

@@ -49,6 +49,7 @@ export type Profile = Person & {
   blocked?: boolean;
   blockedAt?: number;
   pinnedPostId?: string | null;
+  anonymousNumber?: string | null;
   bio: string;
   cover: string;
   handles: string[];

@@ -271,9 +271,15 @@ export function StarsPanel({
               <span className="transaction-grant" aria-hidden="true">
                 <Gift size={23} />
               </span>
-            ) : ['admin_grant', 'purchase', 'purchase_refund'].includes(
-                t.kind,
-              ) ? (
+            ) : [
+                'admin_grant',
+                'admin_debit',
+                'market_fee',
+                'purchase',
+                'purchase_refund',
+              ].includes(t.kind) ||
+              // A system lot is paid to the treasury, which has no profile to open.
+              (t.kind === 'market_sale' && t.recipient === 'noctgram_gifts') ? (
               <span className="transaction-grant">
                 <StarsIcon size={26} />
               </span>
@@ -318,6 +324,16 @@ export function StarsPanel({
                   'Покупка Noct Stars'
                 ) : t.kind === 'purchase_refund' ? (
                   'Возврат покупки'
+                ) : t.kind === 'market_sale' ? (
+                  t.sender === me.id ? (
+                    'Покупка в Маркете'
+                  ) : (
+                    'Продажа в Маркете'
+                  )
+                ) : t.kind === 'market_fee' ? (
+                  'Комиссия Маркета'
+                ) : t.kind === 'admin_debit' ? (
+                  'Списано администратором'
                 ) : t.kind === 'admin_grant' ? (
                   'Подарок от NoctGram'
                 ) : t.kind === 'telegram_test' ? (
@@ -333,37 +349,44 @@ export function StarsPanel({
                 )}
               </strong>
               <span>
-                {t.kind === 'case_open' ? 'Подарок в профиле NoctGram'
-                  : t.kind === 'gift_risk_upgrade' ? 'Попытка улучшения подарка'
-                  : t.kind.startsWith('giveaway_')
-                  ? t.kind === 'giveaway_debit'
-                    ? 'Призы оплачены'
-                    : t.kind === 'giveaway_prize'
-                      ? 'Noct Stars зачислены на баланс'
-                      : 'Возврат за неразыгранные призы'
-                  : t.kind === 'gift_conversion'
-                    ? giftDefinition(t.giftId)?.name || 'Подарок'
-                    : t.kind === 'gift_upgrade'
-                      ? (giftDefinition(t.giftId)?.name ||
-                          'Коллекционный подарок') +
-                        (t.giftNumber ? ' #' + t.giftNumber : '')
-                      : t.kind === 'purchase'
-                        ? 'Оплата подтверждена'
-                        : t.kind === 'purchase_refund'
-                          ? 'Сумма возвращена через платёжный сервис'
-                          : t.kind === 'gift'
-                            ? 'Подарок «' +
-                              (giftDefinition(t.giftId)?.name || 'Подарок') +
-                              '»'
-                            : t.kind === 'admin_grant'
-                              ? 'Начислено администратором'
-                              : t.kind === 'telegram_test'
-                                ? 'Тестовые звёзды · без оплаты'
-                                : t.kind === 'grant'
-                                  ? 'Стартовые звёзды'
-                                  : t.sender === me.id
-                                    ? 'Поддержка автора'
-                                    : 'Поддержали твою публикацию'}
+                {t.kind === 'market_sale' || t.kind === 'market_fee'
+                  ? t.postText
+                  : t.kind === 'admin_debit'
+                    ? 'Noct Stars списаны с баланса'
+                    : t.kind === 'case_open'
+                      ? 'Подарок в профиле NoctGram'
+                      : t.kind === 'gift_risk_upgrade'
+                        ? 'Попытка улучшения подарка'
+                        : t.kind.startsWith('giveaway_')
+                          ? t.kind === 'giveaway_debit'
+                            ? 'Призы оплачены'
+                            : t.kind === 'giveaway_prize'
+                              ? 'Noct Stars зачислены на баланс'
+                              : 'Возврат за неразыгранные призы'
+                          : t.kind === 'gift_conversion'
+                            ? giftDefinition(t.giftId)?.name || 'Подарок'
+                            : t.kind === 'gift_upgrade'
+                              ? (giftDefinition(t.giftId)?.name ||
+                                  'Коллекционный подарок') +
+                                (t.giftNumber ? ' #' + t.giftNumber : '')
+                              : t.kind === 'purchase'
+                                ? 'Оплата подтверждена'
+                                : t.kind === 'purchase_refund'
+                                  ? 'Сумма возвращена через платёжный сервис'
+                                  : t.kind === 'gift'
+                                    ? 'Подарок «' +
+                                      (giftDefinition(t.giftId)?.name ||
+                                        'Подарок') +
+                                      '»'
+                                    : t.kind === 'admin_grant'
+                                      ? 'Начислено администратором'
+                                      : t.kind === 'telegram_test'
+                                        ? 'Тестовые звёзды · без оплаты'
+                                        : t.kind === 'grant'
+                                          ? 'Стартовые звёзды'
+                                          : t.sender === me.id
+                                            ? 'Поддержка автора'
+                                            : 'Поддержали твою публикацию'}
               </span>
               <Stamp time={t.created} />
             </div>

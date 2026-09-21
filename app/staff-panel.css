@@ -939,3 +939,34 @@
     transition: none;
   }
 }
+
+/* Stars balance in the account list and the Noct Market issue form. */
+.admin-person-balance {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 4px;
+  margin-left: auto;
+  color: #ffd36a;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.admin-person .admin-person-balance + .staff-status {
+  margin-left: 0;
+}
+.admin-market-issue {
+  padding: 12px 14px;
+  border: 1px solid #ffffff08;
+  border-radius: 13px;
+  background: #0e0e10;
+}
+.admin-market-issue summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.admin-market-issue[open] summary {
+  margin-bottom: 12px;
+}

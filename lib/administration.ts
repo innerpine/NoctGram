@@ -19,6 +19,9 @@ export async function administrationGet(
   if (action !== 'administration') return null;
   await requireAdministrator(me);
   const q = (s.get('q') || '').trim().replace(/^@/, '').slice(0, 80);
+  const rich = s.get('sort') === 'balance',
+    offset = Math.min(Math.max(Number(s.get('offset')) || 0, 0), 100000);
+  // ponytail: the rich list re-aggregates the whole ledger for every page; materialize balances when it gets slow.
   const people = await db()
     .prepare(`SELECT u.id,u.name,u.avatar,u.kind,${appearanceColumns('u')},h.handle,
     EXISTS(SELECT 1 FROM moderators WHERE userId=u.id) AS moderator,
@@ -26,8 +29,8 @@ export async function administrationGet(
     COALESCE((SELECT SUM(CASE WHEN recipient=u.id THEN amount ELSE -amount END) FROM star_transfers WHERE sender=u.id OR recipient=u.id),0) AS balance
     FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 WHERE u.deletedAt=0 AND u.onboardingComplete=1
     AND (?='' OR instr(lower(u.name),lower(?))>0 OR EXISTS(SELECT 1 FROM handles hh WHERE hh.userId=u.id AND instr(hh.handle,lower(?))>0))
-    ORDER BY u.created DESC LIMIT 30`)
-    .bind(q, q, q)
+    ${rich ? "AND u.kind='person' ORDER BY balance DESC,u.id" : 'ORDER BY u.created DESC'} LIMIT 31 OFFSET ?`)
+    .bind(q, q, q, rich ? offset : 0)
     .all();
   const events = await db()
     .prepare(`SELECT e.*,u.name,u.avatar,${appearanceColumns('u')},h.handle,a.name AS actorName
@@ -35,7 +38,11 @@ export async function administrationGet(
     LEFT JOIN handles h ON h.userId=u.id AND h.main=1 ORDER BY e.created DESC,e.id DESC LIMIT 40`)
     .all();
   return Response.json(
-    { people: people.results, events: events.results },
+    {
+      people: people.results.slice(0, 30),
+      more: rich && people.results.length > 30,
+      events: events.results,
+    },
     { headers: { 'Cache-Control': 'private, no-store' } },
   );
 }
@@ -57,12 +64,15 @@ export async function administrationPost(
   const requestId = clean(b.requestId, 36, true);
   if (!/^[a-f0-9-]{36}$/.test(requestId))
     throw new ApiError(400, 'Обновите форму и повторите.');
-  if (!['stars', 'premium', 'verified', 'moderator'].includes(kind))
+  if (
+    !['stars', 'starsDebit', 'premium', 'verified', 'moderator'].includes(kind)
+  )
     throw new ApiError(400, 'Неизвестное действие.');
-  const amount = Number(b.amount);
+  const amount = Number(b.amount),
+    stars = kind === 'stars' || kind === 'starsDebit';
   if (
     !Number.isSafeInteger(amount) ||
-    (kind === 'stars'
+    (stars
       ? amount < 1 || amount > 1000000
       : kind === 'premium'
         ? amount < 1 || amount > 365
@@ -70,7 +80,7 @@ export async function administrationPost(
   )
     throw new ApiError(
       400,
-      kind === 'stars'
+      stars
         ? 'От 1 до 1 000 000 Stars.'
         : kind === 'premium'
           ? 'От 1 до 365 дней.'
@@ -83,7 +93,7 @@ export async function administrationPost(
     .bind(target)
     .first<{ kind: string }>();
   if (!user) throw new ApiError(404, 'Аккаунт не найден.');
-  if (['stars', 'premium'].includes(kind) && user.kind !== 'person')
+  if ((stars || kind === 'premium') && user.kind !== 'person')
     throw new ApiError(
       400,
       'Stars и Premium выдаются личному аккаунту. Выберите владельца канала.',
@@ -123,6 +133,26 @@ export async function administrationPost(
         `INSERT INTO star_transfers(id,sender,recipient,amount,kind,created) SELECT ?,NULL,?,?,'admin_grant',? WHERE ${gate}`,
       )
       .bind(id, target, amount, Date.now(), id, me, target);
+  else if (kind === 'starsDebit')
+    // The debit goes to the treasury and can never push a balance below zero.
+    grant = d
+      .prepare(
+        `INSERT INTO star_transfers(id,sender,recipient,amount,kind,created) SELECT ?,?,'noctgram_gifts',?,'admin_debit',? WHERE ${gate}
+        AND ? <= (SELECT COALESCE(SUM(CASE WHEN recipient=? THEN amount ELSE -amount END),0) FROM star_transfers WHERE recipient=? OR sender=?)`,
+      )
+      .bind(
+        id,
+        target,
+        amount,
+        Date.now(),
+        id,
+        me,
+        target,
+        amount,
+        target,
+        target,
+        target,
+      );
   else if (kind === 'premium')
     grant = d
       .prepare(`INSERT INTO premium_entitlements(userId,startsAt,expiresAt,source,created) SELECT ?,?,?, 'admin',? WHERE ${gate}
@@ -155,15 +185,43 @@ export async function administrationPost(
     grant,
     d
       .prepare(
-        `INSERT INTO admin_events(id,actorId,targetId,action,amount,reason,created) SELECT ?,?,?,?,?,?,? WHERE ${gate}`,
+        // A debit that did not happen must not leave an audit record.
+        `INSERT INTO admin_events(id,actorId,targetId,action,amount,reason,created) SELECT ?,?,?,?,?,?,? WHERE ${gate}${kind === 'starsDebit' ? " AND EXISTS(SELECT 1 FROM star_transfers WHERE id=? AND kind='admin_debit')" : ''}`,
       )
-      .bind(id, me, target, kind, amount, reason, Date.now(), id, me, target),
+      .bind(
+        id,
+        me,
+        target,
+        kind,
+        amount,
+        reason,
+        Date.now(),
+        id,
+        me,
+        target,
+        ...(kind === 'starsDebit' ? [id] : []),
+      ),
   ]);
   const saved = await d
     .prepare('SELECT * FROM admin_events WHERE id=?')
     .bind(id)
     .first();
-  if (!saved) throw new ApiError(409, 'Права или аккаунт изменились.');
+  if (!saved) {
+    const left =
+      kind === 'starsDebit' &&
+      (await d
+        .prepare(
+          'SELECT COALESCE(SUM(CASE WHEN recipient=? THEN amount ELSE -amount END),0) AS balance FROM star_transfers WHERE recipient=? OR sender=?',
+        )
+        .bind(target, target, target)
+        .first<{ balance: number }>());
+    if (left && left.balance < amount)
+      throw new ApiError(
+        409,
+        `На балансе только ${left.balance} Stars: столько списать нельзя.`,
+      );
+    throw new ApiError(409, 'Права или аккаунт изменились.');
+  }
   if (
     saved.targetId !== target ||
     saved.action !== kind ||
