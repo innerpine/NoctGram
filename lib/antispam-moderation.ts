@@ -146,6 +146,18 @@ async function approve(review: StoredReview, me: string, note: string) {
       WHERE id=? AND status='pending' AND ${staffGate}
       AND EXISTS(SELECT 1 FROM ${table} published WHERE published.id=antispam_queue.targetId AND published.${authorColumn}=antispam_queue.actorId)`)
       .bind(now, me, note, id, me),
+    // An approved comment reaches the post's author like any other comment.
+    ...(kind === 'comment'
+      ? [
+          d
+            .prepare(
+              `INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created)
+              SELECT 'comment:'||c.id,COALESCE(u.ownerId,u.id),c.userId,'comment',c.id,c.created FROM comments c
+              JOIN posts p ON p.id=c.postId JOIN users u ON u.id=p.userId WHERE c.id=? AND COALESCE(u.ownerId,u.id)<>c.userId`,
+            )
+            .bind(targetId),
+        ]
+      : []),
   ]);
   if (!results[0].meta.changes || !results[1].meta.changes)
     throw new ApiError(409, 'Отправка или права изменились. Обновите очередь.');

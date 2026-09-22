@@ -1,17 +1,22 @@
 'use client';
-import { DisplayName } from './profile-identity';
-import { reconcileSnapshot } from '@/lib/reconcile-snapshot';
-import { ProfileLink } from './profile-link';
-/* eslint-disable react/react-compiler */
-import { useEffect, useRef, useState } from 'react';
+/* eslint-disable react/react-compiler, next/no-img-element */
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Bell,
   BellRing,
   Check,
-  Phone,
-  MessageCircle,
-  Newspaper,
   Gift,
+  Heart,
+  MessageCircle,
+  MessageSquareText,
+  Newspaper,
+  Phone,
+  Star,
+  Store,
+  UserPlus,
+  X,
+  type LucideIcon,
 } from 'lucide-react';
 import {
   Dialog,
@@ -20,15 +25,126 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { request, type Person } from '@/lib/client';
-import { Avatar } from './post-card';
+import { DisplayName } from './profile-identity';
+import { Avatar, Stamp } from './post-card';
+
+// Enriched by lib/notifications.ts: the post, comment or lot an event is about.
 type NotificationRow = Person & {
   actorId: string;
-  giftRecipient?: string | null;
   kind: string;
   targetId: string;
   created: number;
   read: number;
+  giftRecipient?: string | null;
+  postId?: string | null;
+  postText?: string | null;
+  postImage?: string | null;
+  commentText?: string | null;
+  others?: number;
+  amount?: number;
+  lotTitle?: string | null;
+  lotKind?: string | null;
+  lotKey?: string | null;
 };
+type Described = {
+  Icon: LucideIcon;
+  tone: string;
+  text: string;
+  quote?: string | null;
+  amount?: string;
+};
+const stars = (value = 0) => value.toLocaleString('ru-RU');
+function describe(n: NotificationRow, me: string): Described {
+  if (n.kind === 'like')
+    return {
+      Icon: Heart,
+      tone: 'like',
+      text: 'Нравится твоя публикация',
+      quote: n.postText,
+    };
+  if (n.kind === 'comment')
+    return {
+      Icon: MessageSquareText,
+      tone: 'comment',
+      text: 'Комментарий к твоей публикации',
+      quote: n.commentText,
+    };
+  if (n.kind === 'follow')
+    return { Icon: UserPlus, tone: 'follow', text: 'Новый подписчик' };
+  if (n.kind === 'support')
+    return {
+      Icon: Star,
+      tone: 'stars',
+      text: 'Поддержка публикации',
+      quote: n.postText,
+      amount: stars(n.amount) + ' Stars',
+    };
+  if (n.kind === 'market')
+    return {
+      Icon: Store,
+      tone: 'stars',
+      text: 'Покупка в Маркете: ' + (n.lotTitle || 'лот'),
+      amount: '+' + stars(n.amount) + ' Stars',
+    };
+  if (n.kind === 'gift')
+    return {
+      Icon: Gift,
+      tone: 'gift',
+      text:
+        n.giftRecipient && n.giftRecipient !== me
+          ? 'Подарок твоему каналу'
+          : 'Новый подарок',
+    };
+  if (n.kind === 'call')
+    return { Icon: Phone, tone: 'call', text: 'Аудиозвонок' };
+  if (n.kind === 'post')
+    return {
+      Icon: Newspaper,
+      tone: 'post',
+      text: 'Новая публикация',
+      quote: n.postText,
+    };
+  return { Icon: MessageCircle, tone: 'message', text: 'Новое сообщение' };
+}
+const filters = [
+  { id: 'all', label: 'Все', kinds: '' },
+  { id: 'reactions', label: 'Реакции', kinds: 'like,support' },
+  { id: 'comments', label: 'Комментарии', kinds: 'comment' },
+  { id: 'follows', label: 'Подписчики', kinds: 'follow' },
+  { id: 'messages', label: 'Сообщения', kinds: 'message,call,gift' },
+];
+const kindsOf = (id: string) => filters.find((f) => f.id === id)?.kinds || '';
+const PAGE = 30;
+const titleCount = /^\(\d+\+?\) /;
+
+/** Avatar with a small coloured badge that says what happened. */
+function Face({
+  n,
+  d,
+  size,
+}: {
+  n: NotificationRow;
+  d: Described;
+  size: number;
+}) {
+  return (
+    <span className="notification-face">
+      <Avatar person={n} size={size} />
+      <i className="notification-kind" data-tone={d.tone} aria-hidden="true">
+        <d.Icon size={11} strokeWidth={2.6} />
+      </i>
+    </span>
+  );
+}
+function Who({ n }: { n: NotificationRow }) {
+  return (
+    <strong className="notification-name">
+      <DisplayName person={n} />
+      {!!n.others && <span> и ещё {n.others}</span>}
+    </strong>
+  );
+}
+
 function vapidBytes(value: string) {
   return Uint8Array.from(
     atob(value.replace(/-/g, '+').replace(/_/g, '/')),
@@ -132,8 +248,8 @@ export function PushSettings() {
         <strong>Push-уведомления</strong>
       </div>
       <p className="meta">
-        Сообщения, аудиозвонки и посты твоих подписок — даже когда вкладка
-        закрыта.
+        Сообщения, звонки, реакции, комментарии и новые подписчики — даже когда
+        вкладка закрыта.
       </p>
       <button
         className="secondary"
@@ -168,54 +284,71 @@ export function PushSettings() {
 }
 export function NotificationsBell({
   me,
+  activeChat,
   onPost,
   onChat,
   onGift,
+  onProfile,
 }: {
   me: string;
+  /** The dialogue on screen: its messages need no pop-up. */
+  activeChat?: string;
   onPost: (id: string) => void;
   onChat: (id: string) => void;
   onGift: (recipient?: string) => void;
+  onProfile: (id: string) => void;
 }) {
   const [rows, setRows] = useState<NotificationRow[]>([]),
     [unread, setUnread] = useState(0),
     [open, setOpen] = useState(false),
-    [error, setError] = useState('');
+    [filter, setFilter] = useState('all'),
+    [loading, setLoading] = useState(false),
+    [more, setMore] = useState(false),
+    [error, setError] = useState(''),
+    [toasts, setToasts] = useState<NotificationRow[]>([]),
+    [mounted, setMounted] = useState(false);
+  const since = useRef(0),
+    shown = useRef(new Set<string>()),
+    chat = useRef(activeChat),
+    generation = useRef(0),
+    marked = useRef(false);
+  chat.current = activeChat;
+  useEffect(() => setMounted(true), []);
+
+  // Closed: a light count every 15 s, plus the events that arrived since the
+  // server time of the previous check. Those become pop-ups.
   useEffect(() => {
+    if (open) return;
     let live = true,
       t: ReturnType<typeof setTimeout>;
     const tick = async () => {
       try {
         if (document.hidden) return;
-        if (!open) {
-          const data = await request<{ unread: number }>(
-            '?action=notificationCount',
-          );
-          if (live) {
-            setUnread(data.unread);
-            setError('');
-          }
-          return;
-        }
-        const data = await request<NotificationRow[]>('?action=notifications');
+        const data = await request<{
+          unread: number;
+          latest: NotificationRow[];
+          now: number;
+        }>('?action=notificationCount&since=' + since.current);
         if (!live) return;
-        setRows((previous) => reconcileSnapshot(previous, data));
-        setUnread(data.filter((n) => !n.read).length);
+        setUnread(data.unread);
         setError('');
-        if (open && data.some((n) => !n.read)) {
-          await request('', {
-            action: 'readNotifications',
-            before: Math.max(...data.map((n) => n.created)),
-          });
-          if (live) {
-            setRows(data.map((n) => ({ ...n, read: 1 })));
-            setUnread(0);
-          }
-        }
+        const fresh = data.latest.filter((n) => {
+          const key = n.id + ':' + n.created;
+          if (shown.current.has(key)) return false;
+          shown.current.add(key);
+          // Calls ring on their own; an open dialogue already shows its messages.
+          return (
+            n.kind !== 'call' &&
+            !(n.kind === 'message' && n.actorId === chat.current)
+          );
+        });
+        if (fresh.length)
+          setToasts((current) => [...fresh, ...current].slice(0, 3));
+        since.current = data.now;
       } catch (e) {
         if (live) setError((e as Error).message);
       } finally {
-        if (live) t = setTimeout(tick, open ? 8000 : 15000);
+        if (live) t = setTimeout(tick, 15000);
       }
     };
     void tick();
@@ -224,91 +357,250 @@ export function NotificationsBell({
       clearTimeout(t);
     };
   }, [me, open]);
+
+  // A background tab shows the count in its title.
+  useEffect(() => {
+    const base = document.title.replace(titleCount, '');
+    document.title = unread ? `(${unread > 9 ? '9+' : unread}) ${base}` : base;
+    return () => {
+      document.title = document.title.replace(titleCount, '');
+    };
+  }, [unread]);
+
+  const load = useCallback(async (kinds: string, after?: NotificationRow) => {
+    const current = ++generation.current;
+    setLoading(true);
+    try {
+      const page = await request<NotificationRow[]>(
+        '?action=notifications&kinds=' +
+          encodeURIComponent(kinds) +
+          (after
+            ? '&before=' +
+              after.created +
+              '&beforeId=' +
+              encodeURIComponent(after.id)
+            : ''),
+      );
+      if (current !== generation.current) return;
+      setRows((old) => (after ? [...old, ...page] : page));
+      setMore(page.length === PAGE);
+      setError('');
+      // Opening the bell reads everything it shows. Rows keep their
+      // highlight until the next visit, so the new ones stay findable.
+      if (!marked.current && page.some((n) => !n.read)) {
+        marked.current = true;
+        await request('', {
+          action: 'readNotifications',
+          before: Math.max(...page.map((n) => n.created)),
+        });
+        setUnread(0);
+      }
+    } catch (e) {
+      if (current === generation.current) setError((e as Error).message);
+    } finally {
+      if (current === generation.current) setLoading(false);
+    }
+  }, []);
+  const show = (value: boolean) => {
+    setOpen(value);
+    if (!value) return;
+    marked.current = false;
+    setFilter('all');
+    setToasts([]);
+    setRows([]);
+    void load('');
+  };
+  const pick = (id: string) => {
+    setFilter(id);
+    setRows([]);
+    void load(kindsOf(id));
+  };
+  const go = (n: NotificationRow) => {
+    setOpen(false);
+    setToasts((current) => current.filter((t) => t.id !== n.id));
+    if (n.kind === 'gift') onGift(n.giftRecipient || undefined);
+    else if (n.kind === 'follow') onProfile(n.actorId);
+    else if (n.kind === 'market')
+      window.location.assign(
+        n.lotKind && n.lotKey
+          ? '/market?lot=' + n.lotKind + '&key=' + encodeURIComponent(n.lotKey)
+          : '/market?view=assets',
+      );
+    else if (
+      n.postId &&
+      ['like', 'comment', 'support', 'post'].includes(n.kind)
+    )
+      onPost(n.postId);
+    else onChat(n.actorId);
+  };
+
   return (
     <>
       <button
         className="icon-button notifications-bell"
         aria-label={'Уведомления' + (unread ? `, ${unread} новых` : '')}
-        onClick={() => setOpen(true)}
+        onClick={() => show(true)}
       >
         <Bell size={19} />
         {unread > 0 && <i>{unread > 9 ? '9+' : unread}</i>}
       </button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="noct-dialog">
+      <Dialog open={open} onOpenChange={show}>
+        <DialogContent className="noct-dialog notifications-dialog">
           <DialogTitle>Уведомления</DialogTitle>
-          <DialogDescription>Важное от твоих людей.</DialogDescription>
-          <PushSettings />
+          <DialogDescription>
+            Реакции, комментарии, подписчики и сообщения.
+          </DialogDescription>
+          <div className="notification-filters">
+            {filters.map((f) => (
+              <button
+                key={f.id}
+                aria-pressed={filter === f.id}
+                onClick={() => pick(f.id)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           {error && (
             <p className="realtime-error" role="alert">
               {error}
             </p>
           )}
-          <div className="notification-list">
-            {rows.length ? (
-              rows.map((n) => (
-                <div
+          <div className="notification-list" aria-busy={loading}>
+            {rows.map((n) => {
+              const d = describe(n, me);
+              return (
+                <button
                   key={n.id}
-                  className={'notification-row ' + (!n.read ? 'unread' : '')}
+                  className={'notification-row' + (n.read ? '' : ' unread')}
+                  onClick={() => go(n)}
                 >
-                  <ProfileLink
-                    target={{ id: n.actorId }}
-                    aria-label={'Профиль ' + n.name}
-                  >
-                    <Avatar person={n} size={38} />
-                  </ProfileLink>
+                  <Face n={n} d={d} size={42} />
                   <span className="notification-copy">
-                    <strong>
-                      <ProfileLink target={{ id: n.actorId }}>
-                        <DisplayName person={n} />
-                      </ProfileLink>
-                    </strong>
-                    <small>
-                      <button
-                        className="notification-open"
-                        onClick={() => {
-                          setOpen(false);
-                          if (n.kind === 'gift')
-                            onGift(n.giftRecipient || undefined);
-                          else if (n.kind === 'post') onPost(n.targetId);
-                          else onChat(n.actorId);
-                        }}
-                      >
-                        {n.kind === 'gift' ? (
-                          <Gift size={13} />
-                        ) : n.kind === 'call' ? (
-                          <Phone size={13} />
-                        ) : n.kind === 'post' ? (
-                          <Newspaper size={13} />
-                        ) : (
-                          <MessageCircle size={13} />
-                        )}{' '}
-                        {n.kind === 'gift'
-                          ? n.giftRecipient && n.giftRecipient !== me
-                            ? 'Подарок твоему каналу'
-                            : 'Новый подарок'
-                          : n.kind === 'call'
-                            ? 'Аудиозвонок'
-                            : n.kind === 'post'
-                              ? 'Новая публикация'
-                              : 'Новое сообщение'}
-                      </button>
-                    </small>
+                    <Who n={n} />
+                    <span className="notification-action">
+                      {d.text}
+                      {d.amount && (
+                        <b className="notification-amount"> · {d.amount}</b>
+                      )}
+                    </span>
+                    {d.quote && (
+                      <span className="notification-quote">{d.quote}</span>
+                    )}
                   </span>
-                  <time>
-                    {new Date(n.created).toLocaleDateString('ru-RU', {
-                      day: 'numeric',
-                      month: 'short',
-                    })}
-                  </time>
-                </div>
-              ))
-            ) : (
-              <p className="realtime-empty">Здесь появятся новые события.</p>
+                  <span className="notification-side">
+                    <Stamp time={n.created} compact />
+                    {n.postImage && (
+                      <img
+                        className="notification-thumb"
+                        src={'/api/media/' + encodeURIComponent(n.postImage)}
+                        alt=""
+                        loading="lazy"
+                      />
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+            {!rows.length && !loading && !error && (
+              <p className="realtime-empty">
+                {filter === 'all'
+                  ? 'Здесь появятся реакции, комментарии и новые подписчики.'
+                  : 'Таких уведомлений пока нет.'}
+              </p>
             )}
+            {!rows.length &&
+              loading &&
+              [0, 1, 2].map((i) => (
+                <span key={i} className="notification-skeleton" />
+              ))}
           </div>
+          {more && (
+            <button
+              className="secondary notification-more"
+              disabled={loading}
+              onClick={() => void load(kindsOf(filter), rows.at(-1))}
+            >
+              {loading ? 'Загружаем…' : 'Показать ещё'}
+            </button>
+          )}
+          <PushSettings />
         </DialogContent>
       </Dialog>
+      {mounted &&
+        createPortal(
+          <section
+            className="notification-toasts"
+            aria-label="Новые уведомления"
+            aria-live="polite"
+          >
+            {toasts.map((n) => (
+              <Toast
+                key={n.id + ':' + n.created}
+                n={n}
+                d={describe(n, me)}
+                onOpen={() => go(n)}
+                onClose={() =>
+                  setToasts((current) => current.filter((t) => t !== n))
+                }
+              />
+            ))}
+          </section>,
+          document.body,
+        )}
     </>
+  );
+}
+
+/** A pop-up that leaves after six seconds, but not while the pointer is on it. */
+function Toast({
+  n,
+  d,
+  onOpen,
+  onClose,
+}: {
+  n: NotificationRow;
+  d: Described;
+  onOpen: () => void;
+  onClose: () => void;
+}) {
+  const [hover, setHover] = useState(false),
+    [leaving, setLeaving] = useState(false);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    if (hover || leaving) return;
+    const t = setTimeout(() => setLeaving(true), 6000);
+    return () => clearTimeout(t);
+  }, [hover, leaving]);
+  useEffect(() => {
+    if (!leaving) return;
+    const t = setTimeout(() => close.current(), 200);
+    return () => clearTimeout(t);
+  }, [leaving]);
+  return (
+    <div
+      className={'notification-toast' + (leaving ? ' leaving' : '')}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <button className="notification-toast-open" onClick={onOpen}>
+        <Face n={n} d={d} size={38} />
+        <span className="notification-copy">
+          <Who n={n} />
+          <span className="notification-action">
+            {d.quote ? d.text + ': ' + d.quote : d.text}
+            {d.amount && <b className="notification-amount"> · {d.amount}</b>}
+          </span>
+        </span>
+      </button>
+      <button
+        className="notification-toast-close"
+        aria-label="Скрыть уведомление"
+        onClick={() => setLeaving(true)}
+      >
+        <X size={15} />
+      </button>
+    </div>
   );
 }

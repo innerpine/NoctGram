@@ -371,6 +371,15 @@ export async function featurePost(
         amount,
       )
       .run();
+    // Tell the author only about a transfer that committed.
+    if (result.meta.changes)
+      await d
+        .prepare(
+          `INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created)
+          SELECT 'support:'||t.id,t.recipient,t.sender,'support',t.id,t.created FROM star_transfers t WHERE t.id=? AND t.kind='support'`,
+        )
+        .bind(transferId)
+        .run();
     if (!result.meta.changes) {
       const retry = await d
         .prepare('SELECT amount,postId FROM star_transfers WHERE id=?')

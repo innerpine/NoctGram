@@ -59,24 +59,6 @@
 .gift-from .profile-link {
   display: inline;
 }
-.notification-open {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  text-align: left;
-  color: inherit;
-  border-radius: 4px;
-}
-.notification-open:hover {
-  color: #d7c1ed;
-}
-.notification-open:focus-visible {
-  outline: 2px solid #bca2d8;
-  outline-offset: 3px;
-}
-.notification-row > .profile-link {
-  flex-shrink: 0;
-}
 .playlist-listeners > .profile-link {
   display: inline-flex;
   align-items: center;

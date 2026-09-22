@@ -198,6 +198,14 @@ export async function buyLot(
         AND EXISTS(SELECT 1 FROM star_transfers t WHERE t.id='market:'||?1 AND t.sender=?2 AND t.kind='market_sale')`,
       )
       .bind(listingId, me, fee, now),
+    // The seller hears about the sale; a system lot has nobody to tell.
+    d
+      .prepare(
+        `INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created)
+        SELECT 'market:'||l.id,l.sellerId,l.buyerId,'market',l.id,l.closed FROM market_listings l
+        WHERE l.id=?1 AND l.status='sold' AND l.buyerId=?2 AND l.sellerId IS NOT NULL`,
+      )
+      .bind(listingId, me),
   ]);
   const done = await d
     .prepare('SELECT status,buyerId FROM market_listings WHERE id=?')

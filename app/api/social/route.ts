@@ -15,7 +15,10 @@ import { appearanceColumns } from '@/lib/premium-access';
 import { assertMediaRead, mediaPermission } from '@/lib/media-access';
 import { callsGet, callsPost } from '@/lib/calls';
 import {
+  commentNotification,
   flushPush,
+  followNotification,
+  likeNotification,
   notificationsGet,
   notificationsPost,
 } from '@/lib/notifications';
@@ -113,7 +116,8 @@ export async function GET(req: Request) {
     if (boosts) return boosts;
     const d = db();
     const realtime =
-      (await callsGet(action, s, me)) || (await notificationsGet(action, me));
+      (await callsGet(action, s, me)) ||
+      (await notificationsGet(action, me, s));
     if (realtime) return realtime;
     const privacy = await privacyGet(action, s, me);
     if (privacy) return privacy;
@@ -609,18 +613,25 @@ export async function POST(req: Request) {
           throw new ApiError(409, 'Права доступа изменились');
       } else if (action === 'like' || action === 'save') {
         const table = action === 'like' ? 'likes' : 'bookmarks';
+        // A like also tells the author; the statement re-checks the like it describes.
+        const notice =
+          action === 'like' ? likeNotification(id, me, !!b.value) : [];
         if (b.value)
-          await d
-            .prepare(
-              `INSERT OR IGNORE INTO ${table} (postId,userId) VALUES (?,?)`,
-            )
-            .bind(id, me)
-            .run();
+          await d.batch([
+            d
+              .prepare(
+                `INSERT OR IGNORE INTO ${table} (postId,userId) VALUES (?,?)`,
+              )
+              .bind(id, me),
+            ...notice,
+          ]);
         else
-          await d
-            .prepare(`DELETE FROM ${table} WHERE postId=? AND userId=?`)
-            .bind(id, me)
-            .run();
+          await d.batch([
+            d
+              .prepare(`DELETE FROM ${table} WHERE postId=? AND userId=?`)
+              .bind(id, me),
+            ...notice,
+          ]);
       } else if (action === 'comment') {
         const commentId = crypto.randomUUID();
         const text = clean(b.text, 2000, true);
@@ -632,12 +643,14 @@ export async function POST(req: Request) {
           payload: { text },
         });
         if (held) return Response.json(held, { status: 202 });
-        await d
-          .prepare(
-            'INSERT INTO comments (id,postId,userId,text,created) VALUES (?,?,?,?,?)',
-          )
-          .bind(commentId, id, me, text, Date.now())
-          .run();
+        await d.batch([
+          d
+            .prepare(
+              'INSERT INTO comments (id,postId,userId,text,created) VALUES (?,?,?,?,?)',
+            )
+            .bind(commentId, id, me, text, Date.now()),
+          commentNotification(commentId),
+        ]);
         return Response.json(
           await d
             .prepare(
@@ -679,6 +692,7 @@ export async function POST(req: Request) {
           .bind(me, id, me, me)
           .run();
         await assertCanInteract(me, id);
+        await followNotification(me, id).run();
       } else
         await d
           .prepare('DELETE FROM follows WHERE follower=? AND following=?')

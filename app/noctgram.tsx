@@ -2061,6 +2061,8 @@ export default function Noctgram({
             {me && (
               <NotificationsBell
                 me={me.id}
+                activeChat={page === 'messages' ? peer?.id : undefined}
+                onProfile={(id) => void openProfile(id)}
                 onGift={(recipient) => {
                   if (recipient && recipient !== me.id)
                     void openProfile(recipient, 'gifts');
