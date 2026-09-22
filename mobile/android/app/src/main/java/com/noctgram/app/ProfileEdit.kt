@@ -1,15 +1,18 @@
 package com.noctgram.app
 
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,13 +24,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -41,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,26 +55,44 @@ import org.json.JSONObject
 import kotlin.math.roundToInt
 
 @Composable
-private fun Choice(label: String, active: Boolean, onClick: () -> Unit) = Text(
-    label,
-    color = if (active) Accent else Body,
-    fontSize = 13.sp,
-    fontWeight = FontWeight.Medium,
-    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (active) Accent.copy(alpha = 0.18f) else Segment)
-        .clickable(onClick = onClick).padding(14.dp, 9.dp),
-)
+private fun SectionTitle(text: String, modifier: Modifier = Modifier) =
+    Text(text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.2).sp, modifier = modifier)
 
 @Composable
 private fun Setting(title: String, text: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) = Row(
-    Modifier.fillMaxWidth(),
+    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(12.dp),
 ) {
-    Column(Modifier.weight(1f)) {
-        Text(title, fontWeight = FontWeight.Medium)
+    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
         Text(text, color = Muted, fontSize = 13.sp)
     }
-    Switch(checked, onChange, enabled = enabled, colors = SwitchDefaults.colors(checkedTrackColor = Accent, checkedThumbColor = Foreground))
+    Switch(checked, onChange, enabled = enabled, colors = noctSwitchColors())
+}
+
+/** A thin white track with a round thumb, instead of Material's tall bar. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NoctSlider(value: Float, onChange: (Float) -> Unit, range: ClosedFloatingPointRange<Float>, enabled: Boolean) {
+    val colors = SliderDefaults.colors(
+        thumbColor = Foreground,
+        activeTrackColor = Foreground,
+        inactiveTrackColor = Fill10,
+        disabledThumbColor = Muted,
+        disabledActiveTrackColor = Muted,
+        disabledInactiveTrackColor = Fill6,
+    )
+    Slider(
+        value, onChange, valueRange = range, enabled = enabled, colors = colors,
+        thumb = { Box(Modifier.size(22.dp).clip(CircleShape).background(if (enabled) Foreground else Muted)) },
+        track = { state ->
+            SliderDefaults.Track(
+                state, Modifier.height(4.dp), enabled = enabled, colors = colors,
+                drawStopIndicator = null, thumbTrackGapSize = 0.dp,
+            )
+        },
+    )
 }
 
 /** Name, description, avatar and banner. Usernames are edited on the site; leaving them out keeps them untouched. */
@@ -105,8 +126,8 @@ fun EditProfileScreen(model: AppModel) {
         picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
     Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
-        TopBar("Профиль", model::back) {
-            PrimaryButton(if (busy) "Сохраняем…" else "Сохранить", enabled = !busy && name.isNotBlank(), modifier = Modifier.padding(end = 12.dp)) {
+        TopBar("Редактирование", model::back) {
+            NoctButton(if (busy) "Сохраняем…" else "Сохранить", enabled = !busy && name.isNotBlank(), compact = true, onClick = {
                 busy = true
                 error = ""
                 scope.launch {
@@ -123,29 +144,55 @@ fun EditProfileScreen(model: AppModel) {
                         busy = false
                     }
                 }
-            }
+            })
         }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Box(Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(16.dp)).background(Segment)) {
-                when {
-                    cover == "liquid" && avatar.isNotEmpty() -> NetImage(model.api, avatar, Modifier.fillMaxSize().blur(48.dp), maxSide = 256)
-                    cover.startsWith("/api/") -> NetImage(model.api, cover, Modifier.fillMaxSize())
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Column(Modifier.fillMaxWidth().noctCard(RoundedCornerShape(20.dp))) {
+                Box(Modifier.fillMaxWidth().height(130.dp).background(Cover)) {
+                    when {
+                        cover == "liquid" && avatar.isNotEmpty() && Build.VERSION.SDK_INT >= 31 ->
+                            NetImage(model.api, avatar, Modifier.fillMaxSize().blur(48.dp), maxSide = 256)
+                        cover.startsWith("/api/") -> NetImage(model.api, cover, Modifier.fillMaxSize())
+                    }
+                    IconAction(
+                        Lucide.Camera, "Сменить обложку", tint = Foreground, size = 36.dp, iconSize = 17.dp,
+                        background = Background.copy(alpha = 0.6f), modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+                    ) { pick("cover") }
                 }
-                Avatar(model.api, avatar, name, 72.dp, Modifier.align(Alignment.BottomStart).padding(12.dp).border(3.dp, Card, CircleShape))
+                Box(Modifier.padding(horizontal = 16.dp).overlapUp(44.dp).padding(bottom = 16.dp)) {
+                    Box(Modifier.size(88.dp).clip(CircleShape).background(Card).padding(5.dp).clip(CircleShape).clickable { pick("avatar") }) {
+                        Avatar(model.api, avatar, name, 78.dp)
+                    }
+                    Box(
+                        Modifier.align(Alignment.BottomEnd).size(28.dp).clip(CircleShape).background(Foreground).border(2.dp, Card, CircleShape)
+                            .clickable { pick("avatar") },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Lucide.Camera, contentDescription = "Сменить аватар", tint = Background, modifier = Modifier.size(14.dp)) }
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Choice("Аватар", false) { pick("avatar") }
-                Choice("Обложка", cover.startsWith("/api/")) { pick("cover") }
-                // «Жидкое»: the banner the site draws from the avatar's colours.
-                Choice("Жидкое", cover == "liquid") { cover = "liquid" }
-                if (cover.isNotEmpty()) Choice("Без обложки", false) { cover = "" }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionTitle("Обложка")
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Chip("Картинка", cover.startsWith("/api/"), icon = Lucide.Image) { pick("cover") }
+                    // «Жидкое»: the banner the site draws from the avatar's colours.
+                    Chip("Жидкое", cover == "liquid", icon = Lucide.Sparkles) { cover = "liquid" }
+                    Chip("Без обложки", cover.isEmpty()) { cover = "" }
+                }
+                if (cover == "liquid" && avatar.isEmpty()) Text("«Жидкое» строится из цветов аватарки. Добавьте её, и фон появится.", color = Muted, fontSize = 13.sp)
             }
-            if (cover == "liquid" && avatar.isEmpty()) Text("«Жидкое» строится из аватарки — добавьте её, и фон появится.", color = Muted, fontSize = 13.sp)
-            OutlinedTextField(name, { name = it.take(40) }, label = { Text("Имя") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(bio, { bio = it.take(300) }, label = { Text("О себе") }, minLines = 3, modifier = Modifier.fillMaxWidth())
-            Text("Юзернеймы меняются на noctgram.com.", color = Muted, fontSize = 13.sp)
-            if (error.isNotEmpty()) Text(error, color = Danger)
-            TextButton(onClick = { model.signOut() }) { Text("Выйти из аккаунта", color = Danger) }
+            NoctField(name, { name = it.take(40) }, label = "Имя", placeholder = "Как вас зовут", singleLine = true)
+            NoctField(bio, { bio = it.take(300) }, label = "О себе", placeholder = "Расскажите о себе — пусть свои вас узнают.", minLines = 3, hint = "${bio.length} из 300")
+            Row(
+                Modifier.fillMaxWidth().noctCard(RoundedCornerShape(14.dp)).padding(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Lucide.Link, contentDescription = null, tint = Secondary, modifier = Modifier.size(17.dp))
+                Text("Юзернеймы и анонимный номер меняются на noctgram.com.", color = Secondary, fontSize = 13.sp, lineHeight = 18.sp)
+            }
+            if (error.isNotEmpty()) ErrorNote(error)
+            Spacer(Modifier.height(6.dp))
+            NoctButton("Выйти из аккаунта", { model.signOut() }, Modifier.fillMaxWidth(), tone = Tone.Danger, icon = Lucide.LogOut)
         }
     }
 }
@@ -174,7 +221,7 @@ fun DesignScreen(model: AppModel) {
 
     Column(Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
         TopBar("Дизайн профиля", model::back) {
-            PrimaryButton(if (busy) "Сохраняем…" else "Сохранить", enabled = premium && !busy, modifier = Modifier.padding(end = 12.dp)) {
+            NoctButton(if (busy) "Сохраняем…" else "Сохранить", enabled = premium && !busy, compact = true, onClick = {
                 busy = true
                 error = ""
                 scope.launch {
@@ -199,65 +246,78 @@ fun DesignScreen(model: AppModel) {
                         busy = false
                     }
                 }
-            }
+            })
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            if (!premium) Text(
-                "Оформление профиля открывается с Noct Premium. Сейчас можно только посмотреть, как оно выглядит.",
-                color = Body, modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Segment).padding(14.dp),
-            )
-            Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
-                    .background(if (mode == "none") Brush.linearGradient(listOf(Card, Card)) else Brush.linearGradient(listOf(washed(colors.first, intensity.roundToInt()), washed(colors.second, intensity.roundToInt()))))
-                    .border(1.dp, colors.first.copy(alpha = 0.25f), RoundedCornerShape(20.dp)).padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+            if (!premium) Row(
+                Modifier.fillMaxWidth().noctCard(RoundedCornerShape(14.dp), border = colors.first.copy(alpha = 0.3f)).padding(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                GradientIcon(Lucide.Sparkles, listOf(colors.first, colors.second), 22.dp, null)
+                Text("Оформление открывается с Noct Premium. Пока можно посмотреть, как оно будет выглядеть.", color = Body, fontSize = 13.sp, lineHeight = 19.sp)
+            }
+            val shape = RoundedCornerShape(20.dp)
+            Column(
+                Modifier.fillMaxWidth().clip(shape)
+                    .background(if (mode == "none") Brush.linearGradient(listOf(Card, Card)) else Brush.linearGradient(listOf(washed(colors.first, intensity.roundToInt()), washed(colors.second, intensity.roundToInt()))))
+                    .border(1.dp, colors.first.copy(alpha = 0.25f), shape),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(Modifier.fillMaxWidth().height(64.dp).background(Brush.linearGradient(listOf(washed(colors.first, 38), washed(colors.second, 20)))))
                 // Shown as it will be with Premium, even when the account has none yet.
                 val shown = JSONObject(preview.toString()).put("premium", 1)
-                ProfileAvatar(model.api, shown, 84.dp)
-                DisplayName(shown, fontSize = 23.sp)
-                Text("@" + me.optString("handle"), color = colors.first, fontSize = 13.sp)
+                Box(Modifier.overlapUp(48.dp)) { ProfileAvatar(model.api, shown, 80.dp, if (mode == "none") Card else washed(colors.first, intensity.roundToInt())) }
+                DisplayName(shown, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 20.dp))
+                Text("@" + me.optString("handle"), color = colors.first, fontSize = 14.sp, modifier = Modifier.padding(top = 3.dp, bottom = 18.dp))
             }
-            Text("Палитра", fontWeight = FontWeight.Medium)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                for ((id, label) in ThemeNames) Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    val pair = themeColors(id)
-                    Box(
-                        Modifier.size(44.dp).clip(CircleShape).background(Brush.linearGradient(listOf(pair.first, pair.second)))
-                            // A zero-width border is a hairline in Compose, so it is added only when chosen.
-                            .then(if (theme == id) Modifier.border(3.dp, Foreground, CircleShape) else Modifier).clickable { theme = id },
-                    )
-                    Text(label, color = if (theme == id) Foreground else Muted, fontSize = 11.sp)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionTitle("Палитра")
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    for ((id, label) in ThemeNames) Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        val pair = themeColors(id)
+                        val chosen = theme == id
+                        Box(
+                            Modifier.size(48.dp).clip(CircleShape).border(2.dp, if (chosen) Foreground else Color.Transparent, CircleShape)
+                                .clickable { theme = id }.padding(5.dp).clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(pair.first, pair.second))),
+                        )
+                        Text(label, color = if (chosen) Foreground else Muted, fontSize = 11.sp, fontWeight = if (chosen) FontWeight.Medium else FontWeight.Normal)
+                    }
                 }
             }
-            Setting("Градиент имени", "Имя переливается цветами палитры", gradient, premium) { gradient = it }
-            Setting("Chrome Flow", "Металлический ободок вокруг аватара", chrome, premium) { chrome = it }
-            if (chrome) Column {
-                Text("Темп: ${tempo.roundToInt()} с на оборот", color = Muted, fontSize = 13.sp)
-                Slider(tempo, { tempo = it }, valueRange = 3f..26f, enabled = premium, colors = SliderDefaults.colors(thumbColor = Foreground, activeTrackColor = Accent))
+            Column(Modifier.fillMaxWidth().noctCard(RoundedCornerShape(16.dp))) {
+                Setting("Градиент имени", "Имя переливается цветами палитры", gradient, premium) { gradient = it }
+                HairlineDivider()
+                Setting("Chrome Flow", "Металлический ободок вокруг аватара", chrome, premium) { chrome = it }
+                if (chrome) Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) {
+                    Text("Один оборот за ${tempo.roundToInt()} с", color = Muted, fontSize = 13.sp)
+                    NoctSlider(tempo, { tempo = it }, 3f..26f, premium)
+                }
             }
-            OutlinedTextField(
+            NoctField(
                 ring, { ring = it.take(48) },
-                label = { Text("Текст вокруг аватара") },
-                supportingText = { Text("До 48 символов. Пусто — без обводки.") },
+                label = "Текст вокруг аватара",
+                placeholder = "Например, NOCTGRAM",
+                hint = "До 48 символов. Пусто — без обводки.",
                 singleLine = true,
                 enabled = premium,
-                modifier = Modifier.fillMaxWidth(),
             )
-            Text("Фон карточки профиля", fontWeight = FontWeight.Medium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Choice("Нет", mode == "none") { mode = "none" }
-                Choice("По палитре", mode == "theme") { mode = "theme" }
-                Choice("По обложке", mode == "cover") { mode = "cover" }
-                // Own colours are chosen on the site; here they can only be kept.
-                if (saved?.optString("mode") == "custom") Choice("Свои цвета", mode == "custom") { mode = "custom" }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionTitle("Фон карточки профиля")
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Chip("Нет", mode == "none") { mode = "none" }
+                    Chip("По палитре", mode == "theme") { mode = "theme" }
+                    Chip("По обложке", mode == "cover") { mode = "cover" }
+                    // Own colours are chosen on the site; here they can only be kept.
+                    if (saved?.optString("mode") == "custom") Chip("Свои цвета", mode == "custom") { mode = "custom" }
+                }
+                if (mode != "none") Column {
+                    Text("Насыщенность ${intensity.roundToInt()} %", color = Muted, fontSize = 13.sp)
+                    NoctSlider(intensity, { intensity = it }, 15f..40f, premium)
+                }
             }
-            if (mode != "none") Column {
-                Text("Насыщенность: ${intensity.roundToInt()}%", color = Muted, fontSize = 13.sp)
-                Slider(intensity, { intensity = it }, valueRange = 15f..40f, enabled = premium, colors = SliderDefaults.colors(thumbColor = Foreground, activeTrackColor = Accent))
-            }
-            if (error.isNotEmpty()) Text(error, color = Danger)
+            if (error.isNotEmpty()) ErrorNote(error)
         }
     }
 }

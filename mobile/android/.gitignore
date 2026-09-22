@@ -7,3 +7,6 @@ local.properties
 *.keystore
 .idea/
 *.iml
+.kotlin/
+# Paparazzi pictures change with every run (they use the current time); record them locally.
+app/src/test/snapshots/

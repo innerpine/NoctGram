@@ -6,6 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,8 +18,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -38,14 +44,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -72,11 +84,17 @@ sealed interface Screen {
     data object Design : Screen
 }
 
-/** Who is signed in and which screen that implies; the same decisions as the iOS NativeSession. */
-class AppModel(app: Application) : AndroidViewModel(app) {
-    val api = NoctApi(KeystoreSessionStore(app))
-    val homeFeed = FeedState(api, viewModelScope)
-    val chats = ChatList(api, viewModelScope)
+/**
+ * Who is signed in and which screen that implies; the same decisions as the iOS
+ * NativeSession. Screenshot tests build it with an offline [api] and no start.
+ */
+class AppModel internal constructor(app: Application, val api: NoctApi, start: Boolean, scope: CoroutineScope?) : AndroidViewModel(app) {
+    constructor(app: Application) : this(app, NoctApi(KeystoreSessionStore(app)), start = true, scope = null)
+
+    // Tests have no Android main thread, so they bring their own scope for the lists.
+    private val work: CoroutineScope = scope ?: viewModelScope
+    val homeFeed = FeedState(api, work)
+    val chats = ChatList(api, work)
     val stack = mutableStateListOf<Screen>()
     var phase by mutableStateOf(Phase.Loading)
         private set
@@ -97,7 +115,13 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 
     init {
         api.onSessionExpired = { viewModelScope.launch(Dispatchers.Main) { expire() } }
-        refresh()
+        if (start) refresh()
+    }
+
+    /** Screenshot tests: this account is signed in, and nothing is asked of the server. */
+    internal fun preview(account: JSONObject) {
+        me = account
+        phase = Phase.SignedIn
     }
 
     fun open(screen: Screen) { stack.add(screen) }
@@ -156,9 +180,9 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 }
 
 @Composable
-fun NoctApp(model: AppModel = viewModel()) {
+fun NoctApp(model: AppModel = viewModel()) = Box(Modifier.fillMaxSize().background(Background)) {
     when (model.phase) {
-        Phase.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { Text("noctgram", color = Muted) }
+        Phase.Loading -> Splash()
         Phase.Unavailable -> FullScreenError(model.error) { model.refresh() }
         Phase.SignedOut -> LoginScreen(model)
         Phase.Onboarding -> OnboardingScreen(model)
@@ -167,11 +191,22 @@ fun NoctApp(model: AppModel = viewModel()) {
 }
 
 @Composable
-private fun SignedIn(model: AppModel) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+private fun Splash() = Column(
+    Modifier.fillMaxSize(),
+    verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+    horizontalAlignment = Alignment.CenterHorizontally,
+) {
+    Image(painterResource(R.drawable.noct_logo), contentDescription = null, modifier = Modifier.size(64.dp))
+    Wordmark(30.sp)
+}
+
+@Composable
+internal fun SignedIn(model: AppModel, startTab: Int = 0) {
+    var tab by rememberSaveable { mutableIntStateOf(startTab) }
+    val live = !LocalInspectionMode.current
     // Unread counts for the badge: on entry, then quietly while the app is open.
     LaunchedEffect(model.myId) {
-        while (true) {
+        while (live) {
             model.chats.reload()
             delay(20_000)
         }
@@ -185,7 +220,14 @@ private fun SignedIn(model: AppModel) {
                 else -> ProfileScreen(model, model.myId, onBack = null)
             }
         }
-        if (model.stack.isEmpty()) TabBar(model, tab, Modifier.align(Alignment.BottomCenter)) { tab = it }
+        if (model.stack.isEmpty()) {
+            // Lists fade into the ground under the floating bar instead of being cut by it.
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(TabBarSpace + 24.dp)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Background.copy(alpha = 0.92f)))),
+            )
+            TabBar(model, tab, Modifier.align(Alignment.BottomCenter)) { tab = it }
+        }
         model.stack.lastOrNull()?.let { screen ->
             BackHandler { model.back() }
             // Swallow taps on empty space: without this they reach the tab underneath.
@@ -207,35 +249,43 @@ private fun SignedIn(model: AppModel) {
     }
 }
 
-/** The floating pill bar: a highlighted capsule behind the current tab, the account's face on the last one. */
+/** The floating bar in the Telegram manner: a lit capsule behind the current tab, the account's face on the last one. */
 @Composable
 private fun TabBar(model: AppModel, selected: Int, modifier: Modifier, onSelect: (Int) -> Unit) = Row(
-    modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth()
-        .clip(RoundedCornerShape(36.dp)).background(Popover).border(1.dp, Hairline, RoundedCornerShape(36.dp)).padding(6.dp),
+    modifier.navigationBarsPadding().padding(horizontal = 20.dp, vertical = 10.dp).fillMaxWidth().height(64.dp)
+        .clip(RoundedCornerShape(32.dp)).background(Popover.copy(alpha = 0.97f)).border(1.dp, Hairline, RoundedCornerShape(32.dp))
+        .padding(5.dp),
     horizontalArrangement = Arrangement.spacedBy(4.dp),
 ) {
-    val tabs: List<Pair<String, ImageVector?>> = listOf("Лента" to Glyphs.Feed, "Чаты" to Glyphs.Chats, "Профиль" to null)
+    val tabs: List<Pair<String, ImageVector?>> = listOf("Лента" to Lucide.House, "Чаты" to Lucide.MessageCircle, "Профиль" to null)
     tabs.forEachIndexed { index, (label, icon) ->
         val active = index == selected
-        val tint = if (active) Accent else Body
+        val tint by animateColorAsState(if (active) Foreground else Muted, tween(220), label = "tab")
+        val fill by animateColorAsState(if (active) Fill10 else Color.Transparent, tween(220), label = "tabFill")
         Column(
-            Modifier.weight(1f).clip(RoundedCornerShape(30.dp)).background(if (active) Accent.copy(alpha = 0.14f) else Popover)
-                .clickable(remember { MutableInteractionSource() }, indication = null) { onSelect(index) }
-                .padding(vertical = 8.dp),
+            Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(27.dp)).background(fill)
+                .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Tab) { onSelect(index) },
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.Center,
         ) {
             Box {
-                if (icon != null) Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
-                else Avatar(model.api, model.me?.optString("avatar").orEmpty(), model.me?.optString("name").orEmpty(), 26.dp)
+                if (icon != null) Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+                else Avatar(
+                    model.api, model.me?.optString("avatar").orEmpty(), model.me?.optString("name").orEmpty(), 24.dp,
+                    if (active) Modifier.border(1.5.dp, Foreground, CircleShape) else Modifier,
+                )
                 if (index == 1 && model.chats.unread > 0) Text(
                     if (model.chats.unread > 99) "99+" else model.chats.unread.toString(),
-                    color = Foreground, fontSize = 10.sp, fontWeight = FontWeight.Medium,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(start = 18.dp)
-                        .background(Danger, CircleShape).padding(horizontal = 5.dp, vertical = 1.dp),
+                    color = Foreground,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 12.sp,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(start = 16.dp)
+                        .background(Danger, CircleShape).border(1.5.dp, Popover, CircleShape).padding(horizontal = 5.dp, vertical = 1.dp),
                 )
             }
-            Text(label, color = tint, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(3.dp))
+            Text(label, color = tint, fontSize = 11.sp, fontWeight = FontWeight.Medium, lineHeight = 13.sp)
         }
     }
 }
