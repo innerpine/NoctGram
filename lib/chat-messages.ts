@@ -37,6 +37,12 @@ export async function readConversation(
         `UPDATE messages SET read=1 WHERE sender=? AND recipient=? AND read=0 AND ${messageVisible('messages', 'messages.recipient')}`,
       )
       .bind(peer, me),
+    // A read dialogue no longer counts in the notification bell.
+    db()
+      .prepare(
+        "UPDATE notifications SET read=1 WHERE userId=? AND kind='message' AND actorId=? AND read=0",
+      )
+      .bind(me, peer),
     db()
       .prepare(`UPDATE notifications SET read=1 WHERE userId=? AND kind='gift' AND read=0
       AND EXISTS(SELECT 1 FROM messages m WHERE m.giftReceiptId=notifications.targetId

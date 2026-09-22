@@ -288,6 +288,8 @@ await probe(
       },
     );
     assert.equal(count('star_transfers', "kind='market_fee'"), 0);
+    // A system lot has no seller to notify.
+    assert.equal(count('notifications', "kind='market'"), 0);
     assert.deepEqual(
       {
         ...row(
@@ -463,6 +465,15 @@ await probe(
     assert.equal(
       row('SELECT fee FROM market_listings WHERE id=?', listingId).fee,
       10,
+    );
+    // The seller is told who bought the lot.
+    assert.deepEqual(
+      {
+        ...row(
+          "SELECT userId,actorId,targetId FROM notifications WHERE kind='market'",
+        ),
+      },
+      { userId: 'alice', actorId: 'bob', targetId: listingId },
     );
     // Known limit: the owner-only receipt id still embeds the first sender's id.
     const [shown] = (await api.listGifts('bob', 'bob')).gifts;

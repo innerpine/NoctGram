@@ -92,7 +92,7 @@ function fixture(t) {
   );
   const { notificationsGet } = functions(
     'lib/notifications.ts',
-    ['notificationVisible', 'notificationsGet'],
+    ['notificationVisible', 'notificationRows', 'notificationsGet'],
     {
       db,
       visibleAccount,

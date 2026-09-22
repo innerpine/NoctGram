@@ -28,6 +28,7 @@ import { createPageTransition } from '@/lib/page-transition';
 import { createProfileCoverCache } from '@/lib/profile-cover-cache';
 import { flushSync } from 'react-dom';
 
+import { NotificationsBell } from './notifications';
 import { useAudioCalls } from './audio-calls';
 import { Phone } from 'lucide-react';
 
@@ -2199,6 +2200,38 @@ export default function Noctgram({
               >
                 <ShieldCheck size={20} />
               </AppLink>
+            )}
+            {me && (
+              <NotificationsBell
+                me={me.id}
+                activeChat={page === 'messages' ? peer?.id : undefined}
+                onProfile={(id) => void openProfile(id)}
+                onGift={(recipient) => {
+                  if (recipient && recipient !== me.id)
+                    void openProfile(recipient, 'gifts');
+                  else {
+                    navigate('profile');
+                    setProfileTab('gifts');
+                  }
+                }}
+                onPost={(id) => {
+                  void request<Post>(
+                    '?action=post&id=' + encodeURIComponent(id),
+                  )
+                    .then((p) => {
+                      setCommentPost(p);
+                      setModal('comments');
+                    })
+                    .catch((e) => notify(e.message));
+                }}
+                onChat={(id) => {
+                  void request<Profile>(
+                    '?action=profile&id=' + encodeURIComponent(id),
+                  )
+                    .then(openChat)
+                    .catch((e) => notify(e.message));
+                }}
+              />
             )}
             {page !== 'premium' && (
               <span
