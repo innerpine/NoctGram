@@ -22,6 +22,10 @@ const wanted = [
   ['log-out', 'LogOut'], ['link', 'Link'], ['lock', 'Lock'], ['users', 'Users'],
   ['triangle-alert', 'TriangleAlert'], ['refresh-cw', 'RefreshCw'], ['badge-check', 'BadgeCheck', true],
   ['palette', 'Palette'], ['image-plus', 'ImagePlus'], ['reply', 'Reply'], ['eye-off', 'EyeOff'],
+  ['shield-check', 'ShieldCheck'], ['circle-minus', 'CircleMinus'], ['gift', 'Gift'], ['rotate-ccw-clock', 'History'],
+  ['store', 'Store'], ['film', 'Film'], ['headphones', 'Headphones'], ['rotate-cw', 'RotateCw'],
+  ['chevron-left', 'ChevronLeft'], ['chevron-down', 'ChevronDown'], ['hash', 'Hash'], ['external-link', 'ExternalLink'],
+  ['wallet', 'Wallet'],
 ];
 
 const n = (v) => Number(v);

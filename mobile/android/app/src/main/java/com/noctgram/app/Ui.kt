@@ -45,10 +45,13 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -85,6 +88,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
@@ -413,6 +417,27 @@ fun Chip(label: String, selected: Boolean, modifier: Modifier = Modifier, icon: 
     Text(label, color = if (selected) Foreground else Secondary, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
 }
 
+/** A thin track with a round thumb in [color], instead of Material's tall bar with a gap. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ThinSlider(value: Float, onChange: (Float) -> Unit, range: ClosedFloatingPointRange<Float>, enabled: Boolean = true, color: Color = Foreground, modifier: Modifier = Modifier) {
+    val colors = SliderDefaults.colors(
+        thumbColor = color,
+        activeTrackColor = color,
+        inactiveTrackColor = Fill10,
+        disabledThumbColor = Muted,
+        disabledActiveTrackColor = Muted,
+        disabledInactiveTrackColor = Fill6,
+    )
+    Slider(
+        value, onChange, modifier = modifier, valueRange = range, enabled = enabled, colors = colors,
+        thumb = { Box(Modifier.size(22.dp).clip(CircleShape).background(if (enabled) color else Muted)) },
+        track = { state ->
+            SliderDefaults.Track(state, Modifier.height(4.dp), enabled = enabled, colors = colors, drawStopIndicator = null, thumbTrackGapSize = 0.dp)
+        },
+    )
+}
+
 /** A soft pulse standing in for content that is still loading. */
 @Composable
 fun Modifier.skeleton(shape: Shape = RoundedCornerShape(8.dp)): Modifier {
@@ -508,6 +533,13 @@ private val Themes = mapOf(
 val ThemeNames = listOf("iris" to "Ирис", "aurora" to "Сияние", "ocean" to "Океан", "rose" to "Роза", "ember" to "Закат", "silver" to "Лунный")
 fun themeColors(name: String) = Themes[name] ?: Themes.getValue("iris")
 
+/** Each palette's `wash`, the soft glow the site puts behind previews. */
+private val Washes = mapOf(
+    "iris" to Color(0xFFA88AD8), "aurora" to Color(0xFF78C9B5), "ocean" to Color(0xFF80ACD9),
+    "rose" to Color(0xFFDA96BC), "ember" to Color(0xFFD4A180), "silver" to Color(0xFFA6AFBF),
+)
+fun themeWash(name: String) = Washes[name] ?: Washes.getValue("iris")
+
 /**
  * How a person chose to look. The server already blanks these fields for
  * accounts without Premium (or channel boosts), `active` repeats the site's
@@ -520,6 +552,7 @@ class Look(person: JSONObject) {
     val theme = person.optString("profileTheme", "iris")
     val first = themeColors(theme).first
     val second = themeColors(theme).second
+    val wash = themeWash(theme)
     val nameGradient = active && person.optInt("nameGradient") != 0
     val ringText = if (active) person.optString("ringText") else ""
     val chrome = active && person.optInt("chromeFlow") != 0
@@ -528,20 +561,38 @@ class Look(person: JSONObject) {
     val accent get() = if (active) first else Foreground
 }
 
+/** Paints whatever is drawn with a diagonal gradient, keeping only its shape: the site's CSS mask. */
+private fun Modifier.gradientMask(colors: List<Color>) = graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithCache {
+    val brush = Brush.linearGradient(colors, Offset.Zero, Offset(size.width, size.height))
+    onDrawWithContent {
+        drawContent()
+        drawRect(brush, blendMode = BlendMode.SrcIn)
+    }
+}
+
 /** An icon painted with a gradient, like the site's Premium mark in the palette colours. */
 @Composable
-fun GradientIcon(icon: ImageVector, colors: List<Color>, dp: Dp, label: String?) = Icon(
-    icon,
-    contentDescription = label,
-    tint = Color.White,
-    modifier = Modifier.size(dp).graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithCache {
-        val brush = Brush.linearGradient(colors, Offset.Zero, Offset(size.width, size.height))
-        onDrawWithContent {
-            drawContent()
-            drawRect(brush, blendMode = BlendMode.SrcIn)
-        }
-    },
+fun GradientIcon(icon: ImageVector, colors: List<Color>, dp: Dp, label: String?) =
+    Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(dp).gradientMask(colors))
+
+/** The Noct Premium star of the site (public/assets/noct-premium.png) in the person's palette. */
+@Composable
+fun PremiumBadge(look: Look, dp: Dp) = Image(
+    painterResource(R.drawable.noct_premium), contentDescription = "Noct Premium",
+    modifier = Modifier.size(dp).gradientMask(listOf(look.first, look.second)),
 )
+
+/** The Noct Verified badge (public/assets/noct-verified.png): a crown cut out of the palette gradient. */
+@Composable
+fun VerifiedBadge(look: Look, dp: Dp) = Image(
+    painterResource(R.drawable.noct_verified), contentDescription = "Подтверждённый аккаунт NoctGram",
+    modifier = Modifier.size(dp).gradientMask(listOf(look.first, look.second)),
+)
+
+/** The golden Noct Stars star, drawn as it is. */
+@Composable
+fun StarsIcon(dp: Dp, modifier: Modifier = Modifier) =
+    Image(painterResource(R.drawable.noct_stars), contentDescription = null, modifier = modifier.size(dp))
 
 @Composable
 fun DisplayName(
@@ -565,9 +616,8 @@ fun DisplayName(
                 brush = if (look.nameGradient) Brush.linearGradient(listOf(look.first, look.second)) else SolidColor(Foreground),
             ),
         )
-        val badge = (fontSize.value * 0.95f).coerceAtMost(22f).dp
-        if (look.verified) Icon(Lucide.BadgeCheck, "Подтверждённый аккаунт", tint = Color(0xFF6CB6FF), modifier = Modifier.size(badge))
-        if (look.premium) GradientIcon(Lucide.StarFilled, listOf(look.first, look.second), badge, "Noct Premium")
+        // As on the site the name carries the Premium mark; verification is stated on the profile itself.
+        if (look.premium) PremiumBadge(look, (fontSize.value * 1.05f).coerceAtMost(24f).dp)
     }
 }
 
@@ -638,9 +688,13 @@ fun ProfileAvatar(api: NoctApi, person: JSONObject, size: Dp, edge: Color = Card
     val face = size + 10.dp
     val outer = face + if (ring) 44.dp else if (look.chrome) 12.dp else 0.dp
     val turn = rememberInfiniteTransition(label = "avatar")
+    // «Анимации аватаров и обводок» off: the rim and the ring stand still, the avatar shows its still frame.
+    val moving = MotionPreference.enabled
+    val motion = if (look.active) person.optString("avatarMotion") else ""
     Box(Modifier.size(outer), contentAlignment = Alignment.Center) {
         if (look.chrome) {
-            val angle by turn.animateFloat(0f, 360f, infiniteRepeatable(tween(look.chromeTempo * 750, easing = LinearEasing), RepeatMode.Restart), label = "chrome")
+            val spin by turn.animateFloat(0f, 360f, infiniteRepeatable(tween(look.chromeTempo * 750, easing = LinearEasing), RepeatMode.Restart), label = "chrome")
+            val angle = if (moving) spin else 0f
             Canvas(Modifier.size(face + 10.dp).rotate(angle)) {
                 drawCircle(
                     Brush.sweepGradient(listOf(Color.White, lerp(look.second, Color.White, 0.6f), Color(0xFF17171D), look.first, Color.White, lerp(look.second, Color.White, 0.6f), Color(0xFF17171D), look.first, Color.White)),
@@ -649,7 +703,8 @@ fun ProfileAvatar(api: NoctApi, person: JSONObject, size: Dp, edge: Color = Card
             }
         }
         if (ring) {
-            val angle by turn.animateFloat(0f, 360f, infiniteRepeatable(tween(24_000, easing = LinearEasing), RepeatMode.Restart), label = "ring")
+            val spin by turn.animateFloat(0f, 360f, infiniteRepeatable(tween(24_000, easing = LinearEasing), RepeatMode.Restart), label = "ring")
+            val angle = if (moving) spin else 0f
             val textSize = with(LocalDensity.current) { 10.5.sp.toPx() }
             Canvas(Modifier.size(outer).rotate(angle)) {
                 val radius = face.toPx() / 2 + 8.dp.toPx()
@@ -664,7 +719,8 @@ fun ProfileAvatar(api: NoctApi, person: JSONObject, size: Dp, edge: Color = Card
             }
         }
         Box(Modifier.size(face).clip(CircleShape).background(edge), contentAlignment = Alignment.Center) {
-            Avatar(api, person.optString("avatar"), person.optString("name"), size)
+            val still = @Composable { Avatar(api, person.optString("avatar"), person.optString("name"), size) }
+            if (motion.startsWith("/api/")) MotionFace(api, motion, person.optString("avatarMotionType"), size, still) else still()
         }
     }
 }
@@ -686,6 +742,29 @@ fun PersonRow(api: NoctApi, person: JSONObject, onClick: () -> Unit, trailing: @
 
 /** `mix(colour, #0b0b10, percent)`: the site's color-mix() for the profile background. */
 fun washed(color: Color, percent: Int) = lerp(Color(0xFF0B0B10), color, percent / 100f)
+
+fun parseHex(value: String, fallback: Color = Color(0xFF9775CF)): Color =
+    runCatching { Color(android.graphics.Color.parseColor(value)) }.getOrDefault(fallback)
+
+/** `#rrggbb`, the form the server stores. */
+fun Color.hex(): String = "#%06x".format(toArgb() and 0xFFFFFF)
+
+/**
+ * The card gradient a Premium account chose in «Фон профиля», the site's
+ * color-mix() into #0b0b10; null for the plain card.
+ */
+fun profileSurface(person: JSONObject): List<Color>? {
+    val look = Look(person)
+    if (!look.premium) return null
+    val background = runCatching { JSONObject(person.optString("profileBackground")) }.getOrNull() ?: return null
+    val mode = background.optString("mode")
+    if (mode.isEmpty() || mode == "none") return null
+    val intensity = background.optInt("intensity", 30).coerceIn(15, 40)
+    // ponytail: «Баннер и аватар» uses the palette here; sample the cover bitmap when it matters.
+    val (first, second) = if (mode == "custom") parseHex(background.optString("first")) to parseHex(background.optString("second"))
+    else look.first to look.second
+    return listOf(washed(first, intensity), washed(second, intensity))
+}
 
 // ---------------------------------------------------------------- picked files
 

@@ -77,6 +77,8 @@ class FeedState(private val api: NoctApi, private val scope: CoroutineScope) {
     val saved = mutableStateMapOf<String, Boolean>()
     /** Poll answers given here, shown at once: post id to the chosen option. */
     val voted = mutableStateMapOf<String, Int>()
+    /** Stars this account gave here, per post, until the next reload brings the server's sums. */
+    val supported = mutableStateMapOf<String, Long>()
 
     private var query = mapOf("action" to "feed", "mode" to "all")
     // A slow answer to an old question must not overwrite the list the user now sees.
@@ -111,6 +113,7 @@ class FeedState(private val api: NoctApi, private val scope: CoroutineScope) {
                     liked.clear()
                     saved.clear()
                     voted.clear()
+                    supported.clear()
                 }
             } catch (failure: ApiException) {
                 if (request == generation) error = failure.message.orEmpty()
@@ -149,6 +152,14 @@ class FeedState(private val api: NoctApi, private val scope: CoroutineScope) {
         liked.clear()
         saved.clear()
         voted.clear()
+        supported.clear()
+    }
+
+    fun stars(post: JSONObject) = post.optLong("stars") + (supported[post.optString("id")] ?: 0)
+    fun mySupport(post: JSONObject) = post.optLong("mySupport") + (supported[post.optString("id")] ?: 0)
+    fun supported(post: JSONObject, amount: Long) {
+        val id = post.optString("id")
+        supported[id] = (supported[id] ?: 0) + amount
     }
 
     /** The option this account chose, or -1. */
@@ -206,6 +217,9 @@ fun FeedScreen(model: AppModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Noctgram", fontFamily = Brand, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, letterSpacing = (-0.6).sp, modifier = Modifier.weight(1f))
+            // The site shows its shield only to staff; the app has the administration panel for administrators.
+            if (model.me?.optBoolean("canAdmin") == true)
+                IconAction(Lucide.ShieldCheck, "Администрирование", tint = Foreground) { model.open(Screen.Admin) }
             IconAction(Lucide.SquarePen, "Новая публикация", tint = Foreground) { model.open(Screen.Composer) }
         }
         PullToRefreshBox(isRefreshing = feed.loading && feed.posts.isNotEmpty(), onRefresh = feed::refresh, modifier = Modifier.fillMaxSize()) {
@@ -299,15 +313,6 @@ fun PostCard(model: AppModel, feed: FeedState?, post: JSONObject) {
             val likes = post.optInt("likes") + (if (liked) 1 else 0) - (if (post.optInt("liked") != 0) 1 else 0)
             Counter(if (liked) Lucide.HeartFilled else Lucide.Heart, likes.toLong(), if (liked) "Убрать лайк" else "Нравится", liked) { feed.toggleLike(post) }
             Counter(Lucide.MessageCircle, post.optLong("comments"), "Комментарии", false) { model.open(Screen.Comments(post)) }
-            Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(Lucide.Eye, contentDescription = "Просмотры", tint = Muted, modifier = Modifier.size(17.dp))
-                Text(groupedNumber(post.optLong("views")), color = Muted, fontSize = 13.sp)
-            }
-            // Stars readers gave the author; sending them stays on the site for now.
-            if (post.optLong("stars") > 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Icon(Lucide.StarFilled, contentDescription = "Noct Stars", tint = Gold, modifier = Modifier.size(15.dp))
-                Text(groupedNumber(post.optLong("stars")), color = Gold, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            }
             Spacer(Modifier.weight(1f))
             val saved = feed.isSaved(post)
             IconAction(
@@ -318,7 +323,34 @@ fun PostCard(model: AppModel, feed: FeedState?, post: JSONObject) {
                 modifier = Modifier.offset(x = 10.dp),
             ) { feed.toggleSave(post) }
         }
+        if (feed != null) SupportRow(model, feed, post)
     }
+}
+
+/**
+ * The site's row under the actions: unique views on the left, Stars readers
+ * gave on the right. «Поддержать» opens the transfer, own posts only show the sum.
+ */
+@Composable
+private fun SupportRow(model: AppModel, feed: FeedState, post: JSONObject) {
+    val mine = post.optString("userId") == model.myId || post.optString("ownerId") == model.myId
+    var open by remember { mutableStateOf(false) }
+    HairlineDivider(Modifier.padding(end = 8.dp).padding(top = 2.dp))
+    Row(Modifier.fillMaxWidth().padding(end = 4.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Lucide.Eye, contentDescription = "Просмотры", tint = Muted, modifier = Modifier.size(15.dp))
+        Text(groupedNumber(post.optLong("views")), color = Muted, fontSize = 12.sp, modifier = Modifier.padding(start = 6.dp).weight(1f))
+        Row(
+            Modifier.height(36.dp).clip(CircleShape).clickable(enabled = !mine, onClickLabel = "Поддержать автора") { open = true }
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            StarsIcon(19.dp)
+            Text(groupedNumber(feed.stars(post)), color = Color(0xFFEDD07B), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(if (mine) "От читателей" else "Поддержать", color = Secondary, fontSize = 12.sp)
+        }
+    }
+    if (open) SupportSheet(model, post, feed) { open = false }
 }
 
 /** Long posts fold after eight lines behind «Ещё», as on the site. */

@@ -225,6 +225,58 @@ class ScreensTest {
         shot("design") { DesignScreen(model) }
     }
 
+    private fun adminState() = AdminState().apply {
+        loading = false
+        people = listOf(
+            JSONObject(seedy.toString()).put("administrator", 1).put("balance", 1_250_000),
+            JSONObject().put("id", "lena").put("name", "Лена Сон").put("handle", "lenason").put("avatar", "/api/media/lena")
+                .put("premium", 1).put("profileTheme", "rose").put("nameGradient", 1).put("moderator", 1).put("balance", 48_200),
+            JSONObject().put("id", "dev").put("name", "Дима Кодов").put("handle", "dimacode").put("avatar", "/api/media/dev").put("balance", 3_100),
+            JSONObject().put("id", "news").put("name", "Noctgram | Новости").put("handle", "news").put("avatar", "/api/media/me").put("kind", "channel"),
+        )
+        events = listOf(
+            JSONObject().put("id", "e1").put("action", "stars").put("amount", 5000).put("reason", "Награда за помощь в тестировании")
+                .put("created", now - 3 * 60 * minute).put("actorName", "Seedy").put("handle", "lenason"),
+            JSONObject().put("id", "e2").put("action", "collectible").put("amount", 2).put("reason", "Команда разработки")
+                .put("created", now - 26 * 60 * minute).put("actorName", "Seedy").put("handle", "dimacode")
+                .put("payload", JSONObject().put("giftId", "plush_pepe").put("firstNumber", 101).put("count", 2)
+                    .put("attributes", JSONObject().put("model", JSONObject().put("name", "Neon")).put("backdrop", JSONObject().put("name", "Midnight Blue")).put("symbol", JSONObject().put("name", "Moon"))).toString()),
+            JSONObject().put("id", "e3").put("action", "marketIssue").put("amount", 12).put("reason", "Первый выпуск красивых номеров")
+                .put("created", now - 50 * 60 * minute).put("actorName", "Seedy"),
+        )
+    }
+
+    @Test fun admin() {
+        val model = model()
+        shot("admin") { AdminContent(model, adminState(), onMore = {}) }
+    }
+
+    @Test fun adminGrant() {
+        val model = model()
+        val state = adminState().apply { selected = people[1] }
+        shot("admin_grant") { AdminContent(model, state, onMore = {}) }
+    }
+
+    @Test fun support() {
+        val model = model()
+        shot("support") { SupportPreview(model, samplePosts[0].put("mySupport", 400), balance = 1_250, amount = 100) }
+    }
+
+    @Test fun designCustom() {
+        val model = model()
+        model.preview(
+            JSONObject(account.toString()).put("profileTheme", "rose").put("ringText", "в своей орбите")
+                .put("profileBackground", JSONObject().put("mode", "custom").put("first", "#e05a8a").put("second", "#426b98").put("intensity", 34).put("musicColor", "profile").toString()),
+        )
+        shot("design_custom") { DesignScreen(model) }
+    }
+
+    @Test fun colorPicker() {
+        shot("color_picker") {
+            Box(Modifier.padding(20.dp)) { ColorPicker(androidx.compose.ui.graphics.Color(0xFFE05A8A), "Первый цвет", onPick = {}, onDismiss = {}) }
+        }
+    }
+
     @Test fun login() {
         val model = model()
         shot("login") { LoginScreen(model) }

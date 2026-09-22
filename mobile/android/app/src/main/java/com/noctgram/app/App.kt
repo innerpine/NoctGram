@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        MotionPreference.load(this)
         setContent { NoctTheme { NoctApp() } }
     }
 }
@@ -82,6 +83,7 @@ sealed interface Screen {
     data object Composer : Screen
     data object EditProfile : Screen
     data object Design : Screen
+    data object Admin : Screen
 }
 
 /**
@@ -171,6 +173,7 @@ class AppModel internal constructor(app: Application, val api: NoctApi, start: B
         api.clearSession()
         // Nothing of the previous account may flash in front of the next one.
         ImageCache.clear()
+        MotionCache.clear(getApplication())
         homeFeed.clear()
         chats.clear()
         stack.clear()
@@ -242,6 +245,7 @@ internal fun SignedIn(model: AppModel, startTab: Int = 0) {
                         Screen.Composer -> ComposerScreen(model)
                         Screen.EditProfile -> EditProfileScreen(model)
                         Screen.Design -> DesignScreen(model)
+                        Screen.Admin -> AdminScreen(model)
                     }
                 }
             }

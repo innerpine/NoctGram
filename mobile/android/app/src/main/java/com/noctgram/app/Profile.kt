@@ -145,16 +145,9 @@ private fun ProfileHeader(model: AppModel, person: JSONObject, own: Boolean, onB
     val cover = person.optString("cover")
     val id = person.optString("id")
     // Premium accounts may tint the whole card: the site's color-mix() of the chosen colours into #0b0b10.
-    val background = runCatching { JSONObject(person.optString("profileBackground")) }.getOrNull()
-    val mode = background?.optString("mode").orEmpty()
-    val tinted = look.premium && mode.isNotEmpty() && mode != "none"
-    val surface = if (tinted) {
-        val intensity = background!!.optInt("intensity", 30)
-        // ponytail: «по обложке» uses the theme colours here; sample the cover bitmap when it matters.
-        val (first, second) = if (mode == "custom") parseColor(background.optString("first")) to parseColor(background.optString("second")) else look.first to look.second
-        Brush.linearGradient(listOf(washed(first, intensity), washed(second, intensity)))
-    } else Brush.linearGradient(listOf(Card, Card))
-    val edge = if (tinted) Color(0xFF0B0B10) else Card
+    val tint = profileSurface(person)
+    val surface = Brush.linearGradient(tint ?: listOf(Card, Card))
+    val edge = tint?.first() ?: Card
     val shape = RoundedCornerShape(20.dp)
     Column(Modifier.fillMaxWidth().clip(shape).background(surface).border(1.dp, if (look.active) look.first.copy(alpha = 0.22f) else Hairline, shape)) {
         Box(
@@ -242,6 +235,24 @@ private fun ProfileHeader(model: AppModel, person: JSONObject, own: Boolean, onB
                 Stat(count, plural(count, "публикация", "публикации", "публикаций"), toPosts)
             }
         }
+        if (look.verified) VerifiedProfile(look)
+    }
+}
+
+/** The site's verification strip along the bottom of the profile card, with the Noct Verified badge. */
+@Composable
+private fun VerifiedProfile(look: Look) {
+    HairlineDivider()
+    Row(
+        Modifier.fillMaxWidth().background(Color(0x05FFFFFF)).padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        VerifiedBadge(look, 23.dp)
+        Text(
+            "Этот аккаунт подтверждён как официальный представителями NoctGram.",
+            color = Color(0xFFC9C9CE), fontSize = 12.sp, lineHeight = 18.sp,
+        )
     }
 }
 
@@ -285,9 +296,6 @@ private fun ProfileSkeleton() = Column(Modifier.fillMaxWidth().padding(12.dp)) {
         }
     }
 }
-
-private fun parseColor(hex: String): Color =
-    runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(Color(0xFF9775CF))
 
 /** Followers or subscriptions of an account, thirty at a time. */
 @Composable
