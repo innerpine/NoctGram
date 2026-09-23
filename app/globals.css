@@ -1192,6 +1192,18 @@ small {
 }
 .chat-back {
   display: none;
+  position: relative;
+}
+/* A 44 px touch target that grows into the header padding, never over the
+   peer button beside it (the header gap is at least 4 px). */
+.chat-back::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -4px;
+  width: 44px;
+  height: 44px;
+  translate: 0 -50%;
 }
 .message-list {
   flex: 1;
