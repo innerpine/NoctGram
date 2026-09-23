@@ -25,7 +25,7 @@ const { outputFiles } = await build({
         build.onResolve(
           {
             filter:
-              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog|\.\/chat-video-player)$/,
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog|\.\/chat-video-player|\.\/photo-viewer)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
@@ -35,7 +35,7 @@ const { outputFiles } = await build({
               ? 'export const useState=globalThis.__mediaState;'
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
-                : 'export const Download="Download", File="File", Dialog="Dialog", DialogContent="DialogContent", DialogTitle="DialogTitle", ChatVideoPlayer="ChatVideoPlayer";',
+                : 'export const Download="Download", File="File", ChatVideoPlayer="ChatVideoPlayer", PhotoViewer="PhotoViewer";',
         }));
       },
     },
@@ -85,18 +85,20 @@ for (const kind of ['image', 'video']) {
     assert.equal(nodes(gallery.props.children[1]).includes(stamp), true);
   }
   find(gallery, 'button').props.onClick();
-  let modal = find(render(), 'Dialog');
+  let modal = find(render(), 'PhotoViewer');
   assert.equal(modal.props.open, true);
-  assert.equal(find(modal, 'img').props.src, '/api/media/first');
+  assert.equal(modal.props.src, '/api/media/first');
+  assert.equal(find(modal, 'a').props.download, 'First.png');
   modal.props.onOpenChange(false);
-  modal = find(render(), 'Dialog');
+  modal = find(render(), 'PhotoViewer');
   assert.equal(modal.props.open, false);
-  assert.ok(
-    find(modal, 'img'),
+  assert.equal(
+    modal.props.src,
+    '/api/media/first',
     'The photo stays visible during the exit animation',
   );
   modal.props.onOpenChangeComplete(false);
-  assert.equal(find(find(render(), 'Dialog'), 'img'), undefined);
+  assert.equal(find(render(), 'PhotoViewer').props.src, '');
 }
 delete globalThis.__mediaState;
 console.log(

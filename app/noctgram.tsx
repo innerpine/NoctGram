@@ -21,6 +21,7 @@ import { ProfileRecognitions } from './profile-recognitions';
    Async subscription effects intentionally set loading state; no React compiler is enabled. */
 /* eslint-disable next/no-img-element, next/no-html-link-for-pages, react/react-compiler */
 import { StoriesBar } from './stories-bar';
+import { PhotoViewer } from './photo-viewer';
 import { reconcileSnapshot } from '@/lib/reconcile-snapshot';
 import { createFeedSnapshots, feedKey, sameSearch } from '@/lib/feed-snapshots';
 import { createChatSnapshots, type ChatSnapshot } from '@/lib/chat-snapshots';
@@ -3981,22 +3982,17 @@ export default function Noctgram({
           )}
         </DialogContent>
       </Dialog>
-      <Dialog
+      <PhotoViewer
         open={lightboxOpen}
         onOpenChange={setLightboxOpen}
         onOpenChangeComplete={(open) => {
           if (!open && !lightboxOpen) setLightbox(null);
         }}
-      >
-        <DialogContent className="lightbox">
-          <DialogTitle className="sr-only">
-            {lightbox?.name || 'Фотография'}
-          </DialogTitle>
-          {lightbox && (
-            <img src={'/api/media/' + lightbox.id} alt={lightbox.name} />
-          )}
-        </DialogContent>
-      </Dialog>
+        className="lightbox"
+        title={lightbox?.name || 'Фотография'}
+        src={lightbox ? '/api/media/' + lightbox.id : ''}
+        alt={lightbox?.name || ''}
+      />
       <AlertDialog
         open={!!deleteId}
         onOpenChange={(o) => {

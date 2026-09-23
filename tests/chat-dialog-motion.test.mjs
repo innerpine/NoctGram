@@ -55,7 +55,7 @@ const compiled = await build({
         build.onResolve(
           {
             filter:
-              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog|\.\/profile-identity|\.\/chat-text-editor|\.\/chat-emoji-text|\.\/chat-video-player)$/,
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog|\.\/profile-identity|\.\/chat-text-editor|\.\/chat-emoji-text|\.\/chat-video-player|\.\/photo-viewer)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
@@ -73,9 +73,11 @@ const compiled = await build({
                       ? 'export const ChatEmojiText="ChatEmojiText";'
                       : path === './chat-video-player'
                         ? 'export const ChatVideoPlayer="ChatVideoPlayer";'
-                        : path === './profile-identity'
-                          ? 'export const Avatar="Avatar";'
-                          : 'export const Dialog="Dialog", DialogContent="DialogContent", DialogDescription="DialogDescription", DialogTitle="DialogTitle";',
+                        : path === './photo-viewer'
+                          ? 'export const PhotoViewer="PhotoViewer";'
+                          : path === './profile-identity'
+                            ? 'export const Avatar="Avatar";'
+                            : 'export const Dialog="Dialog", DialogContent="DialogContent", DialogDescription="DialogDescription", DialogTitle="DialogTitle";',
         }));
       },
     },
@@ -305,22 +307,14 @@ void test('photo content remains visible through the closing transition and is r
   let tree = component.render();
   find(tree, 'button').props.onClick();
   tree = component.render();
-  assert.equal(find(tree, 'Dialog').props.open, true);
-  find(tree, 'Dialog').props.onOpenChange(false);
+  assert.equal(find(tree, 'PhotoViewer').props.open, true);
+  find(tree, 'PhotoViewer').props.onOpenChange(false);
   tree = component.render();
-  assert.equal(find(tree, 'Dialog').props.open, false);
-  assert.equal(
-    nodes(find(tree, 'DialogContent')).filter((node) => node.type === 'img')
-      .length,
-    1,
-  );
-  find(tree, 'Dialog').props.onOpenChangeComplete(false);
+  assert.equal(find(tree, 'PhotoViewer').props.open, false);
+  assert.equal(find(tree, 'PhotoViewer').props.src, '/api/media/photo');
+  find(tree, 'PhotoViewer').props.onOpenChangeComplete(false);
   tree = component.render();
-  assert.equal(
-    nodes(find(tree, 'DialogContent')).filter((node) => node.type === 'img')
-      .length,
-    0,
-  );
+  assert.equal(find(tree, 'PhotoViewer').props.src, '');
 });
 
 void test('pin navigation waits for the dialog to exit and retains send-time ordering', (t) => {
