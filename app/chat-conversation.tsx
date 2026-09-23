@@ -94,9 +94,13 @@ export function ChatConversation({
     confirmed.forEach((entry) => refreshed.current.add(entry.message.id));
     void onRefresh().catch((error) => notify(error.message));
   }, [outbox, me.id, peer.id, onRefresh, notify]);
-  const [initialMessages] = useState(
-    () => new Set(messages.map((message) => message.id)),
+  // History shown with the chat skips entry motion. A chat opened before its
+  // data arrived treats its first loaded batch as that history.
+  const [initialMessages, setInitialMessages] = useState(() =>
+    ready ? new Set(messages.map((message) => message.id)) : null,
   );
+  if (!initialMessages && ready)
+    setInitialMessages(new Set(messages.map((message) => message.id)));
   const [replyFocus, setReplyFocus] = useState(0);
   // Own reactions chosen but not yet confirmed by a refreshed conversation.
   const [chosenReactions, setChosenReactions] = useState<
@@ -184,9 +188,10 @@ export function ChatConversation({
       removal.current = null;
     };
   }, []);
+  // Slide in on open, even while the history is still loading.
   useLayoutEffect(() => {
-    if (ready && list.current) return revealChat(list.current);
-  }, [ready]);
+    if (list.current) return revealChat(list.current);
+  }, []);
   const latest = useRef({ onFocus, notify });
   latest.current = { onFocus, notify };
   const jumpHere = (id: string) => {
@@ -462,7 +467,7 @@ export function ChatConversation({
         onContextMenu={chatHistoryContextMenu}
       >
         <div className="chat-history-content" ref={content}>
-          {!visibleMessages.length && (
+          {ready && !visibleMessages.length && (
             <p className="chat-empty-history">Сообщений пока нет.</p>
           )}
           {visibleMessages.map((message) => (
@@ -486,7 +491,7 @@ export function ChatConversation({
               }
               onRetry={onRetry}
               onReact={onReact}
-              initial={initialMessages.has(message.id)}
+              initial={!!initialMessages?.has(message.id)}
               me={me}
               peer={peer}
               disabled={readonly}

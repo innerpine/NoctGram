@@ -178,17 +178,41 @@ export function createAppHistory(
     pending = false,
     disposed = false,
     settling = '';
-  const stateRoute = (state: unknown) => {
+  // Own entries behind this one (depth) and where the current screen began
+  // (base): tab switches inside one profile are a single screen for back().
+  let depth = 0,
+    base = 0,
+    screen = '';
+  const screenOf = (route: AppRoute) =>
+    route.page === 'profile'
+      ? 'profile:' + (route.profileId || route.handle || route.profileRef)
+      : '';
+  const stateEntry = (state: unknown) => {
     if (!state || typeof state !== 'object') return null;
     const entry = (state as Record<string, unknown>)[STATE_KEY] as
-      | { version?: number; owner?: string; route?: AppRoute }
+      | {
+          version?: number;
+          owner?: string;
+          route?: AppRoute;
+          depth?: number;
+          base?: number;
+        }
       | undefined;
     return entry?.version === 1 &&
       entry.owner === options.owner &&
       entry.route &&
       pages.has(entry.route.page)
-      ? normalizeAppRoute(entry.route)
+      ? {
+          route: normalizeAppRoute(entry.route),
+          depth: Number(entry.depth) || 0,
+          base: Number(entry.base) || 0,
+        }
       : null;
+  };
+  const track = (entry: { depth: number; base: number; route: AppRoute }) => {
+    depth = entry.depth;
+    base = Math.min(entry.base, depth);
+    screen = screenOf(entry.route);
   };
   const write = (
     mode: 'push' | 'replace',
@@ -203,10 +227,14 @@ export function createAppHistory(
         if (value) href.searchParams.set(key, value);
       }
     }
+    const next = screenOf(route);
+    if (mode === 'push') depth++;
+    if (!next || next !== screen) base = depth;
+    screen = next;
     // Preserve the router's own metadata and any unrelated state fields.
     const state = {
       ...host.history.state,
-      [STATE_KEY]: { version: 1, owner: options.owner, route },
+      [STATE_KEY]: { version: 1, owner: options.owner, route, depth, base },
     };
     host.history[mode === 'push' ? 'pushState' : 'replaceState'](
       state,
@@ -262,8 +290,8 @@ export function createAppHistory(
     }
   };
   const pop = (event: PopStateEvent) => {
-    const route = stateRoute(event.state);
-    if (!route || !appPaths.has(host.location.pathname)) {
+    const entry = stateEntry(event.state);
+    if (!entry || !appPaths.has(host.location.pathname)) {
       // A native traversal can unmount the app asynchronously. Prevent an older
       // profile request from rewriting the destination URL in the meantime.
       disposed = true;
@@ -274,7 +302,8 @@ export function createAppHistory(
     // These entries describe client views in the mounted app. Letting the
     // framework also traverse them would reload the RSC tree and reset the player.
     event.stopImmediatePropagation();
-    void transition(route, 'replace');
+    track(entry);
+    void transition(entry.route, 'replace');
   };
   const bridge = host.__noctgramHistory;
   const detach = () => {
@@ -284,9 +313,23 @@ export function createAppHistory(
   if (bridge) bridge.listener = pop;
   else host.addEventListener('popstate', pop, true);
   const initialRoute = appRouteFromURL(host.location.href, options.owner);
+  // A reload keeps its place in the app's own history.
+  track(
+    stateEntry(host.history.state) || {
+      depth: 0,
+      base: 0,
+      route: initialRoute,
+    },
+  );
   const state = {
     ...host.history.state,
-    [STATE_KEY]: { version: 1, owner: options.owner, route: initialRoute },
+    [STATE_KEY]: {
+      version: 1,
+      owner: options.owner,
+      route: initialRoute,
+      depth,
+      base,
+    },
   };
   host.history.replaceState(state, '', host.location.href);
   const ready = transition(initialRoute, 'replace', true);
@@ -305,6 +348,12 @@ export function createAppHistory(
       return transition(route, navigation.replace ? 'replace' : 'push');
     },
     cancelPending,
+    /** Returns to the view before the current screen; false when there is none. */
+    back() {
+      if (disposed || !base) return false;
+      host.history.go(base - 1 - depth);
+      return true;
+    },
     observe(input: AppRoute) {
       observed = normalizeAppRoute(input);
       if (disposed || pending) return;

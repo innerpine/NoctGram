@@ -309,6 +309,42 @@ void test('messages → profiles → gift tab restores in both directions withou
   assert.deepEqual(f.host.history.state.tree, ['existing-router-tree']);
 });
 
+void test('in-app Back leaves a profile with all its tabs and survives reloads', async () => {
+  const f = fixture();
+  f.host.history.go = (delta) => f.pop(delta);
+  await f.controller.ready;
+  assert.equal(f.controller.back(), false, 'The first view has nothing behind');
+  await f.controller.navigate({ page: 'profile', profileId: 'friend' });
+  f.observe({ page: 'profile', profileId: 'friend', profileTab: 'media' });
+  f.observe({ page: 'profile', profileId: 'friend', profileTab: 'gifts' });
+  assert.equal(f.controller.back(), true);
+  await tick();
+  assert.equal(f.ui.page, 'feed', 'Back skips the profile tab entries');
+  f.pop(1);
+  await tick();
+  assert.equal(f.ui.profileId, 'friend');
+  await f.controller.navigate({ page: 'profile', profileId: 'other' });
+  f.controller.back();
+  await tick();
+  assert.equal(f.ui.profileId, 'friend', 'Another profile is its own screen');
+  f.controller.dispose();
+  const reload = (owner) =>
+    createAppHistory(f.host, {
+      owner,
+      initial: { page: 'feed' },
+      error: () => {},
+      prepare: async (route) => ({ route, commit: () => {} }),
+    });
+  const same = reload('me');
+  await same.ready;
+  assert.equal(same.back(), true, 'A reload keeps the history behind it');
+  same.dispose();
+  const switched = reload('someone-else');
+  await switched.ready;
+  assert.equal(switched.back(), false, 'Another account starts fresh');
+  switched.dispose();
+});
+
 void test('resolving a joined group link replaces its preview and does not trap browser Back', async () => {
   const f = fixture();
   await f.controller.ready;

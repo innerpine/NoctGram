@@ -238,6 +238,14 @@ async function requestChatSnapshot(
   return { ...conversation, access };
 }
 
+// Navigation waits this briefly for data, then shows the page's loading state.
+function waitBriefly<T>(promise: Promise<T>) {
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 150)),
+  ]);
+}
+
 export default function Noctgram({
   initialPage = 'feed',
 }: {
@@ -434,8 +442,9 @@ export default function Noctgram({
     const cover = coverImage(me?.cover);
     if (!cover || accountBlocked) return;
     let active = true;
-    void coverImages.current.prepare(cover).then((src) => {
-      if (src && active) setCoverRevision((value) => value + 1);
+    // A failed decode also re-renders so the cover falls back to its URL.
+    void coverImages.current.prepare(cover).then(() => {
+      if (active) setCoverRevision((value) => value + 1);
     });
     return () => {
       active = false;
@@ -678,7 +687,7 @@ export default function Noctgram({
     async (append = false, before = Date.now() + 1, afterId = '') => {
       if (
         !myId ||
-        (page === 'profile' && profileTab === 'gifts') ||
+        (page === 'profile' && (profileTab === 'gifts' || !viewedId)) ||
         accountBlocked ||
         (page === 'profile' && profile?.blocked) ||
         [
@@ -774,7 +783,7 @@ export default function Noctgram({
     if (
       !myId ||
       accountBlocked ||
-      (page === 'profile' && profile?.blocked) ||
+      (page === 'profile' && (profile?.blocked || !viewedId)) ||
       [
         'premium',
         'stars',
@@ -820,6 +829,7 @@ export default function Noctgram({
     refresh,
     accountBlocked,
     profile?.blocked,
+    viewedId,
     profileTab,
     publicationKey,
   ]);
@@ -1148,6 +1158,8 @@ export default function Noctgram({
         conversation: Person | null = null;
       let conversationSnapshot: ChatSnapshot | undefined;
       let fetchedConversation = false;
+      let lateProfile: Promise<Profile> | undefined,
+        lateConversation: Promise<ChatSnapshot> | undefined;
       if (
         next.page === 'profile' &&
         (next.handle || next.profileRef) &&
@@ -1171,34 +1183,46 @@ export default function Noctgram({
       }
       if (next.page === 'profile') {
         const id =
-          next.profileId || (!next.handle && !next.profileRef ? myId : '');
+          next.profileId ||
+          (!next.handle && !next.profileRef ? myId || '' : '');
         person ??=
           id === myId ? me : id ? cache.profiles.get(id) || null : null;
-        person ??= await request<Profile>(
-          '?' +
-            new URLSearchParams({
-              action: 'profile',
-              ...(id
-                ? { id }
-                : next.profileRef
-                  ? { ref: next.profileRef }
-                  : { handle: next.handle || '' }),
-            }),
-        );
-        const cover = coverImage(person.cover);
-        if (cover && !person.blocked && !coverImages.current.get(cover)) {
-          setOpeningProfile(person.id);
-          try {
-            await coverImages.current.prepare(cover);
-          } finally {
-            if (chatPreparation.current === preparation) setOpeningProfile('');
-          }
+        if (!person) {
+          const loading = request<Profile>(
+            '?' +
+              new URLSearchParams({
+                action: 'profile',
+                ...(id
+                  ? { id }
+                  : next.profileRef
+                    ? { ref: next.profileRef }
+                    : { handle: next.handle || '' }),
+              }),
+          );
+          const opened = () =>
+            setOpeningProfile((value) => (value === id ? '' : value));
+          setOpeningProfile(id);
+          person = await (id ? waitBriefly(loading) : loading).catch(
+            (error) => {
+              opened();
+              throw error;
+            },
+          );
+          // A slow profile opens as its loading state and fills in on arrival.
+          if (!person) lateProfile = loading;
+          else opened();
         }
+        // The cover appears once decoded; navigation never waits for it.
+        const cover = coverImage(person?.cover);
+        if (cover && !person?.blocked && !coverImages.current.get(cover))
+          void coverImages.current
+            .prepare(cover)
+            .then(() => setCoverRevision((value) => value + 1));
         next = {
           page: 'profile',
-          profileId: person.id,
-          handle: person.handle,
-          ...(next.boost && person.kind === 'channel' && !person.blocked
+          profileId: person?.id || id,
+          handle: person?.handle || '',
+          ...(next.boost && person?.kind === 'channel' && !person.blocked
             ? { boost: true }
             : {}),
           profileTab: next.profileTab || 'posts',
@@ -1215,15 +1239,21 @@ export default function Noctgram({
           throw new Error('Выберите личный диалог');
         conversationSnapshot = chatSnapshots.current.get(conversation.id);
         if (!conversationSnapshot) {
-          const ticket = chatSnapshots.current.begin(conversation.id);
-          setOpeningChat(conversation.id);
-          try {
-            const snapshot = await requestChatSnapshot(conversation.id);
-            conversationSnapshot =
+          const id = conversation.id;
+          const ticket = chatSnapshots.current.begin(id);
+          setOpeningChat(id);
+          const loading = requestChatSnapshot(id).then((snapshot) => {
+            const saved =
               chatSnapshots.current.save(snapshot, ticket) ||
-              chatSnapshots.current.get(conversation.id, ticket.generation);
-            if (!conversationSnapshot)
+              chatSnapshots.current.get(id, ticket.generation);
+            if (!saved)
               throw new Error('Аккаунт изменился. Откройте диалог снова.');
+            return saved;
+          });
+          try {
+            // A slow chat opens with its loading state and fills in on arrival.
+            conversationSnapshot = (await waitBriefly(loading)) || undefined;
+            if (!conversationSnapshot) lateConversation = loading;
             fetchedConversation = true;
           } finally {
             if (chatPreparation.current === preparation) setOpeningChat('');
@@ -1250,9 +1280,45 @@ export default function Noctgram({
             setBoostOpen((current) =>
               current ? { ...current, open: false } : null,
             );
-          if (destination.page === 'profile' && person) setProfile(person);
+          if (destination.page === 'profile') setProfile(person);
           if (destination.page === 'profile')
             setProfileTab(destination.profileTab || 'posts');
+          if (lateProfile) {
+            const id = destination.profileId;
+            // Fill the opened profile in, unless the viewer has moved on.
+            const here = () =>
+              chatPreparation.current === preparation &&
+              navigationLatest.current!.route.page === 'profile' &&
+              !navigationLatest.current!.route.profileId;
+            void lateProfile
+              .then(
+                (loaded) => {
+                  if (!here()) return;
+                  cache.profiles.set(loaded.id, loaded);
+                  void appHistory.current?.navigate(
+                    {
+                      page: 'profile',
+                      profileId: loaded.id,
+                      handle: loaded.handle,
+                      profileTab: destination.profileTab,
+                    },
+                    { replace: true },
+                  );
+                },
+                (error: Error) => {
+                  if (!here()) return;
+                  notify(error.message);
+                  if (!appHistory.current?.back())
+                    void appHistory.current?.navigate(
+                      { page: 'feed' },
+                      { replace: true },
+                    );
+                },
+              )
+              .finally(() =>
+                setOpeningProfile((value) => (value === id ? '' : value)),
+              );
+          }
           if (
             destination.page === 'messages' &&
             (navigationLatest.current!.route.page !== 'messages' ||
@@ -1274,6 +1340,21 @@ export default function Noctgram({
               setMessages([]);
               setMessageAccess(null);
               setChatAppearance(null);
+            }
+            if (conversation && lateConversation) {
+              const id = conversation.id;
+              void lateConversation.then(
+                (saved) => {
+                  if (activePeer.current === id)
+                    applyChatSnapshot(
+                      id,
+                      chatSnapshots.current.get(id) || saved,
+                    );
+                },
+                (error: Error) => {
+                  if (activePeer.current === id) notify(error.message);
+                },
+              );
             }
             setMessageText(
               conversation ? cache.drafts.get(conversation.id) || '' : '',
@@ -2463,7 +2544,9 @@ export default function Noctgram({
               <div
                 className="profile-cover"
                 style={
-                  coverImage(profile.cover)
+                  // A cover still being decoded shows once, without a second download.
+                  coverImage(profile.cover) &&
+                  !coverImages.current.loading(profile.cover)
                     ? {
                         backgroundImage: `url(${coverImages.current.get(profile.cover) || profile.cover})`,
                       }

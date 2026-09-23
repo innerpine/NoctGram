@@ -73,8 +73,10 @@ void test('preparing a cover coalesces requests and exposes it only after image 
     second = f.cache.prepare('/api/media/cover');
   assert.equal(first, second);
   assert.equal(f.cache.get('/api/media/cover'), undefined);
+  assert.equal(f.cache.loading('/api/media/cover'), true);
   decode.resolve();
   const src = await first;
+  assert.equal(f.cache.loading('/api/media/cover'), false);
   assert.equal(f.cache.get('/api/media/cover'), src);
   assert.equal(await f.cache.prepare('/api/media/cover'), src);
   assert.equal(f.calls.length, 1);
@@ -135,6 +137,7 @@ void test('failed, denied and non-image responses are not cached and can be retr
     f.state.response = response;
     assert.equal(await f.cache.prepare('/api/media/fail'), undefined);
     assert.equal(f.cache.get('/api/media/fail'), undefined);
+    assert.equal(f.cache.loading('/api/media/fail'), false, 'falls back');
   }
   f.state.response = () =>
     new Response(new Blob(['cover'], { type: 'image/png' }), {
