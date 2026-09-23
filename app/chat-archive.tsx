@@ -4,6 +4,8 @@ import {
   Archive,
   ArchiveRestore,
   ArrowLeft,
+  Bell,
+  BellOff,
   MoreHorizontal,
 } from 'lucide-react';
 import {
@@ -14,7 +16,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { request } from '@/lib/client';
 import { roomAction } from '@/lib/rooms-client';
-import { ChatNotificationsItem } from './chat-notifications';
+import { createRowSwipe } from '@/lib/chat-row-swipe';
+import {
+  ChatNotificationsItem,
+  useChatNotifications,
+} from './chat-notifications';
 
 export function ArchiveRow({
   owner,
@@ -42,6 +48,14 @@ export function ArchiveRow({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  // Swipe actions mount (and load the mute state) on the first swipe.
+  const [revealed, setRevealed] = useState(false);
+  const [swipe] = useState(() => createRowSwipe(() => setRevealed(true)));
+  useEffect(() => () => swipe.dispose(), [swipe]);
+  const sound = useChatNotifications(
+    { owner, peer: id, kind, onChanged: onDone },
+    revealed,
+  );
   const move = async () => {
     if (locked.current) return;
     locked.current = true;
@@ -72,7 +86,48 @@ export function ArchiveRow({
     }
   };
   return (
-    <div className="archive-row-wrap">
+    <div
+      className="archive-row-wrap"
+      onPointerDown={swipe.onPointerDown}
+      onPointerMove={swipe.onPointerMove}
+      onPointerUp={swipe.onPointerUp}
+      onPointerCancel={swipe.onPointerCancel}
+      onLostPointerCapture={swipe.onLostPointerCapture}
+      onClickCapture={swipe.onClickCapture}
+    >
+      {revealed && (
+        // Touch shortcuts for the row menu below, which stays the accessible path.
+        <div
+          className="archive-row-actions"
+          data-row-actions
+          aria-hidden="true"
+        >
+          <button
+            type="button"
+            tabIndex={-1}
+            disabled={!sound.state || sound.busy}
+            onClick={() => {
+              swipe.close();
+              void sound.toggle();
+            }}
+          >
+            {sound.state?.muted ? <Bell size={18} /> : <BellOff size={18} />}
+            {sound.state?.muted ? 'Со звуком' : 'Без звука'}
+          </button>
+          <button
+            type="button"
+            tabIndex={-1}
+            disabled={busy}
+            onClick={() => {
+              swipe.close();
+              void move();
+            }}
+          >
+            {archived ? <ArchiveRestore size={18} /> : <Archive size={18} />}
+            {archived ? 'Из архива' : 'В архив'}
+          </button>
+        </div>
+      )}
       {children}
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger
@@ -98,9 +153,9 @@ export function ArchiveRow({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {error && (
+      {(error || sound.error) && (
         <span className="archive-error" role="alert">
-          {error}
+          {error || sound.error}
         </span>
       )}
     </div>
