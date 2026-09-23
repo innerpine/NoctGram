@@ -1,5 +1,9 @@
 import { setting } from './auth-session';
 import { assertSpamIdentity } from './antispam';
+import {
+  profileDetailsInput,
+  profileDetailsStatements,
+} from './profile-details';
 import { assertStaticAvatar } from './avatar-media';
 import { appearanceColumns } from '@/lib/premium-access';
 import { assertMediaRead, mediaAssignment } from '@/lib/media-access';
@@ -106,6 +110,15 @@ export async function featureGet(
       await Promise.all(rows.results.map((r) => profile(r.id, me))),
     );
   }
+  if (action === 'myChannels') {
+    const rows = await d
+      .prepare(
+        `SELECT c.id,c.name,c.avatar,c.kind,c.ownerId,${appearanceColumns('c')},h.handle FROM users c LEFT JOIN handles h ON h.userId=c.id AND h.main=1 WHERE c.kind='channel' AND c.ownerId=? AND c.deletedAt=0 ORDER BY c.created,c.id`,
+      )
+      .bind(me)
+      .all();
+    return Response.json({ channels: rows.results });
+  }
   if (action === 'wallet') {
     await ensureWallet(me);
     const before = Number(s.get('before')) || Date.now() + 1;
@@ -210,6 +223,8 @@ export async function featurePost(
           : await validImage(b.cover, me, current?.cover);
     if (avatar && avatar !== current?.avatar) await assertStaticAvatar(avatar);
     const statements = [];
+    // Location, links, birthday and channel cards belong to the actor's own person profile only.
+    const details = target === me ? await profileDetailsInput(b, me) : null;
     await assertSpamIdentity(
       me,
       name,
@@ -220,6 +235,13 @@ export async function featurePost(
             (value): value is string => typeof value === 'string',
           )
         : []),
+      ...[
+        details?.location,
+        details?.website,
+        details?.instagram,
+        details?.tiktok,
+        details?.youtube,
+      ].filter((value): value is string => !!value),
     );
     // mediaAssignment repeats its expressions; use an input CTE to bind each value once.
     const eligibility = `WITH input AS(SELECT ? AS actor,? AS avatar,? AS cover),eligible AS(SELECT u.id FROM users u,input i WHERE u.id=? AND ${mediaAssignment('u.avatar', 'i.avatar', 'i.actor')} AND ${mediaAssignment('u.cover', 'i.cover', 'i.actor')})`;
@@ -278,6 +300,10 @@ export async function featurePost(
           .bind(Date.now(), target),
       );
     }
+    if (details)
+      statements.push(
+        ...profileDetailsStatements(me, details, eligibility, eligibilityArgs),
+      );
     statements.push(
       d
         .prepare(

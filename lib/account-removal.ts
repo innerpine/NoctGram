@@ -199,7 +199,12 @@ export async function deleteAccount(
       )
       .bind(me, ...args),
   );
-  for (const table of ['profile_appearance', 'premium_entitlements', 'handles'])
+  for (const table of [
+    'profile_appearance',
+    'profile_details',
+    'premium_entitlements',
+    'handles',
+  ])
     statements.push(
       d
         .prepare(`DELETE FROM ${table} WHERE userId IN(${own}) AND ${gate}`)
@@ -211,6 +216,11 @@ export async function deleteAccount(
         `UPDATE channel_boost_slots SET channelId=NULL WHERE channelId IN(${own}) AND ${gate}`,
       )
       .bind(me, me, ...args),
+    d
+      .prepare(
+        `DELETE FROM profile_channels WHERE (userId IN(${own}) OR channelId IN(${own})) AND ${gate}`,
+      )
+      .bind(me, me, me, me, ...args),
   );
   statements.push(
     d

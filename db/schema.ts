@@ -1184,6 +1184,37 @@ export const profileAppearance = sqliteTable('profile_appearance', {
   updated: integer().notNull(),
 });
 
+// Person profile details (PROFILE_DETAILS.md); users.* stays free of them because profile() spreads it.
+export const profileDetails = sqliteTable('profile_details', {
+  userId: text()
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  location: text().notNull().default(''),
+  website: text().notNull().default(''),
+  instagram: text().notNull().default(''),
+  tiktok: text().notNull().default(''),
+  youtube: text().notNull().default(''),
+  birthday: text().notNull().default(''),
+  showBirthYear: integer().notNull().default(1),
+  updated: integer().notNull(),
+});
+export const profileChannels = sqliteTable(
+  'profile_channels',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    channelId: text()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    position: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.channelId] }),
+    index('profile_channels_channel').on(t.channelId),
+  ],
+);
+
 // Linking requires proof from both the signed-in website and the private bot chat.
 export const telegramChallenges = sqliteTable('telegram_challenges', {
   id: text().primaryKey(),

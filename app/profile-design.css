@@ -324,8 +324,23 @@
   background: transparent;
 }
 .profile-card[data-profile-background='true']
-  :is(.bio, .profile-details, .profile-stats, .profile-aliases) {
+  :is(
+    .bio,
+    .profile-details,
+    .profile-stats,
+    .profile-aliases,
+    .profile-channel-top,
+    .profile-channel-body > time
+  ) {
   color: #ffffffb8;
+}
+.profile-card[data-profile-background='true']
+  :is(.profile-social, .profile-channel-card) {
+  background: #00000024;
+}
+.profile-card[data-profile-background='true']
+  :is(.profile-social, .profile-channel-card):hover {
+  background: #0000003d;
 }
 .profile-card[data-profile-background='true'] .profile-saved-link {
   background: #00000020;

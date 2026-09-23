@@ -1,5 +1,16 @@
 # Обновление локальной версии
 
+## Сведения профиля и личные каналы — 23 сентября
+
+Примените `0049_profile_details.sql`, предварительно сохранив резервную копию базы:
+
+```sh
+npx wrangler d1 export DB --local --config wrangler.local.json --output work/before-profile-details.sql
+npx wrangler d1 execute DB --local --config wrangler.local.json --file drizzle/0049_profile_details.sql
+```
+
+Миграция только добавляет таблицы `profile_details` (местоположение, сайт, Instagram, TikTok, YouTube, дата рождения) и `profile_channels` (до трёх своих каналов в профиле); существующие данные не меняются. Подробнее — [PROFILE_DETAILS.md](PROFILE_DETAILS.md).
+
 ## Noct Market — 21 сентября
 
 Примените `0048_market.sql`, предварительно сохранив резервную копию `.wrangler/state`:
