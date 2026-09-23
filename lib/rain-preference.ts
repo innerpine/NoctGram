@@ -10,9 +10,11 @@ export type RainPreference = RainOptions & {
   mode: 'site' | 'player' | 'off';
   player: 'full-and-dock' | 'full';
 };
+// No full-viewport motion by default: rain stays in the player until someone
+// chooses the whole site. A saved choice (including 'site') is kept.
 export const defaultRainPreference: RainPreference = {
   ...defaultRainOptions,
-  mode: 'site',
+  mode: 'player',
   player: 'full-and-dock',
 };
 export function readRainPreference(value: unknown): RainPreference {
@@ -20,7 +22,11 @@ export function readRainPreference(value: unknown): RainPreference {
   return {
     ...readRainOptions(value),
     mode:
-      input?.mode === 'off' || input?.mode === 'player' ? input.mode : 'site',
+      input?.mode === 'off' ||
+      input?.mode === 'player' ||
+      input?.mode === 'site'
+        ? input.mode
+        : defaultRainPreference.mode,
     player: input?.player === 'full' ? 'full' : 'full-and-dock',
   };
 }

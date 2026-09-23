@@ -335,9 +335,14 @@ await test('rain modes select only their surfaces and malformed settings stay bo
   ])
     assert.deepEqual(readRainPreference(input), {
       ...defaultRainOptions,
-      mode: 'site',
+      mode: 'player',
       player: 'full-and-dock',
     });
+  assert.equal(
+    readRainPreference({ mode: 'site' }).mode,
+    'site',
+    'A saved whole-site choice survives the player-only default',
+  );
   const scopes = ['site', 'full', 'dock'];
   for (const [mode, player, expected] of [
     ['off', 'full-and-dock', [false, false, false]],
