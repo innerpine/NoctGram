@@ -19,7 +19,7 @@ const { DYNAMIC_TYPE_BOOTSTRAP } = await import(
 function rootSize({ apple = true, touch = 5, body = 17 } = {}) {
   const root = { style: {}, appendChild() {} };
   runInNewContext(DYNAMIC_TYPE_BOOTSTRAP, {
-    CSS: { supports: (property, value) => apple && property === 'font' },
+    CSS: { supports: (property) => apple && property === 'font' },
     navigator: { maxTouchPoints: touch },
     document: {
       documentElement: root,
