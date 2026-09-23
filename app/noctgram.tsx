@@ -435,6 +435,8 @@ export default function Noctgram({
   const coverImages = useRef(createProfileCoverCache());
   const [, setCoverRevision] = useState(0);
   const [openingProfile, setOpeningProfile] = useState('');
+  // The own profile opened from its tab is a root view without a back arrow.
+  const [profileRoot, setProfileRoot] = useState(false);
   coverImages.current.reset(
     accountBlocked || !me ? '' : me.id + ':' + privacyVersion,
   );
@@ -470,6 +472,8 @@ export default function Noctgram({
     premiumReturn = useRef('feed'),
     starsReturn = useRef('feed'),
     actionLock = useRef(false),
+    rootNavigation = useRef(false),
+    rootTab = useRef('feed'),
     itemLocks = useRef(new Set<string>()),
     postRequests = useRef<ReturnType<typeof createLatestRequests> | null>(null);
   const appHistory = useRef<ReturnType<typeof createAppHistory> | null>(null);
@@ -900,18 +904,25 @@ export default function Noctgram({
       ...(page === 'music' ? { musicTab } : {}),
       ...(page === 'feed' ? { mode } : {}),
     });
-  const navigate = (v: string) => {
+  // Resolves false when the section did not open (sign-in, no access, failure).
+  const openSection = (v: string): boolean | Promise<boolean> => {
     if (
       ['profile', 'saved', 'messages', 'channels', 'stars'].includes(v) &&
       !auth()
     )
-      return;
-    if (v === 'moderation' && !me?.canModerate) return;
+      return false;
+    if (v === 'moderation' && !me?.canModerate) return false;
     if (v === 'premium' && page !== 'premium') premiumReturn.current = page;
     if (v === 'stars' && page !== 'stars') starsReturn.current = page;
     if (v === 'profile' && appHistory.current) {
-      void appHistory.current.navigate({ page: 'profile', profileId: me!.id });
-      return;
+      // Prepare reads this synchronously: the own profile opens as a root.
+      rootNavigation.current = true;
+      const opened = appHistory.current.navigate({
+        page: 'profile',
+        profileId: me!.id,
+      });
+      rootNavigation.current = false;
+      return opened;
     }
     setQuery('');
     setPage(v);
@@ -920,6 +931,10 @@ export default function Noctgram({
       setProfileTab('posts');
     }
     if (v === 'search') searchRef.current?.focus({ preventScroll: true });
+    return true;
+  };
+  const navigate = (v: string) => {
+    void openSection(v);
   };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -1143,6 +1158,7 @@ export default function Noctgram({
     notify,
     prepare: async (next) => {
       const preparation = ++chatPreparation.current;
+      const root = rootNavigation.current;
       setOpeningChat('');
       setOpeningProfile('');
       if (
@@ -1280,9 +1296,11 @@ export default function Noctgram({
             setBoostOpen((current) =>
               current ? { ...current, open: false } : null,
             );
-          if (destination.page === 'profile') setProfile(person);
-          if (destination.page === 'profile')
+          if (destination.page === 'profile') {
+            setProfile(person);
             setProfileTab(destination.profileTab || 'posts');
+            setProfileRoot(root);
+          }
           if (lateProfile) {
             const id = destination.profileId;
             // Fill the opened profile in, unless the viewer has moved on.
@@ -2104,6 +2122,40 @@ export default function Noctgram({
     await Promise.all([loadThreads(), roomList.refresh()]);
   };
   const online = !!profile?.lastSeen && Date.now() - profile.lastSeen < 120000;
+  // The bar highlights the current section; someone else's profile keeps the
+  // tab it was opened from, as a pushed screen does on iOS.
+  const ownProfile = page === 'profile' && !!me && profile?.id === me.id;
+  const pageTab =
+    page === 'music-services'
+      ? 'music'
+      : page === 'saved' || ownProfile
+        ? 'profile'
+        : page === 'profile'
+          ? ''
+          : page;
+  if (['feed', 'messages', 'channels', 'music', 'profile'].includes(pageTab))
+    rootTab.current = pageTab;
+  const navTab = pageTab || rootTab.current;
+  const refreshPage = () => {
+    if (['music', 'music-services'].includes(page)) {
+      window.dispatchEvent(new Event('noctgram:music-refresh'));
+    } else if (me) void refresh();
+    else void bootstrap();
+  };
+  // Tapping the open tab again scrolls to the top, and at the top refreshes.
+  const selectTab = (v: string) => {
+    if (v === 'search' || v !== page || (v === 'profile' && !ownProfile))
+      return openSection(v);
+    if (window.scrollY > 0)
+      window.scrollTo({
+        top: 0,
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'instant'
+          : 'smooth',
+      });
+    else refreshPage();
+    return true;
+  };
   if (accountBlocked && me)
     return (
       <>
@@ -2181,9 +2233,10 @@ export default function Noctgram({
           noctgram<span className="alpha">α</span>
         </AppLink>
         <MainNavigation
-          page={page}
+          active={navTab}
+          origin={rootTab.current}
           href={navigationHref}
-          navigate={navigate}
+          navigate={selectTab}
           openingProfile={!!openingProfile}
           unread={unread}
         />
@@ -2375,14 +2428,9 @@ export default function Noctgram({
               <Search size={20} />
             </AppLink>
             <button
-              className="icon-button"
+              className="icon-button page-refresh"
               aria-label="Обновить"
-              onClick={() => {
-                if (['music', 'music-services'].includes(page)) {
-                  window.dispatchEvent(new Event('noctgram:music-refresh'));
-                } else if (me) void refresh();
-                else void bootstrap();
-              }}
+              onClick={refreshPage}
             >
               <RefreshCw size={18} />
             </button>
@@ -2557,14 +2605,18 @@ export default function Noctgram({
                 {profile.cover === LIQUID_COVER && profile.avatar && (
                   <LiquidCover src={profile.avatar} />
                 )}
-                <AppLink
-                  className="back-button"
-                  aria-label="Вернуться в ленту"
-                  href={navigationHref('feed')}
-                  onNavigate={() => navigate('feed')}
-                >
-                  <ArrowLeft size={18} />
-                </AppLink>
+                {!(ownProfile && profileRoot) && (
+                  <AppLink
+                    className="back-button"
+                    aria-label="Назад"
+                    href={navigationHref('feed')}
+                    onNavigate={() => {
+                      if (!appHistory.current?.back()) navigate('feed');
+                    }}
+                  >
+                    <ArrowLeft size={18} />
+                  </AppLink>
+                )}
                 {profileEditable && (
                   <button
                     className="cover-edit"

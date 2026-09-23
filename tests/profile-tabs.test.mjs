@@ -516,6 +516,65 @@ try {
   console.log(
     'Room entry passed: plus placement, controlled dialogs, account isolation and mobile conversation state.',
   );
+  const viewer = account('bar-viewer');
+  states.set(stateSlots.get('me'), viewer);
+  states.set(stateSlots.get('roomTarget'), null);
+  states.set(stateSlots.get('page'), 'profile');
+  states.set(stateSlots.get('profileTab'), 'posts');
+  const view = () => {
+    const tree = render();
+    return {
+      bar: all(tree, 'MainNavigation')[0].props,
+      back: all(tree, 'AppLink').some(
+        (node) => node.props.className === 'back-button',
+      ),
+    };
+  };
+  states.set(stateSlots.get('profile'), account('someone'));
+  assert.equal(view().bar.active, 'feed', 'Other profiles keep their tab');
+  assert.equal(view().back, true);
+  states.set(stateSlots.get('profile'), viewer);
+  states.set(stateSlots.get('profileRoot'), false);
+  assert.equal(view().bar.active, 'profile');
+  assert.equal(view().back, true, 'The own profile opened from a post');
+  states.set(stateSlots.get('profileRoot'), true);
+  assert.equal(view().back, false, 'The Profile tab is a root view');
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const scrolls = [],
+    events = [];
+  const host = {
+    scrollY: 300,
+    scrollTo: (options) => scrolls.push(options),
+    matchMedia: () => ({ matches: false }),
+    dispatchEvent: (event) => events.push(event.type),
+  };
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: host,
+  });
+  try {
+    states.set(stateSlots.get('page'), 'music');
+    assert.equal(view().bar.navigate('music'), true);
+    assert.deepEqual(scrolls, [{ top: 0, behavior: 'smooth' }]);
+    host.matchMedia = () => ({ matches: true });
+    view().bar.navigate('music');
+    assert.equal(scrolls[1].behavior, 'instant', 'Reduced motion jumps');
+    host.scrollY = 0;
+    view().bar.navigate('music');
+    assert.deepEqual(
+      events,
+      ['noctgram:music-refresh'],
+      'At the top it refreshes',
+    );
+    assert.equal(scrolls.length, 2);
+  } finally {
+    if (originalWindow)
+      Object.defineProperty(globalThis, 'window', originalWindow);
+    else delete globalThis.window;
+  }
+  console.log(
+    'Bottom bar passed: own/other profile tab, root profile without Back, re-tap scrolls then refreshes.',
+  );
 } finally {
   delete globalThis[hookKey];
 }

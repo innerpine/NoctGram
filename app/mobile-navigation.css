@@ -18,10 +18,29 @@
     flex-shrink: 0;
   }
   .page-header h1 {
+    order: -2;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* Tapping the open tab again refreshes, so the header leaves room for the
+     title. The loading icon sits just after the title without taking space. */
+  .page-header .page-refresh {
+    display: none;
+  }
+  .page-header .page-loading-indicator {
+    order: -1;
+    position: relative;
+    flex: 0 0 0;
+    width: 0;
+    /* Cancels the header's 4px gap. */
+    margin-inline-start: -4px;
+  }
+  .page-header .page-loading-indicator svg {
+    position: absolute;
+    top: -7.5px;
+    left: 4px;
   }
   :root,
   .dark {
