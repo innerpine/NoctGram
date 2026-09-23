@@ -56,6 +56,7 @@ import './mobile-navigation.css';
 import './profile-workspace.css';
 import './settings.css';
 import './rain.css';
+import './accessibility.css';
 import { RainEffect } from './rain-effect';
 import { MusicProvider } from './music-provider';
 import { APP_HISTORY_BOOTSTRAP } from '@/lib/app-history-bootstrap';

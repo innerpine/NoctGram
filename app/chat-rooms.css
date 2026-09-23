@@ -111,8 +111,6 @@
 }
 /* Retain opacity: 0 until Base UI removes the closing portal. */
 .room-dialog-overlay[data-slot='dialog-overlay'] {
-  background: #0009 !important;
-  backdrop-filter: blur(7px);
   animation: none !important;
   opacity: 1;
   transition: opacity 180ms ease;

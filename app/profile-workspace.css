@@ -25,7 +25,7 @@
   position: relative;
   isolation: isolate;
   border-radius: 16px;
-  border-color: #ffffff16;
+  border-color: var(--border);
   background: #101013;
 }
 .profile-shell .profile-card[data-profile-background='true'] {
@@ -73,6 +73,15 @@
   z-index: 2;
   border-color: #ffffff24;
   background: #101013b8;
+  /* Keeps the arrow legible over busy cover photos. */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+/* A 44px touch target around the 36px chip (inset is from its padding box). */
+.profile-shell :is(.back-button, .cover-edit)::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
 }
 .profile-shell .back-button {
   left: 12px;

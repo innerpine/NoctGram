@@ -45,6 +45,9 @@
   --hairline: #ffffff0a;
   --body: #ffffffa6;
   --ring: #d4d4d4;
+  /* One dimming layer behind every modal. */
+  --scrim: #000000b3;
+  --scrim-blur: 8px;
 }
 * {
   box-sizing: border-box;
@@ -467,7 +470,7 @@ time,
 }
 .feed-tabs [data-slot='tabs-list'] {
   background: #0e0e0e;
-  border: 1px solid #ffffff08;
+  border: 1px solid var(--hairline);
   border-radius: 50px;
   width: 100%;
   height: 45px !important;
@@ -958,7 +961,7 @@ time,
   align-items: center;
   gap: 9px;
   padding: 0 13px;
-  border: 1px solid #ffffff15;
+  border: 1px solid var(--border);
   border-radius: 12px;
   background: #ffffff05;
   min-width: 0;
@@ -1141,17 +1144,35 @@ time,
 .threads-panel {
   width: 250px;
   flex-shrink: 0;
-  border-right: 1px solid #ffffff12;
+  border-right: 1px solid var(--border);
   overflow: auto;
   overscroll-behavior-y: contain;
 }
 .threads-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   padding: 12px 14px;
   font-size: 0.75rem;
   color: #999;
   border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+/* The divider stays hidden until dialogs scroll under the heading; without
+   scroll timelines (or with animations off) it simply stays visible. */
+@supports (animation-timeline: scroll()) {
+  .threads-heading {
+    animation: threads-heading-edge linear both;
+    animation-timeline: scroll();
+    animation-range: 0 24px;
+  }
+  @keyframes threads-heading-edge {
+    from {
+      border-bottom-color: transparent;
+    }
+  }
 }
 .thread-row {
   display: flex;
@@ -1340,8 +1361,9 @@ time,
 }
 [data-slot='dialog-overlay'],
 [data-slot='alert-dialog-overlay'] {
-  background: #000b !important;
-  backdrop-filter: blur(6px);
+  background: var(--scrim) !important;
+  backdrop-filter: blur(var(--scrim-blur));
+  -webkit-backdrop-filter: blur(var(--scrim-blur));
 }
 .noct-dialog .primary {
   min-height: 40px;

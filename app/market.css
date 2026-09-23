@@ -102,16 +102,16 @@
   margin-top: 2px;
 }
 
-/* header */
+/* header; the installed app draws it under the translucent status bar */
 .mk-hdr {
   position: sticky;
   top: 0;
   z-index: 6;
-  height: 64px;
+  height: calc(64px + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 0 24px;
+  padding: env(safe-area-inset-top, 0px) 24px 0;
   border-bottom: 1px solid var(--mk-b8);
   background: #000;
 }
@@ -586,10 +586,10 @@ select.mk-chip option {
   width: 264px;
   flex: none;
   line-height: 1.4;
-  max-height: calc(100dvh - 112px);
+  max-height: calc(100dvh - 112px - env(safe-area-inset-top, 0px));
   overflow: auto;
   position: sticky;
-  top: 88px;
+  top: calc(88px + env(safe-area-inset-top, 0px));
 }
 .mk-grid {
   flex: 1;
@@ -729,7 +729,7 @@ select.mk-chip option {
   width: 400px;
   flex: none;
   position: sticky;
-  top: 88px;
+  top: calc(88px + env(safe-area-inset-top, 0px));
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -952,9 +952,9 @@ select.mk-chip option {
 /* phone */
 @media (max-width: 720px) {
   .mk-hdr {
-    height: 56px;
+    height: calc(56px + env(safe-area-inset-top, 0px));
     gap: 12px;
-    padding: 0 16px;
+    padding: env(safe-area-inset-top, 0px) 16px 0;
   }
   .mk-hdr .mk-nav,
   .mk-hdr .mk-search,
@@ -1061,8 +1061,11 @@ select.mk-chip option {
     z-index: 7;
     height: calc(64px + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: #000;
-    border-top: 1px solid var(--mk-b8);
+    /* The main tab bar's glass material. */
+    background: linear-gradient(135deg, #18181bc9, #0f0f12df);
+    border-top: 1px solid #ffffff24;
+    backdrop-filter: blur(22px) saturate(1.15);
+    -webkit-backdrop-filter: blur(22px) saturate(1.15);
     display: flex;
   }
   .mk-bnav a {

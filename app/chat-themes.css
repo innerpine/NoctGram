@@ -4,8 +4,20 @@
   background-image: var(--chat-backdrop);
 }
 .chat-themed .chat-header {
+  position: relative;
+  z-index: 1;
+  border-bottom-color: transparent;
   background: var(--chat-base);
   flex-shrink: 0;
+}
+/* A soft scroll edge instead of a hard divider: messages fade out under it. */
+.chat-themed .chat-header::after {
+  content: '';
+  position: absolute;
+  inset: 100% 0 auto;
+  height: 12px;
+  background: linear-gradient(var(--chat-base), transparent);
+  pointer-events: none;
 }
 .chat-header .chat-peer {
   min-width: 0;
@@ -88,10 +100,6 @@
   gap: 16px;
   border-radius: 22px;
   background: #161618 !important;
-}
-.chat-theme-overlay {
-  background: #0009;
-  backdrop-filter: blur(7px);
 }
 .chat-theme-heading {
   padding-right: 20px;

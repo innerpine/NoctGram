@@ -631,7 +631,6 @@
   border: 1px solid #ffffff24;
   background: #161616f5;
   box-shadow: 0 12px 70px #000b;
-  backdrop-filter: blur(20px);
   animation: music-player-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 body:has(.music-player) {
