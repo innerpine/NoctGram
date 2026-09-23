@@ -31,6 +31,7 @@ import {
   type Profile,
 } from '@/lib/client';
 import { Avatar } from './post-card';
+import { useViewerGesture } from './use-viewer-gesture';
 type Story = Person & {
   userId: string;
   text: string;
@@ -73,13 +74,15 @@ export function StoriesBar({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [paused, setPaused] = useState(false),
+    [holding, setHolding] = useState(false),
     [progress, setProgress] = useState(0),
     [reporting, setReporting] = useState(false),
     [reason, setReason] = useState(''),
     [viewers, setViewers] = useState<Person[] | null>(null),
     [mediaReady, setMediaReady] = useState(false);
   const activeStory = useRef<string | null>(null),
-    picture = useRef<HTMLImageElement>(null);
+    picture = useRef<HTMLImageElement>(null),
+    avatar = useRef<Element | null>(null);
   const visible = useRef(active),
     lastLoaded = useRef(0),
     reloadStories = useRef<() => void>(() => {});
@@ -113,6 +116,21 @@ export function StoriesBar({
     if (index + 1 < playlist.length) setIndex(index + 1);
     else setOpen(false);
   }, [index, playlist.length]);
+  // On the media: hold pauses, a tap in the left third goes back, anywhere
+  // else forward, and a drag down closes into the avatar it opened from.
+  const viewerRef = useViewerGesture({
+    open,
+    origin: () => avatar.current,
+    accepts: (target) => !!target.closest('.story-media'),
+    dismiss: { share: 0.25, speed: 500 },
+    onDismiss: () => setOpen(false),
+    onTap: (x, width) => {
+      if (busy || reporting || viewers !== null) return;
+      if (x < width / 3) setIndex((v) => Math.max(0, v - 1));
+      else next();
+    },
+    onHold: setHolding,
+  });
   useEffect(() => {
     let live = true,
       pending = false;
@@ -159,6 +177,7 @@ export function StoriesBar({
     if (!open || !current) return;
     setViewers(null);
     setReporting(false);
+    setHolding(false);
     setMediaReady(
       !current.mediaId ||
         !!picture.current?.complete ||
@@ -184,7 +203,7 @@ export function StoriesBar({
   useEffect(() => {
     if (!open || !current) return;
     const stopped =
-      paused || reporting || viewers !== null || busy || !mediaReady;
+      paused || holding || reporting || viewers !== null || busy || !mediaReady;
     const v = video.current;
     if (stopped) v?.pause();
     else if (v) void v.play().catch(() => setPaused(true));
@@ -218,6 +237,7 @@ export function StoriesBar({
     open,
     index,
     paused,
+    holding,
     reporting,
     viewers,
     busy,
@@ -289,7 +309,8 @@ export function StoriesBar({
                 ? 'unseen'
                 : '')
             }
-            onClick={() => {
+            onClick={(event) => {
+              avatar.current = event.currentTarget.firstElementChild;
               setPlaylist(
                 available
                   .filter((s) => s.userId === g.userId)
@@ -308,9 +329,7 @@ export function StoriesBar({
             <small>{g.userId === me.id ? 'Вы' : g.name}</small>
           </button>
         ))}
-        {loaded && !groups.length && (
-          <p className="meta">Историй пока нет.</p>
-        )}
+        {loaded && !groups.length && <p className="meta">Историй пока нет.</p>}
       </div>
       {error && !open && !creating && (
         <p className="realtime-error" role="alert">
@@ -430,6 +449,7 @@ export function StoriesBar({
       </Dialog>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
+          ref={viewerRef}
           className="noct-dialog story-dialog"
           showCloseButton={false}
         >
@@ -515,6 +535,7 @@ export function StoriesBar({
                   ) : (
                     <img
                       ref={picture}
+                      draggable={false}
                       onLoad={() => setMediaReady(true)}
                       src={'/api/media/' + current.mediaId}
                       alt={current.text || 'История'}
