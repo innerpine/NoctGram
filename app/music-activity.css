@@ -273,7 +273,7 @@
   margin-top: 3px;
 }
 .profile-music-track small {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   color: #ffffff4f;
 }
 .profile-music-progress {
@@ -312,7 +312,7 @@
   display: flex;
   justify-content: space-between;
   color: #ffffff60;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
   margin-top: 6px;
 }

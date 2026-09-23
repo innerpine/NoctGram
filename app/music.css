@@ -130,7 +130,7 @@
   animation: music-score-in 280ms ease-out both;
 }
 .music-listener-score small {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   color: #747474;
 }
 .music-leaderboard strong,
@@ -185,7 +185,7 @@
 }
 .music-listener-self em {
   margin-left: 8px;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   color: #aaa;
   font-style: normal;
   font-weight: 400;

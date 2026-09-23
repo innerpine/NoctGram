@@ -817,7 +817,6 @@
     padding: max(10px, env(safe-area-inset-top)) 16px 8px;
   }
   .music-stage-label {
-    font-size: 0.625rem;
     gap: 8px;
   }
   .music-stage-body {

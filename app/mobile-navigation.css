@@ -110,7 +110,7 @@
   .sidebar .main-navigation a .nav-item-label {
     display: block;
     max-width: 100%;
-    font-size: clamp(0.625rem, 2.8vw, 0.75rem);
+    font-size: clamp(0.6875rem, 2.8vw, 0.75rem);
     line-height: 1.2;
     letter-spacing: -0.15px;
     white-space: nowrap;

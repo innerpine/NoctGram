@@ -81,7 +81,7 @@
 .music-dock-header > div {
   gap: 10px;
   color: #ffffff84;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.15em;
 }
@@ -180,7 +180,7 @@
 }
 .music-lyrics-dock .music-lyrics-footer {
   gap: 8px;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   min-height: 28px;
 }
 .music-lyrics-dock .music-stage-empty {

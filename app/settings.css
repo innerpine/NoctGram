@@ -437,16 +437,22 @@
     padding: 20px 18px 16px;
   }
   .settings-navigation[data-slot='tabs-list'] {
-    margin: 0 10px;
-    gap: 2px;
+    margin: 0 6px;
+    gap: 0;
     padding-bottom: 12px;
   }
   .settings-navigation .settings-tab {
-    font-size: 0.5625rem;
     padding-inline: 0;
     height: 56px;
     gap: 7px;
     border-radius: 12px;
+  }
+  /* Five labels share a phone row; the title attribute keeps the full name. */
+  .settings-navigation .settings-tab > span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .settings-page[data-slot='tabs-content'] {
     padding: 20px 18px 24px;

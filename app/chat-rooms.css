@@ -200,7 +200,7 @@
 .room-section-heading h3 > span {
   margin-left: 6px;
   color: #8e8798;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 400;
 }
 .room-create-dialog .room-input,
@@ -345,7 +345,7 @@
 }
 .room-member-count {
   color: #a899b5;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
 }
 .room-selected-members {
@@ -369,7 +369,7 @@
   border-radius: 8px;
   background: #c2a3dd0e;
   color: #d7c3e5;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   cursor: pointer;
 }
 .room-selected-members button > span {
@@ -439,7 +439,7 @@
 }
 .room-person-copy small {
   color: #a398ae;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
 }
 .room-person-row [data-slot='checkbox'],
 .room-person-check {

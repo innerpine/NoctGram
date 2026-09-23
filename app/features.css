@@ -533,7 +533,7 @@
   font-weight: 500;
 }
 .channel-card strong .badge {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   white-space: nowrap;
   font-weight: 400;
 }
@@ -685,9 +685,6 @@
     min-width: 0;
     width: auto;
     flex: 1;
-  }
-  .sidebar nav a span {
-    font-size: 0.5625rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {

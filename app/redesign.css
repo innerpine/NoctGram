@@ -1493,7 +1493,7 @@ textarea::placeholder {
   max-height: 120px;
 }
 .comment-input .meta {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
 }
 .comment-input .primary {
   min-height: 32px;
@@ -1940,9 +1940,6 @@ textarea::placeholder {
   }
   .comments-dialog {
     max-width: calc(100% - 20px) !important;
-  }
-  .comment-input .meta {
-    font-size: 0.5625rem;
   }
   .premium-main {
     padding-top: 12px;
