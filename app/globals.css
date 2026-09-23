@@ -66,7 +66,7 @@ body {
     Roboto,
     sans-serif;
   font-optical-sizing: auto;
-  letter-spacing: -0.16px;
+  letter-spacing: -0.006em;
 }
 button,
 input,
@@ -147,14 +147,33 @@ h3 {
 }
 h1 {
   font-size: 1.4375rem;
-  letter-spacing: -0.8px;
+  font-weight: 600;
+  letter-spacing: -0.022em;
 }
 h2 {
   font-size: 1.0625rem;
-  letter-spacing: -0.4px;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+}
+/* Headings no longer inherit body leading; component rules and utilities still win. */
+@layer base {
+  h1 {
+    line-height: 1.15;
+  }
+  h2 {
+    line-height: 1.25;
+  }
 }
 small {
   display: block;
+}
+/* Tracking follows size: open at 11-12px, tight on large headings. */
+small,
+time,
+.meta,
+.badge,
+.unread {
+  letter-spacing: 0.01em;
 }
 .grow {
   flex: 1;
@@ -252,7 +271,7 @@ small {
 .brand {
   font-family: 'Instrument Sans', 'Inter', sans-serif;
   font-size: 1.5625rem;
-  letter-spacing: -1px;
+  letter-spacing: -0.022em;
   justify-content: flex-start;
   gap: 9px;
   margin-bottom: 35px;
@@ -898,7 +917,7 @@ small {
 }
 .premium-card h2 {
   font-size: 1.625rem;
-  letter-spacing: -1.1px;
+  letter-spacing: -0.022em;
   line-height: 1.1;
 }
 .premium-card p {
@@ -1026,7 +1045,7 @@ small {
 }
 .profile-info h2 {
   font-size: 1.8125rem;
-  letter-spacing: -1.2px;
+  letter-spacing: -0.022em;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1291,7 +1310,7 @@ small {
 }
 .chat-empty h2 {
   font-size: 1.625rem;
-  letter-spacing: -1px;
+  letter-spacing: -0.022em;
 }
 .chat-empty p {
   font-size: 0.8125rem;
@@ -1311,7 +1330,7 @@ small {
 }
 .noct-dialog [data-slot='dialog-title'] {
   font-size: 1.3125rem;
-  letter-spacing: -0.6px;
+  letter-spacing: -0.022em;
   margin-right: 24px;
 }
 .noct-dialog [data-slot='dialog-description'] {
@@ -1424,7 +1443,7 @@ small {
 .premium-modal h2 {
   font-size: 2.5rem;
   line-height: 1;
-  letter-spacing: -2px;
+  letter-spacing: -0.022em;
   margin: 18px 0;
 }
 .premium-modal > p {

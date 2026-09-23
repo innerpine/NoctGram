@@ -137,7 +137,7 @@
   font-family: 'Instrument Sans', 'Inter', sans-serif;
   font-size: 1.75rem;
   line-height: 1.16;
-  letter-spacing: -0.6px;
+  letter-spacing: -0.022em;
   font-weight: 600;
 }
 .profile-shell .profile-info h2 .display-name {

@@ -130,7 +130,7 @@
   font-size: 1.375rem;
   line-height: 1.3;
   font-weight: 500;
-  letter-spacing: -0.55px;
+  letter-spacing: -0.022em;
 }
 .noct-dialog.channel-boosts-dialog [data-slot='dialog-description'] {
   margin: 0;
