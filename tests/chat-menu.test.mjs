@@ -473,8 +473,11 @@ try {
       isPrimary: true,
       cancelable: true,
       clientX: 140,
+      timeStamp: 0,
     };
+    // Tracking starts once the 12 px threshold is crossed.
     surface.props.onPointerDown(start);
+    surface.props.onPointerMove({ ...start, clientX: 128 });
     surface.props.onPointerMove({ ...start, clientX: 60 });
     surface.props.onPointerUp({ ...start, clientX: 60 });
   };

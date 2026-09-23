@@ -9,7 +9,12 @@ const compiled = await build({
   platform: 'node',
   format: 'esm',
 });
-const { createMessageReplyGesture, isMessageReplyTarget } = await import(
+const {
+  createMessageReplyGesture,
+  isMessageReplyTarget,
+  replyShift,
+  repliesOnRelease,
+} = await import(
   'data:text/javascript;base64,' +
     Buffer.from(compiled.outputFiles[0].text).toString('base64')
 );
@@ -101,6 +106,7 @@ function fixture(t) {
     button: 0,
     clientX: 200,
     clientY: 100,
+    timeStamp: now,
     detail: 1,
     ctrlKey: false,
     metaKey: false,
@@ -155,6 +161,7 @@ function fixture(t) {
       assert.equal(root.attrs.has('data-reply-ready'), false);
       assert.equal(root.properties.size, 0);
     },
+    // The first move decides; tracking starts there, so drag as far again.
     swipe(dx = -64, dy = 0, extra = {}) {
       call('onPointerDown', extra);
       const move = call('onPointerMove', {
@@ -162,9 +169,14 @@ function fixture(t) {
         clientY: 100 + dy,
         ...extra,
       });
+      call('onPointerMove', {
+        clientX: 200 + 2 * dx,
+        clientY: 100 + 2 * dy,
+        ...extra,
+      });
       const up = call('onPointerUp', {
-        clientX: 200 + dx,
-        clientY: 100 + dy,
+        clientX: 200 + 2 * dx,
+        clientY: 100 + 2 * dy,
         ...extra,
       });
       return { move, up };
@@ -187,19 +199,69 @@ await test('left swipe replies once at 64 px and restores the message after rele
     'Touch begins without preventing scrolling',
   );
   assert.equal(f.root.captured, null, 'A tap does not capture the pointer');
-  f.call('onPointerMove', { clientX: 137 });
+  f.call('onPointerMove', { clientX: 188 });
   assert.equal(f.root.captured, 1);
+  assert.equal(
+    f.root.properties.get('--reply-shift'),
+    '0px',
+    'Taking the gesture does not jump by the threshold',
+  );
+  f.call('onPointerMove', { clientX: 125 });
   assert.equal(f.root.attrs.has('data-reply-ready'), false);
   assert.equal(f.replies, 0, 'Moving never submits a reply');
-  f.call('onPointerMove', { clientX: 136 });
+  f.call('onPointerMove', { clientX: 124 });
   assert.equal(f.root.attrs.has('data-reply-ready'), true);
   assert.equal(f.root.properties.get('--reply-progress'), '1');
-  const up = f.call('onPointerUp', { clientX: 136 });
+  const up = f.call('onPointerUp', { clientX: 124 });
   assert.equal(up.prevented, true);
   assert.equal(f.replies, 1);
   f.clean();
-  f.call('onPointerUp', { clientX: 136 });
+  f.call('onPointerUp', { clientX: 124 });
   assert.equal(f.replies, 1, 'A duplicate release cannot reply twice');
+});
+
+await test('past 64 px the message resists instead of stopping hard', (t) => {
+  const f = fixture(t);
+  assert.equal(replyShift(40), 40);
+  assert.equal(replyShift(64), 64);
+  assert.ok(replyShift(88) > 64 && replyShift(88) < 88);
+  assert.ok(replyShift(400) > replyShift(200));
+  assert.ok(replyShift(10000) < 64 + 48);
+  f.call('onPointerDown');
+  f.call('onPointerMove', { clientX: 188 });
+  f.call('onPointerMove', { clientX: 68 });
+  const shift = parseFloat(f.root.properties.get('--reply-shift'));
+  assert.ok(shift < -64 && shift > -120, String(shift));
+  f.call('onPointerUp', { clientX: 68 });
+  assert.equal(f.replies, 1);
+  f.clean();
+});
+
+await test('release velocity carries a short flick and a flick back cancels', (t) => {
+  assert.equal(repliesOnRelease(64, 0), true);
+  assert.equal(repliesOnRelease(63, 0), false);
+  assert.equal(repliesOnRelease(28, -900), true, 'Projected past 64 px');
+  assert.equal(repliesOnRelease(90, 200), false, 'Moving back toward start');
+  assert.equal(repliesOnRelease(140, 120), true, 'A slow drift back far out');
+  const f = fixture(t);
+  f.call('onPointerDown');
+  f.advance(10);
+  f.call('onPointerMove', { clientX: 188 });
+  f.advance(16);
+  f.call('onPointerMove', { clientX: 160 });
+  f.call('onPointerUp', { clientX: 160 });
+  assert.equal(f.replies, 1, 'A fast 28 px flick replies');
+  f.clean();
+  f.advance(501);
+  f.call('onPointerDown');
+  f.call('onPointerMove', { clientX: 188 });
+  f.advance(100);
+  f.call('onPointerMove', { clientX: 90 });
+  f.advance(20);
+  f.call('onPointerMove', { clientX: 110 });
+  f.call('onPointerUp', { clientX: 110 });
+  assert.equal(f.replies, 1, 'Flicking back past 64 px cancels');
+  f.clean();
 });
 
 await test('short, rightward, vertical and diagonal gestures cannot reply', (t) => {
@@ -283,8 +345,8 @@ await test('transferring implicit touch capture from a descendant does not cance
     1,
     'Another pointer cannot cancel this capture',
   );
-  f.call('onPointerMove', { target: f.root, clientX: 120 });
-  f.call('onPointerUp', { target: f.root, clientX: 120 });
+  f.call('onPointerMove', { target: f.root, clientX: 110 });
+  f.call('onPointerUp', { target: f.root, clientX: 110 });
   assert.equal(f.replies, 1);
   f.clean();
   f.advance(501);
