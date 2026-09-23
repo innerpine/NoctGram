@@ -13,10 +13,11 @@ const compiled = await build({
   platform: 'node',
   format: 'esm',
 });
-const { soundCloudQueue, moveMusicItem, musicLabel } = await import(
-  'data:text/javascript;base64,' +
-    Buffer.from(compiled.outputFiles[0].text).toString('base64')
-);
+const { soundCloudQueue, moveMusicItem, nextMusicMove, musicLabel } =
+  await import(
+    'data:text/javascript;base64,' +
+      Buffer.from(compiled.outputFiles[0].text).toString('base64')
+  );
 
 await test('widget placeholders cannot crash reorder and native song indices survive filtering', () => {
   const sounds = [
@@ -68,4 +69,27 @@ await test('widget placeholders cannot crash reorder and native song indices sur
   assert.equal(new Set(reordered.map((t) => t.url)).size, 3);
   assert.deepEqual(soundCloudQueue(undefined), []);
   assert.deepEqual(soundCloudQueue([{ id: 7 }]), []);
+});
+
+await test('queued saves: one move for a dragged row, converging for any order', () => {
+  assert.deepEqual(
+    nextMusicMove(['1', '2', '3', '4', '5'], ['1', '2', '5', '3', '4'], '5'),
+    { from: 4, to: 2 },
+  );
+  assert.deepEqual(nextMusicMove(['a', 'b', 'c'], ['b', 'c', 'a']), {
+    from: 0,
+    to: 2,
+  });
+  assert.equal(nextMusicMove(['a', 'b'], ['a', 'b']), null);
+  assert.equal(nextMusicMove(['a', 'b'], ['a', 'c']), null, 'other rows');
+  let order = ['a', 'b', 'c', 'd', 'e'],
+    step,
+    moves = 0;
+  const wanted = ['e', 'c', 'a', 'd', 'b'];
+  while ((step = nextMusicMove(order, wanted))) {
+    order = moveMusicItem(order, step.from, step.to);
+    moves++;
+  }
+  assert.deepEqual(order, wanted);
+  assert.ok(moves < wanted.length);
 });

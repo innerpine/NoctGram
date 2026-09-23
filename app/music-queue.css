@@ -6,9 +6,11 @@
   align-items: center;
   position: relative;
   border-radius: 12px;
+  /* The position is an inline transform that follows the finger untransitioned. */
   transition:
     background 160ms ease,
-    box-shadow 160ms ease;
+    box-shadow 160ms ease,
+    scale 160ms var(--motion);
 }
 .music-sort-row > :not(.music-sort-handle) {
   flex: 1;
@@ -16,6 +18,7 @@
 }
 .music-sort-row[data-dragging='true'] {
   z-index: 1;
+  scale: 1.02;
   background: #ffffff12;
   box-shadow:
     inset 0 0 0 1px #d8c7ff75,
