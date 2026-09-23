@@ -7,6 +7,7 @@ import type {
   AnimationEvent as ReactAnimationEvent,
   PointerEvent as ReactPointerEvent,
 } from 'react';
+import { createVelocityTracker } from '@/lib/fluid-motion';
 
 const FOLLOW = 0.55; // share of the pointer travel the body takes
 const MAX_TRAVEL = 58; // px the body may leave its slot by, approached asymptotically
@@ -38,8 +39,11 @@ const buzz = (ms: number): void => {
 /* One spring at a time. Grabbing the mascot again mid-return cancels the old run
    instead of letting two animation frames fight over the same transform. */
 let spring = 0;
+// Where the body is on screen right now, so a grab mid-wobble starts from there.
+let live: Pose = { x: 0, y: 0 };
 
 function paint(el: HTMLElement, { x, y }: Pose): void {
+  live = { x, y };
   const dist = Math.hypot(x, y);
   const pull = Math.min(dist / MAX_TRAVEL, 1);
   const stretch = 1 + pull * STRETCH;
@@ -57,6 +61,7 @@ function paint(el: HTMLElement, { x, y }: Pose): void {
 }
 
 function rest(el: HTMLElement): void {
+  live = { x: 0, y: 0 };
   el.style.transform = '';
   el.classList.remove(PULLING);
   delete el.dataset.pulling;
@@ -86,15 +91,15 @@ function respawn(el: HTMLElement): void {
   el.style.animation = '';
 }
 
-function snapBack(el: HTMLElement, from: Pose): void {
+function snapBack(el: HTMLElement, from: Pose, velocity: Pose): void {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     rest(el);
     return;
   }
   const run = ++spring;
   let { x, y } = from;
-  let vx = 0;
-  let vy = 0;
+  // The throw carries on into the return instead of stopping dead.
+  let { x: vx, y: vy } = velocity;
   let last = performance.now();
   let crossed = false;
   const step = (now: number): void => {
@@ -121,19 +126,28 @@ function snapBack(el: HTMLElement, from: Pose): void {
 
 export function pullMascot(event: ReactPointerEvent<HTMLElement>): void {
   const el = event.currentTarget;
-  if (el.dataset.pulling) return;
+  if (el.dataset.pulling === 'held') return; // one pointer at a time
+  const wobbling = !!el.dataset.pulling;
   spring++; // cancel a spring still running from the previous pull
   // Grabbing the mascot mid-entrance counts as landing it: from here the element
   // carries only the drift, so releasing the pull cannot replay the drop.
   el.classList.add(LANDED);
-  el.dataset.pulling = '1';
+  el.dataset.pulling = 'held';
   el.classList.add(PULLING);
   el.setPointerCapture(event.pointerId);
   buzz(8);
-  const startX = event.clientX;
-  const startY = event.clientY;
-  let pose: Pose = { x: 0, y: 0 };
+  // Caught mid-wobble, the pull starts where the body is: unbend its offset into
+  // the pointer travel that would have put it there.
+  const from = wobbling ? live : { x: 0, y: 0 };
+  const reach = Math.hypot(from.x, from.y);
+  const unbend =
+    reach > 0.01 ? (MAX_TRAVEL * Math.atanh(Math.min(reach / MAX_TRAVEL, 0.99))) / reach / FOLLOW : 0;
+  const startX = event.clientX - from.x * unbend;
+  const startY = event.clientY - from.y * unbend;
+  let pose: Pose = from;
   let ticks = 0;
+  const velocity = createVelocityTracker();
+  velocity.add(pose.x, pose.y);
   const move = (moved: PointerEvent): void => {
     // Rubber band: the travel follows the pointer, then bends into MAX_TRAVEL and
     // never passes it, however far the pointer goes — the body stays inside its
@@ -143,6 +157,7 @@ export function pullMascot(event: ReactPointerEvent<HTMLElement>): void {
     const raw = Math.hypot(dx, dy);
     const bend = raw > 0.01 ? (MAX_TRAVEL * Math.tanh(raw / MAX_TRAVEL)) / raw : 0;
     pose = { x: dx * bend, y: dy * bend };
+    velocity.add(pose.x, pose.y);
     const step = Math.floor(Math.hypot(pose.x, pose.y) / TICK_PULL_PX);
     if (step !== ticks) {
       ticks = step;
@@ -155,11 +170,13 @@ export function pullMascot(event: ReactPointerEvent<HTMLElement>): void {
     el.removeEventListener('pointerup', end);
     el.removeEventListener('pointercancel', end);
     buzz(6);
-    if (Math.hypot(pose.x, pose.y) < TAP_PX) {
+    if (!wobbling && Math.hypot(pose.x, pose.y) < TAP_PX) {
       respawn(el);
       return;
     }
-    snapBack(el, pose);
+    el.dataset.pulling = '1';
+    velocity.add(pose.x, pose.y); // a pause before letting go leaves no throw
+    snapBack(el, pose, velocity.velocity());
   };
   el.addEventListener('pointermove', move);
   el.addEventListener('pointerup', end);

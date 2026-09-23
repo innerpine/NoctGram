@@ -10,7 +10,9 @@ import {
   type PointerEvent,
 } from 'react';
 import { GripVertical } from 'lucide-react';
-import { moveMusicItem } from '@/lib/music-queue';
+import { animateSpring } from '@/lib/fluid-motion';
+import { chatDragSpeed } from '@/lib/chat-drag-selection';
+import { moveMusicItem, nextMusicMove } from '@/lib/music-queue';
 
 type Row = { id: string; label: string; content: ReactNode };
 export function MusicReorderList({
@@ -27,119 +29,191 @@ export function MusicReorderList({
   const root = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState<string[] | null>(null);
   const [dragging, setDragging] = useState('');
-  const [pending, setPending] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [announcement, setAnnouncement] = useState('');
-  const locked = useRef(false),
-    cancel = useRef<(() => void) | null>(null);
+  const cancel = useRef<(() => void) | null>(null);
   const latest = useRef({ rows, onMove });
   latest.current = { rows, onMove };
   const positions = useRef(new Map<string, number>());
+  const springs = useRef(new Map<string, ReturnType<typeof animateSpring>>());
+  // The dragged row repaints itself whenever its slot moves.
+  const follow = useRef<{ id: string; paint: () => void } | null>(null);
+  // Shown optimistically while saves run one by one; the newest drop wins.
+  const wanted = useRef<string[] | null>(null),
+    flushing = useRef(false),
+    lastMoved = useRef('');
   const ids = rows.map((r) => r.id);
   const signature = ids.join('|');
+  const members = [...ids].sort().join('|');
   const shown = preview
     ? preview
         .map((id) => rows.find((r) => r.id === id))
         .filter((r): r is Row => !!r)
     : rows;
   useEffect(() => {
-    setPreview(null);
-    return () => cancel.current?.();
+    // Our own saves change the rows too; only an outside change resets.
+    if (!flushing.current && !cancel.current) setPreview(null);
   }, [signature]);
+  useEffect(() => () => cancel.current?.(), [members]);
   useEffect(() => {
     if (disabled) cancel.current?.();
   }, [disabled]);
+  useEffect(() => {
+    const running = springs.current;
+    return () => running.forEach((spring) => spring.stop());
+  }, []);
+  const reduced = () =>
+    !!root.current?.closest('[data-motion="off"]') ||
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function slide(node: HTMLElement, id: string, from: number, velocity = 0) {
+    springs.current.get(id)?.stop();
+    springs.current.delete(id);
+    const done = () => {
+      springs.current.delete(id);
+      node.style.transform = node.style.zIndex = '';
+    };
+    if (!from || reduced()) {
+      done();
+      return;
+    }
+    node.style.transform = `translateY(${from}px)`;
+    springs.current.set(
+      id,
+      animateSpring(from, 0, {
+        damping: 1,
+        response: 0.25,
+        velocity,
+        onUpdate: (y) => {
+          node.style.transform = `translateY(${y}px)`;
+        },
+        onComplete: done,
+      }),
+    );
+  }
   useLayoutEffect(() => {
     const list = root.current;
     if (!list) return;
-    const reduce =
-      !!list.closest('[data-motion="off"]') ||
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const next = new Map<string, number>();
     for (const node of list.querySelectorAll<HTMLElement>('[data-music-row]')) {
       const id = node.dataset.musicRow!,
         top = node.offsetTop;
       const before = positions.current.get(id);
-      if (!reduce && before !== undefined && before !== top) {
-        node.getAnimations().forEach((animation) => animation.cancel());
-        node.animate(
-          [
-            { transform: `translateY(${before - top}px)` },
-            { transform: 'translateY(0)' },
-          ],
-          { duration: 180, easing: 'cubic-bezier(.2,.75,.25,1)' },
-        );
-      }
       next.set(id, top);
+      if (before === undefined || before === top || id === follow.current?.id)
+        continue;
+      // Start from where the row is on screen now, even halfway through a slide.
+      const live = springs.current.get(id)?.stop();
+      slide(node, id, (live?.value ?? 0) + before - top, live?.velocity);
     }
     positions.current = next;
+    follow.current?.paint();
   }, [preview, signature]);
-  async function commit(original: string[], ordered: string[], id: string) {
-    const from = original.indexOf(id),
-      to = ordered.indexOf(id);
-    if (from === to || from < 0 || to < 0) {
-      setPreview(null);
-      return;
-    }
-    locked.current = true;
-    setPending(true);
+  async function flush() {
+    if (flushing.current) return;
+    flushing.current = true;
+    setSaving(true);
+    let saved = latest.current.rows.map((r) => r.id),
+      failed = false,
+      step: ReturnType<typeof nextMusicMove>;
     try {
-      await latest.current.onMove?.(id, original[to]);
-      setAnnouncement(`Песня перемещена на ${to + 1} место`);
+      // Re-read the wanted order before every request: the latest drop wins.
+      while (
+        wanted.current &&
+        (step = nextMusicMove(saved, wanted.current, lastMoved.current))
+      ) {
+        await latest.current.onMove?.(saved[step.from], saved[step.to]);
+        saved = moveMusicItem(saved, step.from, step.to);
+      }
     } catch {
-      setAnnouncement('Не удалось сохранить порядок');
-    } finally {
-      locked.current = false;
-      setPending(false);
-      setPreview(null);
+      failed = true;
     }
+    const done = !failed && wanted.current?.join('|') === saved.join('|');
+    setAnnouncement(
+      done
+        ? `Песня перемещена на ${saved.indexOf(lastMoved.current) + 1} место`
+        : 'Не удалось сохранить порядок',
+    );
+    wanted.current = null;
+    flushing.current = false;
+    setSaving(false);
+    if (!cancel.current) setPreview(null);
+  }
+  function save(order: string[], id: string) {
+    wanted.current = order;
+    lastMoved.current = id;
+    setPreview(order);
+    void flush();
   }
   function start(event: PointerEvent<HTMLButtonElement>, id: string) {
     if (
       event.button !== 0 ||
       disabled ||
-      locked.current ||
+      cancel.current ||
       !onMove ||
       !root.current
     )
       return;
+    const list = root.current;
+    const row = [
+      ...list.querySelectorAll<HTMLElement>('[data-music-row]'),
+    ].find((node) => node.dataset.musicRow === id);
+    if (!row) return;
     event.preventDefault();
-    const list = root.current,
-      original = [...ids];
-    let ordered = [...ids],
+    const original = shown.map((r) => r.id);
+    let ordered = original,
       y = event.clientY,
       frame = 0,
-      moved = false;
+      carry = 0,
+      moved = false,
+      time = performance.now();
     const startY = y,
+      startScroll = list.scrollTop,
+      startTop = row.offsetTop,
       pointerId = event.pointerId;
-    const tick = () => {
-      if (moved) {
-        const box = list.getBoundingClientRect();
-        const edge = 44;
-        const velocity =
-          y < box.top + edge
-            ? -Math.min(15, (box.top + edge - y) / 4)
-            : y > box.bottom - edge
-              ? Math.min(15, (y - box.bottom + edge) / 4)
-              : 0;
-        if (velocity) list.scrollTop += velocity;
-        const nodes = [
-          ...list.querySelectorAll<HTMLElement>('[data-music-row]'),
-        ];
-        const from = ordered.indexOf(id);
-        // Use layout positions, unaffected by the siblings' entrance animation.
-        let to = nodes.findIndex(
-          (node) =>
-            y <
-            box.top + node.offsetTop - list.scrollTop + node.offsetHeight / 2,
-        );
-        if (to < 0) to = nodes.length;
-        if (to > from) to--;
-        if (to !== from && to >= 0) {
-          ordered = moveMusicItem(ordered, from, to);
-          setPreview(ordered);
-        }
-      }
+    // Caught while settling: keep its on-screen offset.
+    const grab = springs.current.get(id)?.stop().value ?? 0;
+    springs.current.delete(id);
+    // The finger's travel minus how far the row's own slot has moved.
+    const offset = () =>
+      grab +
+      y -
+      startY +
+      list.scrollTop -
+      startScroll -
+      (row.offsetTop - startTop);
+    const paint = () => {
+      row.style.transform = `translateY(${offset()}px)`;
+    };
+    follow.current = { id, paint };
+    const tick = (now: number) => {
       frame = requestAnimationFrame(tick);
+      if (!moved) return;
+      const box = list.getBoundingClientRect();
+      // Scroll by elapsed time so 120 Hz screens are no faster.
+      carry +=
+        (chatDragSpeed(y, box.top, box.bottom) *
+          Math.min(32, Math.max(0, now - time))) /
+        1000;
+      time = now;
+      const whole = Math.trunc(carry);
+      if (whole) {
+        list.scrollTop += whole;
+        carry -= whole;
+      }
+      const nodes = [...list.querySelectorAll<HTMLElement>('[data-music-row]')];
+      const from = ordered.indexOf(id);
+      // Layout positions, unaffected by the rows' slide transforms.
+      let to = nodes.findIndex(
+        (node) =>
+          y < box.top + node.offsetTop - list.scrollTop + node.offsetHeight / 2,
+      );
+      if (to < 0) to = nodes.length;
+      if (to > from) to--;
+      if (to !== from && to >= 0) {
+        ordered = moveMusicItem(ordered, from, to);
+        setPreview(ordered);
+      }
+      paint();
     };
     const move = (e: globalThis.PointerEvent) => {
       if (e.pointerId !== pointerId) return;
@@ -150,7 +224,7 @@ export function MusicReorderList({
       }
       if (e.cancelable) e.preventDefault();
     };
-    const finish = (save: boolean) => {
+    const finish = (commit: boolean) => {
       cancelAnimationFrame(frame);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
@@ -158,12 +232,16 @@ export function MusicReorderList({
       window.removeEventListener('blur', abort);
       window.removeEventListener('keydown', key, true);
       cancel.current = null;
+      follow.current = null;
       setDragging('');
-      if (save && moved) void commit(original, ordered, id);
-      else setPreview(null);
+      // Settle into the slot from wherever the finger left the row.
+      row.style.zIndex = '1';
+      slide(row, id, offset());
+      if (commit && ordered.join('|') !== original.join('|')) save(ordered, id);
+      else setPreview(wanted.current);
     };
     const up = (e: globalThis.PointerEvent) => {
-      if (e.pointerId === pointerId) finish(true);
+      if (e.pointerId === pointerId) finish(moved);
     };
     const abort = () => finish(false);
     const key = (e: KeyboardEvent) => {
@@ -185,7 +263,7 @@ export function MusicReorderList({
     <div
       className={className + ' music-sort-list'}
       ref={root}
-      aria-busy={pending}
+      aria-busy={saving}
     >
       {shown.map((row) => (
         <div
@@ -198,7 +276,7 @@ export function MusicReorderList({
             <button
               type="button"
               className="music-sort-handle"
-              disabled={disabled || pending || rows.length < 2}
+              disabled={disabled || rows.length < 2}
               aria-label={'Переместить ' + row.label}
               title="Перетащить · ↑/↓ на клавиатуре"
               onClick={(e) => e.stopPropagation()}
@@ -207,16 +285,19 @@ export function MusicReorderList({
                 if (
                   !['ArrowUp', 'ArrowDown'].includes(e.key) ||
                   disabled ||
-                  locked.current
+                  cancel.current
                 )
                   return;
                 e.preventDefault();
                 e.stopPropagation();
-                const from = ids.indexOf(row.id),
-                  to = from + (e.key === 'ArrowUp' ? -1 : 1);
-                const next = moveMusicItem(ids, from, to);
-                setPreview(next);
-                void commit(ids, next, row.id);
+                const order = shown.map((r) => r.id),
+                  from = order.indexOf(row.id);
+                const next = moveMusicItem(
+                  order,
+                  from,
+                  from + (e.key === 'ArrowUp' ? -1 : 1),
+                );
+                if (next !== order) save(next, row.id);
               }}
             >
               <GripVertical size={17} />

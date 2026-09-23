@@ -97,7 +97,9 @@
   height: auto;
   max-width: none;
   max-height: none;
-  transform: none;
+  /* Drag-to-close: follows the finger and shrinks slightly. */
+  transform: translate3d(0, var(--drag-y, 0px), 0)
+    scale(calc(1 - 0.06 * var(--drag-progress, 0)));
   translate: none;
   display: flex;
   flex-direction: column;
@@ -113,12 +115,17 @@
     inset 0 0 0 1px #ffffff12;
   transition:
     opacity 0.28s,
-    scale 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    transform 0.42s var(--motion);
 }
+.music-stage[data-dragging] {
+  transition: none;
+}
+/* Rises from the mini player's cover and returns into it. */
 .music-stage[data-starting-style],
 .music-stage[data-ending-style] {
   opacity: 0;
-  scale: 0.97;
+  scale: 1;
+  transform: var(--viewer-origin, translate3d(0, 12%, 0) scale(0.94));
 }
 .music-stage-atmosphere {
   position: absolute;

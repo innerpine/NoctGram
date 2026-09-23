@@ -130,16 +130,18 @@ function environment(t) {
   );
   const frames = new Map();
   let frame = 0;
-  globalThis.window = Object.assign(new EventTarget(), {
-    matchMedia: () => ({ matches: false }),
-    setTimeout,
-    clearTimeout,
-  });
   globalThis.requestAnimationFrame = (fn) => {
     frames.set(++frame, fn);
     return frame;
   };
   globalThis.cancelAnimationFrame = (id) => frames.delete(id);
+  globalThis.window = Object.assign(new EventTarget(), {
+    matchMedia: () => ({ matches: false }),
+    setTimeout,
+    clearTimeout,
+    requestAnimationFrame,
+    cancelAnimationFrame,
+  });
   t.after(() => {
     context?.dispose();
     for (const [key, value] of saved)
@@ -150,7 +152,8 @@ function environment(t) {
     frame() {
       const pending = [...frames.values()];
       frames.clear();
-      pending.forEach((fn) => fn());
+      const now = performance.now() + 16;
+      pending.forEach((fn) => fn(now));
     },
     event(type, values = {}) {
       window.dispatchEvent(
@@ -295,11 +298,33 @@ void test('heart: no playlists creates favorites, while a failed save leaves the
     'Нет соединения',
   );
 });
+function fakeList(snapshot) {
+  const rows = new Map();
+  return {
+    rows,
+    scrollTop: 0,
+    closest: () => null,
+    getBoundingClientRect: () => ({ top: 0, bottom: 300 }),
+    querySelectorAll: () =>
+      nodes(snapshot(), (n) => !!n.props?.['data-music-row']).map(
+        (node, index) => {
+          const id = node.props['data-music-row'];
+          const row = rows.get(id) ?? {
+            dataset: { musicRow: id },
+            offsetHeight: 60,
+            style: {},
+          };
+          rows.set(id, row);
+          row.offsetTop = index * 60;
+          return row;
+        },
+      ),
+  };
+}
 void test('drag: fifth to third, keyboard reorder, autoscroll and Escape cancellation never start playback', async (t) => {
   const env = environment(t);
   const calls = [];
-  let animations = 0,
-    treeSnapshot;
+  let treeSnapshot;
   const rowIds = ['1', '2', '3', '4', '5'];
   const makeRows = () =>
     rowIds.map((id) => ({
@@ -307,23 +332,7 @@ void test('drag: fifth to third, keyboard reorder, autoscroll and Escape cancell
       label: id,
       content: { type: 'button', props: { onClick: () => calls.push('play') } },
     }));
-  const list = {
-    scrollTop: 0,
-    closest: () => null,
-    getBoundingClientRect: () => ({ top: 0, bottom: 300 }),
-    querySelectorAll: () =>
-      nodes(treeSnapshot, (n) => !!n.props?.['data-music-row']).map(
-        (node, index) => ({
-          dataset: { musicRow: node.props['data-music-row'] },
-          offsetTop: index * 60,
-          offsetHeight: 60,
-          getAnimations: () => [],
-          animate: () => {
-            animations++;
-          },
-        }),
-      ),
-  };
+  const list = fakeList(() => treeSnapshot);
   const c = harness(
     MusicReorderList,
     {
@@ -358,11 +367,20 @@ void test('drag: fifth to third, keyboard reorder, autoscroll and Escape cancell
   env.event('pointermove', { pointerId: 1, clientY: 149 });
   env.frame();
   await c.flush();
+  assert.equal(
+    list.rows.get('3').style.transform,
+    'translateY(-60px)',
+    'A neighbour slides from where it was on screen',
+  );
+  assert.equal(
+    list.rows.get('5').style.transform,
+    'translateY(-1px)',
+    'The dragged row follows the finger minus its own slot movement',
+  );
   env.event('pointerup', { pointerId: 1 });
   await c.flush();
   assert.deepEqual(rowIds, ['1', '2', '5', '3', '4']);
   assert.deepEqual(calls, [['5', '3']]);
-  assert.ok(animations > 0);
   handle('5').props.onKeyDown({
     key: 'ArrowUp',
     preventDefault() {},
@@ -387,4 +405,58 @@ void test('drag: fifth to third, keyboard reorder, autoscroll and Escape cancell
   await c.flush();
   assert.equal(calls.length, before);
   assert.deepEqual(rowIds, ['1', '5', '2', '3', '4']);
+});
+void test('reorders made while a save is pending queue up in order instead of locking the list', async (t) => {
+  environment(t);
+  const calls = [];
+  let treeSnapshot, open;
+  const gate = new Promise((resolve) => (open = resolve));
+  const rowIds = ['a', 'b', 'c', 'd'];
+  const makeRows = () => rowIds.map((id) => ({ id, label: id, content: null }));
+  const c = harness(
+    MusicReorderList,
+    {
+      className: 'queue',
+      rows: makeRows(),
+      onMove: async (from, to) => {
+        calls.push([from, to]);
+        await gate;
+        const target = rowIds.indexOf(to);
+        rowIds.splice(rowIds.indexOf(from), 1);
+        rowIds.splice(target, 0, from);
+        c.props.rows = makeRows();
+        c.dirty = true;
+      },
+    },
+    (tree) => {
+      treeSnapshot = tree;
+      tree.props.ref.current = fakeList(() => treeSnapshot);
+    },
+  );
+  await c.flush();
+  const handle = (id) =>
+    byType(c.tree, 'button').find(
+      (n) => n.props['aria-label'] === 'Переместить ' + id,
+    );
+  const shown = () =>
+    nodes(c.tree, (n) => !!n.props?.['data-music-row']).map(
+      (n) => n.props['data-music-row'],
+    );
+  const key = { key: 'ArrowDown', preventDefault() {}, stopPropagation() {} };
+  handle('a').props.onKeyDown(key);
+  await c.flush();
+  assert.deepEqual(shown(), ['b', 'a', 'c', 'd'], 'Shown before it is saved');
+  assert.equal(handle('a').props.disabled, false, 'No lock while saving');
+  handle('a').props.onKeyDown(key);
+  await c.flush();
+  assert.deepEqual(shown(), ['b', 'c', 'a', 'd']);
+  assert.deepEqual(calls, [['a', 'b']], 'One request at a time');
+  open();
+  await c.flush();
+  assert.deepEqual(calls, [
+    ['a', 'b'],
+    ['a', 'c'],
+  ]);
+  assert.deepEqual(rowIds, ['b', 'c', 'a', 'd']);
+  assert.deepEqual(shown(), ['b', 'c', 'a', 'd']);
 });

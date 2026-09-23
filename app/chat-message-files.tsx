@@ -2,9 +2,9 @@
 /* eslint-disable next/no-img-element */
 import { useState, type ReactNode } from 'react';
 import { Download, File as FileIcon } from 'lucide-react';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { chatFileSize, type ChatAttachment } from '@/lib/chat-files';
 import { ChatVideoPlayer } from './chat-video-player';
+import { PhotoViewer } from './photo-viewer';
 
 export function ChatMessageFiles({
   files,
@@ -77,33 +77,26 @@ export function ChatMessageFiles({
           );
         })}
       </div>
-      <Dialog
+      <PhotoViewer
         open={open}
         onOpenChange={setOpen}
         onOpenChangeComplete={(isOpen) => {
           if (!isOpen) setPhoto(null);
         }}
+        className="noct-dialog chat-photo-dialog"
+        title={photo?.name || 'Фото'}
+        src={photo ? '/api/media/' + encodeURIComponent(photo.id) : ''}
+        alt={photo?.name || ''}
       >
-        <DialogContent className="noct-dialog chat-photo-dialog">
-          <DialogTitle className="sr-only">{photo?.name || 'Фото'}</DialogTitle>
-          {photo && (
-            <>
-              <img
-                src={'/api/media/' + encodeURIComponent(photo.id)}
-                alt={photo.name}
-              />
-              <a
-                href={
-                  '/api/media/' + encodeURIComponent(photo.id) + '?download=1'
-                }
-                download={photo.name}
-              >
-                <Download size={16} /> Скачать фото
-              </a>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+        {photo && (
+          <a
+            href={'/api/media/' + encodeURIComponent(photo.id) + '?download=1'}
+            download={photo.name}
+          >
+            <Download size={16} /> Скачать фото
+          </a>
+        )}
+      </PhotoViewer>
     </>
   );
 }

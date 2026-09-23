@@ -40,6 +40,7 @@ import {
   restoreVideoPosition,
   type VideoPlayback,
 } from '@/lib/chat-video';
+import { useViewerGesture } from './use-viewer-gesture';
 
 const initialState = {
   duration: 0,
@@ -105,6 +106,14 @@ function VideoWithViewer(props: PlayerProps) {
   function close() {
     setOpen(false);
   }
+  // Drags down to close on the picture only; the controls keep their gestures.
+  const viewerRef = useViewerGesture({
+    open,
+    origin: () => inlineSlot.current,
+    accepts: (target) => target.localName === 'video',
+    dismiss: { share: 0.25, speed: 500 },
+    onDismiss: close,
+  });
   const player = (
     <VideoPlayer
       {...props}
@@ -133,6 +142,7 @@ function VideoWithViewer(props: PlayerProps) {
         }}
       >
         <DialogContent
+          ref={viewerRef}
           className="noct-video-viewer"
           style={
             {
