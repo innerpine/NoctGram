@@ -13,6 +13,7 @@ import {
   type CSSProperties,
   type RefObject,
   type ButtonHTMLAttributes,
+  type HTMLAttributes,
 } from 'react';
 import {
   ChevronDown,
@@ -60,6 +61,9 @@ import {
 } from '@/lib/music-player';
 import { useTrackLyrics, type LyricLookup } from '@/lib/use-track-lyrics';
 import { centerLyric } from '@/lib/lyric-scroll';
+import { animateSpring, createVelocityTracker } from '@/lib/fluid-motion';
+import { sheetPosition, sheetTarget } from '@/lib/viewer-gesture';
+import { useViewerGesture } from './use-viewer-gesture';
 import { MusicSeekControl } from './music-seek-control';
 import { MusicFavorite } from './music-favorite';
 import { MusicReorderList } from './music-reorder-list';
@@ -106,6 +110,12 @@ type Props = {
   onStop: () => void;
   onRetry: () => void;
 };
+// Controls keep their own gestures; everything else can drag the player.
+const CONTROLS =
+  'input,textarea,select,[contenteditable],[role="slider"],[data-slot="slider"],.music-sort-handle';
+const SHEET_CONTROLS = CONTROLS + ',button,a';
+const reducedMotion = () =>
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const LyricLines = memo(function LyricLines({
   lines,
@@ -383,12 +393,22 @@ export function MusicPlayerView(p: Props) {
   const [dockAvailable, setDockAvailable] = useState(false);
   const dockButton = useRef<HTMLButtonElement>(null);
   const [miniCollapsed, setMiniCollapsed] = useState(false);
-  const [sheetDragging, setSheetDragging] = useState(false);
   const sheetHandle = useRef<HTMLButtonElement>(null);
   const compactHandle = useRef<HTMLButtonElement>(null);
-  const sheetDrag = useRef<{ id: number; y: number } | null>(null);
+  const sheetDrag = useRef<{
+    id: number;
+    x: number;
+    y: number;
+    from: number;
+    travel: number;
+    active: boolean;
+    surface: HTMLElement;
+  } | null>(null);
   const dragFrame = useRef<number | null>(null);
-  const dragOffset = useRef(0);
+  // 0 is the open panel, `travel` the collapsed pill.
+  const sheetOffset = useRef(0);
+  const sheetSpring = useRef<ReturnType<typeof animateSpring> | null>(null);
+  const sheetVelocity = useRef(createVelocityTracker(80));
   const focusSheet = useRef(false);
   const suppressSheetClickUntil = useRef(0);
   const changeMini = (collapsed: boolean) => {
@@ -400,12 +420,53 @@ export function MusicPlayerView(p: Props) {
       /* The sheet works without device storage. */
     }
   };
-  const resetSheetDrag = () => {
+  const paintSheet = (travel: number) => {
+    const sheet = p.playerRef.current;
+    if (!sheet) return;
+    const { progress, overshoot } = sheetPosition(sheetOffset.current, travel);
+    sheet.style.setProperty('--music-sheet-progress', String(progress));
+    sheet.style.setProperty('--music-sheet-travel', `${travel}px`);
+    sheet.style.setProperty('--music-sheet-drag', `${overshoot}px`);
+  };
+  const releaseSheet = () => {
     if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
     dragFrame.current = null;
-    sheetDrag.current = null;
-    setSheetDragging(false);
-    p.playerRef.current?.style.removeProperty('--music-sheet-drag');
+    sheetSpring.current?.stop();
+    sheetSpring.current = null;
+    const sheet = p.playerRef.current;
+    sheet?.removeAttribute('data-dragging');
+    for (const name of ['progress', 'travel', 'drag'])
+      sheet?.style.removeProperty('--music-sheet-' + name);
+  };
+  const settleSheet = (
+    collapsed: boolean,
+    travel: number,
+    velocity: number,
+    flick: boolean,
+  ) => {
+    releaseSheet();
+    changeMini(collapsed);
+    if (!appearance.motion || reducedMotion()) return;
+    p.playerRef.current?.setAttribute('data-dragging', '');
+    paintSheet(travel);
+    // A flick keeps a little of its momentum as overshoot.
+    sheetSpring.current = animateSpring(
+      sheetOffset.current,
+      collapsed ? travel : 0,
+      {
+        damping: flick ? 0.8 : 1,
+        response: 0.3,
+        velocity,
+        onUpdate: (value) => {
+          sheetOffset.current = value;
+          paintSheet(travel);
+        },
+        onComplete: () => {
+          sheetSpring.current = null;
+          releaseSheet();
+        },
+      },
+    );
   };
   useLayoutEffect(() => {
     if (!focusSheet.current) return;
@@ -417,54 +478,112 @@ export function MusicPlayerView(p: Props) {
   useEffect(
     () => () => {
       if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
+      sheetSpring.current?.stop();
     },
     [],
   );
-  const sheetGesture: ButtonHTMLAttributes<HTMLButtonElement> = {
+  const sheetKeys: ButtonHTMLAttributes<HTMLButtonElement> = {
     onClick(event) {
       if (event.detail > 0 && Date.now() < suppressSheetClickUntil.current)
         return;
+      releaseSheet();
       changeMini(!miniCollapsed);
     },
     onKeyDown(event) {
       if (['ArrowUp', 'ArrowDown', 'Escape'].includes(event.key)) {
         event.preventDefault();
+        releaseSheet();
         changeMini(event.key !== 'ArrowUp');
       }
     },
+  };
+  const cancelSheetDrag = (pointer: number) => {
+    const drag = sheetDrag.current;
+    if (drag?.id !== pointer) return;
+    sheetDrag.current = null;
+    if (drag.active)
+      settleSheet(sheetOffset.current > drag.travel / 2, drag.travel, 0, false);
+  };
+  // The handles and empty parts of the panel drag it; controls keep their taps.
+  const sheetGesture: HTMLAttributes<HTMLElement> = {
     onPointerDown(event) {
       if (!event.isPrimary || event.button !== 0) return;
-      sheetDrag.current = { id: event.pointerId, y: event.clientY };
-      event.currentTarget.setPointerCapture(event.pointerId);
+      const target = event.target as Element;
+      const surface = target.closest<HTMLElement>(
+        '.music-sheet-panel, .music-sheet-compact',
+      );
+      if (
+        !surface ||
+        (!target.closest('.music-sheet-handle') &&
+          target.closest(SHEET_CONTROLS))
+      )
+        return;
+      const panel =
+        event.currentTarget.querySelector<HTMLElement>('.music-sheet-panel');
+      const travel = Math.max(1, (panel?.offsetHeight ?? 0) - 56);
+      // Caught mid-settle: continue from where it is.
+      const live = sheetSpring.current?.stop();
+      sheetSpring.current = null;
+      if (!live) sheetOffset.current = miniCollapsed ? travel : 0;
+      sheetDrag.current = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        from: sheetOffset.current,
+        travel,
+        active: !!live,
+        surface,
+      };
+      sheetVelocity.current.reset();
+      sheetVelocity.current.add(event.clientX, event.clientY);
+      if (live) surface.setPointerCapture(event.pointerId);
     },
     onPointerMove(event) {
-      if (sheetDrag.current?.id !== event.pointerId) return;
-      const delta = event.clientY - sheetDrag.current.y;
-      if (Math.abs(delta) < 3) return;
-      if (!sheetDragging) setSheetDragging(true);
-      dragOffset.current = Math.max(-14, Math.min(24, delta * 0.3));
+      const drag = sheetDrag.current;
+      if (drag?.id !== event.pointerId) return;
+      sheetVelocity.current.add(event.clientX, event.clientY);
+      if (!drag.active) {
+        const dx = event.clientX - drag.x,
+          dy = event.clientY - drag.y;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < 10) return;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          sheetDrag.current = null;
+          return;
+        }
+        drag.active = true;
+        drag.y = event.clientY;
+        event.currentTarget.setAttribute('data-dragging', '');
+        drag.surface.setPointerCapture(event.pointerId);
+      }
+      sheetOffset.current = drag.from + event.clientY - drag.y;
       if (dragFrame.current !== null) return;
       dragFrame.current = requestAnimationFrame(() => {
         dragFrame.current = null;
-        p.playerRef.current?.style.setProperty(
-          '--music-sheet-drag',
-          `${dragOffset.current}px`,
-        );
+        paintSheet(drag.travel);
       });
     },
     onPointerUp(event) {
-      if (sheetDrag.current?.id !== event.pointerId) return;
-      const delta = event.clientY - sheetDrag.current.y;
-      if (Math.abs(delta) >= 24) {
-        suppressSheetClickUntil.current = Date.now() + 400;
-        changeMini(delta > 0);
-      }
-      resetSheetDrag();
-      if (event.currentTarget.hasPointerCapture(event.pointerId))
-        event.currentTarget.releasePointerCapture(event.pointerId);
+      const drag = sheetDrag.current;
+      if (drag?.id !== event.pointerId) return;
+      sheetDrag.current = null;
+      if (!drag.active) return;
+      suppressSheetClickUntil.current = Date.now() + 400;
+      sheetVelocity.current.add(event.clientX, event.clientY);
+      const velocity = sheetVelocity.current.velocity().y;
+      const { collapsed, flick } = sheetTarget(
+        sheetOffset.current,
+        velocity,
+        drag.travel,
+      );
+      settleSheet(collapsed, drag.travel, velocity, flick);
+      if (drag.surface.hasPointerCapture(event.pointerId))
+        drag.surface.releasePointerCapture(event.pointerId);
     },
-    onPointerCancel: resetSheetDrag,
-    onLostPointerCapture: resetSheetDrag,
+    onPointerCancel: (event) => cancelSheetDrag(event.pointerId),
+    onLostPointerCapture(event) {
+      if (event.target === sheetDrag.current?.surface)
+        cancelSheetDrag(event.pointerId);
+    },
   };
   useEffect(() => {
     const query = window.matchMedia('(min-width: 1100px)');
@@ -544,6 +663,16 @@ export function MusicPlayerView(p: Props) {
     return () => document.removeEventListener('contextmenu', close, true);
   }, [settingsOpen]);
   const coverButton = useRef<HTMLButtonElement>(null);
+  // Opens from and closes into the mini player; drags down to close.
+  const stageRef = useViewerGesture({
+    open: p.expanded,
+    origin: () => (miniCollapsed ? compactHandle : coverButton).current,
+    accepts: (target, pointer) =>
+      pointer !== 'mouse' && !target.closest(CONTROLS),
+    dismiss: { share: 0.3, speed: 300, momentum: true },
+    onDismiss: () => p.onExpanded(false),
+    reduced: () => !appearance.motion || reducedMotion(),
+  });
   const lastVolume = useRef(25);
   useEffect(() => {
     try {
@@ -706,8 +835,8 @@ export function MusicPlayerView(p: Props) {
         className="music-player music-sheet"
         aria-label="Музыкальный плеер"
         data-collapsed={miniCollapsed}
-        data-dragging={sheetDragging}
         data-motion={appearance.motion ? 'on' : 'off'}
+        {...sheetGesture}
       >
         <div
           className="music-sheet-panel"
@@ -727,7 +856,7 @@ export function MusicPlayerView(p: Props) {
                 ? 'Раскрыть плеер — нажми или потяни вверх'
                 : 'Свернуть плеер — нажми или потяни вниз'
             }
-            {...sheetGesture}
+            {...sheetKeys}
           >
             <span className="music-sheet-grip" aria-hidden="true" />
           </button>
@@ -848,7 +977,7 @@ export function MusicPlayerView(p: Props) {
           aria-hidden={!miniCollapsed}
           inert={!miniCollapsed}
           title="Раскрыть плеер — нажми или потяни вверх"
-          {...sheetGesture}
+          {...sheetKeys}
         >
           <span className="music-sheet-grip" aria-hidden="true" />
           <span className="music-sheet-peek" aria-hidden="true">
@@ -976,6 +1105,7 @@ export function MusicPlayerView(p: Props) {
           }}
         >
           <DialogContent
+            ref={stageRef}
             layout="fullscreen"
             showCloseButton={false}
             finalFocus={miniCollapsed ? compactHandle : coverButton}
