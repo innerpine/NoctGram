@@ -177,5 +177,7 @@ await test('ready entrance animates the chat pane only and supports cleanup and 
   assert.equal(canceled, true);
   reduced = true;
   revealChat(list)();
-  assert.equal(animations.length, 1);
+  assert.equal(animations.length, 2, 'reduced motion still fades in');
+  assert.equal(animations[1].options.duration, 150);
+  assert.ok(animations[1].frames.every((frame) => !('translate' in frame)));
 });

@@ -131,12 +131,21 @@ void test('cancellation on account change prevents queued updates after unmount'
   assert.deepEqual(f.updates, []);
   assert.equal(f.attributes.size, 0);
 });
-void test('same section, initial load, nonmusic navigation, reduced motion and hidden pages commit immediately', async () => {
+void test('reduced motion swaps the rising entrance for a short fade', async () => {
+  const f = fixture();
+  f.state.reduced = true;
+  delete f.host.document.startViewTransition;
+  await f.run('feed', 'music');
+  assert.deepEqual(f.updates, ['music']);
+  assert.equal(f.animations.length, 1);
+  assert.equal(f.animations[0].options.duration, 150);
+  assert.deepEqual(f.animations[0].frames, [{ opacity: 0 }, { opacity: 1 }]);
+});
+void test('same section, initial load, nonmusic navigation and hidden pages commit immediately', async () => {
   for (const [from, to, enabled, flag] of [
     ['music', 'music'],
     ['feed', 'music', false],
     ['messages', 'profile'],
-    ['feed', 'music', true, 'reduced'],
     ['music', 'feed', true, 'hidden'],
   ]) {
     const f = fixture();

@@ -1997,12 +1997,19 @@ small {
     max-width: 67%;
   }
 }
+/* Reduced motion: nothing travels, scales or loops, but fades and colour changes
+   still ease. Keyframe entrances end at once; a component's own reduce variant
+   opts back in with !important (a class beats this universal selector). */
 @media (prefers-reduced-motion: reduce) {
   *,
-  *:before,
-  *:after {
-    animation: none !important;
-    transition: none !important;
+  *::before,
+  *::after {
+    transition-property:
+      opacity, visibility, color, background-color, border-color, outline-color,
+      box-shadow, fill, stroke !important;
+    animation-duration: 1ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
 }

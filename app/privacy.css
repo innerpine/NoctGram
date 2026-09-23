@@ -304,20 +304,6 @@
   opacity: 1;
   transform: scale(1) rotate(0deg);
 }
-@media (prefers-reduced-motion: reduce) {
-  .privacy-select-trigger,
-  .privacy-select-chevron,
-  .privacy-select-menu,
-  .privacy-select-option,
-  .privacy-option-icon,
-  .privacy-option-check,
-  .privacy-toggle,
-  .privacy-switch,
-  .privacy-switch-thumb,
-  .privacy-switch-thumb svg {
-    transition: none !important;
-  }
-}
 .privacy-toggle {
   display: flex !important;
   flex-direction: row !important;

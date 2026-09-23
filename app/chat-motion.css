@@ -199,23 +199,9 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .chat-panel,
-  .room-workspace,
-  .room-workspace *,
-  .thread-row,
-  .chat-conversation,
-  .chat-conversation *,
-  .chat-action-menu,
-  .chat-action-menu *,
-  .chat-options-menu,
-  .chat-options-menu *,
-  .chat-theme-dialog,
-  .chat-theme-dialog *,
-  .chat-operation-dialog,
-  .chat-delete-backdrop,
-  .chat-pins-dialog,
-  .chat-photo-dialog {
-    animation: none !important;
-    transition: none !important;
+  /* Their keyframes would end at once; the shared dialog fade takes over. */
+  .chat-delete-dialog[data-open],
+  .chat-delete-backdrop[data-open] {
+    animation: none;
   }
 }

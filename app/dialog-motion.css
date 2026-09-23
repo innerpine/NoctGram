@@ -47,11 +47,3 @@
 ) {
   scale: 0.97;
 }
-@media (prefers-reduced-motion: reduce) {
-  [data-slot='dialog-overlay'],
-  [data-slot='alert-dialog-overlay'],
-  [data-slot='dialog-content'],
-  [data-slot='alert-dialog-content'] {
-    transition: none !important;
-  }
-}

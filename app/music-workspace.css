@@ -503,11 +503,3 @@ body:has(.music-shell) .music-player.music-sheet {
     justify-content: center;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .playlist-create-overlay,
-  .playlist-create-dialog,
-  .playlist-create-dialog * {
-    animation: none !important;
-    transition: none !important;
-  }
-}

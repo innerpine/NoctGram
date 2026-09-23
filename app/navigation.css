@@ -86,11 +86,16 @@ html[data-page-transition]::view-transition-new(noct-page-in) {
     translate: 0 0;
   }
 }
+/* Reduced motion: surfaces stay put and the sections only cross-fade. */
 @media (prefers-reduced-motion: reduce) {
-  html[data-page-transition]::view-transition-group(*),
-  html[data-page-transition]::view-transition-old(*),
-  html[data-page-transition]::view-transition-new(*) {
+  html[data-page-transition]::view-transition-group(*) {
     animation: none !important;
+  }
+  html[data-page-transition]::view-transition-old(noct-page-out) {
+    animation: stream-enter 150ms ease reverse both;
+  }
+  html[data-page-transition]::view-transition-new(noct-page-in) {
+    animation: stream-enter 150ms ease both;
   }
 }
 .main-column[data-page='profile'] .profile-card {

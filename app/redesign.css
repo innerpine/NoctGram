@@ -1989,14 +1989,6 @@ textarea::placeholder {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-delay: 0ms !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
-  }
   .post-text-wrap.collapsed {
     mask-image: none;
   }

@@ -632,9 +632,11 @@
 @media (prefers-reduced-motion: reduce) {
   .notification-toast {
     animation-name: notification-toast-fade;
+    animation-duration: 200ms !important;
   }
   .notification-toast.leaving {
     animation-name: notification-toast-vanish;
+    animation-duration: 160ms !important;
   }
   .notification-skeleton {
     animation: none;
