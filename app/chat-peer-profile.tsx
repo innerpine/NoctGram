@@ -172,14 +172,17 @@ function PeerProfileBody({
   const [errors, setErrors] = useState<Record<string, string>>({}),
     [loading, setLoading] = useState<Record<string, boolean>>({});
   const [view, setView] = useState<View>({ kind: 'profile' }),
-    [leaving, setLeaving] = useState(false),
+    [previous, setPrevious] = useState<View | null>(null),
     [backward, setBackward] = useState(false);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>(
     'idle',
   );
   const scroll = useRef<HTMLDivElement>(null),
     heading = useRef<HTMLHeadingElement>(null),
-    positions = useRef(new Map<string, number>());
+    positions = useRef(new Map<string, number>()),
+    ghost = useRef<HTMLDivElement>(null),
+    // Where the leaving page was drawn: scroll area top and its scroll offset.
+    drawn = useRef<{ top: number; scroll: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null),
     abort = useRef<AbortController | null>(null),
     pending = useRef(new Set<string>());
@@ -313,34 +316,52 @@ function PeerProfileBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useLayoutEffect(() => {
-    if (scroll.current)
-      scroll.current.scrollTop = positions.current.get(viewKey(view)) || 0;
+    const list = scroll.current,
+      old = ghost.current;
+    // A page taken back while still fading keeps no pinned geometry.
+    for (const element of list?.querySelectorAll<HTMLElement>(
+      '.peer-profile-page',
+    ) || [])
+      element.style.top = element.style.height = '';
+    // Collapsed first, the leaving page cannot stretch the new scroll range.
+    if (old) old.style.height = '0px';
+    if (list) {
+      list.scrollTop = positions.current.get(viewKey(view)) || 0;
+      if (old && drawn.current) {
+        // The toolbar can enter or leave the flow, moving the scroll area.
+        const shift = list.getBoundingClientRect().top - drawn.current.top;
+        old.style.top = list.scrollTop - drawn.current.scroll - shift + 'px';
+        old.style.height =
+          drawn.current.scroll + shift + list.clientHeight + 'px';
+      }
+    }
     if (view.kind !== 'profile')
       heading.current?.focus({ preventScroll: true });
   }, [view]);
   function navigate(next: View, back = false) {
-    if (timer.current) return;
-    if (scroll.current)
-      positions.current.set(viewKey(view), scroll.current.scrollTop);
+    if (viewKey(next) === viewKey(view)) return;
+    const list = scroll.current;
+    if (list) {
+      positions.current.set(viewKey(view), list.scrollTop);
+      drawn.current = {
+        top: list.getBoundingClientRect().top,
+        scroll: list.scrollTop,
+      };
+    }
     if (
       sections.some((section) => section.id === next.kind) &&
       !pages[next.kind as ChatLibraryKind]
     )
       void load(next.kind);
     setBackward(back);
-    const reduced = window.matchMedia(
-      '(prefers-reduced-motion: reduce)',
-    ).matches;
-    if (reduced) {
-      setView(next);
-      return;
-    }
-    setLeaving(true);
+    // No input lock: the next page is live at once, the old one fades on top.
+    setPrevious(view);
+    setView(next);
+    if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      setView(next);
-      setLeaving(false);
+      setPrevious(null);
       timer.current = null;
-    }, 110);
+    }, 160);
   }
   function back() {
     navigate(
@@ -362,11 +383,409 @@ function PeerProfileBody({
       </div>
     ) : null;
   }
-  const library = sections.some((section) => section.id === view.kind)
-    ? pages[view.kind as ChatLibraryKind]
-    : null;
-  const currentGift =
-    view.kind === 'gift' ? giftDefinition(view.gift.giftId) : null;
+  // A view change mounts the next page at once with its entrance while the
+  // previous one fades out on top of it, pinned where it was on screen.
+  const page = (view: View, leaving = false) => {
+    const library = sections.some((section) => section.id === view.kind)
+      ? pages[view.kind as ChatLibraryKind]
+      : null;
+    const currentGift =
+      view.kind === 'gift' ? giftDefinition(view.gift.giftId) : null;
+    return (
+      <div
+        key={viewKey(view)}
+        ref={leaving ? ghost : undefined}
+        className={
+          'peer-profile-page' +
+          (leaving ? ' leaving' : '') +
+          (backward ? ' backward' : '')
+        }
+        aria-hidden={leaving || undefined}
+        inert={leaving || undefined}
+      >
+        {view.kind === 'profile' && (
+          <>
+            <div className="peer-profile-hero">
+              <div className="peer-profile-cover">
+                {person?.cover === LIQUID_COVER && person.avatar && (
+                  <LiquidCover src={person.avatar} />
+                )}
+                {coverImage(person?.cover) && (
+                  <img
+                    src={coverImage(person?.cover)}
+                    alt=""
+                    decoding="async"
+                    onError={(event) => {
+                      event.currentTarget.style.visibility = 'hidden';
+                    }}
+                  />
+                )}
+              </div>
+              <div className="peer-profile-identity">
+                <ProfileLink
+                  target={{ id: peer.id, handle: peer.handle }}
+                  className="peer-profile-avatar"
+                  aria-label={'Открыть профиль: ' + identity.name}
+                >
+                  <Avatar person={identity} size={86} eager />
+                </ProfileLink>
+                <h2>
+                  <ProfileLink target={{ id: peer.id, handle: peer.handle }}>
+                    <DisplayName person={identity} />
+                  </ProfileLink>
+                </h2>
+                <p className={online ? 'online' : ''}>
+                  {online
+                    ? 'В сети'
+                    : person?.lastSeen === null
+                      ? 'Статус скрыт'
+                      : person?.lastSeen
+                        ? 'Был(а) ' +
+                          new Date(person.lastSeen).toLocaleString('ru-RU', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : 'Личный диалог'}
+                </p>
+              </div>
+              <div className="peer-profile-actions">
+                <button className="secondary" onClick={onClose}>
+                  <MessageCircle size={17} /> В чат
+                </button>
+                <ProfileLink
+                  className="secondary"
+                  target={{ id: peer.id, handle: peer.handle }}
+                >
+                  Полный профиль <ArrowUpRight size={17} />
+                </ProfileLink>
+              </div>
+            </div>
+            <div className="peer-profile-info">
+              <button
+                className="peer-info-row peer-copy-handle"
+                onClick={() => void copyHandle()}
+                aria-label={'Скопировать @' + identity.handle}
+                title="Скопировать имя пользователя"
+              >
+                <AtSign size={19} />
+                <span className="peer-copy-text">
+                  <span>@{identity.handle}</span>
+                  <small>
+                    <output>
+                      {copyStatus === 'copied'
+                        ? 'Скопировано'
+                        : copyStatus === 'error'
+                          ? 'Не удалось скопировать. Нажмите ещё раз'
+                          : 'Имя пользователя'}
+                    </output>
+                  </small>
+                </span>
+                {copyStatus === 'copied' ? (
+                  <Check size={17} className="peer-copy-icon copied" />
+                ) : (
+                  <Copy size={17} className="peer-copy-icon" />
+                )}
+              </button>
+              {person?.bio && (
+                <div className="peer-profile-bio">
+                  <ChatEmojiText text={person.bio} />
+                  <small>О себе</small>
+                </div>
+              )}
+              {loading.profile && !person && (
+                <output className="peer-loading-inline">
+                  <LoaderCircle size={14} className="spin" /> Загружаем
+                  информацию…
+                </output>
+              )}
+              <ProfileRecognitions person={identity} compact />
+              {feedback('profile')}
+            </div>
+            <div className="peer-chat-stats">
+              <h3>Ваша переписка</h3>
+              <div className="peer-stats-grid">
+                <div>
+                  <strong>
+                    {stats?.messages.toLocaleString('ru-RU') ?? '—'}
+                  </strong>
+                  <small>Сообщений</small>
+                </div>
+                <div>
+                  <strong>
+                    {stats
+                      ? (
+                          stats.photos +
+                          stats.videos +
+                          stats.files +
+                          stats.audio
+                        ).toLocaleString('ru-RU')
+                      : '—'}
+                  </strong>
+                  <small>Вложений</small>
+                </div>
+              </div>
+              {stats?.first ? (
+                <p>
+                  Общаетесь с {date(stats.first)} · от вас {stats.sent}, от
+                  собеседника {stats.received}
+                </p>
+              ) : (
+                <p>
+                  {stats
+                    ? 'Здесь начнётся ваша переписка'
+                    : 'Загружаем статистику…'}
+                </p>
+              )}
+              {feedback('stats')}
+            </div>
+            <div className="peer-profile-sections">
+              <button onClick={() => navigate({ kind: 'gifts' })}>
+                <Gift size={21} />
+                <span>Подарки в профиле</span>
+                <small>
+                  {gifts ? gifts.gifts.length + (gifts.next ? '+' : '') : '—'}
+                </small>
+                <ChevronRight size={16} />
+              </button>
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => navigate({ kind: section.id })}
+                >
+                  <section.icon size={21} />
+                  <span>{section.title}</span>
+                  <small>
+                    {section.id === 'links' ? '' : (stats?.[section.id] ?? '—')}
+                  </small>
+                  <ChevronRight size={16} />
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {view.kind === 'gifts' && (
+          <div className="peer-section-body">
+            {loading.gifts && !gifts && <Loading />}
+            {feedback('gifts')}
+            {gifts && (
+              <>
+                <div className="peer-gift-grid">
+                  {gifts.gifts.map((receipt) => (
+                    <button
+                      key={receipt.id}
+                      className="peer-gift-tile"
+                      onClick={() => navigate({ kind: 'gift', gift: receipt })}
+                    >
+                      <GiftAnimation id={receipt.giftId} />
+                      <strong>
+                        {giftDefinition(receipt.giftId)?.name || 'Подарок'}
+                      </strong>
+                    </button>
+                  ))}
+                </div>
+                {!gifts.gifts.length && (
+                  <Empty
+                    icon="gift"
+                    text="Пока без подарков"
+                    detail={
+                      own
+                        ? 'Здесь появятся подарки, которые вы показываете в профиле.'
+                        : 'Здесь появятся подарки, которые собеседник показывает в профиле.'
+                    }
+                  />
+                )}
+                {gifts.next && (
+                  <More
+                    busy={!!loading.gifts}
+                    onClick={() => void load('gifts', true)}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {view.kind === 'gift' && (
+          <div className="peer-gift-detail peer-section-body">
+            <div className="peer-gift-art">
+              <GiftAnimation id={view.gift.giftId} />
+            </div>
+            <h3>{currentGift?.name || 'Подарок'}</h3>
+            <p>
+              от{' '}
+              <ProfileLink target={{ id: view.gift.sender }}>
+                {view.gift.senderName}
+              </ProfileLink>
+            </p>
+            {view.gift.message && (
+              <div className="peer-gift-message">
+                <ChatEmojiText text={view.gift.message} />
+              </div>
+            )}
+            <time>{date(view.gift.created)}</time>
+          </div>
+        )}
+        {sections.some((section) => section.id === view.kind) && (
+          <div className="peer-section-body">
+            {loading[view.kind] && !library && <Loading />}
+            {feedback(view.kind)}
+            {library && (
+              <>
+                <div
+                  className={
+                    ['photos', 'videos'].includes(view.kind)
+                      ? 'peer-media-grid'
+                      : 'peer-file-list'
+                  }
+                >
+                  {library.items.map((item) =>
+                    item.url ? (
+                      <a
+                        className="peer-link-row"
+                        key={item.id}
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <span className="peer-file-icon">
+                          <LinkIcon size={23} />
+                        </span>
+                        <span>
+                          <strong>{new URL(item.url).hostname}</strong>
+                          <span className="peer-link-url">{item.url}</span>
+                          <small>{date(item.created)}</small>
+                        </span>
+                        <ArrowUpRight size={17} />
+                      </a>
+                    ) : (
+                      item.file && (
+                        <button
+                          key={item.id}
+                          className={
+                            ['photos', 'videos'].includes(view.kind)
+                              ? 'peer-media-tile'
+                              : 'peer-file-row'
+                          }
+                          onClick={() =>
+                            navigate({
+                              kind: 'media',
+                              item,
+                              from: view.kind as ChatLibraryKind,
+                            })
+                          }
+                          aria-label={'Открыть ' + item.file.name}
+                        >
+                          {view.kind === 'photos' ? (
+                            <img
+                              src={mediaUrl(item.file.id)}
+                              alt={item.file.name}
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          ) : view.kind === 'videos' ? (
+                            <>
+                              <video
+                                src={mediaUrl(item.file.id)}
+                                preload="metadata"
+                                muted
+                                playsInline
+                              />
+                              <span className="peer-video-play">
+                                <Play size={22} />
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="peer-file-icon">
+                                {view.kind === 'audio' ? (
+                                  <Headphones size={23} />
+                                ) : (
+                                  <FileIcon size={23} />
+                                )}
+                              </span>
+                              <span>
+                                <strong>{item.file.name}</strong>
+                                <small>
+                                  {chatFileSize(item.file.size)} ·{' '}
+                                  {date(item.created)}
+                                </small>
+                              </span>
+                              <ChevronRight size={16} />
+                            </>
+                          )}
+                        </button>
+                      )
+                    ),
+                  )}
+                </div>
+                {!library.items.length && (
+                  <Empty
+                    text={
+                      library.next
+                        ? 'На этой странице нет доступных материалов'
+                        : 'Здесь пока пусто'
+                    }
+                    detail="Материалы из вашей переписки появятся в этом разделе."
+                  />
+                )}
+                {library.next && (
+                  <More
+                    busy={!!loading[view.kind]}
+                    onClick={() => void load(view.kind, true)}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {view.kind === 'media' && view.item.file && (
+          <div className="peer-media-detail peer-section-body">
+            {view.item.file.kind === 'image' ? (
+              <img
+                src={mediaUrl(view.item.file.id)}
+                alt={view.item.file.name}
+              />
+            ) : view.item.file.kind === 'video' ? (
+              <ChatVideoPlayer
+                src={mediaUrl(view.item.file.id)}
+                name={view.item.file.name}
+              />
+            ) : view.item.file.type.startsWith('audio/') ? (
+              <>
+                <div className="peer-document-art">
+                  <Headphones size={54} />
+                </div>
+                <audio
+                  src={mediaUrl(view.item.file.id)}
+                  controls
+                  preload="metadata"
+                  aria-label={view.item.file.name}
+                />
+              </>
+            ) : (
+              <div className="peer-document-art">
+                <FileIcon size={54} />
+              </div>
+            )}
+            <strong>{view.item.file.name}</strong>
+            <small>
+              {chatFileSize(view.item.file.size)} · {date(view.item.created)}
+            </small>
+            {view.item.file.kind !== 'video' && (
+              <a
+                className="secondary"
+                href={mediaUrl(view.item.file.id) + '?download=1'}
+                download={view.item.file.name}
+              >
+                <Download size={17} /> Скачать
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (!person) {
     return (
@@ -420,7 +839,6 @@ function PeerProfileBody({
             className="icon-button"
             aria-label="Назад в мини-профиле"
             onClick={back}
-            disabled={leaving}
           >
             <ArrowLeft size={20} />
           </button>
@@ -446,401 +864,8 @@ function PeerProfileBody({
           : 'Информация о собеседнике, его подарки и материалы вашей переписки.'}
       </DialogDescription>
       <div ref={scroll} className="peer-profile-scroll">
-        <div
-          key={viewKey(view)}
-          className={
-            'peer-profile-page' +
-            (leaving ? ' leaving' : '') +
-            (backward ? ' backward' : '')
-          }
-          aria-busy={leaving}
-          inert={leaving}
-        >
-          {view.kind === 'profile' && (
-            <>
-              <div className="peer-profile-hero">
-                <div className="peer-profile-cover">
-                  {person?.cover === LIQUID_COVER && person.avatar && (
-                    <LiquidCover src={person.avatar} />
-                  )}
-                  {coverImage(person?.cover) && (
-                    <img
-                      src={coverImage(person?.cover)}
-                      alt=""
-                      decoding="async"
-                      onError={(event) => {
-                        event.currentTarget.style.visibility = 'hidden';
-                      }}
-                    />
-                  )}
-                </div>
-                <div className="peer-profile-identity">
-                  <ProfileLink
-                    target={{ id: peer.id, handle: peer.handle }}
-                    className="peer-profile-avatar"
-                    aria-label={'Открыть профиль: ' + identity.name}
-                  >
-                    <Avatar person={identity} size={86} eager />
-                  </ProfileLink>
-                  <h2>
-                    <ProfileLink target={{ id: peer.id, handle: peer.handle }}>
-                      <DisplayName person={identity} />
-                    </ProfileLink>
-                  </h2>
-                  <p className={online ? 'online' : ''}>
-                    {online
-                      ? 'В сети'
-                      : person?.lastSeen === null
-                        ? 'Статус скрыт'
-                        : person?.lastSeen
-                          ? 'Был(а) ' +
-                            new Date(person.lastSeen).toLocaleString('ru-RU', {
-                              day: 'numeric',
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : 'Личный диалог'}
-                  </p>
-                </div>
-                <div className="peer-profile-actions">
-                  <button className="secondary" onClick={onClose}>
-                    <MessageCircle size={17} /> В чат
-                  </button>
-                  <ProfileLink
-                    className="secondary"
-                    target={{ id: peer.id, handle: peer.handle }}
-                  >
-                    Полный профиль <ArrowUpRight size={17} />
-                  </ProfileLink>
-                </div>
-              </div>
-              <div className="peer-profile-info">
-                <button
-                  className="peer-info-row peer-copy-handle"
-                  onClick={() => void copyHandle()}
-                  aria-label={'Скопировать @' + identity.handle}
-                  title="Скопировать имя пользователя"
-                >
-                  <AtSign size={19} />
-                  <span className="peer-copy-text">
-                    <span>@{identity.handle}</span>
-                    <small>
-                      <output>
-                        {copyStatus === 'copied'
-                          ? 'Скопировано'
-                          : copyStatus === 'error'
-                            ? 'Не удалось скопировать. Нажмите ещё раз'
-                            : 'Имя пользователя'}
-                      </output>
-                    </small>
-                  </span>
-                  {copyStatus === 'copied' ? (
-                    <Check size={17} className="peer-copy-icon copied" />
-                  ) : (
-                    <Copy size={17} className="peer-copy-icon" />
-                  )}
-                </button>
-                {person?.bio && (
-                  <div className="peer-profile-bio">
-                    <ChatEmojiText text={person.bio} />
-                    <small>О себе</small>
-                  </div>
-                )}
-                {loading.profile && !person && (
-                  <output className="peer-loading-inline">
-                    <LoaderCircle size={14} className="spin" /> Загружаем
-                    информацию…
-                  </output>
-                )}
-                <ProfileRecognitions person={identity} compact />
-                {feedback('profile')}
-              </div>
-              <div className="peer-chat-stats">
-                <h3>Ваша переписка</h3>
-                <div className="peer-stats-grid">
-                  <div>
-                    <strong>
-                      {stats?.messages.toLocaleString('ru-RU') ?? '—'}
-                    </strong>
-                    <small>Сообщений</small>
-                  </div>
-                  <div>
-                    <strong>
-                      {stats
-                        ? (
-                            stats.photos +
-                            stats.videos +
-                            stats.files +
-                            stats.audio
-                          ).toLocaleString('ru-RU')
-                        : '—'}
-                    </strong>
-                    <small>Вложений</small>
-                  </div>
-                </div>
-                {stats?.first ? (
-                  <p>
-                    Общаетесь с {date(stats.first)} · от вас {stats.sent}, от
-                    собеседника {stats.received}
-                  </p>
-                ) : (
-                  <p>
-                    {stats
-                      ? 'Здесь начнётся ваша переписка'
-                      : 'Загружаем статистику…'}
-                  </p>
-                )}
-                {feedback('stats')}
-              </div>
-              <div className="peer-profile-sections">
-                <button onClick={() => navigate({ kind: 'gifts' })}>
-                  <Gift size={21} />
-                  <span>Подарки в профиле</span>
-                  <small>
-                    {gifts ? gifts.gifts.length + (gifts.next ? '+' : '') : '—'}
-                  </small>
-                  <ChevronRight size={16} />
-                </button>
-                {sections.map((section) => (
-                  <button
-                    key={section.id}
-                    onClick={() => navigate({ kind: section.id })}
-                  >
-                    <section.icon size={21} />
-                    <span>{section.title}</span>
-                    <small>
-                      {section.id === 'links'
-                        ? ''
-                        : (stats?.[section.id] ?? '—')}
-                    </small>
-                    <ChevronRight size={16} />
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          {view.kind === 'gifts' && (
-            <div className="peer-section-body">
-              {loading.gifts && !gifts && <Loading />}
-              {feedback('gifts')}
-              {gifts && (
-                <>
-                  <div className="peer-gift-grid">
-                    {gifts.gifts.map((receipt) => (
-                      <button
-                        key={receipt.id}
-                        className="peer-gift-tile"
-                        onClick={() =>
-                          navigate({ kind: 'gift', gift: receipt })
-                        }
-                      >
-                        <GiftAnimation id={receipt.giftId} />
-                        <strong>
-                          {giftDefinition(receipt.giftId)?.name || 'Подарок'}
-                        </strong>
-                      </button>
-                    ))}
-                  </div>
-                  {!gifts.gifts.length && (
-                    <Empty
-                      icon="gift"
-                      text="Пока без подарков"
-                      detail={
-                        own
-                          ? 'Здесь появятся подарки, которые вы показываете в профиле.'
-                          : 'Здесь появятся подарки, которые собеседник показывает в профиле.'
-                      }
-                    />
-                  )}
-                  {gifts.next && (
-                    <More
-                      busy={!!loading.gifts}
-                      onClick={() => void load('gifts', true)}
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          )}
-          {view.kind === 'gift' && (
-            <div className="peer-gift-detail peer-section-body">
-              <div className="peer-gift-art">
-                <GiftAnimation id={view.gift.giftId} />
-              </div>
-              <h3>{currentGift?.name || 'Подарок'}</h3>
-              <p>
-                от{' '}
-                <ProfileLink target={{ id: view.gift.sender }}>
-                  {view.gift.senderName}
-                </ProfileLink>
-              </p>
-              {view.gift.message && (
-                <div className="peer-gift-message">
-                  <ChatEmojiText text={view.gift.message} />
-                </div>
-              )}
-              <time>{date(view.gift.created)}</time>
-            </div>
-          )}
-          {sections.some((section) => section.id === view.kind) && (
-            <div className="peer-section-body">
-              {loading[view.kind] && !library && <Loading />}
-              {feedback(view.kind)}
-              {library && (
-                <>
-                  <div
-                    className={
-                      ['photos', 'videos'].includes(view.kind)
-                        ? 'peer-media-grid'
-                        : 'peer-file-list'
-                    }
-                  >
-                    {library.items.map((item) =>
-                      item.url ? (
-                        <a
-                          className="peer-link-row"
-                          key={item.id}
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <span className="peer-file-icon">
-                            <LinkIcon size={23} />
-                          </span>
-                          <span>
-                            <strong>{new URL(item.url).hostname}</strong>
-                            <span className="peer-link-url">{item.url}</span>
-                            <small>{date(item.created)}</small>
-                          </span>
-                          <ArrowUpRight size={17} />
-                        </a>
-                      ) : (
-                        item.file && (
-                          <button
-                            key={item.id}
-                            className={
-                              ['photos', 'videos'].includes(view.kind)
-                                ? 'peer-media-tile'
-                                : 'peer-file-row'
-                            }
-                            onClick={() =>
-                              navigate({
-                                kind: 'media',
-                                item,
-                                from: view.kind as ChatLibraryKind,
-                              })
-                            }
-                            aria-label={'Открыть ' + item.file.name}
-                          >
-                            {view.kind === 'photos' ? (
-                              <img
-                                src={mediaUrl(item.file.id)}
-                                alt={item.file.name}
-                                loading="lazy"
-                                decoding="async"
-                              />
-                            ) : view.kind === 'videos' ? (
-                              <>
-                                <video
-                                  src={mediaUrl(item.file.id)}
-                                  preload="metadata"
-                                  muted
-                                  playsInline
-                                />
-                                <span className="peer-video-play">
-                                  <Play size={22} />
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <span className="peer-file-icon">
-                                  {view.kind === 'audio' ? (
-                                    <Headphones size={23} />
-                                  ) : (
-                                    <FileIcon size={23} />
-                                  )}
-                                </span>
-                                <span>
-                                  <strong>{item.file.name}</strong>
-                                  <small>
-                                    {chatFileSize(item.file.size)} ·{' '}
-                                    {date(item.created)}
-                                  </small>
-                                </span>
-                                <ChevronRight size={16} />
-                              </>
-                            )}
-                          </button>
-                        )
-                      ),
-                    )}
-                  </div>
-                  {!library.items.length && (
-                    <Empty
-                      text={
-                        library.next
-                          ? 'На этой странице нет доступных материалов'
-                          : 'Здесь пока пусто'
-                      }
-                      detail="Материалы из вашей переписки появятся в этом разделе."
-                    />
-                  )}
-                  {library.next && (
-                    <More
-                      busy={!!loading[view.kind]}
-                      onClick={() => void load(view.kind, true)}
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          )}
-          {view.kind === 'media' && view.item.file && (
-            <div className="peer-media-detail peer-section-body">
-              {view.item.file.kind === 'image' ? (
-                <img
-                  src={mediaUrl(view.item.file.id)}
-                  alt={view.item.file.name}
-                />
-              ) : view.item.file.kind === 'video' ? (
-                <ChatVideoPlayer
-                  src={mediaUrl(view.item.file.id)}
-                  name={view.item.file.name}
-                />
-              ) : view.item.file.type.startsWith('audio/') ? (
-                <>
-                  <div className="peer-document-art">
-                    <Headphones size={54} />
-                  </div>
-                  <audio
-                    src={mediaUrl(view.item.file.id)}
-                    controls
-                    preload="metadata"
-                    aria-label={view.item.file.name}
-                  />
-                </>
-              ) : (
-                <div className="peer-document-art">
-                  <FileIcon size={54} />
-                </div>
-              )}
-              <strong>{view.item.file.name}</strong>
-              <small>
-                {chatFileSize(view.item.file.size)} · {date(view.item.created)}
-              </small>
-              {view.item.file.kind !== 'video' && (
-                <a
-                  className="secondary"
-                  href={mediaUrl(view.item.file.id) + '?download=1'}
-                  download={view.item.file.name}
-                >
-                  <Download size={17} /> Скачать
-                </a>
-              )}
-            </div>
-          )}
-        </div>
+        {page(view)}
+        {previous && page(previous, true)}
       </div>
     </div>
   );
