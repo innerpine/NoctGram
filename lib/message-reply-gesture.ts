@@ -1,7 +1,24 @@
+import {
+  animateSpring,
+  createVelocityTracker,
+  project,
+  rubberband,
+} from './fluid-motion';
+
 const CONTROLS =
   'a,button,input,textarea,select,[contenteditable],[role="button"],[role="slider"],video,audio,iframe,[data-chat-menu-exempt],[data-chat-removing],[role="menu"]';
 const TOUCH_CONTROLS = CONTROLS.replace('button,', '');
 const THRESHOLD = 64;
+
+/** 1:1 up to the reply threshold, then resisting. */
+export const replyShift = (distance: number) =>
+  distance <= THRESHOLD
+    ? Math.max(0, distance)
+    : THRESHOLD + rubberband(distance - THRESHOLD, 48);
+
+/** A short flick still replies; flicking back toward the start cancels. */
+export const repliesOnRelease = (distance: number, velocityX: number) =>
+  velocityX <= 150 && distance + project(-velocityX) >= THRESHOLD;
 
 export function isMessageReplyTarget(
   target: EventTarget | null,
@@ -24,6 +41,7 @@ type Pointer = {
   button: number;
   clientX: number;
   clientY: number;
+  timeStamp: number;
   cancelable: boolean;
   preventDefault: () => void;
   stopPropagation: () => void;
@@ -49,20 +67,49 @@ export function createMessageReplyGesture(hooks: ReplyOptions) {
     y: number;
     root: HTMLElement;
     dragging: boolean;
+    base: number;
   } | null = null;
   let lastInput = 'mouse',
     firstClick = false,
     suppressUntil = 0;
-  const reset = () => {
+  // The shown offset outlives the touch while the message springs home.
+  let offset = 0,
+    spring: ReturnType<typeof animateSpring> | null = null;
+  const tracker = createVelocityTracker();
+  const clear = (root: HTMLElement) => {
+    spring = null;
+    offset = 0;
+    root.removeAttribute('data-reply-dragging');
+    root.style.removeProperty('--reply-shift');
+  };
+  const settle = (root: HTMLElement, velocity: number) => {
+    spring?.stop();
+    root.removeAttribute('data-reply-ready');
+    // Dropping the progress fades the indicator out while the row returns.
+    root.style.removeProperty('--reply-progress');
+    if (
+      !offset ||
+      typeof window === 'undefined' ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    )
+      return clear(root);
+    spring = animateSpring(offset, 0, {
+      response: 0.3,
+      velocity,
+      onUpdate: (value) => {
+        offset = Math.max(0, value);
+        root.style.setProperty('--reply-shift', `${-offset}px`);
+      },
+      onComplete: () => clear(root),
+    });
+  };
+  const reset = (velocity = 0) => {
     const previous = active;
     active = null;
     if (!previous) return;
-    previous.root.removeAttribute('data-reply-dragging');
-    previous.root.removeAttribute('data-reply-ready');
-    previous.root.style.removeProperty('--reply-shift');
-    previous.root.style.removeProperty('--reply-progress');
     if (previous.root.hasPointerCapture?.(previous.id))
       previous.root.releasePointerCapture(previous.id);
+    settle(previous.root, velocity);
   };
   const cancel = () => {
     firstClick = false;
@@ -90,12 +137,16 @@ export function createMessageReplyGesture(hooks: ReplyOptions) {
         !isMessageReplyTarget(event.target, event.currentTarget, true)
       )
         return;
+      // Touching a returning message holds it where it is.
+      spring?.stop();
+      spring = null;
       active = {
         id: event.pointerId,
         x: event.clientX,
         y: event.clientY,
         root: event.currentTarget,
         dragging: false,
+        base: offset,
       };
     },
     onPointerMove: (event: Pointer) => {
@@ -113,14 +164,16 @@ export function createMessageReplyGesture(hooks: ReplyOptions) {
           return;
         }
         active.dragging = true;
+        // Follow from here: the first frame must not jump by the threshold.
+        active.x = event.clientX;
+        tracker.reset();
         active.root.setAttribute('data-reply-dragging', '');
         active.root.setPointerCapture?.(active.id);
       }
-      const distance = Math.max(0, -dx);
-      active.root.style.setProperty(
-        '--reply-shift',
-        `${-Math.min(88, distance)}px`,
-      );
+      tracker.add(event.clientX, event.clientY, event.timeStamp);
+      const distance = Math.max(0, active.base + active.x - event.clientX);
+      offset = replyShift(distance);
+      active.root.style.setProperty('--reply-shift', `${-offset}px`);
       active.root.style.setProperty(
         '--reply-progress',
         String(Math.min(1, distance / THRESHOLD)),
@@ -132,10 +185,13 @@ export function createMessageReplyGesture(hooks: ReplyOptions) {
     },
     onPointerUp: (event: Pointer) => {
       if (!active || event.pointerId !== active.id) return;
-      const distance = active.x - event.clientX;
+      const distance = Math.max(0, active.base + active.x - event.clientX);
+      if (active.dragging)
+        tracker.add(event.clientX, event.clientY, event.timeStamp);
+      const velocity = active.dragging ? tracker.velocity().x : 0;
       const reply =
         active.dragging &&
-        distance >= THRESHOLD &&
+        repliesOnRelease(distance, velocity) &&
         Math.abs(event.clientY - active.y) < distance * 0.8 &&
         hooks.enabled();
       if (active.dragging) {
@@ -143,7 +199,7 @@ export function createMessageReplyGesture(hooks: ReplyOptions) {
         if (event.cancelable) event.preventDefault();
         event.stopPropagation();
       }
-      reset();
+      reset(-velocity);
       if (reply) hooks.reply();
     },
     onPointerCancel: cancel,

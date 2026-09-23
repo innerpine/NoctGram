@@ -25,6 +25,7 @@ import { reconcileSnapshot } from '@/lib/reconcile-snapshot';
 import { createFeedSnapshots, feedKey, sameSearch } from '@/lib/feed-snapshots';
 import { createChatSnapshots, type ChatSnapshot } from '@/lib/chat-snapshots';
 import { createPageTransition } from '@/lib/page-transition';
+import { createChatSwipeBack } from '@/lib/chat-swipe-back';
 import { createProfileCoverCache } from '@/lib/profile-cover-cache';
 import { createLatestRequests } from '@/lib/optimistic';
 import { flushSync } from 'react-dom';
@@ -388,6 +389,28 @@ export default function Noctgram({
   }, []);
   const backFromRoom = useCallback(() => {
     void appHistory.current?.navigate({ page: 'messages' });
+  }, []);
+  // On phones back (arrow or edge swipe) slides the chat off before clearing it.
+  const chatSwipe = useRef<ReturnType<typeof createChatSwipeBack> | null>(null);
+  const closeChat = useRef(() => {});
+  closeChat.current = roomTarget
+    ? backFromRoom
+    : () => {
+        appHistory.current?.cancelPending();
+        setPeer(null);
+      };
+  const exitChat = useCallback(() => {
+    if (chatSwipe.current) chatSwipe.current.exit();
+    else closeChat.current();
+  }, []);
+  const messengerRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const swipe = createChatSwipeBack(node, () => closeChat.current());
+    chatSwipe.current = swipe;
+    return () => {
+      swipe.dispose();
+      if (chatSwipe.current === swipe) chatSwipe.current = null;
+    };
   }, []);
   const [chatAppearance, setChatAppearance] = useState<{
     viewer: string;
@@ -3066,6 +3089,7 @@ export default function Noctgram({
           )}
         {page === 'messages' && (
           <div
+            ref={messengerRef}
             className={'messenger ' + (peer || roomTarget ? 'peer-open' : '')}
           >
             <section className="threads-panel">
@@ -3222,7 +3246,7 @@ export default function Noctgram({
                   me={me}
                   disabled={readOnly || accountBlocked}
                   onOpen={resolveRoomLink}
-                  onBack={backFromRoom}
+                  onBack={exitChat}
                   onProfile={(id) => void openProfile(id)}
                   onRoomsChanged={roomList.refresh}
                 />
@@ -3232,10 +3256,7 @@ export default function Noctgram({
                     <button
                       className="chat-back icon-button"
                       aria-label="Назад к диалогам"
-                      onClick={() => {
-                        appHistory.current?.cancelPending();
-                        setPeer(null);
-                      }}
+                      onClick={exitChat}
                     >
                       <ArrowLeft size={18} />
                     </button>

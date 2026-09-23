@@ -3,17 +3,54 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  /* Horizontal drags reveal the swipe actions; vertical ones scroll. */
+  touch-action: pan-y pinch-zoom;
 }
 .archive-row-wrap > .thread-row {
   flex: 1;
   min-width: 0;
   padding-right: 38px;
 }
+.archive-row-wrap > .thread-row,
+.archive-row-menu {
+  translate: var(--row-shift, 0px) 0;
+}
 .archive-row-menu {
   position: absolute;
   right: 7px;
   top: 18px;
   opacity: 0.65;
+}
+/* Fills exactly the space the row slides out of; the buttons widen past it. */
+.archive-row-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  width: max(0px, calc(var(--row-shift, 0px) * -1));
+  overflow: hidden;
+  border-radius: 10px;
+}
+.archive-row-actions > button {
+  flex: 1 0 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  color: #fff;
+  background: #4a3f57;
+}
+.archive-row-actions > button + button {
+  background: #685078;
+}
+.archive-row-actions > button:disabled {
+  color: #ffffff80;
 }
 .archive-row-menu:focus-visible {
   opacity: 1;

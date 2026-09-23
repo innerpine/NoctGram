@@ -4,17 +4,18 @@ import { Bell, BellOff } from 'lucide-react';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { chatRequest } from '@/lib/chat-client';
 
-export function ChatNotificationsItem({
-  owner,
-  peer,
-  kind = 'person',
-  onChanged,
-}: {
+type NotificationTarget = {
   owner: string;
   peer: string;
   kind?: 'person' | 'room';
   onChanged?: () => Promise<unknown>;
-}) {
+};
+
+/** Loads the mute setting once enabled; shared by the row menu and swipe action. */
+export function useChatNotifications(
+  { owner, peer, kind = 'person', onChanged }: NotificationTarget,
+  enabled = true,
+) {
   const [state, setState] = useState<{ muted: boolean } | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -24,7 +25,7 @@ export function ChatNotificationsItem({
     const current = { active: true },
       controller = new AbortController();
     lifetime.current = current;
-    if (owner && peer) {
+    if (owner && peer && enabled) {
       void chatRequest<{ muted: boolean }>(
         (kind === 'room' ? '/api/rooms?' : '/api/chat-notifications?') +
           new URLSearchParams(
@@ -54,7 +55,7 @@ export function ChatNotificationsItem({
       current.active = false;
       controller.abort();
     };
-  }, [owner, peer, kind]);
+  }, [owner, peer, kind, enabled]);
   const toggle = async () => {
     const current = lifetime.current;
     if (!state || locked.current || !current?.active) return;
@@ -93,6 +94,11 @@ export function ChatNotificationsItem({
       }
     }
   };
+  return { state, busy, error, toggle };
+}
+
+export function ChatNotificationsItem(props: NotificationTarget) {
+  const { state, busy, error, toggle } = useChatNotifications(props);
   return (
     <>
       <DropdownMenuItem

@@ -1257,6 +1257,34 @@ time,
 }
 .chat-back {
   display: none;
+  position: relative;
+}
+/* A 44 px touch target that grows into the header padding, never over the
+   peer button beside it (the header gap is at least 4 px). */
+.chat-back::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -4px;
+  width: 44px;
+  height: 44px;
+  translate: 0 -50%;
+}
+/* Back on phones: the thread list shows beneath the chat sliding away. */
+.messenger:has(> .chat-panel[data-chat-swipe]) {
+  position: relative;
+}
+.messenger.peer-open:has(> .chat-panel[data-chat-swipe]) > .threads-panel {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: auto;
+  will-change: translate, opacity;
+}
+.chat-panel[data-chat-swipe] {
+  position: relative;
+  z-index: 1;
+  will-change: translate;
 }
 .message-list {
   flex: 1;
@@ -1765,6 +1793,11 @@ time,
   }
   .chat-back {
     display: inline-flex;
+  }
+  /* Horizontal drags stay with the edge swipe back; scrolling stays native. */
+  .messages-main:has(.messenger.peer-open),
+  .messenger.peer-open .message-list {
+    touch-action: pan-y pinch-zoom;
   }
   .post-author .handle {
     max-width: 160px;
