@@ -1205,6 +1205,22 @@ small {
   height: 44px;
   translate: 0 -50%;
 }
+/* Back on phones: the thread list shows beneath the chat sliding away. */
+.messenger:has(> .chat-panel[data-chat-swipe]) {
+  position: relative;
+}
+.messenger.peer-open:has(> .chat-panel[data-chat-swipe]) > .threads-panel {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: auto;
+  will-change: translate, opacity;
+}
+.chat-panel[data-chat-swipe] {
+  position: relative;
+  z-index: 1;
+  will-change: translate;
+}
 .message-list {
   flex: 1;
   min-height: 0;
@@ -1710,6 +1726,11 @@ small {
   }
   .chat-back {
     display: inline-flex;
+  }
+  /* Horizontal drags stay with the edge swipe back; scrolling stays native. */
+  .messages-main:has(.messenger.peer-open),
+  .messenger.peer-open .message-list {
+    touch-action: pan-y pinch-zoom;
   }
   .post-author .handle {
     max-width: 160px;
