@@ -1159,7 +1159,7 @@ export default function Noctgram({
       let conversationSnapshot: ChatSnapshot | undefined;
       let fetchedConversation = false;
       let lateProfile: Promise<Profile> | undefined,
-        lateConversation: Promise<ChatSnapshot> | undefined;
+        lateConversation: Promise<ChatSnapshot | undefined> | undefined;
       if (
         next.page === 'profile' &&
         (next.handle || next.profileRef) &&
@@ -1242,18 +1242,18 @@ export default function Noctgram({
           const id = conversation.id;
           const ticket = chatSnapshots.current.begin(id);
           setOpeningChat(id);
-          const loading = requestChatSnapshot(id).then((snapshot) => {
-            const saved =
+          const loading = requestChatSnapshot(id).then(
+            (snapshot) =>
               chatSnapshots.current.save(snapshot, ticket) ||
-              chatSnapshots.current.get(id, ticket.generation);
-            if (!saved)
-              throw new Error('Аккаунт изменился. Откройте диалог снова.');
-            return saved;
-          });
+              chatSnapshots.current.get(id, ticket.generation),
+          );
           try {
+            const ready = await waitBriefly(loading);
             // A slow chat opens with its loading state and fills in on arrival.
-            conversationSnapshot = (await waitBriefly(loading)) || undefined;
-            if (!conversationSnapshot) lateConversation = loading;
+            if (ready === null) lateConversation = loading;
+            else if (!ready)
+              throw new Error('Аккаунт изменился. Откройте диалог снова.');
+            else conversationSnapshot = ready;
             fetchedConversation = true;
           } finally {
             if (chatPreparation.current === preparation) setOpeningChat('');
@@ -1343,9 +1343,10 @@ export default function Noctgram({
             }
             if (conversation && lateConversation) {
               const id = conversation.id;
+              // A superseded load (no snapshot) leaves the newer one to apply.
               void lateConversation.then(
                 (saved) => {
-                  if (activePeer.current === id)
+                  if (saved && activePeer.current === id)
                     applyChatSnapshot(
                       id,
                       chatSnapshots.current.get(id) || saved,
