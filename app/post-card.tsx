@@ -34,6 +34,7 @@ import { MusicLinkCard } from './music-link-card';
 import { ChatVideoPlayer } from './chat-video-player';
 import { GiveawayCard } from './giveaway-card';
 import type { Post, Media } from '@/lib/client';
+import { choosePost, type PostChoice } from '@/lib/optimistic';
 import {
   memo,
   useMemo,
@@ -121,7 +122,7 @@ export function PostSkeleton() {
   );
 }
 export const PostCard = memo(function PostCard({
-  p,
+  p: server,
   me,
   busy,
   onProfile,
@@ -138,7 +139,12 @@ export const PostCard = memo(function PostCard({
   me?: string;
   busy: boolean;
   onProfile: (id: string) => void;
-  onAction: (p: Post, kind: string, value: unknown) => Promise<boolean>;
+  // false: refused before sending; undefined: joined a request in flight.
+  onAction: (
+    p: Post,
+    kind: keyof PostChoice,
+    value: boolean | number,
+  ) => Promise<unknown> | false | undefined;
   onComments: (p: Post) => void;
   onDelete: (id: string) => void;
   onMedia: (m: Media) => void;
@@ -148,9 +154,11 @@ export const PostCard = memo(function PostCard({
   canModerate?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false),
-    [pending, setPending] = useState(false),
+    [choice, setChoice] = useState<PostChoice>({}),
     [bump, setBump] = useState(''),
     [revealed, setRevealed] = useState(false);
+  // Taps show at once; the choice layer is dropped when the server copy lands.
+  const p = choosePost(server, choice);
   const article = useRef<HTMLElement>(null),
     recorded = useRef(false);
   const mine = p.userId === me || p.ownerId === me;
@@ -186,28 +194,27 @@ export const PostCard = memo(function PostCard({
       stopObserving();
     };
   }, [me, mine, p.id, onView]);
-  const lock = useRef(false),
-    timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
     },
     [],
   );
-  const act = async (kind: string, value: unknown) => {
-    if (lock.current) return;
-    lock.current = true;
-    setPending(true);
-    try {
-      if (await onAction(p, kind, value)) {
-        setBump(kind);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => setBump(''), 600);
-      }
-    } finally {
-      setPending(false);
-      lock.current = false;
-    }
+  const act = (kind: keyof PostChoice, value: boolean | number) => {
+    const sending = onAction(server, kind, value);
+    if (sending === false) return;
+    setChoice((current) => ({ ...current, [kind]: value }));
+    setBump(kind);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setBump(''), 600);
+    void sending?.finally(() =>
+      setChoice((current) => {
+        const next = { ...current };
+        delete next[kind];
+        return next;
+      }),
+    );
   };
   const total = p.votes.reduce((n, v) => n + v.count, 0),
     long = p.text.length > 220;
@@ -411,10 +418,11 @@ export const PostCard = memo(function PostCard({
               return (
                 <button
                   key={i}
-                  disabled={busy || pending}
                   className={chosen ? 'voted' : ''}
                   aria-pressed={chosen}
-                  onClick={() => void act('vote', i)}
+                  onClick={() => {
+                    if (!chosen) act('vote', i);
+                  }}
                 >
                   <span
                     className="poll-fill"
@@ -449,8 +457,7 @@ export const PostCard = memo(function PostCard({
             aria-label={p.liked ? 'Убрать лайк' : 'Поставить лайк'}
             aria-pressed={!!p.liked}
             className={p.liked ? 'liked' : ''}
-            disabled={busy || pending}
-            onClick={() => void act('like', !p.liked)}
+            onClick={() => act('like', !p.liked)}
           >
             <span className="heart-wrap">
               <Heart
@@ -498,8 +505,7 @@ export const PostCard = memo(function PostCard({
               p.saved ? 'Убрать из сохранённого' : 'Сохранить публикацию'
             }
             aria-pressed={!!p.saved}
-            disabled={busy || pending}
-            onClick={() => void act('save', !p.saved)}
+            onClick={() => act('save', !p.saved)}
           >
             <Bookmark
               className={bump === 'save' ? 'icon-swap' : ''}

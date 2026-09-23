@@ -11,7 +11,8 @@ import {
 import { Forward, Trash2, X } from 'lucide-react';
 import type { Message, Person } from '@/lib/client';
 import { chatRequest } from '@/lib/chat-client';
-import type { ReactionEmoji } from '@/lib/message-reactions';
+import { withOwnReaction, type ReactionEmoji } from '@/lib/message-reactions';
+import { createLatestRequests } from '@/lib/optimistic';
 import { chatOutbox, emptyOutbox, mergeOutgoing } from '@/lib/chat-outbox';
 import { messageSummary } from '@/lib/chat-message-display';
 import { createChatNavigator } from '@/lib/chat-navigation';
@@ -93,14 +94,19 @@ export function ChatConversation({
     confirmed.forEach((entry) => refreshed.current.add(entry.message.id));
     void onRefresh().catch((error) => notify(error.message));
   }, [outbox, me.id, peer.id, onRefresh, notify]);
-  const [initialMessages] = useState(
-    () => new Set(messages.map((message) => message.id)),
+  // History shown with the chat skips entry motion. A chat opened before its
+  // data arrived treats its first loaded batch as that history.
+  const [initialMessages, setInitialMessages] = useState(() =>
+    ready ? new Set(messages.map((message) => message.id)) : null,
   );
+  if (!initialMessages && ready)
+    setInitialMessages(new Set(messages.map((message) => message.id)));
   const [replyFocus, setReplyFocus] = useState(0);
-  const [reactionPending, setReactionPending] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const reactionLocks = useRef(new Set<string>());
+  // Own reactions chosen but not yet confirmed by a refreshed conversation.
+  const [chosenReactions, setChosenReactions] = useState<
+    ReadonlyMap<string, ReactionEmoji | null>
+  >(() => new Map());
+  const [reactionRequests] = useState(createLatestRequests);
   const [profileId, setProfileId] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
   const openMiniProfile = useCallback((id: string) => {
@@ -182,9 +188,10 @@ export function ChatConversation({
       removal.current = null;
     };
   }, []);
+  // Slide in on open, even while the history is still loading.
   useLayoutEffect(() => {
-    if (ready && list.current) return revealChat(list.current);
-  }, [ready]);
+    if (list.current) return revealChat(list.current);
+  }, []);
   const latest = useRef({ onFocus, notify });
   latest.current = { onFocus, notify };
   const jumpHere = (id: string) => {
@@ -348,13 +355,18 @@ export function ChatConversation({
       disabled ||
       working ||
       !canSend ||
-      reactionLocks.current.has(message.id) ||
       !messages.some((item) => item.id === message.id)
     )
       return;
-    reactionLocks.current.add(message.id);
-    setReactionPending(new Set(reactionLocks.current));
-    try {
+    const choose = (next?: ReactionEmoji | null) =>
+      setChosenReactions((previous) => {
+        const chosen = new Map(previous);
+        if (next === undefined) chosen.delete(message.id);
+        else chosen.set(message.id, next);
+        return chosen;
+      });
+    choose(emoji);
+    const sending = reactionRequests(message.id, emoji, async (value) => {
       await chatRequest('/api/social', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -363,11 +375,15 @@ export function ChatConversation({
           expectedSender: me.id,
           peer: peer.id,
           id: message.id,
-          emoji,
+          emoji: value,
         }),
         signal: AbortSignal.timeout(15000),
       });
       if (alive.current) await onRefresh();
+    });
+    if (!sending) return;
+    try {
+      await sending;
     } catch (error) {
       if (alive.current)
         notify(
@@ -376,8 +392,8 @@ export function ChatConversation({
             : 'Не удалось поставить реакцию',
         );
     } finally {
-      reactionLocks.current.delete(message.id);
-      if (alive.current) setReactionPending(new Set(reactionLocks.current));
+      // Confirmed or failed, the conversation copy is the truth again.
+      if (alive.current) choose();
     }
   };
   const onReact = useCallback(
@@ -451,13 +467,23 @@ export function ChatConversation({
         onContextMenu={chatHistoryContextMenu}
       >
         <div className="chat-history-content" ref={content}>
-          {!visibleMessages.length && (
+          {ready && !visibleMessages.length && (
             <p className="chat-empty-history">Сообщений пока нет.</p>
           )}
           {visibleMessages.map((message) => (
             <ChatMessage
               key={message.id}
-              message={message}
+              message={
+                chosenReactions.has(message.id)
+                  ? {
+                      ...message,
+                      reactions: withOwnReaction(
+                        message.reactions,
+                        chosenReactions.get(message.id)!,
+                      ),
+                    }
+                  : message
+              }
               delivery={
                 messages.some((item) => item.id === message.id)
                   ? undefined
@@ -465,8 +491,7 @@ export function ChatConversation({
               }
               onRetry={onRetry}
               onReact={onReact}
-              reactionPending={reactionPending.has(message.id)}
-              initial={initialMessages.has(message.id)}
+              initial={!!initialMessages?.has(message.id)}
               me={me}
               peer={peer}
               disabled={readonly}

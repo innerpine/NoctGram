@@ -26,6 +26,7 @@ import { createFeedSnapshots, feedKey, sameSearch } from '@/lib/feed-snapshots';
 import { createChatSnapshots, type ChatSnapshot } from '@/lib/chat-snapshots';
 import { createPageTransition } from '@/lib/page-transition';
 import { createProfileCoverCache } from '@/lib/profile-cover-cache';
+import { createLatestRequests } from '@/lib/optimistic';
 import { flushSync } from 'react-dom';
 
 import { NotificationsBell } from './notifications';
@@ -237,6 +238,14 @@ async function requestChatSnapshot(
   return { ...conversation, access };
 }
 
+// Navigation waits this briefly for data, then shows the page's loading state.
+function waitBriefly<T>(promise: Promise<T>) {
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 150)),
+  ]);
+}
+
 export default function Noctgram({
   initialPage = 'feed',
 }: {
@@ -426,6 +435,8 @@ export default function Noctgram({
   const coverImages = useRef(createProfileCoverCache());
   const [, setCoverRevision] = useState(0);
   const [openingProfile, setOpeningProfile] = useState('');
+  // The own profile opened from its tab is a root view without a back arrow.
+  const [profileRoot, setProfileRoot] = useState(false);
   coverImages.current.reset(
     accountBlocked || !me ? '' : me.id + ':' + privacyVersion,
   );
@@ -433,8 +444,9 @@ export default function Noctgram({
     const cover = coverImage(me?.cover);
     if (!cover || accountBlocked) return;
     let active = true;
-    void coverImages.current.prepare(cover).then((src) => {
-      if (src && active) setCoverRevision((value) => value + 1);
+    // A failed decode also re-renders so the cover falls back to its URL.
+    void coverImages.current.prepare(cover).then(() => {
+      if (active) setCoverRevision((value) => value + 1);
     });
     return () => {
       active = false;
@@ -459,7 +471,11 @@ export default function Noctgram({
     activePeer = useRef(''),
     premiumReturn = useRef('feed'),
     starsReturn = useRef('feed'),
-    actionLock = useRef(false);
+    actionLock = useRef(false),
+    rootNavigation = useRef(false),
+    rootTab = useRef('feed'),
+    itemLocks = useRef(new Set<string>()),
+    postRequests = useRef<ReturnType<typeof createLatestRequests> | null>(null);
   const appHistory = useRef<ReturnType<typeof createAppHistory> | null>(null);
   const pageTransition = useRef<ReturnType<typeof createPageTransition> | null>(
     null,
@@ -507,17 +523,25 @@ export default function Noctgram({
     }
     return true;
   };
-  const run = async (fn: () => Promise<void>) => {
-    if (actionLock.current) return;
-    actionLock.current = true;
-    setBusy(true);
+  // Without an item key the whole app waits (publishing, deletion, forms);
+  // with one only repeated taps on that item are dropped.
+  const run = async (fn: () => Promise<void>, item = '') => {
+    if (item ? itemLocks.current.has(item) : actionLock.current) return;
+    if (item) itemLocks.current.add(item);
+    else {
+      actionLock.current = true;
+      setBusy(true);
+    }
     try {
       await fn();
     } catch (e) {
       notify((e as Error).message);
     } finally {
-      actionLock.current = false;
-      setBusy(false);
+      if (item) itemLocks.current.delete(item);
+      else {
+        actionLock.current = false;
+        setBusy(false);
+      }
     }
   };
   const bootstrapFeed = useRef('');
@@ -667,7 +691,7 @@ export default function Noctgram({
     async (append = false, before = Date.now() + 1, afterId = '') => {
       if (
         !myId ||
-        (page === 'profile' && profileTab === 'gifts') ||
+        (page === 'profile' && (profileTab === 'gifts' || !viewedId)) ||
         accountBlocked ||
         (page === 'profile' && profile?.blocked) ||
         [
@@ -763,7 +787,7 @@ export default function Noctgram({
     if (
       !myId ||
       accountBlocked ||
-      (page === 'profile' && profile?.blocked) ||
+      (page === 'profile' && (profile?.blocked || !viewedId)) ||
       [
         'premium',
         'stars',
@@ -809,6 +833,7 @@ export default function Noctgram({
     refresh,
     accountBlocked,
     profile?.blocked,
+    viewedId,
     profileTab,
     publicationKey,
   ]);
@@ -879,18 +904,25 @@ export default function Noctgram({
       ...(page === 'music' ? { musicTab } : {}),
       ...(page === 'feed' ? { mode } : {}),
     });
-  const navigate = (v: string) => {
+  // Resolves false when the section did not open (sign-in, no access, failure).
+  const openSection = (v: string): boolean | Promise<boolean> => {
     if (
       ['profile', 'saved', 'messages', 'channels', 'stars'].includes(v) &&
       !auth()
     )
-      return;
-    if (v === 'moderation' && !me?.canModerate) return;
+      return false;
+    if (v === 'moderation' && !me?.canModerate) return false;
     if (v === 'premium' && page !== 'premium') premiumReturn.current = page;
     if (v === 'stars' && page !== 'stars') starsReturn.current = page;
     if (v === 'profile' && appHistory.current) {
-      void appHistory.current.navigate({ page: 'profile', profileId: me!.id });
-      return;
+      // Prepare reads this synchronously: the own profile opens as a root.
+      rootNavigation.current = true;
+      const opened = appHistory.current.navigate({
+        page: 'profile',
+        profileId: me!.id,
+      });
+      rootNavigation.current = false;
+      return opened;
     }
     setQuery('');
     setPage(v);
@@ -899,6 +931,10 @@ export default function Noctgram({
       setProfileTab('posts');
     }
     if (v === 'search') searchRef.current?.focus({ preventScroll: true });
+    return true;
+  };
+  const navigate = (v: string) => {
+    void openSection(v);
   };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -1122,6 +1158,7 @@ export default function Noctgram({
     notify,
     prepare: async (next) => {
       const preparation = ++chatPreparation.current;
+      const root = rootNavigation.current;
       setOpeningChat('');
       setOpeningProfile('');
       if (
@@ -1137,6 +1174,8 @@ export default function Noctgram({
         conversation: Person | null = null;
       let conversationSnapshot: ChatSnapshot | undefined;
       let fetchedConversation = false;
+      let lateProfile: Promise<Profile> | undefined,
+        lateConversation: Promise<ChatSnapshot | undefined> | undefined;
       if (
         next.page === 'profile' &&
         (next.handle || next.profileRef) &&
@@ -1160,34 +1199,46 @@ export default function Noctgram({
       }
       if (next.page === 'profile') {
         const id =
-          next.profileId || (!next.handle && !next.profileRef ? myId : '');
+          next.profileId ||
+          (!next.handle && !next.profileRef ? myId || '' : '');
         person ??=
           id === myId ? me : id ? cache.profiles.get(id) || null : null;
-        person ??= await request<Profile>(
-          '?' +
-            new URLSearchParams({
-              action: 'profile',
-              ...(id
-                ? { id }
-                : next.profileRef
-                  ? { ref: next.profileRef }
-                  : { handle: next.handle || '' }),
-            }),
-        );
-        const cover = coverImage(person.cover);
-        if (cover && !person.blocked && !coverImages.current.get(cover)) {
-          setOpeningProfile(person.id);
-          try {
-            await coverImages.current.prepare(cover);
-          } finally {
-            if (chatPreparation.current === preparation) setOpeningProfile('');
-          }
+        if (!person) {
+          const loading = request<Profile>(
+            '?' +
+              new URLSearchParams({
+                action: 'profile',
+                ...(id
+                  ? { id }
+                  : next.profileRef
+                    ? { ref: next.profileRef }
+                    : { handle: next.handle || '' }),
+              }),
+          );
+          const opened = () =>
+            setOpeningProfile((value) => (value === id ? '' : value));
+          setOpeningProfile(id);
+          person = await (id ? waitBriefly(loading) : loading).catch(
+            (error) => {
+              opened();
+              throw error;
+            },
+          );
+          // A slow profile opens as its loading state and fills in on arrival.
+          if (!person) lateProfile = loading;
+          else opened();
         }
+        // The cover appears once decoded; navigation never waits for it.
+        const cover = coverImage(person?.cover);
+        if (cover && !person?.blocked && !coverImages.current.get(cover))
+          void coverImages.current
+            .prepare(cover)
+            .then(() => setCoverRevision((value) => value + 1));
         next = {
           page: 'profile',
-          profileId: person.id,
-          handle: person.handle,
-          ...(next.boost && person.kind === 'channel' && !person.blocked
+          profileId: person?.id || id,
+          handle: person?.handle || '',
+          ...(next.boost && person?.kind === 'channel' && !person.blocked
             ? { boost: true }
             : {}),
           profileTab: next.profileTab || 'posts',
@@ -1204,15 +1255,21 @@ export default function Noctgram({
           throw new Error('Выберите личный диалог');
         conversationSnapshot = chatSnapshots.current.get(conversation.id);
         if (!conversationSnapshot) {
-          const ticket = chatSnapshots.current.begin(conversation.id);
-          setOpeningChat(conversation.id);
-          try {
-            const snapshot = await requestChatSnapshot(conversation.id);
-            conversationSnapshot =
+          const id = conversation.id;
+          const ticket = chatSnapshots.current.begin(id);
+          setOpeningChat(id);
+          const loading = requestChatSnapshot(id).then(
+            (snapshot) =>
               chatSnapshots.current.save(snapshot, ticket) ||
-              chatSnapshots.current.get(conversation.id, ticket.generation);
-            if (!conversationSnapshot)
+              chatSnapshots.current.get(id, ticket.generation),
+          );
+          try {
+            const ready = await waitBriefly(loading);
+            // A slow chat opens with its loading state and fills in on arrival.
+            if (ready === null) lateConversation = loading;
+            else if (!ready)
               throw new Error('Аккаунт изменился. Откройте диалог снова.');
+            else conversationSnapshot = ready;
             fetchedConversation = true;
           } finally {
             if (chatPreparation.current === preparation) setOpeningChat('');
@@ -1239,9 +1296,47 @@ export default function Noctgram({
             setBoostOpen((current) =>
               current ? { ...current, open: false } : null,
             );
-          if (destination.page === 'profile' && person) setProfile(person);
-          if (destination.page === 'profile')
+          if (destination.page === 'profile') {
+            setProfile(person);
             setProfileTab(destination.profileTab || 'posts');
+            setProfileRoot(root);
+          }
+          if (lateProfile) {
+            const id = destination.profileId;
+            // Fill the opened profile in, unless the viewer has moved on.
+            const here = () =>
+              chatPreparation.current === preparation &&
+              navigationLatest.current!.route.page === 'profile' &&
+              !navigationLatest.current!.route.profileId;
+            void lateProfile
+              .then(
+                (loaded) => {
+                  if (!here()) return;
+                  cache.profiles.set(loaded.id, loaded);
+                  void appHistory.current?.navigate(
+                    {
+                      page: 'profile',
+                      profileId: loaded.id,
+                      handle: loaded.handle,
+                      profileTab: destination.profileTab,
+                    },
+                    { replace: true },
+                  );
+                },
+                (error: Error) => {
+                  if (!here()) return;
+                  notify(error.message);
+                  if (!appHistory.current?.back())
+                    void appHistory.current?.navigate(
+                      { page: 'feed' },
+                      { replace: true },
+                    );
+                },
+              )
+              .finally(() =>
+                setOpeningProfile((value) => (value === id ? '' : value)),
+              );
+          }
           if (
             destination.page === 'messages' &&
             (navigationLatest.current!.route.page !== 'messages' ||
@@ -1263,6 +1358,22 @@ export default function Noctgram({
               setMessages([]);
               setMessageAccess(null);
               setChatAppearance(null);
+            }
+            if (conversation && lateConversation) {
+              const id = conversation.id;
+              // A superseded load (no snapshot) leaves the newer one to apply.
+              void lateConversation.then(
+                (saved) => {
+                  if (saved && activePeer.current === id)
+                    applyChatSnapshot(
+                      id,
+                      chatSnapshots.current.get(id) || saved,
+                    );
+                },
+                (error: Error) => {
+                  if (activePeer.current === id) notify(error.message);
+                },
+              );
             }
             setMessageText(
               conversation ? cache.drafts.get(conversation.id) || '' : '',
@@ -1497,28 +1608,24 @@ export default function Noctgram({
     },
     [myId],
   );
-  const action = async (
-    p: Post,
-    kind: string,
-    value: unknown,
-  ): Promise<boolean> => {
-    if (!auth()) return false;
-    try {
-      await request('', {
-        action: kind,
-        id: p.id,
-        ...(kind === 'vote' ? { option: value } : { value }),
-      });
-      const updated = await request<Post>(
-        '?action=post&id=' + encodeURIComponent(p.id),
-      );
-      snapshots.current.update(updated);
-      setPosts((rows) => rows.map((x) => (x.id === p.id ? updated : x)));
-      return true;
-    } catch (e) {
-      notify((e as Error).message);
-      return false;
-    }
+  // The card already shows the choice; this only confirms it with the server.
+  const action = (p: Post, kind: string, value: unknown) => {
+    if (!writable()) return false;
+    postRequests.current ??= createLatestRequests();
+    return postRequests
+      .current(p.id + ':' + kind, value, async (chosen) => {
+        await request('', {
+          action: kind,
+          id: p.id,
+          ...(kind === 'vote' ? { option: chosen } : { value: chosen }),
+        });
+        const updated = await request<Post>(
+          '?action=post&id=' + encodeURIComponent(p.id),
+        );
+        snapshots.current.update(updated);
+        setPosts((rows) => rows.map((x) => (x.id === p.id ? updated : x)));
+      })
+      ?.catch((e) => notify((e as Error).message));
   };
   const openComments = (p: Post) => {
     if (!auth()) return;
@@ -1578,7 +1685,7 @@ export default function Noctgram({
             : 'Публикация закреплена в профиле',
         );
       }
-    });
+    }, 'post:' + p.id);
   };
   const profileOwned =
     !!me && (profile?.id === me.id || profile?.ownerId === me.id);
@@ -1690,7 +1797,7 @@ export default function Noctgram({
       const updated = await request<Profile>('?action=profile&id=' + person.id);
       setProfile((current) => (current?.id === person.id ? updated : current));
       setMe(await request<Profile>('?action=profile'));
-    });
+    }, 'follow:' + person.id);
   };
   const composer = (
     <fieldset
@@ -2015,6 +2122,40 @@ export default function Noctgram({
     await Promise.all([loadThreads(), roomList.refresh()]);
   };
   const online = !!profile?.lastSeen && Date.now() - profile.lastSeen < 120000;
+  // The bar highlights the current section; someone else's profile keeps the
+  // tab it was opened from, as a pushed screen does on iOS.
+  const ownProfile = page === 'profile' && !!me && profile?.id === me.id;
+  const pageTab =
+    page === 'music-services'
+      ? 'music'
+      : page === 'saved' || ownProfile
+        ? 'profile'
+        : page === 'profile'
+          ? ''
+          : page;
+  if (['feed', 'messages', 'channels', 'music', 'profile'].includes(pageTab))
+    rootTab.current = pageTab;
+  const navTab = pageTab || rootTab.current;
+  const refreshPage = () => {
+    if (['music', 'music-services'].includes(page)) {
+      window.dispatchEvent(new Event('noctgram:music-refresh'));
+    } else if (me) void refresh();
+    else void bootstrap();
+  };
+  // Tapping the open tab again scrolls to the top, and at the top refreshes.
+  const selectTab = (v: string) => {
+    if (v === 'search' || v !== page || (v === 'profile' && !ownProfile))
+      return openSection(v);
+    if (window.scrollY > 0)
+      window.scrollTo({
+        top: 0,
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'instant'
+          : 'smooth',
+      });
+    else refreshPage();
+    return true;
+  };
   if (accountBlocked && me)
     return (
       <>
@@ -2092,9 +2233,10 @@ export default function Noctgram({
           noctgram<span className="alpha">α</span>
         </AppLink>
         <MainNavigation
-          page={page}
+          active={navTab}
+          origin={rootTab.current}
           href={navigationHref}
-          navigate={navigate}
+          navigate={selectTab}
           openingProfile={!!openingProfile}
           unread={unread}
         />
@@ -2286,14 +2428,9 @@ export default function Noctgram({
               <Search size={20} />
             </AppLink>
             <button
-              className="icon-button"
+              className="icon-button page-refresh"
               aria-label="Обновить"
-              onClick={() => {
-                if (['music', 'music-services'].includes(page)) {
-                  window.dispatchEvent(new Event('noctgram:music-refresh'));
-                } else if (me) void refresh();
-                else void bootstrap();
-              }}
+              onClick={refreshPage}
             >
               <RefreshCw size={18} />
             </button>
@@ -2456,7 +2593,9 @@ export default function Noctgram({
               <div
                 className="profile-cover"
                 style={
-                  coverImage(profile.cover)
+                  // A cover still being decoded shows once, without a second download.
+                  coverImage(profile.cover) &&
+                  !coverImages.current.loading(profile.cover)
                     ? {
                         backgroundImage: `url(${coverImages.current.get(profile.cover) || profile.cover})`,
                       }
@@ -2466,14 +2605,18 @@ export default function Noctgram({
                 {profile.cover === LIQUID_COVER && profile.avatar && (
                   <LiquidCover src={profile.avatar} />
                 )}
-                <AppLink
-                  className="back-button"
-                  aria-label="Вернуться в ленту"
-                  href={navigationHref('feed')}
-                  onNavigate={() => navigate('feed')}
-                >
-                  <ArrowLeft size={18} />
-                </AppLink>
+                {!(ownProfile && profileRoot) && (
+                  <AppLink
+                    className="back-button"
+                    aria-label="Назад"
+                    href={navigationHref('feed')}
+                    onNavigate={() => {
+                      if (!appHistory.current?.back()) navigate('feed');
+                    }}
+                  >
+                    <ArrowLeft size={18} />
+                  </AppLink>
+                )}
                 {profileEditable && (
                   <button
                     className="cover-edit"
@@ -3151,7 +3294,7 @@ export default function Noctgram({
                               ? 'Собеседник разблокирован'
                               : 'Собеседник добавлен в чёрный список',
                           );
-                        })
+                        }, 'block:' + peer.id)
                       }
                     >
                       <Ban size={17} />
@@ -4052,7 +4195,7 @@ export default function Noctgram({
                   setUndoHidden(null);
                   setNotice('');
                   await latestRefresh.current();
-                })
+                }, 'post:' + undoHidden.id)
               }
             >
               Отменить

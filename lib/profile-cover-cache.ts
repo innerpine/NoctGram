@@ -36,6 +36,7 @@ export function createProfileCoverCache() {
     },
     clear,
     get,
+    loading: (url: string) => pending.has(url),
     prepare(url: string): Promise<string | undefined> {
       if (!scope || !url.startsWith('/api/media/'))
         return Promise.resolve(undefined);
