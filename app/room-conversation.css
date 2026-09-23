@@ -638,22 +638,6 @@
     display: none;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .room-workspace,
-  .room-workspace *,
-  .room-manage-dialog,
-  .room-manage-dialog *,
-  .room-safety-dialog,
-  .room-safety-dialog *,
-  .room-confirm-dialog,
-  .room-confirm-dialog *,
-  .room-thread,
-  .room-search-results * {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-
 /* Group-specific identity and controls; bubbles, editor and motion are shared. */
 .room-message-context.chat-message-row {
   position: relative;

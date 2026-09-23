@@ -98,26 +98,20 @@
     opacity: 1;
   }
 }
+/* Reply, pin and selection bars take their height at once (the message list
+   resizes a single time) and only fade and slide; animating grid rows resized
+   the list on every frame. */
 .chat-reveal {
-  display: grid;
-  grid-template-rows: 0fr;
   flex-shrink: 0;
-  min-height: 0;
   opacity: 0;
   translate: 0 -4px;
   transition:
-    grid-template-rows 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 160ms ease,
-    translate 200ms ease;
+    translate 200ms var(--motion);
 }
 .chat-reveal[data-expanded='true'] {
-  grid-template-rows: 1fr;
   opacity: 1;
   translate: 0 0;
-}
-.chat-reveal-inner {
-  min-height: 0;
-  overflow: hidden;
 }
 .chat-message-shell {
   outline: 1px solid transparent;
@@ -127,7 +121,7 @@
 }
 .chat-message-shell > .chat-message-row.other {
   transition:
-    margin-left 200ms ease,
+    translate 200ms var(--motion),
     background-color 240ms ease;
 }
 .chat-message-shell[data-chat-removing] {
@@ -182,6 +176,29 @@
     background-color 240ms ease,
     border-color 240ms ease;
 }
+/* Long press opens the menu after 500 ms (Base UI); until then the bubble
+   gives way under the finger, and it stays lifted while its menu is open. */
+@media (hover: none) and (prefers-reduced-motion: no-preference) {
+  :is(.chat-message-shell, .room-message-context)
+    :is(.bubble, .chat-gift-card, .room-giveaway-content) {
+    transition:
+      scale 220ms var(--motion),
+      background-color 240ms ease,
+      border-color 240ms ease;
+  }
+  :is(.chat-message-shell, .room-message-context):active
+    :is(.bubble, .chat-gift-card, .room-giveaway-content) {
+    scale: 0.96;
+    transition-duration: 450ms, 240ms, 240ms;
+    transition-timing-function: ease;
+  }
+  :is(.chat-message-shell, .room-message-context)[data-popup-open]
+    :is(.bubble, .chat-gift-card, .room-giveaway-content) {
+    scale: 1.02;
+    transition-duration: 240ms;
+    transition-timing-function: var(--motion), ease, ease;
+  }
+}
 .chat-pinned-summary > span,
 .chat-reply-draft > span,
 .chat-message-select,
@@ -199,23 +216,9 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .chat-panel,
-  .room-workspace,
-  .room-workspace *,
-  .thread-row,
-  .chat-conversation,
-  .chat-conversation *,
-  .chat-action-menu,
-  .chat-action-menu *,
-  .chat-options-menu,
-  .chat-options-menu *,
-  .chat-theme-dialog,
-  .chat-theme-dialog *,
-  .chat-operation-dialog,
-  .chat-delete-backdrop,
-  .chat-pins-dialog,
-  .chat-photo-dialog {
-    animation: none !important;
-    transition: none !important;
+  /* Their keyframes would end at once; the shared dialog fade takes over. */
+  .chat-delete-dialog[data-open],
+  .chat-delete-backdrop[data-open] {
+    animation: none;
   }
 }

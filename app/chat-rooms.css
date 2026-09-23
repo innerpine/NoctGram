@@ -627,15 +627,3 @@
     font-size: 0.6875rem;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .room-create-trigger,
-  .room-create-trigger *,
-  .room-create-menu,
-  .room-create-menu *,
-  .room-create-dialog,
-  .room-create-dialog *,
-  .room-dialog-overlay {
-    animation: none !important;
-    transition: none !important;
-  }
-}

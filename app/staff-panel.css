@@ -938,11 +938,9 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .moderation-panel [data-slot='tabs-content'],
-  .staff-select-menu {
+  .moderation-panel [data-slot='tabs-content'] {
     animation: none;
   }
-  .staff-select-menu,
   .staff-select-trigger,
   .staff-select-trigger > svg:last-child,
   .staff-search,

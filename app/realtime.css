@@ -350,9 +350,39 @@
   font-style: normal;
   font-weight: 700;
 }
-/* Notifications: a list in the bell dialog and pop-ups for new events. */
-.notifications-dialog.noct-dialog {
-  max-width: 520px !important;
+/* Notifications: a list in a panel that grows out of the bell (motion in
+   dialog-motion.css) and pop-ups for new events. */
+.notifications-panel[data-slot='popover-content'] {
+  width: min(440px, calc(var(--app-viewport-width, 100vw) - 24px));
+  max-height: min(var(--available-height, 100dvh), 680px);
+  padding: 20px;
+  gap: 14px;
+  border: 1px solid #ffffff26;
+  border-radius: 18px;
+  background: #0e0e0e;
+  box-shadow: 0 24px 70px #000c;
+}
+.notifications-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -6px -8px -8px 0;
+}
+.notifications-panel [data-slot='popover-title'] {
+  font-size: 1.3125rem;
+  letter-spacing: -0.6px;
+}
+.notifications-panel [data-slot='popover-description'] {
+  margin: 0;
+  color: #888;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+@media (max-width: 500px) {
+  .notifications-panel[data-slot='popover-content'] {
+    padding: 18px 16px;
+  }
 }
 .notification-filters {
   display: flex;
@@ -557,8 +587,13 @@
   pointer-events: auto;
   animation: notification-toast-in 280ms var(--motion) both;
 }
-.notification-toast.leaving {
+/* Leaving pop-ups stay in the stack until their exit ends; the others then
+   slide into place (FLIP in notifications.tsx). */
+.notification-toast[data-leaving='out'] {
   animation: notification-toast-out 200ms ease both;
+}
+.notification-toast[data-leaving='bell'] {
+  animation: notification-toast-to-bell 240ms var(--motion) both;
 }
 .notification-toast-open {
   display: flex;
@@ -603,6 +638,13 @@
     transform: translateX(28px);
   }
 }
+/* transform-origin is set to the bell's centre when the bell opens. */
+@keyframes notification-toast-to-bell {
+  to {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
 @media (max-width: 500px) {
   .notification-toasts {
     top: calc(10px + env(safe-area-inset-top, 0px));
@@ -613,7 +655,7 @@
   .notification-toast {
     animation-name: notification-toast-drop;
   }
-  .notification-toast.leaving {
+  .notification-toast[data-leaving='out'] {
     animation-name: notification-toast-lift;
   }
 }
@@ -632,9 +674,11 @@
 @media (prefers-reduced-motion: reduce) {
   .notification-toast {
     animation-name: notification-toast-fade;
+    animation-duration: 200ms !important;
   }
-  .notification-toast.leaving {
+  .notification-toast[data-leaving] {
     animation-name: notification-toast-vanish;
+    animation-duration: 160ms !important;
   }
   .notification-skeleton {
     animation: none;

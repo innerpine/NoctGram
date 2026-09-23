@@ -32,8 +32,7 @@ export function createPageTransition(
         !enabled ||
         from === to ||
         (!musicPage(from) && !musicPage(to)) ||
-        document.hidden ||
-        host.matchMedia('(prefers-reduced-motion: reduce)').matches
+        document.hidden
       ) {
         commit();
         return;
@@ -41,13 +40,19 @@ export function createPageTransition(
       const enter = () => {
         const main = document.querySelector<HTMLElement>('.main-column');
         if (main?.animate && generation === version) {
-          fallback = main.animate(
-            [
-              { opacity: 0, translate: '0 10px' },
-              { opacity: 1, translate: '0 0' },
-            ],
-            { duration: 360, easing: 'cubic-bezier(0.2, 0.75, 0.25, 1)' },
-          );
+          // Reduced motion keeps a short fade; the section no longer rises.
+          fallback = host.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? main.animate([{ opacity: 0 }, { opacity: 1 }], {
+                duration: 150,
+                easing: 'ease',
+              })
+            : main.animate(
+                [
+                  { opacity: 0, translate: '0 10px' },
+                  { opacity: 1, translate: '0 0' },
+                ],
+                { duration: 360, easing: 'cubic-bezier(0.2, 0.75, 0.25, 1)' },
+              );
         }
       };
       const reveal = () => {

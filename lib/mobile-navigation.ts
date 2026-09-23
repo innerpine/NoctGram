@@ -10,7 +10,9 @@ export function isAppleTouchDevice(
 }
 
 /** Only transforms are written inside the frame loop. Retargeting preserves
- * velocity; resizing, backgrounding and reduced motion settle immediately. */
+ * velocity; resizing, backgrounding and reduced motion settle immediately.
+ * The glass pill's damping ratio is 0.8 (32 / 2√400): a tap carries no
+ * momentum, so it settles with ~1.5 % overshoot rather than bouncing. */
 export function createNavSpring(
   host: Pick<Window, 'requestAnimationFrame' | 'cancelAnimationFrame'>,
   render: (x: number) => void,
@@ -41,7 +43,7 @@ export function createNavSpring(
       const h = Math.min(dt, 1 / 240);
       velocity +=
         ((elastic ? 400 : 625) * (target - x) -
-          (elastic ? 21.5 : 50) * velocity) *
+          (elastic ? 32 : 50) * velocity) *
         h;
       x += velocity * h;
       dt -= h;
@@ -133,20 +135,20 @@ export function createMobileNavigation(
     spring.move(next, moving);
     cancelEffects();
     if (moving && apple && distance > 1) {
-      const stretch = 1.1 + Math.min(distance / width, 3) / 60;
+      // Liquid stretch on the way, one soft rebound, no wobble (matches the
+      // near-critical spring above).
+      const stretch = 1.06 + Math.min(distance / width, 3) / 90;
       shapeAnimation = shape.animate?.(
         [
           { transform: 'translateY(0) scale(1)' },
           {
-            transform: `translateY(1.4px) scale(${stretch}, .89)`,
-            offset: 0.16,
+            transform: `translateY(0.9px) scale(${stretch}, .93)`,
+            offset: 0.2,
           },
-          { transform: 'translateY(-1.2px) scale(.925, 1.035)', offset: 0.38 },
-          { transform: 'scale(1.025, .985)', offset: 0.63 },
-          { transform: 'scale(.99, 1.008)', offset: 0.81 },
+          { transform: 'translateY(-0.4px) scale(.975, 1.015)', offset: 0.5 },
           { transform: 'translateY(0) scale(1)' },
         ],
-        { duration: 510, easing: 'ease-out' },
+        { duration: 420, easing: 'ease-out' },
       );
       bounce(link);
     }

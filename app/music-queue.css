@@ -230,8 +230,7 @@
 @media (prefers-reduced-motion: reduce) {
   .music-sort-row,
   .music-sort-handle,
-  .music-favorite-choice,
-  .music-favorite-dialog.noct-dialog {
+  .music-favorite-choice {
     transition: none;
   }
   .music-favorite-note,

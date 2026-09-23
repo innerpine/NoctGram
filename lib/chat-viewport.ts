@@ -76,17 +76,20 @@ export function watchChatTail(
 /** Called once when the conversation is ready, not while its request is pending. */
 export function revealChat(list: HTMLElement) {
   const panel = list.closest<HTMLElement>('.chat-panel');
-  if (
-    !panel?.animate ||
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  )
-    return () => {};
-  const animation = panel.animate(
-    [
-      { opacity: 0, translate: '32px 0' },
-      { opacity: 1, translate: '0 0' },
-    ],
-    { duration: 360, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
-  );
+  if (!panel?.animate) return () => {};
+  // Reduced motion keeps a short fade; the panel no longer slides in.
+  const animation = window.matchMedia('(prefers-reduced-motion: reduce)')
+    .matches
+    ? panel.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: 150,
+        easing: 'ease',
+      })
+    : panel.animate(
+        [
+          { opacity: 0, translate: '32px 0' },
+          { opacity: 1, translate: '0 0' },
+        ],
+        { duration: 360, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+      );
   return () => animation.cancel();
 }

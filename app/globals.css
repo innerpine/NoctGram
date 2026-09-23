@@ -88,10 +88,13 @@ button,
   align-items: center;
   justify-content: center;
   gap: 8px;
+  -webkit-tap-highlight-color: transparent;
   transition:
     background 0.15s,
     color 0.15s,
-    border-color 0.15s;
+    border-color 0.15s,
+    box-shadow 0.15s,
+    transform 160ms var(--motion);
   border-radius: 8px;
   font-weight: 500;
 }
@@ -105,9 +108,24 @@ button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
+/* Presses land on touch-down; the release eases back over 160 ms. */
 button:active:not(:disabled),
 .app-link:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+  transition:
+    background 70ms,
+    color 70ms,
+    border-color 70ms,
+    box-shadow 70ms,
+    transform 70ms ease-out;
+}
+/* Touch has no hover, so a press tints unstyled buttons instead. A component
+   with its own shadow keeps it (zero-specificity :where). */
+@media (hover: none) {
+  button:where(:active:not(:disabled)),
+  .app-link:where(:active) {
+    box-shadow: inset 0 0 0 100vmax #ffffff10;
+  }
 }
 button:focus-visible,
 a:focus-visible {
@@ -1588,7 +1606,8 @@ time,
 }
 .toast {
   position: fixed;
-  bottom: 24px;
+  /* Above the phone tab bar and the mini player, whichever is shown. */
+  bottom: calc(var(--app-nav-inset) + max(24px, var(--app-player-space)));
   left: 50%;
   transform: translateX(-50%);
   background: #222;
@@ -2003,7 +2022,7 @@ time,
     margin: 13px 0;
   }
   .toast {
-    bottom: 78px;
+    bottom: calc(var(--app-nav-inset) + max(12px, var(--app-player-space)));
     width: calc(100% - 32px);
     font-size: 0.75rem;
   }
@@ -2036,12 +2055,19 @@ time,
     max-width: 67%;
   }
 }
+/* Reduced motion: nothing travels, scales or loops, but fades and colour changes
+   still ease. Keyframe entrances end at once; a component's own reduce variant
+   opts back in with !important (a class beats this universal selector). */
 @media (prefers-reduced-motion: reduce) {
   *,
-  *:before,
-  *:after {
-    animation: none !important;
-    transition: none !important;
+  *::before,
+  *::after {
+    transition-property:
+      opacity, visibility, color, background-color, border-color, outline-color,
+      box-shadow, fill, stroke !important;
+    animation-duration: 1ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
 }

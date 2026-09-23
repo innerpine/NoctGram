@@ -65,6 +65,7 @@ import { MusicFavorite } from './music-favorite';
 import { MusicReorderList } from './music-reorder-list';
 import { RainEffect } from './rain-effect';
 import { RainSettings } from './rain-settings';
+import { LayoutFlip } from './layout-flip';
 
 export type PlayerTrack = {
   url: string;
@@ -857,6 +858,12 @@ export function MusicPlayerView(p: Props) {
           </span>
         </button>
       </section>
+      {/* The dock resizes the page once; the page and player then slide over. */}
+      <LayoutFlip
+        watch={dockVisible}
+        duration={440}
+        targets={() => document.querySelectorAll('.app-shell, .music-player')}
+      />
 
       {/* Escape bubbles from the panel's controls; the panel never traps focus. */}
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
@@ -1205,6 +1212,27 @@ export function MusicPlayerView(p: Props) {
                 </div>
               </aside>
             </div>
+            {/* Switching panes re-lays out once; the cover grows and the
+                controls glide from where they were (FLIP). */}
+            <LayoutFlip
+              watch={pane}
+              mode="scale"
+              duration={420}
+              disabled={!appearance.motion}
+              targets={() => [
+                document.querySelector('.music-stage .music-stage-artwork'),
+              ]}
+            />
+            <LayoutFlip
+              watch={pane}
+              duration={420}
+              disabled={!appearance.motion}
+              targets={() =>
+                document.querySelectorAll(
+                  '.music-stage :is(.music-stage-track, .music-progress, .music-stage-controls, .music-stage-volume)',
+                )
+              }
+            />
             <footer className="music-stage-footer">
               <Tabs
                 value={pane}

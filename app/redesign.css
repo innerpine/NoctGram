@@ -17,7 +17,9 @@ button {
   transition:
     background 0.18s,
     color 0.18s,
-    border-color 0.18s;
+    border-color 0.18s,
+    box-shadow 0.18s,
+    transform 160ms var(--motion);
 }
 button:focus-visible,
 a:focus-visible {
@@ -373,8 +375,6 @@ textarea::placeholder {
 }
 .post-text-wrap {
   overflow: hidden;
-  max-height: 260em;
-  transition: max-height 0.38s var(--motion);
 }
 .post-text-wrap.collapsed {
   max-height: 7.7em;
@@ -454,8 +454,6 @@ textarea::placeholder {
   border-radius: 12px !important;
   padding: 6px !important;
   box-shadow: 0 18px 44px #000a !important;
-  transform-origin: top right;
-  animation: menu-in 0.24s var(--motion) !important;
 }
 .post-menu [data-slot='dropdown-menu-item'] {
   min-height: 38px;
@@ -1560,15 +1558,28 @@ textarea::placeholder {
   width: 120px;
   margin-top: 6px;
 }
+/* Transitions, not keyframes: a new notice during the exit turns the toast
+   back from its current opacity instead of restarting from zero. */
 .toast {
   font-size: 0.8125rem;
   background: #161616;
   border-color: #ffffff24;
   border-radius: 12px;
-  animation: toast-in 0.32s var(--motion) both;
+  transform: translate(-50%, 0) scale(1);
+  transition:
+    opacity 0.26s var(--motion),
+    transform 0.32s var(--motion);
 }
-.toast.leaving {
-  animation: toast-out 0.26s var(--motion) both;
+@starting-style {
+  .toast {
+    opacity: 0;
+    transform: translate(-50%, 18px) scale(0.94);
+  }
+}
+.toast[data-leaving] {
+  opacity: 0;
+  transform: translate(-50%, 14px) scale(0.96);
+  pointer-events: none;
 }
 .toast-undo {
   font-size: 0.75rem;
@@ -1635,12 +1646,10 @@ textarea::placeholder {
 @keyframes menu-in {
   from {
     opacity: 0;
-    filter: blur(5px);
     transform: scale(0.9) translateY(-6px);
   }
   to {
     opacity: 1;
-    filter: blur(0);
     transform: none;
   }
 }
@@ -1685,25 +1694,6 @@ textarea::placeholder {
   }
   50% {
     opacity: 0.8;
-  }
-}
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    filter: blur(6px);
-    transform: translate(-50%, 18px) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-    transform: translate(-50%, 0) scale(1);
-  }
-}
-@keyframes toast-out {
-  to {
-    opacity: 0;
-    filter: blur(6px);
-    transform: translate(-50%, 14px) scale(0.96);
   }
 }
 @keyframes dialog-in {
@@ -1971,9 +1961,6 @@ textarea::placeholder {
   .premium-coming {
     padding: 16px;
   }
-  .toast {
-    bottom: 78px;
-  }
 }
 @media (max-width: 360px) {
   .post-author .handle,
@@ -1988,14 +1975,6 @@ textarea::placeholder {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-delay: 0ms !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
-  }
   .post-text-wrap.collapsed {
     mask-image: none;
   }

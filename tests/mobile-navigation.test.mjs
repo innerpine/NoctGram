@@ -43,7 +43,7 @@ function clock() {
   };
 }
 
-void test('iPhone spring overshoots gently and settles exactly at 30, 60 and 120 Hz', () => {
+void test('iPhone spring barely overshoots (no bounce without momentum) and settles exactly at 30, 60 and 120 Hz', () => {
   for (const hz of [30, 60, 120]) {
     const host = clock(),
       positions = [];
@@ -57,8 +57,12 @@ void test('iPhone spring overshoots gently and settles exactly at 30, 60 and 120
     spring.move(131, true);
     host.settle(1000 / hz);
     assert.equal(positions.at(-1), 131);
-    assert.ok(Math.max(...positions) > 139);
-    assert.ok(Math.max(...positions) < 156);
+    // Damping ratio 0.8: at most ~2 % of the 125 px travel, and it never
+    // swings back below the target.
+    assert.ok(Math.max(...positions) > 131);
+    assert.ok(Math.max(...positions) < 131 + 125 * 0.02);
+    const peak = positions.indexOf(Math.max(...positions));
+    assert.ok(positions.slice(peak).every((x) => x >= 130.9));
   }
 });
 

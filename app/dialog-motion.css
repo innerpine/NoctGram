@@ -47,11 +47,37 @@
 ) {
   scale: 0.97;
 }
-@media (prefers-reduced-motion: reduce) {
-  [data-slot='dialog-overlay'],
-  [data-slot='alert-dialog-overlay'],
-  [data-slot='dialog-content'],
-  [data-slot='alert-dialog-content'] {
-    transition: none !important;
-  }
+/* Menus and popovers grow out of their trigger (--transform-origin follows a
+   flip to the other side) and shrink back along the same path. Unlike
+   keyframes, a reopen mid-close reverses from the current value. */
+:is(
+  [data-slot='dropdown-menu-content'],
+  [data-slot='dropdown-menu-sub-content'],
+  [data-slot='context-menu-content'],
+  [data-slot='context-menu-sub-content'],
+  [data-slot='popover-content']
+) {
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity 200ms var(--motion),
+    scale 200ms var(--motion);
+}
+:is(
+  [data-slot='dropdown-menu-content'],
+  [data-slot='dropdown-menu-sub-content'],
+  [data-slot='context-menu-content'],
+  [data-slot='context-menu-sub-content'],
+  [data-slot='popover-content']
+):is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+  scale: 0.96;
+}
+:is(
+  [data-slot='dropdown-menu-content'],
+  [data-slot='dropdown-menu-sub-content'],
+  [data-slot='context-menu-content'],
+  [data-slot='context-menu-sub-content'],
+  [data-slot='popover-content']
+)[data-ending-style] {
+  transition-duration: 120ms;
 }

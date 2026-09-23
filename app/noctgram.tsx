@@ -609,16 +609,19 @@ export default function Noctgram({
   useEffect(() => {
     if (!notice) return;
     const fade = setTimeout(() => setToastLeaving(true), 4200);
+    return () => clearTimeout(fade);
+  }, [notice, noticeVersion]);
+  // A new notice during the exit cancels the removal; the toast turns back
+  // from wherever its transition is.
+  useEffect(() => {
+    if (!toastLeaving) return;
     const t = setTimeout(() => {
       setNotice('');
       setUndoHidden(null);
       setToastLeaving(false);
-    }, 4480);
-    return () => {
-      clearTimeout(fade);
-      clearTimeout(t);
-    };
-  }, [notice, noticeVersion]);
+    }, 280);
+    return () => clearTimeout(t);
+  }, [toastLeaving]);
   const updateAccount = useCallback((next: Profile) => {
     setMe((current) => reconcileSnapshot(current, next));
     setProfile((current) =>
@@ -4178,7 +4181,8 @@ export default function Noctgram({
       </AlertDialog>
       {notice && (
         <output
-          className={'toast ' + (toastLeaving ? 'leaving' : '')}
+          className="toast"
+          data-leaving={toastLeaving || undefined}
           aria-live="polite"
         >
           <span>{notice}</span>
@@ -4192,8 +4196,7 @@ export default function Noctgram({
                     id: undoHidden.id,
                     value: false,
                   });
-                  setUndoHidden(null);
-                  setNotice('');
+                  setToastLeaving(true);
                   await latestRefresh.current();
                 }, 'post:' + undoHidden.id)
               }
@@ -4203,7 +4206,7 @@ export default function Noctgram({
           )}
           <button
             aria-label="Закрыть уведомление"
-            onClick={() => setNotice('')}
+            onClick={() => setToastLeaving(true)}
           >
             <X size={15} />
           </button>

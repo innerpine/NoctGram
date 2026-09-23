@@ -1,6 +1,13 @@
 'use client';
 /* eslint-disable react/react-compiler, next/no-img-element */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { createPortal } from 'react-dom';
 import {
   Bell,
@@ -19,14 +26,16 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { request, type Person } from '@/lib/client';
 import { DisplayName } from './profile-identity';
 import { Avatar, Stamp } from './post-card';
+import { LayoutFlip } from './layout-flip';
 
 // Enriched by lib/notifications.ts: the post, comment or lot an event is about.
 type NotificationRow = Person & {
@@ -116,6 +125,15 @@ const filters = [
 const kindsOf = (id: string) => filters.find((f) => f.id === id)?.kinds || '';
 const PAGE = 30;
 const titleCount = /^\(\d+\+?\) /;
+type Leaving = 'out' | 'bell';
+type ToastItem = { n: NotificationRow; key: string; leaving?: Leaving };
+/** Newest first. Past three pop-ups the oldest leave instead of vanishing. */
+const capToasts = (list: ToastItem[]) => {
+  let shown = 0;
+  return list.map((t) =>
+    t.leaving || ++shown <= 3 ? t : { ...t, leaving: 'out' as const },
+  );
+};
 
 /** Avatar with a small coloured badge that says what happened. */
 function Face({
@@ -305,13 +323,15 @@ export function NotificationsBell({
     [loading, setLoading] = useState(false),
     [more, setMore] = useState(false),
     [error, setError] = useState(''),
-    [toasts, setToasts] = useState<NotificationRow[]>([]),
+    [toasts, setToasts] = useState<ToastItem[]>([]),
     [mounted, setMounted] = useState(false);
   const since = useRef(0),
     shown = useRef(new Set<string>()),
     chat = useRef(activeChat),
     generation = useRef(0),
-    marked = useRef(false);
+    marked = useRef(false),
+    bell = useRef<HTMLButtonElement>(null),
+    stack = useRef<HTMLElement>(null);
   chat.current = activeChat;
   useEffect(() => setMounted(true), []);
 
@@ -343,7 +363,12 @@ export function NotificationsBell({
           );
         });
         if (fresh.length)
-          setToasts((current) => [...fresh, ...current].slice(0, 3));
+          setToasts((current) =>
+            capToasts([
+              ...fresh.map((n) => ({ n, key: n.id + ':' + n.created })),
+              ...current,
+            ]),
+          );
         since.current = data.now;
       } catch (e) {
         if (live) setError((e as Error).message);
@@ -401,12 +426,19 @@ export function NotificationsBell({
       if (current === generation.current) setLoading(false);
     }
   }, []);
+  // Every removal plays the pop-up's exit; the rest slide into place.
+  const leave = (match: (t: ToastItem) => boolean, how: Leaving = 'out') =>
+    setToasts((current) =>
+      current.map((t) => (!t.leaving && match(t) ? { ...t, leaving: how } : t)),
+    );
+  const drop = (key: string) =>
+    setToasts((current) => current.filter((t) => t.key !== key));
   const show = (value: boolean) => {
     setOpen(value);
     if (!value) return;
     marked.current = false;
     setFilter('all');
-    setToasts([]);
+    leave(() => true, 'bell');
     setRows([]);
     void load('');
   };
@@ -417,7 +449,7 @@ export function NotificationsBell({
   };
   const go = (n: NotificationRow) => {
     setOpen(false);
-    setToasts((current) => current.filter((t) => t.id !== n.id));
+    leave((t) => t.n.id === n.id);
     if (n.kind === 'gift') onGift(n.giftRecipient || undefined);
     else if (n.kind === 'follow') onProfile(n.actorId);
     else if (n.kind === 'market')
@@ -436,20 +468,35 @@ export function NotificationsBell({
 
   return (
     <>
-      <button
-        className="icon-button notifications-bell"
-        aria-label={'Уведомления' + (unread ? `, ${unread} новых` : '')}
-        onClick={() => show(true)}
-      >
-        <Bell size={19} />
-        {unread > 0 && <i>{unread > 9 ? '9+' : unread}</i>}
-      </button>
-      <Dialog open={open} onOpenChange={show}>
-        <DialogContent className="noct-dialog notifications-dialog">
-          <DialogTitle>Уведомления</DialogTitle>
-          <DialogDescription>
+      {/* A panel that grows out of the bell, on phones too (top right). */}
+      <Popover open={open} onOpenChange={show}>
+        <PopoverTrigger
+          ref={bell}
+          className="icon-button notifications-bell"
+          aria-label={'Уведомления' + (unread ? `, ${unread} новых` : '')}
+        >
+          <Bell size={19} />
+          {unread > 0 && <i>{unread > 9 ? '9+' : unread}</i>}
+        </PopoverTrigger>
+        <PopoverContent
+          align="end"
+          sideOffset={8}
+          className="notifications-panel"
+          initialFocus={(type) => type !== 'touch'}
+        >
+          <div className="notifications-heading">
+            <PopoverTitle>Уведомления</PopoverTitle>
+            <button
+              className="icon-button"
+              aria-label="Закрыть уведомления"
+              onClick={() => show(false)}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <PopoverDescription>
             Реакции, комментарии, подписчики и сообщения.
-          </DialogDescription>
+          </PopoverDescription>
           <div className="notification-filters">
             {filters.map((f) => (
               <button
@@ -525,24 +572,30 @@ export function NotificationsBell({
             </button>
           )}
           <PushSettings />
-        </DialogContent>
-      </Dialog>
+        </PopoverContent>
+      </Popover>
+      <LayoutFlip
+        watch={toasts}
+        targets={() => stack.current?.children || []}
+      />
       {mounted &&
         createPortal(
           <section
+            ref={stack}
             className="notification-toasts"
             aria-label="Новые уведомления"
             aria-live="polite"
           >
-            {toasts.map((n) => (
+            {toasts.map((t) => (
               <Toast
-                key={n.id + ':' + n.created}
-                n={n}
-                d={describe(n, me)}
-                onOpen={() => go(n)}
-                onClose={() =>
-                  setToasts((current) => current.filter((t) => t !== n))
-                }
+                key={t.key}
+                n={t.n}
+                d={describe(t.n, me)}
+                leaving={t.leaving}
+                bell={bell}
+                onOpen={() => go(t.n)}
+                onLeave={() => leave((x) => x.key === t.key)}
+                onDone={() => drop(t.key)}
               />
             ))}
           </section>,
@@ -556,31 +609,48 @@ export function NotificationsBell({
 function Toast({
   n,
   d,
+  leaving,
+  bell,
   onOpen,
-  onClose,
+  onLeave,
+  onDone,
 }: {
   n: NotificationRow;
   d: Described;
+  leaving?: Leaving;
+  bell: RefObject<HTMLElement | null>;
   onOpen: () => void;
-  onClose: () => void;
+  onLeave: () => void;
+  onDone: () => void;
 }) {
-  const [hover, setHover] = useState(false),
-    [leaving, setLeaving] = useState(false);
-  const close = useRef(onClose);
-  close.current = onClose;
+  const [hover, setHover] = useState(false);
+  const node = useRef<HTMLDivElement>(null),
+    handlers = useRef({ onLeave, onDone });
+  handlers.current = { onLeave, onDone };
   useEffect(() => {
     if (hover || leaving) return;
-    const t = setTimeout(() => setLeaving(true), 6000);
+    const t = setTimeout(() => handlers.current.onLeave(), 6000);
     return () => clearTimeout(t);
   }, [hover, leaving]);
   useEffect(() => {
     if (!leaving) return;
-    const t = setTimeout(() => close.current(), 200);
+    const t = setTimeout(() => handlers.current.onDone(), 250);
     return () => clearTimeout(t);
   }, [leaving]);
+  // Opening the bell gathers the pop-ups into it: they shrink toward its centre.
+  useLayoutEffect(() => {
+    const element = node.current,
+      target = bell.current?.getBoundingClientRect();
+    if (leaving !== 'bell' || !element || !target?.width) return;
+    const box = element.getBoundingClientRect();
+    element.style.transformOrigin = `${target.left + target.width / 2 - box.left}px ${target.top + target.height / 2 - box.top}px`;
+  }, [leaving, bell]);
   return (
     <div
-      className={'notification-toast' + (leaving ? ' leaving' : '')}
+      ref={node}
+      className="notification-toast"
+      data-leaving={leaving}
+      inert={!!leaving || undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
@@ -597,7 +667,7 @@ function Toast({
       <button
         className="notification-toast-close"
         aria-label="Скрыть уведомление"
-        onClick={() => setLeaving(true)}
+        onClick={onLeave}
       >
         <X size={15} />
       </button>
