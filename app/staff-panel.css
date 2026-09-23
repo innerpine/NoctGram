@@ -545,7 +545,7 @@
   font-variant-numeric: tabular-nums;
 }
 .admin-balance small {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   color: #908778;
 }
 .staff-status,
@@ -559,7 +559,7 @@
   border-radius: 7px;
   background: #ffffff04;
   color: #a69daf;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-style: normal;
   line-height: 1.4;
   white-space: normal;

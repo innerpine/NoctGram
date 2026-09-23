@@ -76,13 +76,18 @@
   .app-shell > .main-column:not(.messages-main) {
     padding-top: env(safe-area-inset-top, 0px);
   }
-  /* Scrolled page content must not show through the standalone iOS status bar. */
+  /* Scrolled page content must not show through the standalone iOS status bar.
+     The lower edge fades out below the status icons instead of cutting hard. */
   .app-shell::before {
     content: '';
     position: fixed;
     inset: 0 0 auto;
     height: env(safe-area-inset-top, 0px);
-    background: var(--background, #000);
+    background: linear-gradient(
+      var(--background, #000)
+        calc(100% - min(16px, env(safe-area-inset-top, 0px) / 3)),
+      transparent
+    );
     pointer-events: none;
     z-index: 40;
   }
@@ -261,7 +266,7 @@
   .music-stage-body .music-lyrics-footer {
     flex-wrap: wrap;
     gap: 6px;
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
   }
   .music-stage-body .music-stage-empty {
     gap: 10px;

@@ -130,7 +130,7 @@
   animation: music-score-in 280ms ease-out both;
 }
 .music-listener-score small {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   color: #747474;
 }
 .music-leaderboard strong,
@@ -185,7 +185,7 @@
 }
 .music-listener-self em {
   margin-left: 8px;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   color: #aaa;
   font-style: normal;
   font-weight: 400;
@@ -290,7 +290,7 @@
   margin: 0;
   font-size: 1.4375rem;
   font-weight: 500;
-  letter-spacing: -0.65px;
+  letter-spacing: -0.022em;
 }
 .music-intro p {
   margin: 4px 0 0;
@@ -631,7 +631,6 @@
   border: 1px solid #ffffff24;
   background: #161616f5;
   box-shadow: 0 12px 70px #000b;
-  backdrop-filter: blur(20px);
   animation: music-player-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 body:has(.music-player) {

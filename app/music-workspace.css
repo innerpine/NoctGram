@@ -50,9 +50,6 @@ body:has(.music-shell) .music-player.music-sheet {
 }
 
 .playlist-create-overlay {
-  background: #060708a8 !important;
-  backdrop-filter: blur(16px) saturate(0.65);
-  -webkit-backdrop-filter: blur(16px) saturate(0.65);
   transition:
     opacity 360ms ease,
     backdrop-filter 360ms ease;
@@ -62,8 +59,8 @@ body:has(.music-shell) .music-player.music-sheet {
   [data-ending-style],
   [data-closed]
 ) {
-  backdrop-filter: blur(0) saturate(1);
-  -webkit-backdrop-filter: blur(0) saturate(1);
+  backdrop-filter: blur(0);
+  -webkit-backdrop-filter: blur(0);
 }
 .noct-dialog.playlist-create-dialog {
   display: block;
@@ -123,7 +120,7 @@ body:has(.music-shell) .music-player.music-sheet {
 .playlist-create-dialog .playlist-create-header [data-slot='dialog-title'] {
   margin: 0;
   font-size: 1.375rem;
-  letter-spacing: -0.6px;
+  letter-spacing: -0.022em;
 }
 .playlist-create-dialog [data-slot='dialog-description'] {
   margin-top: 6px;
@@ -215,7 +212,7 @@ body:has(.music-shell) .music-player.music-sheet {
 }
 .playlist-create-eyebrow {
   color: #9db1a4;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.15em;
 }
@@ -227,7 +224,7 @@ body:has(.music-shell) .music-player.music-sheet {
   overflow-wrap: anywhere;
   font-size: 1.3125rem;
   line-height: 1.2;
-  letter-spacing: -0.6px;
+  letter-spacing: -0.022em;
   color: #eee;
   margin: 7px 0 9px;
 }

@@ -56,9 +56,11 @@ import './mobile-navigation.css';
 import './profile-workspace.css';
 import './settings.css';
 import './rain.css';
+import './accessibility.css';
 import { RainEffect } from './rain-effect';
 import { MusicProvider } from './music-provider';
 import { APP_HISTORY_BOOTSTRAP } from '@/lib/app-history-bootstrap';
+import { DYNAMIC_TYPE_BOOTSTRAP } from '@/lib/dynamic-type-bootstrap';
 import { SITE_URL, SITE_DESCRIPTION } from '@/lib/site-metadata';
 export const viewport: Viewport = {
   width: 'device-width',
@@ -96,15 +98,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ru" className="dark">
+    // The Dynamic Type bootstrap sets the root font size before hydration.
+    <html lang="ru" className="dark" suppressHydrationWarning>
       <head>
         <script
           id="noctgram-history"
           dangerouslySetInnerHTML={{ __html: APP_HISTORY_BOOTSTRAP }}
         />
+        <script
+          id="noctgram-dynamic-type"
+          dangerouslySetInnerHTML={{ __html: DYNAMIC_TYPE_BOOTSTRAP }}
+        />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=Instrument+Sans:wght@400..600&display=swap"
         />
       </head>
       <body>

@@ -19,8 +19,10 @@
   --color-secondary: var(--raised);
   --color-secondary-foreground: var(--foreground);
   --color-destructive: #ef4444;
-  --font-sans: 'Inter', sans-serif;
-  --font-heading: 'Inter', sans-serif;
+  --font-sans:
+    'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-heading:
+    'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
   --radius-lg: 12px;
   --radius-md: 10px;
   --radius-sm: 8px;
@@ -43,6 +45,9 @@
   --hairline: #ffffff0a;
   --body: #ffffffa6;
   --ring: #d4d4d4;
+  /* One dimming layer behind every modal. */
+  --scrim: #000000b3;
+  --scrim-blur: 8px;
 }
 * {
   box-sizing: border-box;
@@ -57,9 +62,14 @@ body {
   background: #000;
   color: #fff;
   font:
-    400 14px/1.5 'Inter',
+    400 0.875rem/1.5 'Inter',
+    -apple-system,
+    system-ui,
+    'Segoe UI',
+    Roboto,
     sans-serif;
-  letter-spacing: -0.16px;
+  font-optical-sizing: auto;
+  letter-spacing: -0.006em;
 }
 button,
 input,
@@ -140,14 +150,33 @@ h3 {
 }
 h1 {
   font-size: 1.4375rem;
-  letter-spacing: -0.8px;
+  font-weight: 600;
+  letter-spacing: -0.022em;
 }
 h2 {
   font-size: 1.0625rem;
-  letter-spacing: -0.4px;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+}
+/* Headings no longer inherit body leading; component rules and utilities still win. */
+@layer base {
+  h1 {
+    line-height: 1.15;
+  }
+  h2 {
+    line-height: 1.25;
+  }
 }
 small {
   display: block;
+}
+/* Tracking follows size: open at 11-12px, tight on large headings. */
+small,
+time,
+.meta,
+.badge,
+.unread {
+  letter-spacing: 0.01em;
 }
 .grow {
   flex: 1;
@@ -217,7 +246,7 @@ small {
   border: 1px solid #ffffff15;
   border-radius: 8px;
   padding: 2px 7px;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 500;
   white-space: nowrap;
   color: #aaa;
@@ -245,7 +274,7 @@ small {
 .brand {
   font-family: 'Instrument Sans', 'Inter', sans-serif;
   font-size: 1.5625rem;
-  letter-spacing: -1px;
+  letter-spacing: -0.022em;
   justify-content: flex-start;
   gap: 9px;
   margin-bottom: 35px;
@@ -441,7 +470,7 @@ small {
 }
 .feed-tabs [data-slot='tabs-list'] {
   background: #0e0e0e;
-  border: 1px solid #ffffff08;
+  border: 1px solid var(--hairline);
   border-radius: 50px;
   width: 100%;
   height: 45px !important;
@@ -541,7 +570,7 @@ small {
   background: #ffffff15;
 }
 .composer-hint {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   white-space: nowrap;
 }
 .avatar {
@@ -615,7 +644,7 @@ small {
   line-height: 16px;
 }
 .post-content > time {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   color: #707070;
 }
 .post-text {
@@ -791,7 +820,7 @@ small {
   text-align: left;
 }
 .topic small {
-  font-size: 0.5625rem;
+  font-size: 0.6875rem;
   letter-spacing: 0.5px;
   color: #616161;
   font-weight: 400;
@@ -891,7 +920,7 @@ small {
 }
 .premium-card h2 {
   font-size: 1.625rem;
-  letter-spacing: -1.1px;
+  letter-spacing: -0.022em;
   line-height: 1.1;
 }
 .premium-card p {
@@ -910,7 +939,7 @@ small {
 .aside-footer {
   padding: 22px 7px;
   color: #4c4c4c;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -932,7 +961,7 @@ small {
   align-items: center;
   gap: 9px;
   padding: 0 13px;
-  border: 1px solid #ffffff15;
+  border: 1px solid var(--border);
   border-radius: 12px;
   background: #ffffff05;
   min-width: 0;
@@ -1019,7 +1048,7 @@ small {
 }
 .profile-info h2 {
   font-size: 1.8125rem;
-  letter-spacing: -1.2px;
+  letter-spacing: -0.022em;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1115,17 +1144,35 @@ small {
 .threads-panel {
   width: 250px;
   flex-shrink: 0;
-  border-right: 1px solid #ffffff12;
+  border-right: 1px solid var(--border);
   overflow: auto;
   overscroll-behavior-y: contain;
 }
 .threads-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   padding: 12px 14px;
   font-size: 0.75rem;
   color: #999;
   border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+/* The divider stays hidden until dialogs scroll under the heading; without
+   scroll timelines (or with animations off) it simply stays visible. */
+@supports (animation-timeline: scroll()) {
+  .threads-heading {
+    animation: threads-heading-edge linear both;
+    animation-timeline: scroll();
+    animation-range: 0 24px;
+  }
+  @keyframes threads-heading-edge {
+    from {
+      border-bottom-color: transparent;
+    }
+  }
 }
 .thread-row {
   display: flex;
@@ -1233,7 +1280,7 @@ small {
   align-items: center;
   gap: 5px;
   color: #777;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   margin-top: 5px;
 }
 .message-composer {
@@ -1284,7 +1331,7 @@ small {
 }
 .chat-empty h2 {
   font-size: 1.625rem;
-  letter-spacing: -1px;
+  letter-spacing: -0.022em;
 }
 .chat-empty p {
   font-size: 0.8125rem;
@@ -1304,7 +1351,7 @@ small {
 }
 .noct-dialog [data-slot='dialog-title'] {
   font-size: 1.3125rem;
-  letter-spacing: -0.6px;
+  letter-spacing: -0.022em;
   margin-right: 24px;
 }
 .noct-dialog [data-slot='dialog-description'] {
@@ -1314,8 +1361,9 @@ small {
 }
 [data-slot='dialog-overlay'],
 [data-slot='alert-dialog-overlay'] {
-  background: #000b !important;
-  backdrop-filter: blur(6px);
+  background: var(--scrim) !important;
+  backdrop-filter: blur(var(--scrim-blur));
+  -webkit-backdrop-filter: blur(var(--scrim-blur));
 }
 .noct-dialog .primary {
   min-height: 40px;
@@ -1417,7 +1465,7 @@ small {
 .premium-modal h2 {
   font-size: 2.5rem;
   line-height: 1;
-  letter-spacing: -2px;
+  letter-spacing: -0.022em;
   margin: 18px 0;
 }
 .premium-modal > p {
@@ -1477,7 +1525,7 @@ small {
   display: block;
 }
 .comment time {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
 }
 .comment p {
   font-size: 0.875rem;
@@ -1846,7 +1894,7 @@ small {
   }
   .sidebar nav a span {
     display: block;
-    font-size: 0.5rem;
+    font-size: 0.6875rem;
   }
   .sidebar nav a.active {
     background: #ffffff0c;
@@ -1865,7 +1913,7 @@ small {
     height: 43px !important;
   }
   .feed-intro {
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
     min-height: 50px;
   }
   .composer {
@@ -1904,13 +1952,10 @@ small {
   }
   .post-author .handle {
     max-width: 105px;
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
   }
   .author-button {
     font-size: 0.75rem;
-  }
-  .post-content > time {
-    font-size: 0.5625rem;
   }
   .post-text {
     font-size: 0.875rem;
@@ -1922,9 +1967,6 @@ small {
   .poll > button {
     padding: 10px 9px;
     font-size: 0.75rem;
-  }
-  .poll > .meta {
-    font-size: 0.625rem;
   }
   .profile-cover {
     height: 140px;
@@ -1953,9 +1995,6 @@ small {
   .profile-stats {
     gap: 12px;
     flex-wrap: wrap;
-  }
-  .profile-details {
-    font-size: 0.625rem;
   }
   .profile-card {
     border-radius: 14px;
@@ -1991,7 +2030,7 @@ small {
     padding-top: 18px;
   }
   .welcome-banner span {
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
   }
   .author-button {
     max-width: 67%;

@@ -13,7 +13,7 @@
   margin-bottom: 32px;
   color: #f5f5f5;
   font-size: 1.5rem;
-  letter-spacing: -0.8px;
+  letter-spacing: -0.022em;
   font-weight: 500;
 }
 .auth-card {
@@ -29,7 +29,7 @@
   font-size: 1.75rem;
   font-weight: 500;
   line-height: 1.15;
-  letter-spacing: -1px;
+  letter-spacing: -0.022em;
 }
 .auth-step {
   display: flex;

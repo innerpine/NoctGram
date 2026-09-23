@@ -110,15 +110,13 @@
   .sidebar .main-navigation a .nav-item-label {
     display: block;
     max-width: 100%;
-    font-size: clamp(0.625rem, 2.8vw, 0.75rem);
+    font-size: clamp(0.6875rem, 2.8vw, 0.75rem);
     line-height: 1.2;
-    letter-spacing: -0.15px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .sidebar .main-navigation a.active .nav-item-label {
-    font-weight: 500;
   }
   .sidebar .main-navigation a .nav-item-icon {
     flex-shrink: 0;

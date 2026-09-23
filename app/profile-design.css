@@ -333,7 +333,7 @@
   top: 12px;
   right: 14px;
   color: #a3a0ac;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   letter-spacing: 0.05em;
 }
 .design-preview > .avatar {
@@ -406,7 +406,7 @@
 }
 .design-premium-label {
   margin-left: auto;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   color: #c8acec;
 }
 .background-modes {
@@ -469,7 +469,7 @@
   display: block;
   margin-top: 4px;
   color: #9c94a5;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
 }
 .background-intensity {
   display: grid;
@@ -556,7 +556,7 @@
   box-shadow: inset 0 0 0 1px #ffffff30;
 }
 .palette-option small {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   color: #aaa6b2;
 }
 .appearance-switch {
@@ -690,9 +690,6 @@
 @media (max-width: 440px) {
   .profile-palette {
     gap: 2px;
-  }
-  .palette-option small {
-    font-size: 0.5625rem;
   }
   .profile-avatar-line > .has-text-ring {
     margin-left: 16px;

@@ -166,10 +166,6 @@
     transition: none;
   }
 }
-.gift-backdrop[data-slot='dialog-overlay'] {
-  backdrop-filter: blur(12px);
-  background: #05030988;
-}
 .profile-gift-button {
   color: #d7bcea;
   transition:

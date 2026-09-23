@@ -54,7 +54,7 @@
 .room-thread .thread-copy small {
   max-width: none;
   color: #a297ab;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
 }
 .room-thread .unread {
   background: #cdb7df;
@@ -92,7 +92,7 @@
   color: #e3d7ed;
   font-size: 1.3125rem;
   font-weight: 500;
-  letter-spacing: -0.6px;
+  letter-spacing: -0.022em;
   overflow-wrap: anywhere;
 }
 .room-history-empty h3 {
@@ -119,7 +119,7 @@
   border-radius: 7px;
   background: #cbb2df08;
   color: #c8b4d7;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
 }
 .room-secret-status {
   display: flex;
@@ -144,7 +144,7 @@
 .room-secret-status > .secondary {
   min-height: 33px;
   padding: 7px 9px;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
 }
 
 .room-message-more.icon-button {
@@ -177,7 +177,7 @@
   border-radius: 10px;
   background: #1d1821;
   color: #c5afd5;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   cursor: pointer;
 }
 .room-load-earlier {
@@ -199,7 +199,7 @@
   margin: 0;
   background: #171419;
   color: #b5a4c0;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.65;
 }
 .room-workspace > .room-error {
@@ -381,7 +381,7 @@
 .room-member-add small {
   overflow: hidden;
   color: #a497af;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -391,7 +391,7 @@
   border-radius: 5px;
   background: #ceb1e30b;
   color: #bca3cd;
-  font-size: 0.5625rem;
+  font-size: 0.6875rem;
 }
 .room-edit-form {
   display: flex;
@@ -425,7 +425,7 @@
 }
 .room-manage-dialog .room-visibility small {
   color: #a08ead;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
 }
 .room-invite-section {
   display: flex;
@@ -575,7 +575,7 @@
 }
 .room-search-row small {
   color: #a28bad;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 400;
 }
 .room-search-error {
@@ -601,7 +601,6 @@
     flex-wrap: wrap;
     gap: 7px;
     padding: 10px 12px;
-    font-size: 0.625rem;
   }
   .room-secret-status > span {
     flex-basis: calc(100% - 40px);
@@ -624,9 +623,9 @@
   }
   .room-tabs > button {
     gap: 5px;
-    padding-right: 7px;
-    padding-left: 7px;
-    font-size: 0.625rem;
+    padding-right: 6px;
+    padding-left: 6px;
+    white-space: nowrap;
   }
   .room-manage-dialog .room-text-input {
     font-size: 1rem;

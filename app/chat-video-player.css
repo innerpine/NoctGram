@@ -285,10 +285,6 @@
   object-fit: contain;
   border: 0;
 }
-.noct-video-backdrop[data-slot='dialog-overlay'] {
-  background: #08080ca8 !important;
-  backdrop-filter: blur(20px) saturate(0.7);
-}
 .noct-video-viewer[data-slot='dialog-content'][data-layout='centered'] {
   width: min(
     1040px,
