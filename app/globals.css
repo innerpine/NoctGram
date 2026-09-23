@@ -1558,7 +1558,8 @@ small {
 }
 .toast {
   position: fixed;
-  bottom: 24px;
+  /* Above the phone tab bar and the mini player, whichever is shown. */
+  bottom: calc(var(--app-nav-inset) + max(24px, var(--app-player-space)));
   left: 50%;
   transform: translateX(-50%);
   background: #222;
@@ -1982,7 +1983,7 @@ small {
     margin: 13px 0;
   }
   .toast {
-    bottom: 78px;
+    bottom: calc(var(--app-nav-inset) + max(12px, var(--app-player-space)));
     width: calc(100% - 32px);
     font-size: 0.75rem;
   }

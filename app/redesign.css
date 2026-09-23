@@ -1558,15 +1558,28 @@ textarea::placeholder {
   width: 120px;
   margin-top: 6px;
 }
+/* Transitions, not keyframes: a new notice during the exit turns the toast
+   back from its current opacity instead of restarting from zero. */
 .toast {
   font-size: 0.8125rem;
   background: #161616;
   border-color: #ffffff24;
   border-radius: 12px;
-  animation: toast-in 0.32s var(--motion) both;
+  transform: translate(-50%, 0) scale(1);
+  transition:
+    opacity 0.26s var(--motion),
+    transform 0.32s var(--motion);
 }
-.toast.leaving {
-  animation: toast-out 0.26s var(--motion) both;
+@starting-style {
+  .toast {
+    opacity: 0;
+    transform: translate(-50%, 18px) scale(0.94);
+  }
+}
+.toast[data-leaving] {
+  opacity: 0;
+  transform: translate(-50%, 14px) scale(0.96);
+  pointer-events: none;
 }
 .toast-undo {
   font-size: 0.75rem;
@@ -1681,25 +1694,6 @@ textarea::placeholder {
   }
   50% {
     opacity: 0.8;
-  }
-}
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    filter: blur(6px);
-    transform: translate(-50%, 18px) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-    transform: translate(-50%, 0) scale(1);
-  }
-}
-@keyframes toast-out {
-  to {
-    opacity: 0;
-    filter: blur(6px);
-    transform: translate(-50%, 14px) scale(0.96);
   }
 }
 @keyframes dialog-in {
@@ -1969,9 +1963,6 @@ textarea::placeholder {
   }
   .premium-coming {
     padding: 16px;
-  }
-  .toast {
-    bottom: 78px;
   }
 }
 @media (max-width: 360px) {
