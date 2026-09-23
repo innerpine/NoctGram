@@ -218,6 +218,9 @@ function fixture(t) {
         import { db } from './storage';
         async function isAdministrator(id:string) { return !!(await db().prepare('SELECT userId FROM administrators WHERE userId=?').bind(id).first()); }
         ${declaration(file, 'clean')}
+        // Person details and channel cards are covered by profile-details.test.mjs.
+        function personDetails() { return {}; }
+        async function profileChannels() { return []; }
         ${declaration(file, 'profile')}
       `,
       );

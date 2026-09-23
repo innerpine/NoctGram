@@ -54,7 +54,8 @@ export async function assertUnqueuedPublicWrite(
     now = Date.now();
   const actor = await d
     .prepare(`SELECT u.created,u.name,u.bio,COALESCE(pa.ringText,'') AS ringText,
-    (SELECT group_concat(h.handle,' ') FROM handles h WHERE h.userId=u.id) AS handles
+    (SELECT group_concat(h.handle,' ') FROM handles h WHERE h.userId=u.id) AS handles,
+    (SELECT location||'|'||website||'|'||instagram||'|'||tiktok||'|'||youtube FROM profile_details WHERE userId=u.id) AS details
     FROM users u LEFT JOIN profile_appearance pa ON pa.userId=u.id WHERE u.id=?`)
     .bind(actorId)
     .first<{
@@ -63,6 +64,7 @@ export async function assertUnqueuedPublicWrite(
       bio: string;
       ringText: string;
       handles: string;
+      details: string | null;
     }>();
   if (!actor) throw new ApiError(401, 'Аккаунт не найден');
   const target =
@@ -78,6 +80,7 @@ export async function assertUnqueuedPublicWrite(
       actor.bio,
       actor.ringText,
       actor.handles || '',
+      actor.details || '',
       target?.name || '',
       target?.bio || '',
     ].some((value) => detectSpamDomain(value, settings.domains, true)) ||
@@ -162,7 +165,8 @@ export async function reviewSpam(
     now = Date.now();
   const actor = await d
     .prepare(`SELECT u.created,u.name,u.bio,COALESCE(pa.ringText,'') AS ringText,
-    (SELECT group_concat(h.handle,' ') FROM handles h WHERE h.userId=u.id) AS handles
+    (SELECT group_concat(h.handle,' ') FROM handles h WHERE h.userId=u.id) AS handles,
+    (SELECT location||'|'||website||'|'||instagram||'|'||tiktok||'|'||youtube FROM profile_details WHERE userId=u.id) AS details
     FROM users u LEFT JOIN profile_appearance pa ON pa.userId=u.id WHERE u.id=?`)
     .bind(actorId)
     .first<{
@@ -171,6 +175,7 @@ export async function reviewSpam(
       bio: string;
       ringText: string;
       handles: string;
+      details: string | null;
     }>();
   if (!actor) throw new ApiError(401, 'Аккаунт не найден');
   const reasons: string[] = [];
@@ -181,9 +186,13 @@ export async function reviewSpam(
   if (domain)
     reasons.push('Рекламный домен или его кодированное написание: ' + domain);
   if (
-    [actor.name, actor.bio, actor.ringText, actor.handles || ''].some((field) =>
-      detectSpamDomain(field, settings.domains, true),
-    )
+    [
+      actor.name,
+      actor.bio,
+      actor.ringText,
+      actor.handles || '',
+      actor.details || '',
+    ].some((field) => detectSpamDomain(field, settings.domains, true))
   )
     reasons.push('Рекламное написание в профиле отправителя');
   if (kind === 'post' && contextId !== actorId) {

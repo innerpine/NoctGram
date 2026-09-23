@@ -50,6 +50,17 @@ export type Profile = Person & {
   blockedAt?: number;
   pinnedPostId?: string | null;
   anonymousNumber?: string | null;
+  // Person profiles only (see PROFILE_DETAILS.md); '' when unset.
+  location?: string;
+  website?: string;
+  instagram?: string;
+  tiktok?: string;
+  youtube?: string;
+  /** 'YYYY-MM-DD', or 'MM-DD' when another viewer may not see the year. */
+  birthday?: string;
+  /** Own profile only. */
+  showBirthYear?: boolean;
+  personalChannels?: ProfileChannelCard[];
   bio: string;
   cover: string;
   handles: string[];
@@ -57,6 +68,19 @@ export type Profile = Person & {
   followers: number;
   following: number;
   postCount: number;
+};
+/** A channel its owner shows on their profile, drawn as a Telegram-style card. */
+export type ProfileChannelCard = Person & {
+  followers: number;
+  post: {
+    id: string;
+    /** First 200 characters, premium emoji tokens kept. */
+    text: string;
+    media: 'photo' | 'video' | 'file' | '';
+    poll: boolean;
+    code: boolean;
+    created: number;
+  } | null;
 };
 export type Media = { id: string; type: string; name: string; url?: string };
 export type Post = Appearance & {

@@ -75,7 +75,6 @@ import {
   ArrowLeft,
   Pencil,
   Camera,
-  CalendarDays,
   RefreshCw,
   Video,
   LogOut,
@@ -123,6 +122,13 @@ import {
 } from '@/lib/chat-themes';
 import { ChatEmojiText } from './chat-emoji-text';
 import { MentionText } from './profile-link';
+import {
+  ProfileMeta,
+  ProfileChannels,
+  ProfileDetailsFields,
+  detailsDraft,
+  type ProfileDetailsDraft,
+} from './profile-details';
 import { PROFILE_NAVIGATE, type ProfileNavigation } from '@/lib/profile-links';
 import { resolveMention } from '@/lib/mention-navigation';
 import { NoctMascot } from './noct-mascot';
@@ -304,6 +310,9 @@ export default function Noctgram({
     [editId, setEditId] = useState(''),
     [editHandle, setEditHandle] = useState(''),
     [editAliases, setEditAliases] = useState<string[]>([]);
+  const [editDetails, setEditDetails] = useState<ProfileDetailsDraft | null>(
+    null,
+  );
   const [chatFolder, setChatFolder] = useState<'active' | 'archive'>('active');
   const [threads, setThreads] = useState<Person[]>([]),
     [threadUnread, setThreadUnread] = useState(0),
@@ -1595,6 +1604,7 @@ export default function Noctgram({
     setEditCover(target.cover);
     setEditHandle(target.handle);
     setEditAliases(target.handles.filter((h) => h !== target.handle));
+    setEditDetails(detailsDraft(target));
     setModal('edit');
   };
   useEffect(() => {
@@ -1611,6 +1621,7 @@ export default function Noctgram({
     setEditCover(me.cover);
     setEditHandle(me.handle);
     setEditAliases(me.handles.filter((h) => h !== me.handle));
+    setEditDetails(detailsDraft(me));
     setEditTab('account');
     setModal('edit');
   }, [me]);
@@ -1655,6 +1666,7 @@ export default function Noctgram({
         cover: editCover,
         mainHandle: editHandle,
         extraHandles: editAliases,
+        ...(editId === me?.id ? editDetails : null),
       });
       if (r.id === me?.id) setMe(r);
       setProfile((current) => (current?.id === r.id ? r : current));
@@ -2660,14 +2672,7 @@ export default function Noctgram({
                     'Пока без описания.'
                   )}
                 </p>
-                <div className="profile-details">
-                  <CalendarDays size={14} /> В Noctgram с{' '}
-                  {new Date(profile.created).toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </div>
+                <ProfileMeta profile={profile} />
                 <div className="profile-stats">
                   <button
                     type="button"
@@ -2700,6 +2705,7 @@ export default function Noctgram({
                     публикаций
                   </span>
                 </div>
+                <ProfileChannels channels={profile.personalChannels} />
                 {profile.id === me?.id && (
                   <AppLink
                     className="profile-saved-link"
@@ -3773,6 +3779,13 @@ export default function Noctgram({
                       />
                       <span className="meta">{editBio.length} / 300</span>
                     </label>
+                    {editId === me?.id && editDetails && (
+                      <ProfileDetailsFields
+                        value={editDetails}
+                        onChange={setEditDetails}
+                        disabled={busy || uploading || readOnly}
+                      />
+                    )}
                     <button
                       className="primary"
                       disabled={busy || uploading || !editName.trim()}

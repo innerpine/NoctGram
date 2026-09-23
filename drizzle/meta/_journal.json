@@ -407,6 +407,13 @@
       "when": 1790013260890,
       "tag": "0057_market",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1790186835138,
+      "tag": "0058_profile_details",
+      "breakpoints": true
     }
   ]
 }

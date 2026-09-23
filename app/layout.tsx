@@ -33,6 +33,7 @@ import './music-playlists.css';
 import './music-workspace.css';
 import './messages-workspace.css';
 import './profile-links.css';
+import './profile-details.css';
 import './chat-themes.css';
 import './chat-attachments.css';
 import './chat-actions.css';
