@@ -26,6 +26,7 @@ import { createFeedSnapshots, feedKey, sameSearch } from '@/lib/feed-snapshots';
 import { createChatSnapshots, type ChatSnapshot } from '@/lib/chat-snapshots';
 import { createPageTransition } from '@/lib/page-transition';
 import { createProfileCoverCache } from '@/lib/profile-cover-cache';
+import { createLatestRequests } from '@/lib/optimistic';
 import { flushSync } from 'react-dom';
 
 import { NotificationsBell } from './notifications';
@@ -459,7 +460,9 @@ export default function Noctgram({
     activePeer = useRef(''),
     premiumReturn = useRef('feed'),
     starsReturn = useRef('feed'),
-    actionLock = useRef(false);
+    actionLock = useRef(false),
+    itemLocks = useRef(new Set<string>()),
+    postRequests = useRef<ReturnType<typeof createLatestRequests> | null>(null);
   const appHistory = useRef<ReturnType<typeof createAppHistory> | null>(null);
   const pageTransition = useRef<ReturnType<typeof createPageTransition> | null>(
     null,
@@ -507,17 +510,25 @@ export default function Noctgram({
     }
     return true;
   };
-  const run = async (fn: () => Promise<void>) => {
-    if (actionLock.current) return;
-    actionLock.current = true;
-    setBusy(true);
+  // Without an item key the whole app waits (publishing, deletion, forms);
+  // with one only repeated taps on that item are dropped.
+  const run = async (fn: () => Promise<void>, item = '') => {
+    if (item ? itemLocks.current.has(item) : actionLock.current) return;
+    if (item) itemLocks.current.add(item);
+    else {
+      actionLock.current = true;
+      setBusy(true);
+    }
     try {
       await fn();
     } catch (e) {
       notify((e as Error).message);
     } finally {
-      actionLock.current = false;
-      setBusy(false);
+      if (item) itemLocks.current.delete(item);
+      else {
+        actionLock.current = false;
+        setBusy(false);
+      }
     }
   };
   const bootstrapFeed = useRef('');
@@ -1497,28 +1508,24 @@ export default function Noctgram({
     },
     [myId],
   );
-  const action = async (
-    p: Post,
-    kind: string,
-    value: unknown,
-  ): Promise<boolean> => {
-    if (!auth()) return false;
-    try {
-      await request('', {
-        action: kind,
-        id: p.id,
-        ...(kind === 'vote' ? { option: value } : { value }),
-      });
-      const updated = await request<Post>(
-        '?action=post&id=' + encodeURIComponent(p.id),
-      );
-      snapshots.current.update(updated);
-      setPosts((rows) => rows.map((x) => (x.id === p.id ? updated : x)));
-      return true;
-    } catch (e) {
-      notify((e as Error).message);
-      return false;
-    }
+  // The card already shows the choice; this only confirms it with the server.
+  const action = (p: Post, kind: string, value: unknown) => {
+    if (!writable()) return false;
+    postRequests.current ??= createLatestRequests();
+    return postRequests
+      .current(p.id + ':' + kind, value, async (chosen) => {
+        await request('', {
+          action: kind,
+          id: p.id,
+          ...(kind === 'vote' ? { option: chosen } : { value: chosen }),
+        });
+        const updated = await request<Post>(
+          '?action=post&id=' + encodeURIComponent(p.id),
+        );
+        snapshots.current.update(updated);
+        setPosts((rows) => rows.map((x) => (x.id === p.id ? updated : x)));
+      })
+      ?.catch((e) => notify((e as Error).message));
   };
   const openComments = (p: Post) => {
     if (!auth()) return;
@@ -1578,7 +1585,7 @@ export default function Noctgram({
             : 'Публикация закреплена в профиле',
         );
       }
-    });
+    }, 'post:' + p.id);
   };
   const profileOwned =
     !!me && (profile?.id === me.id || profile?.ownerId === me.id);
@@ -1690,7 +1697,7 @@ export default function Noctgram({
       const updated = await request<Profile>('?action=profile&id=' + person.id);
       setProfile((current) => (current?.id === person.id ? updated : current));
       setMe(await request<Profile>('?action=profile'));
-    });
+    }, 'follow:' + person.id);
   };
   const composer = (
     <fieldset
@@ -3151,7 +3158,7 @@ export default function Noctgram({
                               ? 'Собеседник разблокирован'
                               : 'Собеседник добавлен в чёрный список',
                           );
-                        })
+                        }, 'block:' + peer.id)
                       }
                     >
                       <Ban size={17} />
@@ -4052,7 +4059,7 @@ export default function Noctgram({
                   setUndoHidden(null);
                   setNotice('');
                   await latestRefresh.current();
-                })
+                }, 'post:' + undoHidden.id)
               }
             >
               Отменить
