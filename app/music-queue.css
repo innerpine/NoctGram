@@ -36,10 +36,15 @@
     color 160ms ease,
     background 160ms ease;
 }
-.music-sort-handle:hover,
 .music-sort-handle:focus-visible {
   color: #e2d5ff;
   background: #ffffff09;
+}
+@media (hover: hover) {
+  .music-sort-handle:hover {
+    color: #e2d5ff;
+    background: #ffffff09;
+  }
 }
 .music-sort-handle:active {
   cursor: grabbing;
@@ -77,8 +82,10 @@
   }
 }
 @media (hover: none), (pointer: coarse) {
-  .music-favorite-button:hover {
-    background: transparent;
+  @media (hover: hover) {
+    .music-favorite-button:hover {
+      background: transparent;
+    }
   }
 }
 .music-favorite-button[data-saved='true'] > svg:not(.spin) {
@@ -109,7 +116,7 @@
   border-radius: 12px;
   background: #201e25;
   color: #eee;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   box-shadow: 0 8px 28px #0004;
   animation: music-heart-note 180ms ease both;
@@ -145,8 +152,10 @@
     background 160ms ease,
     transform 160ms ease;
 }
-.music-favorite-choice:hover {
-  background: #ffffff0b;
+@media (hover: hover) {
+  .music-favorite-choice:hover {
+    background: #ffffff0b;
+  }
 }
 .music-favorite-choice:active {
   transform: scale(0.985);
@@ -177,14 +186,14 @@
 }
 .music-favorite-copy strong {
   display: block;
-  font-size: 14px;
+  font-size: 0.875rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .music-favorite-copy small {
   display: block;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #ffffff70;
   margin-top: 3px;
 }

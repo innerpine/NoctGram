@@ -12,14 +12,14 @@
 }
 .services-heading h2 {
   margin: 0;
-  font-size: 21px;
+  font-size: 1.3125rem;
   font-weight: 500;
   letter-spacing: -0.5px;
 }
 .services-heading p {
   margin: 6px 0 0;
   color: #999;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .service-picker {
   min-width: 0;
@@ -39,7 +39,7 @@
   flex: none;
   min-height: 35px;
   border-radius: 20px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 0 13px;
   gap: 7px;
   color: #999;
@@ -85,14 +85,14 @@
   gap: 12px;
   padding: 0 3px 16px;
   color: #aaa;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .service-state {
   border-radius: 16px;
   padding: 4px 9px;
   background: #ffffff06;
   color: #777;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .service-state.connected {
   background: #3ecf8e12;
@@ -108,14 +108,14 @@
   padding: 36px 20px 28px;
 }
 .service-login h3 {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 500;
   margin: 16px 0 6px;
 }
 .service-login p {
   margin: 0;
   color: #929292;
-  font-size: 14px;
+  font-size: 0.875rem;
   max-width: 350px;
   line-height: 1.6;
 }
@@ -132,7 +132,7 @@
 }
 .service-login p.service-setup-note {
   margin-top: 14px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #8c8c8c;
 }
 .service-privacy {
@@ -141,7 +141,7 @@
   gap: 8px;
   margin: 17px 3px 1px;
   color: #828282;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
 }
 .service-privacy svg {
@@ -161,12 +161,12 @@
   min-width: 0;
 }
 .service-connected h3 {
-  font-size: 17px;
+  font-size: 1.0625rem;
   margin: 0 0 3px;
   overflow-wrap: anywhere;
 }
 .service-connected a {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #999;
   display: inline-flex;
   align-items: center;
@@ -181,7 +181,7 @@
 }
 .service-capabilities h3 {
   margin: 0 0 16px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   color: #c7c7c7;
 }
@@ -194,7 +194,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #ccc;
 }
 .service-capability svg {
@@ -203,7 +203,7 @@
 }
 .service-capability small {
   color: #707070;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-left: auto;
   text-align: right;
 }
@@ -211,7 +211,7 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  font-size: 14px;
+  font-size: 0.875rem;
   padding: 12px 14px;
   border: 1px solid #ffffff12;
   border-radius: 12px;
@@ -232,7 +232,7 @@
 }
 .service-library h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 500;
 }
 .service-library [data-slot='tabs-list'] {
@@ -269,7 +269,7 @@
   gap: 3px;
 }
 .service-playlist-row strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -277,7 +277,7 @@
 }
 .service-playlist-row small {
   color: #888;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .service-playlist-row a {
   color: #aaa;
@@ -286,14 +286,14 @@
   padding: 7px;
 }
 .service-import-button {
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 7px 10px;
   border-radius: 8px;
 }
 .service-library-note,
 .service-footer {
   color: #818181;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
 }
 .service-footer {
@@ -322,7 +322,7 @@
   gap: 8px;
   color: #aaa;
   padding: 16px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .music-services-link {
   display: flex;
@@ -344,11 +344,11 @@
 }
 .music-services-link strong {
   font-weight: 500;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .music-services-link small {
   color: #888;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .music-services-link > svg {
   color: #aaa;
@@ -405,7 +405,7 @@
   margin: 16px auto;
 }
 .yandex-token-form label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted-foreground);
 }
 .yandex-actions {

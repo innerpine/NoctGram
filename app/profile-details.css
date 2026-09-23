@@ -15,9 +15,11 @@
   color: #c9b4e1;
   overflow-wrap: anywhere;
 }
-.profile-detail-link:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+@media (hover: hover) {
+  .profile-detail-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }
 .profile-socials {
   display: flex;
@@ -35,9 +37,13 @@
   color: #ffffffd9;
   transition: background 160ms ease;
 }
-.profile-social:hover,
 .profile-social:focus-visible {
   background: #ffffff24;
+}
+@media (hover: hover) {
+  .profile-social:hover {
+    background: #ffffff24;
+  }
 }
 .profile-channels {
   display: grid;
@@ -56,20 +62,22 @@
     background 160ms ease,
     border-color 160ms ease;
 }
-.profile-channel-card:hover {
-  color: inherit;
-  background: #ffffff0f;
-  border-color: #ffffff24;
+@media (hover: hover) {
+  .profile-channel-card:hover {
+    color: inherit;
+    background: #ffffff0f;
+    border-color: #ffffff24;
+  }
 }
 .profile-channel-top {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   color: #ffffff7a;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .profile-channel-top > span:first-child {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -86,7 +94,7 @@
   min-width: 0;
 }
 .profile-channel-copy .display-name {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
 }
 .profile-channel-preview {
@@ -96,7 +104,7 @@
   -webkit-line-clamp: 2;
   line-clamp: 2;
   color: #ffffffbf;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
@@ -114,7 +122,7 @@
   padding: 2px 0;
   border: 0;
   color: #ddd;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .profile-details-label {
   display: inline-flex;
@@ -145,12 +153,12 @@
   white-space: nowrap;
 }
 .profile-channel-option-copy strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .profile-channel-option-copy small {
   color: #ffffff7a;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .profile-channel-order {
   display: grid;
@@ -160,7 +168,7 @@
   border-radius: 50%;
   background: #b8a0e7;
   color: #1a1523;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 @media (max-width: 500px) {
@@ -175,7 +183,7 @@
     padding: 10px 12px;
   }
   .profile-channel-preview {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {

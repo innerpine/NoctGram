@@ -13,15 +13,15 @@
   gap: 12px;
 }
 .admin-access-panel h2 {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 .admin-access-panel h3 {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .admin-access-panel p {
   margin: 6px 0;
   color: #b8b1c1;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.6;
 }
 .admin-access-people {
@@ -58,11 +58,11 @@
   overflow-wrap: anywhere;
 }
 .admin-access-person strong {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .admin-access-panel small {
   color: #a29aa9;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 .admin-access-panel button:disabled {
@@ -98,7 +98,7 @@
   color: #c0a7d4;
 }
 .admin-access-observation strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   overflow-wrap: anywhere;
 }
 .admin-access-observation[data-protected='true'] {
@@ -111,7 +111,7 @@
 .admin-access-reason {
   display: grid;
   gap: 8px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .admin-access-reason textarea {
   min-height: 80px;
@@ -120,7 +120,7 @@
   border: 1px solid #ffffff25;
   border-radius: 10px;
   background: #0e0d11;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .admin-access-editor .danger-button {
   display: flex;
@@ -137,7 +137,7 @@
   align-items: flex-start;
 }
 .admin-access-block strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   overflow-wrap: anywhere;
 }
 .admin-access-block strong span {
@@ -148,7 +148,7 @@
   margin: 0;
   padding-left: 18px;
   color: #bfb5ca;
-  font-size: 13px;
+  font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
 .admin-access-block[data-revoked='true'] {
@@ -163,7 +163,7 @@
     flex: 1;
     gap: 4px;
     padding: 0 6px;
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .admin-section-tabs [role='tab'] > svg {
     display: none;

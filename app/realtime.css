@@ -24,14 +24,14 @@
 }
 .realtime-error {
   color: #eea6b3;
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 8px 0;
 }
 .realtime-empty {
   color: #898891;
   text-align: center;
   padding: 30px 16px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .realtime-person {
   display: flex;
@@ -47,7 +47,7 @@
 .realtime-person small {
   display: block;
   color: #92919b;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 3px;
 }
 .realtime-search {
@@ -64,11 +64,11 @@
   padding: 12px 20px;
 }
 .channel-tools .secondary {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .realtime-person .secondary {
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .stories-strip {
   display: flex;
@@ -90,7 +90,7 @@
   min-width: 0;
 }
 .stories-strip small {
-  font-size: 11px;
+  font-size: 0.6875rem;
   max-width: 68px;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -114,8 +114,10 @@
   color: #c2afe9;
   border-style: dashed;
 }
-.stories-strip > button:hover > span {
-  background: #292331;
+@media (hover: hover) {
+  .stories-strip > button:hover > span {
+    background: #292331;
+  }
 }
 .stories-strip > button:focus-visible {
   outline: 2px solid #af9add;
@@ -123,7 +125,7 @@
   border-radius: 12px;
 }
 .stories-strip > p {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .story-bg-night {
   background: radial-gradient(ellipse at 30% 0%, #363444, #15141c 80%);
@@ -168,7 +170,7 @@
 }
 .story-preview > span {
   padding: 36px;
-  font-size: 22px;
+  font-size: 1.375rem;
   opacity: 0.6;
 }
 .story-preview > .icon-button {
@@ -231,11 +233,11 @@
   z-index: 2;
 }
 .story-heading strong {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .story-heading small {
   display: block;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #ccc;
   margin-top: 3px;
 }
@@ -261,14 +263,14 @@
   overflow-wrap: anywhere;
   text-align: center;
   padding: 20px 30px;
-  font-size: 20px;
+  font-size: 1.25rem;
   line-height: 1.5;
   max-height: 50%;
   text-shadow: 0 2px 12px #0004;
 }
 .story-media > p:only-child {
   max-height: 100%;
-  font-size: 25px;
+  font-size: 1.5625rem;
 }
 .story-prev,
 .story-next {
@@ -291,7 +293,7 @@
   background: #0002;
 }
 .story-footer .secondary {
-  font-size: 11px;
+  font-size: 0.6875rem;
   background: #ffffff10;
   border-color: #ffffff20;
   color: white;
@@ -324,11 +326,11 @@
   gap: 11px;
 }
 .push-settings p {
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
 }
 .push-settings strong {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .push-settings .secondary {
   justify-self: start;
@@ -343,7 +345,7 @@
   border-radius: 7px;
   background: #ad96d8;
   color: #131018;
-  font-size: 9px;
+  font-size: 0.5625rem;
   padding: 2px 4px;
   font-style: normal;
   font-weight: 700;
@@ -367,14 +369,16 @@
   border: 1px solid #ffffff14;
   border-radius: 999px;
   color: #ffffffb0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   transition:
     background 160ms var(--motion),
     color 160ms var(--motion);
 }
-.notification-filters button:hover {
-  background: #ffffff0a;
-  color: #fff;
+@media (hover: hover) {
+  .notification-filters button:hover {
+    background: #ffffff0a;
+    color: #fff;
+  }
 }
 .notification-filters button[aria-pressed='true'] {
   border-color: transparent;
@@ -398,8 +402,10 @@
   text-align: left;
   transition: background 160ms var(--motion);
 }
-.notification-row:hover {
-  background: #ffffff0a;
+@media (hover: hover) {
+  .notification-row:hover {
+    background: #ffffff0a;
+  }
 }
 .notification-row.unread {
   background: #ffffff06;
@@ -468,7 +474,7 @@
   gap: 4px;
   min-width: 0;
   overflow: hidden;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -479,7 +485,7 @@
 }
 .notification-action {
   color: #ffffffbf;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.45;
 }
 .notification-amount {
@@ -491,7 +497,7 @@
   display: -webkit-box;
   overflow: hidden;
   color: #ffffff80;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
@@ -503,7 +509,7 @@
   gap: 6px;
 }
 .notification-side time {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #ffffff66;
 }
 .notification-thumb {
@@ -579,9 +585,11 @@
   border-radius: 50%;
   color: #ffffff8c;
 }
-.notification-toast-close:hover {
-  background: #ffffff12;
-  color: #fff;
+@media (hover: hover) {
+  .notification-toast-close:hover {
+    background: #ffffff12;
+    color: #fff;
+  }
 }
 @keyframes notification-toast-in {
   from {
@@ -667,12 +675,12 @@
   animation: call-ring 2.4s ease-out infinite;
 }
 .call-dialog h2 {
-  font-size: 24px;
+  font-size: 1.5rem;
   letter-spacing: -0.5px;
 }
 .call-dialog > p {
   color: #9995a0;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .call-actions {
   display: flex;
@@ -701,11 +709,15 @@
   background: #558b72;
   color: #fff;
 }
-.call-hangup:hover {
-  background: #b86074;
+@media (hover: hover) {
+  .call-hangup:hover {
+    background: #b86074;
+  }
 }
-.call-accept:hover {
-  background: #64a284;
+@media (hover: hover) {
+  .call-accept:hover {
+    background: #64a284;
+  }
 }
 .chat-header .call-button {
   margin-left: auto;

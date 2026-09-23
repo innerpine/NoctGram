@@ -35,13 +35,13 @@
   gap: 8px;
   margin-bottom: 16px;
   color: var(--muted, #a2a2ac);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .admin-gratitude-name {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 600;
 }
 .admin-gratitude-name > span:first-child {
@@ -182,7 +182,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .chrome-tempo-heading output {
   color: var(--profile-first);
@@ -190,7 +190,7 @@
 }
 .chrome-tempo-scale {
   color: #929099;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .chrome-tempo-control {
   position: relative;
@@ -333,20 +333,20 @@
   top: 12px;
   right: 14px;
   color: #a3a0ac;
-  font-size: 10px;
+  font-size: 0.625rem;
   letter-spacing: 0.05em;
 }
 .design-preview > .avatar {
   margin: 8px 0 27px;
 }
 .design-preview h3 {
-  font-size: 24px;
+  font-size: 1.5rem;
   margin: 0 0 3px;
   max-width: 100%;
 }
 .design-preview p {
   color: #a6a3ad;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin: 12px 0 0;
   overflow-wrap: anywhere;
 }
@@ -378,9 +378,11 @@
   :is(.profile-social, .profile-channel-card) {
   background: #00000024;
 }
-.profile-card[data-profile-background='true']
-  :is(.profile-social, .profile-channel-card):hover {
-  background: #0000003d;
+@media (hover: hover) {
+  .profile-card[data-profile-background='true']
+    :is(.profile-social, .profile-channel-card):hover {
+    background: #0000003d;
+  }
 }
 .profile-card[data-profile-background='true'] .profile-saved-link {
   background: #00000020;
@@ -399,12 +401,12 @@
 .design-background p {
   margin: 0;
   color: #a9a3b1;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
 }
 .design-premium-label {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 0.625rem;
   color: #c8acec;
 }
 .background-modes {
@@ -418,7 +420,7 @@
 .background-modes button {
   min-height: 40px;
   padding: 9px 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   border: 1px solid #ffffff12;
   border-radius: 10px;
   background: #ffffff04;
@@ -437,7 +439,7 @@
   outline-offset: 2px;
 }
 .music-color-modes button {
-  font-size: 14px;
+  font-size: 0.875rem;
   min-height: 44px;
   overflow-wrap: anywhere;
 }
@@ -450,7 +452,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   min-width: 0;
 }
 .background-colors input {
@@ -467,12 +469,12 @@
   display: block;
   margin-top: 4px;
   color: #9c94a5;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .background-intensity {
   display: grid;
   gap: 12px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .background-intensity > span {
   display: flex;
@@ -509,7 +511,7 @@
   display: flex;
   gap: 9px;
   align-items: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .design-section-heading svg {
   color: #a8a3b2;
@@ -535,8 +537,10 @@
     background 0.18s,
     border-color 0.18s;
 }
-.palette-option:hover {
-  background: #ffffff08;
+@media (hover: hover) {
+  .palette-option:hover {
+    background: #ffffff08;
+  }
 }
 .palette-option[aria-pressed='true'] {
   border-color: #ffffff25;
@@ -552,7 +556,7 @@
   box-shadow: inset 0 0 0 1px #ffffff30;
 }
 .palette-option small {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: #aaa6b2;
 }
 .appearance-switch {
@@ -560,7 +564,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 16px 0;
   border-top: 1px solid #ffffff0c;
   border-bottom: 1px solid #ffffff0c;
@@ -572,7 +576,7 @@
 }
 .appearance-switch small {
   color: #929099;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 400;
   line-height: 1.5;
 }
@@ -608,7 +612,7 @@
 .design-ring-label {
   display: grid;
   gap: 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .design-ring-label > span {
   display: flex;
@@ -661,7 +665,7 @@
   margin-top: 12px;
 }
 .premium-bottom .error {
-  font-size: 12px;
+  font-size: 0.75rem;
   text-align: center;
 }
 @keyframes profile-text-orbit {
@@ -688,7 +692,7 @@
     gap: 2px;
   }
   .palette-option small {
-    font-size: 9px;
+    font-size: 0.5625rem;
   }
   .profile-avatar-line > .has-text-ring {
     margin-left: 16px;

@@ -21,7 +21,7 @@
   border-radius: 20px;
   background: #ffffff05;
   color: #bbb6c0;
-  font-size: 12px;
+  font-size: 0.75rem;
   text-align: center;
 }
 .chat-gift-cost {
@@ -54,7 +54,7 @@
 }
 .chat-gift-card h3 {
   margin: 4px 0 8px;
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 600;
   color: #f1edf3;
 }
@@ -66,7 +66,7 @@
   max-width: 100%;
   min-width: 0;
   color: #aba4af;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .chat-gift-person .display-name {
   min-width: 0;
@@ -80,7 +80,7 @@
 .chat-gift-caption {
   margin: 15px 0 0;
   color: #e3dce6;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.5;
   text-align: center;
   white-space: pre-wrap;
@@ -94,15 +94,17 @@
   border: 1px solid #ffffff0b;
   border-radius: 13px;
   color: #ede7f0;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   background: color-mix(in srgb, var(--gift-color) 10%, #ffffff03);
   transition:
     background 180ms,
     transform 180ms;
 }
-.chat-gift-view:hover {
-  background: color-mix(in srgb, var(--gift-color) 18%, #ffffff05);
+@media (hover: hover) {
+  .chat-gift-view:hover {
+    background: color-mix(in srgb, var(--gift-color) 18%, #ffffff05);
+  }
 }
 .chat-gift-view:active {
   transform: scale(0.98);
@@ -118,7 +120,7 @@
   gap: 5px;
   margin-top: 10px;
   color: #918996;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .chat-gift-time > span {
   display: inline-flex;
@@ -131,7 +133,7 @@
   display: grid;
   gap: 12px;
   margin-top: 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .chat-gift-details > div {
   display: flex;
@@ -175,10 +177,12 @@
     background 180ms,
     transform 250ms;
 }
-.profile-gift-button:hover {
-  color: #f3e5ff;
-  background: #d1a6ee12;
-  transform: rotate(-8deg);
+@media (hover: hover) {
+  .profile-gift-button:hover {
+    color: #f3e5ff;
+    background: #d1a6ee12;
+    transform: rotate(-8deg);
+  }
 }
 .gift-dialog.noct-dialog {
   width: min(560px, calc(100vw - 28px));
@@ -228,7 +232,7 @@
   background: transparent;
   color: #eee;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .gift-search input::-webkit-search-cancel-button {
   display: none;
@@ -241,9 +245,11 @@
   height: 26px;
   border-radius: 50%;
 }
-.gift-search button:hover {
-  color: #eee;
-  background: #ffffff0d;
+@media (hover: hover) {
+  .gift-search button:hover {
+    color: #eee;
+    background: #ffffff0d;
+  }
 }
 .gift-catalog-scroll {
   flex: 1;
@@ -263,7 +269,7 @@
   padding: 35px 8px;
   color: #99919f;
   text-align: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .gift-send-dialog .gift-catalog {
   gap: 8px;
@@ -360,10 +366,12 @@
 .gift-tile:nth-child(3n) {
   animation-delay: 100ms;
 }
-.gift-tile:hover {
-  transform: translateY(-4px);
-  border-color: color-mix(in srgb, var(--gift-color) 38%, transparent);
-  background-color: #ffffff07;
+@media (hover: hover) {
+  .gift-tile:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--gift-color) 38%, transparent);
+    background-color: #ffffff07;
+  }
 }
 .gift-tile:focus-visible {
   outline: 2px solid var(--gift-color);
@@ -372,7 +380,7 @@
 .gift-tile > strong {
   margin: 6px 0;
   color: #eee;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .gift-art {
   contain: layout paint;
@@ -419,7 +427,7 @@
   background: #ffdb690c;
   border-radius: 12px;
   color: #efdca1;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 .gift-checkout {
@@ -435,7 +443,7 @@
   align-items: center;
   gap: 6px;
   color: #8c898f;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .gift-wallet b {
   color: #e5d2a5;
@@ -484,7 +492,7 @@
   justify-content: center;
   gap: 8px;
   color: #ccc;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .gift-recipient > span:last-child {
   min-width: 0;
@@ -494,7 +502,7 @@
   display: block;
   text-align: left;
   margin-top: 22px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #bbb;
 }
 .gift-message-label > span {
@@ -523,13 +531,13 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: #d4ccd9;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.65;
   margin: 20px 0;
 }
 .gift-date {
   color: #7e7983;
-  font-size: 12px;
+  font-size: 0.75rem;
   display: block;
   margin-top: 14px;
 }
@@ -598,7 +606,7 @@
   border-radius: 6px;
   background: #10101370;
   color: #fff;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -629,7 +637,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #938e98;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .gift-hidden-mark {
   position: absolute;
@@ -662,11 +670,11 @@
 }
 .gift-empty h3 {
   margin: 4px 0 9px;
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 .gift-empty p {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
   color: #8d8793;
 }
@@ -678,7 +686,7 @@
   gap: 10px;
   padding: 35px;
   color: #8f8798;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .gift-retry {
   margin-left: 8px;
@@ -730,7 +738,7 @@
     padding: 8px 5px 12px;
   }
   .gift-tile > strong {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .gift-preview-art {
     width: 200px;

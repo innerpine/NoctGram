@@ -24,7 +24,7 @@
   padding: 10px 5px;
   margin: 0;
   line-height: 24px;
-  font-size: 16px;
+  font-size: 1rem;
   resize: none;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -42,10 +42,15 @@
     color 150ms,
     background-color 150ms;
 }
-.chat-compose-area :is(.chat-attach-button, .chat-emoji-button):hover,
 .chat-compose-area .chat-emoji-button[data-popup-open] {
   background: #ffffff08;
   color: #d9cef6;
+}
+@media (hover: hover) {
+  .chat-compose-area :is(.chat-attach-button, .chat-emoji-button):hover {
+    background: #ffffff08;
+    color: #d9cef6;
+  }
 }
 .chat-compose-area .send-button {
   display: grid;
@@ -64,8 +69,10 @@
   background: #8774e1;
   color: #fff;
 }
-.chat-compose-area .send-button:not(:disabled):hover {
-  background: #9785ee;
+@media (hover: hover) {
+  .chat-compose-area .send-button:not(:disabled):hover {
+    background: #9785ee;
+  }
 }
 .chat-compose-area .send-button:not(:disabled):active {
   transform: scale(0.94);
@@ -103,12 +110,12 @@
   font-family: inherit;
 }
 .chat-emoji-popover .epr-emoji-category-label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   text-transform: none;
 }
 .chat-emoji-popover input {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .chat-emoji-loading {
   display: flex;
@@ -117,7 +124,7 @@
   justify-content: center;
   gap: 10px;
   color: #c4bdcf;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 @media (prefers-reduced-motion: reduce) {
   .chat-compose-area
@@ -162,12 +169,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 .chat-draft-file small,
 .chat-files-limit {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #aaa5b4;
 }
 .chat-draft-file > button {
@@ -186,7 +193,7 @@
 .chat-send-error {
   margin: 8px 16px;
   color: #ecb6bd;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.4;
 }
 .bubble:has(.chat-message-files) {
@@ -320,13 +327,13 @@
 }
 .chat-document strong {
   display: block;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
 .chat-document small {
   color: #b8b0c4;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .chat-document > svg {
   flex-shrink: 0;
@@ -350,7 +357,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #dbd1e5;
 }
 .chat-pinned-bar {
@@ -378,7 +385,7 @@
 .chat-pinned-summary strong {
   display: block;
   margin-bottom: 3px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
 }
 .chat-pinned-summary > span {
@@ -387,7 +394,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   color: #d7d2df;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .chat-pinned-bar .icon-button {
   flex-shrink: 0;
@@ -419,7 +426,7 @@
   align-items: flex-start;
   gap: 9px;
   min-width: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: left;
 }
 .chat-pinned-list > div svg {

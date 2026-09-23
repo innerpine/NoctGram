@@ -18,13 +18,13 @@
 }
 .telegram-link-heading h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
 }
 .telegram-link-heading p {
   margin: 4px 0 0;
   color: #93919b;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .telegram-link-icon,
 .telegram-account-icon {
@@ -47,16 +47,18 @@
 .telegram-link-copy {
   margin: 0;
   color: #aaa8b2;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.65;
 }
 .telegram-link .primary {
   min-height: 38px;
   gap: 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
-.telegram-link .primary:hover {
-  text-decoration: none;
+@media (hover: hover) {
+  .telegram-link .primary:hover {
+    text-decoration: none;
+  }
 }
 .telegram-link a[aria-disabled='true'] {
   opacity: 0.5;
@@ -70,7 +72,7 @@
 }
 .telegram-link-actions .secondary {
   gap: 7px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .telegram-link-text-button {
   display: inline-flex;
@@ -78,14 +80,16 @@
   min-height: 30px;
   padding: 3px 0;
   color: #a6a2af;
-  font-size: 12px;
+  font-size: 0.75rem;
   text-align: left;
 }
-.telegram-link-text-button:hover {
-  color: #f4efff;
-  background: transparent;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+@media (hover: hover) {
+  .telegram-link-text-button:hover {
+    color: #f4efff;
+    background: transparent;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }
 .telegram-link-text-button:disabled {
   opacity: 0.5;
@@ -104,7 +108,7 @@
   flex-wrap: wrap;
   gap: 7px;
   color: #96929e;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.5;
 }
 .telegram-link-wait > span {
@@ -134,18 +138,18 @@
   min-width: 0;
 }
 .telegram-account strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
 .telegram-account span:not(.telegram-account-icon) {
   color: #ada3bd;
-  font-size: 12px;
+  font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
 .telegram-account small {
   color: #86838e;
-  font-size: 11px;
+  font-size: 0.6875rem;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
@@ -162,7 +166,7 @@
 }
 .telegram-link-fields label {
   color: #c4c0cd;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .telegram-link-fields input {
   width: 100%;
@@ -171,7 +175,7 @@
   border-radius: 11px;
   padding: 12px 14px;
   background: #18161c;
-  font-size: 19px;
+  font-size: 1.1875rem;
   letter-spacing: 0.22em;
   font-variant-numeric: tabular-nums;
 }
@@ -194,7 +198,7 @@
 .telegram-unlink-confirm p {
   margin: 0;
   color: #bbb4c5;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
 }
 .telegram-link-limit {
@@ -202,13 +206,13 @@
   padding-top: 14px;
   border-top: 1px solid #ffffff0c;
   color: #77737f;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.7;
 }
 .telegram-link-error {
   margin: 0;
   color: #e5aaa9;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -223,7 +227,7 @@
 .telegram-link-notice {
   margin: 0;
   color: #b4cbbb;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
 }
 .transaction-grant.telegram-transaction-icon {
@@ -252,6 +256,6 @@
     gap: 16px;
   }
   .telegram-link-heading h3 {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
 }

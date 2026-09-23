@@ -12,7 +12,7 @@
   gap: 10px;
   margin-bottom: 32px;
   color: #f5f5f5;
-  font-size: 24px;
+  font-size: 1.5rem;
   letter-spacing: -0.8px;
   font-weight: 500;
 }
@@ -26,7 +26,7 @@
 }
 .auth-card h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 500;
   line-height: 1.15;
   letter-spacing: -1px;
@@ -50,7 +50,7 @@
 }
 .auth-description {
   color: #a4a4a4;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
@@ -62,13 +62,13 @@
   display: flex;
   flex-direction: column;
   gap: 9px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #bcbcbc;
 }
 .auth-field input {
   width: 100%;
   min-height: 48px;
-  font-size: 16px;
+  font-size: 1rem;
   border: 1px solid #ffffff20;
   border-radius: 11px;
   background: #ffffff04;
@@ -90,12 +90,12 @@
   width: 100%;
   min-height: 46px;
   border-radius: 11px;
-  font-size: 14px;
+  font-size: 0.875rem;
   text-align: center;
   padding: 12px 16px;
 }
 .auth-footnote {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
   color: #858585;
   overflow-wrap: anywhere;
@@ -106,7 +106,7 @@
   background: #ffffff04;
   padding: 12px;
   color: #a4a4a4;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.6;
 }
 .auth-premium-gift {
@@ -118,7 +118,7 @@
   border-radius: 12px;
   background: #b8a8ed08;
   color: #a9a5b7;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
 }
 .auth-premium-gift > :first-child {
@@ -127,7 +127,7 @@
 .auth-premium-gift strong {
   display: block;
   color: #e3ddf5;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .auth-divider {
@@ -135,7 +135,7 @@
   align-items: center;
   gap: 14px;
   color: #777;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .auth-divider::before,
 .auth-divider::after {
@@ -150,10 +150,12 @@
   justify-content: center;
   min-height: 36px;
   color: #bcbcbc;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
-.auth-text-button:hover {
-  color: #fff;
+@media (hover: hover) {
+  .auth-text-button:hover {
+    color: #fff;
+  }
 }
 .auth-card button:disabled {
   opacity: 0.45;
@@ -164,7 +166,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #aaa;
   min-height: 32px;
 }
@@ -184,7 +186,7 @@
   border-radius: 10px;
   background: #ffffff04;
   color: #eee;
-  font-size: 24px;
+  font-size: 1.5rem;
   box-shadow: none;
 }
 .auth-otp [data-slot='input-otp-slot'][data-active='true'] {
@@ -197,14 +199,14 @@
   gap: 9px;
   margin-top: 22px;
   color: #999;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .auth-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   color: #a4b8ab;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .auth-avatar-row {
   display: flex;
@@ -244,7 +246,7 @@
   align-items: center;
   gap: 4px;
   color: #999;
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding-top: 6px;
 }
 .auth-spin,
@@ -252,7 +254,7 @@
   animation: auth-spin 900ms linear infinite;
 }
 .auth-card .form-error {
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.5;
 }
 @keyframes auth-appear {

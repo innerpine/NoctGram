@@ -149,8 +149,10 @@
 .giveaway-winner .avatar {
   flex-shrink: 0;
 }
-.giveaway-winner:hover {
-  background: #bda2ee2a;
+@media (hover: hover) {
+  .giveaway-winner:hover {
+    background: #bda2ee2a;
+  }
 }
 .giveaway-card footer {
   display: grid;
@@ -303,9 +305,11 @@
 .giveaway-option > :is(img, svg) {
   flex-shrink: 0;
 }
-.giveaway-form fieldset:not(:disabled) .giveaway-option:hover {
-  background: #b88ae412;
-  border-color: #c4a3eb80;
+@media (hover: hover) {
+  .giveaway-form fieldset:not(:disabled) .giveaway-option:hover {
+    background: #b88ae412;
+    border-color: #c4a3eb80;
+  }
 }
 .giveaway-option.selected {
   border-color: #c4a3eb;
@@ -409,8 +413,10 @@
   color: #dbd1e8;
   background: #ffffff06;
 }
-.giveaway-duration button:hover {
-  background: #b88ae41a;
+@media (hover: hover) {
+  .giveaway-duration button:hover {
+    background: #b88ae41a;
+  }
 }
 .giveaway-total {
   display: grid;

@@ -33,8 +33,10 @@
 .room-thread {
   transition: background-color 150ms ease;
 }
-.room-thread:hover {
-  background: #cab3de08;
+@media (hover: hover) {
+  .room-thread:hover {
+    background: #cab3de08;
+  }
 }
 .room-thread.active {
   background: #cab3de13;
@@ -52,7 +54,7 @@
 .room-thread .thread-copy small {
   max-width: none;
   color: #a297ab;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .room-thread .unread {
   background: #cdb7df;
@@ -79,7 +81,7 @@
   max-width: 320px;
   margin: 0;
   color: #a89bb1;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.8;
   overflow-wrap: anywhere;
 }
@@ -88,20 +90,20 @@
   max-width: 100%;
   margin: 0;
   color: #e3d7ed;
-  font-size: 21px;
+  font-size: 1.3125rem;
   font-weight: 500;
   letter-spacing: -0.6px;
   overflow-wrap: anywhere;
 }
 .room-history-empty h3 {
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 .room-join-preview > .room-avatar-wrap {
   margin-bottom: 7px;
 }
 .room-join-preview > small {
   color: #a998b6;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .room-join-preview > .primary {
   min-width: 180px;
@@ -117,7 +119,7 @@
   border-radius: 7px;
   background: #cbb2df08;
   color: #c8b4d7;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .room-secret-status {
   display: flex;
@@ -128,7 +130,7 @@
   border-bottom: 1px solid #b7d6c70c;
   background: #b7d6c705;
   color: #a7c8b9;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.65;
 }
 .room-secret-status > span {
@@ -142,7 +144,7 @@
 .room-secret-status > .secondary {
   min-height: 33px;
   padding: 7px 9px;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 
 .room-message-more.icon-button {
@@ -175,7 +177,7 @@
   border-radius: 10px;
   background: #1d1821;
   color: #c5afd5;
-  font-size: 10px;
+  font-size: 0.625rem;
   cursor: pointer;
 }
 .room-load-earlier {
@@ -184,9 +186,11 @@
 .room-return-new {
   margin: 0 12px 10px;
 }
-.room-load-earlier:hover:not(:disabled),
-.room-return-new:hover:not(:disabled) {
-  background: #292130;
+@media (hover: hover) {
+  .room-load-earlier:hover:not(:disabled),
+  .room-return-new:hover:not(:disabled) {
+    background: #292130;
+  }
 }
 
 .room-write-note {
@@ -195,7 +199,7 @@
   margin: 0;
   background: #171419;
   color: #b5a4c0;
-  font-size: 10px;
+  font-size: 0.625rem;
   line-height: 1.65;
 }
 .room-workspace > .room-error {
@@ -208,11 +212,11 @@
   padding: 11px 17px;
   border-top: 1px solid #e4a4b91a;
   background: #261820;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .room-workspace > .room-error .text-button {
   color: #ecc1d3;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .room-manage-dialog.noct-dialog,
 .room-safety-dialog.noct-dialog,
@@ -243,7 +247,7 @@
 .room-safety-dialog h3 {
   margin: 4px 0 0;
   color: #c6d5cd;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.6;
 }
@@ -255,7 +259,7 @@
   background: #a9d2bd08;
   color: #c9e8d9;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 17px;
+  font-size: 1.0625rem;
   line-height: 1.9;
   letter-spacing: 1px;
   text-align: center;
@@ -282,7 +286,7 @@
   border-radius: 8px;
   background: transparent;
   color: #ada1b8;
-  font-size: 11px;
+  font-size: 0.6875rem;
   cursor: pointer;
   transition:
     background-color 140ms ease,
@@ -306,7 +310,7 @@
   align-items: center;
   gap: 7px;
   color: #c1b1ce;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .room-text-input {
   width: 100%;
@@ -318,7 +322,7 @@
   background: #ffffff04;
   color: #e8e0f0;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
   transition: border-color 140ms ease;
 }
@@ -363,12 +367,12 @@
   min-width: 0;
   flex-direction: column;
   gap: 5px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .room-member-copy strong {
   overflow: hidden;
   color: #e3d9eb;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -377,7 +381,7 @@
 .room-member-add small {
   overflow: hidden;
   color: #a497af;
-  font-size: 10px;
+  font-size: 0.625rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -387,7 +391,7 @@
   border-radius: 5px;
   background: #ceb1e30b;
   color: #bca3cd;
-  font-size: 9px;
+  font-size: 0.5625rem;
 }
 .room-edit-form {
   display: flex;
@@ -417,11 +421,11 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .room-manage-dialog .room-visibility small {
   color: #a08ead;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .room-invite-section {
   display: flex;
@@ -436,7 +440,7 @@
   max-width: 100%;
   margin: 0;
   color: #ded0e9;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 500;
   letter-spacing: -0.4px;
   overflow-wrap: anywhere;
@@ -445,12 +449,12 @@
   max-width: 340px;
   margin: 0;
   color: #ada0b8;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.7;
 }
 .room-invite-section .room-text-input {
   color: #cbb0df;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .room-invite-section .secondary {
   align-self: stretch;
@@ -465,7 +469,7 @@
 .room-confirm p {
   margin: 0 0 13px;
   color: #dcb9c6;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.7;
 }
 .room-confirm > div {
@@ -479,7 +483,7 @@
   border-top: 1px solid #ffffff0d;
   margin-top: 0;
   color: #d2a5b5;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .room-workspace :is(.primary, .secondary),
 .room-manage-dialog :is(.primary, .secondary, .danger-button),
@@ -492,7 +496,7 @@
   min-height: 39px;
   padding: 9px 13px;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 .room-workspace .primary,
@@ -533,7 +537,7 @@
   padding: 4px 10px;
   margin: 0 0 4px;
   color: #bda8cc;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
 }
 .room-search-row {
@@ -548,8 +552,10 @@
   text-align: left;
   cursor: pointer;
 }
-.room-search-row:hover {
-  background: #cbb2df0a;
+@media (hover: hover) {
+  .room-search-row:hover {
+    background: #cbb2df0a;
+  }
 }
 .room-search-row > span:not(.room-avatar-wrap):not(.room-kind-chip) {
   display: flex;
@@ -562,14 +568,14 @@
 .room-search-row small {
   overflow: hidden;
   color: #e0d4e9;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .room-search-row small {
   color: #a28bad;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 400;
 }
 .room-search-error {
@@ -579,7 +585,7 @@
   gap: 8px;
   padding: 10px;
   color: #d9a8b9;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 @media (max-width: 1000px) {
   .room-workspace {
@@ -595,7 +601,7 @@
     flex-wrap: wrap;
     gap: 7px;
     padding: 10px 12px;
-    font-size: 10px;
+    font-size: 0.625rem;
   }
   .room-secret-status > span {
     flex-basis: calc(100% - 40px);
@@ -620,14 +626,14 @@
     gap: 5px;
     padding-right: 7px;
     padding-left: 7px;
-    font-size: 10px;
+    font-size: 0.625rem;
   }
   .room-manage-dialog .room-text-input {
-    font-size: 16px;
+    font-size: 1rem;
   }
   .room-safety-code {
     padding: 13px;
-    font-size: 14px;
+    font-size: 0.875rem;
   }
   .room-search-row .room-kind-chip {
     display: none;
@@ -678,7 +684,7 @@
   overflow: hidden;
   background: transparent;
   color: var(--chat-accent);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   text-align: left;
   text-overflow: ellipsis;
@@ -692,8 +698,10 @@
 .room-message-context .bubble .chat-reply-quote {
   cursor: pointer;
 }
-.room-message-context .bubble .chat-reply-quote:hover:not(:disabled) {
-  background: #ffffff10;
+@media (hover: hover) {
+  .room-message-context .bubble .chat-reply-quote:hover:not(:disabled) {
+    background: #ffffff10;
+  }
 }
 .room-message-context .bubble:focus-visible {
   outline: 2px solid var(--chat-accent);

@@ -159,10 +159,15 @@
     border-color 160ms ease,
     color 160ms ease;
 }
-.chat-pinned-list > div:has(button:first-child:hover),
-.chat-forward-people > button:hover:not(:disabled) {
+.chat-pinned-list > div:has(button:first-child:hover) {
   background-color: #dac4ec13;
   border-color: #d0a9ed30;
+}
+@media (hover: hover) {
+  .chat-forward-people > button:hover:not(:disabled) {
+    background-color: #dac4ec13;
+    border-color: #d0a9ed30;
+  }
 }
 .chat-themed
   :is(

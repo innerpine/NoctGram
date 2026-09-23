@@ -60,7 +60,7 @@
 .peer-profile-load-status {
   padding: 22px;
   text-align: center;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #a6a2ae;
 }
 .peer-profile-toolbar {
@@ -95,7 +95,7 @@
 }
 .peer-section-title {
   min-width: 0;
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -211,7 +211,7 @@
 }
 .peer-profile-identity h2 {
   max-width: 100%;
-  font-size: 22px;
+  font-size: 1.375rem;
   line-height: 1.25;
   text-align: center;
   overflow-wrap: anywhere;
@@ -222,15 +222,19 @@
 .peer-profile-identity h2 .profile-link {
   color: inherit;
 }
-.peer-profile-shell .profile-link:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+@media (hover: hover) {
+  .peer-profile-shell .profile-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }
-.peer-profile-shell .peer-profile-avatar:hover {
-  text-decoration: none;
+@media (hover: hover) {
+  .peer-profile-shell .peer-profile-avatar:hover {
+    text-decoration: none;
+  }
 }
 .peer-profile-identity > p {
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin-top: -6px;
   color: #a1a1ab;
 }
@@ -246,7 +250,7 @@
 .peer-profile-actions .secondary {
   height: 38px;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   gap: 8px;
   background: #ffffff09;
   padding: 0 14px;
@@ -279,9 +283,13 @@
   text-align: left;
   transition: background 150ms ease;
 }
-.peer-copy-handle:hover,
 .peer-copy-handle:focus-visible {
   background: #ffffff06;
+}
+@media (hover: hover) {
+  .peer-copy-handle:hover {
+    background: #ffffff06;
+  }
 }
 .peer-info-row > .peer-copy-icon {
   color: #777481;
@@ -291,24 +299,24 @@
 }
 .peer-info-row span {
   color: #c6bbef;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .peer-profile-info small {
   display: block;
   margin-top: 5px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #82828e;
 }
 .peer-profile-bio {
   margin: 16px 0 0 33px;
   color: #d3d3d9;
   line-height: 1.55;
-  font-size: 14px;
+  font-size: 0.875rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .peer-chat-stats h3 {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: #adadb9;
 }
@@ -326,16 +334,16 @@
   flex-wrap: wrap;
 }
 .peer-stats-grid strong {
-  font-size: 19px;
+  font-size: 1.1875rem;
   font-weight: 500;
 }
 .peer-stats-grid small {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #858591;
 }
 .peer-chat-stats > p {
   color: #7f7f8b;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   margin-top: 12px;
 }
@@ -350,12 +358,14 @@
   padding: 13px 12px;
   min-height: 49px;
   border-radius: 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
   text-align: left;
   transition: background 140ms ease;
 }
-.peer-profile-sections > button:hover {
-  background: #ffffff08;
+@media (hover: hover) {
+  .peer-profile-sections > button:hover {
+    background: #ffffff08;
+  }
 }
 .peer-profile-sections > button > svg:first-child {
   color: #aaa6bd;
@@ -387,8 +397,10 @@
   min-width: 0;
   transition: background 150ms ease;
 }
-.peer-gift-tile:hover {
-  background: #ffffff0a;
+@media (hover: hover) {
+  .peer-gift-tile:hover {
+    background: #ffffff0a;
+  }
 }
 .peer-gift-tile .gift-art {
   width: 100%;
@@ -396,7 +408,7 @@
   height: auto;
 }
 .peer-gift-tile strong {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   overflow-wrap: anywhere;
   text-align: center;
@@ -427,17 +439,17 @@
   height: 100%;
 }
 .peer-gift-detail h3 {
-  font-size: 21px;
+  font-size: 1.3125rem;
 }
 .peer-gift-detail > p {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #aaa6b6;
 }
 .peer-gift-message {
   background: #ffffff06;
   border-radius: 15px;
   padding: 14px;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -445,7 +457,7 @@
 }
 .peer-gift-detail time {
   color: #81818e;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .peer-media-grid {
   display: grid;
@@ -495,9 +507,11 @@
   border-radius: 12px;
   text-align: left;
 }
-.peer-file-row:hover,
-.peer-link-row:hover {
-  background: #ffffff07;
+@media (hover: hover) {
+  .peer-file-row:hover,
+  .peer-link-row:hover {
+    background: #ffffff07;
+  }
 }
 .peer-file-row > span:nth-child(2),
 .peer-link-row > span:nth-child(2) {
@@ -516,7 +530,7 @@
 .peer-file-row strong,
 .peer-link-row strong {
   display: block;
-  font-size: 13px;
+  font-size: 0.8125rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -524,14 +538,14 @@
 .peer-file-row small,
 .peer-link-row small {
   display: block;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 6px;
   color: #8a8a96;
 }
 .peer-link-url {
   display: block;
   color: #aaa1c8;
-  font-size: 12px;
+  font-size: 0.75rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -560,14 +574,14 @@
   width: 100%;
 }
 .peer-media-detail > strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   overflow-wrap: anywhere;
   text-align: center;
   max-width: 100%;
 }
 .peer-media-detail > small {
   color: #92929c;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .peer-media-detail > .secondary {
   border-radius: 12px;
@@ -589,13 +603,13 @@
   justify-content: center;
   align-items: center;
   padding: 70px 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #a2a2ac;
 }
 .peer-loading-inline {
   display: flex;
   gap: 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #81818e;
   margin-top: 14px;
 }
@@ -609,11 +623,11 @@
   color: #92909e;
 }
 .peer-empty h3 {
-  font-size: 17px;
+  font-size: 1.0625rem;
   color: #e0dce9;
 }
 .peer-empty p {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.65;
 }
 .peer-load-more {
@@ -623,7 +637,7 @@
 }
 .peer-error {
   padding: 16px 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
   color: #ddb6b6;
 }

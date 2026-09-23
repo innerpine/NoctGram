@@ -27,7 +27,7 @@ body {
   gap: 9px;
   margin-bottom: 14px;
   padding: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .rain-settings legend svg {
@@ -62,7 +62,7 @@ body {
   border: 1px solid #ffffff18;
   border-radius: 12px;
   color: #a2a2ad;
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: center;
 }
 .rain-mode-option input:checked + span {
@@ -74,8 +74,10 @@ body {
   outline: 2px solid #d4d4d4;
   outline-offset: 3px;
 }
-.rain-mode-option:hover > span {
-  border-color: #ffffff40;
+@media (hover: hover) {
+  .rain-mode-option:hover > span {
+    border-color: #ffffff40;
+  }
 }
 .rain-dock-option {
   display: flex;
@@ -89,13 +91,13 @@ body {
 }
 .rain-dock-option strong {
   display: block;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 400;
 }
 .rain-dock-option small,
 .rain-preference-note {
   color: #92929e;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 .rain-dock-option small {
@@ -119,7 +121,7 @@ body {
   justify-content: space-between;
   gap: 12px;
   color: #e5e5eb;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .rain-fps-row select {
   width: 106px;
@@ -142,7 +144,7 @@ body {
 .rain-control-hint {
   margin: 8px 0 0;
   color: #92929e;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 .rain-range {
@@ -170,12 +172,14 @@ body {
   border-radius: 9px;
   background: transparent;
   color: #c8c8d0;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
-.rain-reset:hover:not(:disabled) {
-  background: #ffffff0a;
-  color: #fff;
+@media (hover: hover) {
+  .rain-reset:hover:not(:disabled) {
+    background: #ffffff0a;
+    color: #fff;
+  }
 }
 .rain-reset:disabled {
   opacity: 0.4;

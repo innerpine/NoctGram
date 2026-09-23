@@ -24,7 +24,7 @@
   align-items: center;
   gap: 10px;
   padding: 13px 20px;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: #c9c9ce;
   text-align: left;
@@ -69,14 +69,14 @@
   color: #bcb8c8;
 }
 .account-section-heading h3 {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   margin: 0;
   color: #f0eff4;
 }
 .account-section p,
 .account-section-heading p {
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
   color: #8b8995;
   margin: 0;
@@ -99,7 +99,7 @@
 .account-field {
   display: grid;
   gap: 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #b4b1bf;
 }
 .account-field input,
@@ -112,7 +112,7 @@
   color: #eeeef2;
   padding: 12px 14px;
   font: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   transition:
     background 0.18s,
     border-color 0.18s;
@@ -138,7 +138,7 @@
 }
 .account-panel button,
 .administration-panel button {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .account-panel .primary,
 .account-panel .secondary,
@@ -185,7 +185,7 @@
   overflow-wrap: anywhere;
 }
 .recovery-codes code {
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.6;
   color: #d3c6eb;
 }
@@ -218,7 +218,7 @@
   display: flex;
   gap: 10px;
   align-items: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: #c6bcc0;
 }
@@ -235,8 +235,10 @@
   border-radius: 13px;
   transition: background 0.16s;
 }
-.admin-person:hover {
-  background: #ffffff05;
+@media (hover: hover) {
+  .admin-person:hover {
+    background: #ffffff05;
+  }
 }
 .admin-person > span:nth-child(2) {
   flex: 1;
@@ -246,7 +248,7 @@
   display: block;
   color: #888593;
   margin-top: 4px;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .admin-person > svg {
   color: #9383a8;
@@ -257,7 +259,7 @@
   gap: 12px;
 }
 .admin-target p {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #928e9c;
   margin-top: 4px;
 }
@@ -269,7 +271,7 @@
   animation: account-reveal 0.2s ease-out;
 }
 .admin-grant-summary {
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
   padding: 12px;
   border-radius: 10px;
@@ -281,12 +283,12 @@
   gap: 12px;
 }
 .admin-journal h4 {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .admin-journal article {
   padding: 14px 0;
   border-top: 1px solid #ffffff0b;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .admin-journal article > div {
   display: flex;
@@ -295,7 +297,7 @@
   flex-wrap: wrap;
 }
 .admin-journal time {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: #787581;
 }
 .admin-journal p {
@@ -339,7 +341,7 @@
   .profile-verification {
     padding-left: 18px;
     padding-right: 18px;
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
   .account-actions {
     align-items: stretch;

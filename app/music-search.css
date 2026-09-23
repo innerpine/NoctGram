@@ -19,8 +19,10 @@
     transform 180ms,
     opacity 180ms;
 }
-.music-search-submit:not(:disabled):hover {
-  background: #ffffff24;
+@media (hover: hover) {
+  .music-search-submit:not(:disabled):hover {
+    background: #ffffff24;
+  }
 }
 .music-search-submit:not(:disabled):active {
   transform: scale(0.94);
@@ -30,7 +32,7 @@
   outline-offset: 2px;
 }
 .music-search-caption {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #89928e;
   margin: 8px 0 18px;
 }
@@ -42,7 +44,7 @@
 }
 .music-search-duration {
   color: #89928e;
-  font-size: 12px;
+  font-size: 0.75rem;
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
@@ -52,12 +54,12 @@
   gap: 10px;
   padding: 24px 8px;
   color: #a9b1ac;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .music-search-empty {
   padding: 22px 4px;
   color: #89928e;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .music-search-more {
   display: block;
@@ -74,7 +76,7 @@
 }
 @media (max-width: 500px) {
   .music-search .music-link-search input {
-    font-size: 16px;
+    font-size: 1rem;
     min-width: 0;
   }
   .music-search .music-track {

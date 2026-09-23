@@ -78,8 +78,10 @@
     background 160ms,
     box-shadow 160ms;
 }
-.chat-video-player button.chat-video-center:hover {
-  background: #37323de6;
+@media (hover: hover) {
+  .chat-video-player button.chat-video-center:hover {
+    background: #37323de6;
+  }
 }
 .chat-video-player button.chat-video-center:active {
   background: #51445be6;
@@ -110,8 +112,10 @@
     opacity 180ms,
     background 160ms;
 }
-.chat-video-player .chat-video-save:hover {
-  background: #37323de6;
+@media (hover: hover) {
+  .chat-video-player .chat-video-save:hover {
+    background: #37323de6;
+  }
 }
 .chat-video-controls {
   /* Only the overlay is contained; the video retains its intrinsic chat width. */
@@ -145,8 +149,10 @@
   border-radius: 50%;
   background: transparent;
 }
-.chat-video-control-row button:hover {
-  background: #ffffff1a;
+@media (hover: hover) {
+  .chat-video-control-row button:hover {
+    background: #ffffff1a;
+  }
 }
 .chat-video-control-row .chat-video-toggle {
   color: #fff;
@@ -154,7 +160,7 @@
 .chat-video-time {
   flex: 1;
   min-width: 0;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   color: #fff;
@@ -241,7 +247,7 @@
   width: 44px;
   height: 32px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-align: center;
   background: transparent;
@@ -259,7 +265,7 @@
   border-radius: 9px;
   background: #17151bea;
   color: #ffd0cb;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.4;
   z-index: 4;
   pointer-events: none;
@@ -310,7 +316,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   color: #e0dce8;
   line-height: 1.5;
@@ -341,7 +347,7 @@
   height: 36px;
 }
 .chat-video-player[data-viewer='true'] .chat-video-time {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .chat-video-player:fullscreen {
   width: 100vw;

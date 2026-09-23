@@ -20,7 +20,7 @@
   border-radius: 999px;
   background: #26212f;
   color: #e9def8;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1;
   cursor: pointer;
   transition:
@@ -93,7 +93,7 @@
   border: 1px solid transparent;
   border-radius: 50%;
   background: transparent;
-  font-size: 23px;
+  font-size: 1.4375rem;
   line-height: 1;
   cursor: pointer;
 }

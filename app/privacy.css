@@ -31,7 +31,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   margin: 0;
 }
@@ -56,7 +56,7 @@
   box-shadow: inset 0 1px #ffffff05;
   color: #e9e9ef;
   font: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   text-align: left;
   cursor: pointer;
   outline: none;
@@ -65,8 +65,10 @@
     background 180ms ease,
     box-shadow 180ms ease;
 }
-.privacy-select-trigger:hover:not([data-disabled]) {
-  border-color: #505057;
+@media (hover: hover) {
+  .privacy-select-trigger:hover:not([data-disabled]) {
+    border-color: #505057;
+  }
 }
 .privacy-select-trigger[data-popup-open] {
   border-color: #9380ca;
@@ -187,13 +189,13 @@
 .privacy-option-copy {
   flex: 1;
   min-width: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.45;
 }
 .privacy-option-copy small {
   display: block;
   margin-top: 2px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #a09da9;
 }
 .privacy-option-check {
@@ -241,7 +243,7 @@
 .privacy-toggle > span:first-child {
   min-width: 0;
   color: #dedde5;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.45;
 }
 .privacy-toggle .privacy-switch {
@@ -326,7 +328,7 @@
 }
 .privacy-toggle small {
   display: block;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #999;
   line-height: 1.6;
   margin-top: 6px;
@@ -370,26 +372,26 @@
   white-space: nowrap;
 }
 .privacy-person strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .privacy-person small {
   color: #999;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 3px;
 }
 .privacy-person .secondary {
   padding: 7px 10px;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .privacy-empty {
   padding: 20px;
   text-align: center;
   color: #999;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .message-privacy-note {
   padding: 10px 16px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #999;
   background: #141416;
   border-top: 1px solid #252528;
@@ -411,7 +413,7 @@
 }
 .presence-fields > legend {
   margin-bottom: 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #ababba;
 }
 .presence-choices {
@@ -459,7 +461,7 @@
 }
 .presence-exceptions-title h4 {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 .presence-exceptions-title .secondary {
@@ -471,7 +473,7 @@
 }
 .presence-exceptions > .meta {
   margin: 9px 0 14px;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 .presence-people,
@@ -500,7 +502,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .presence-people small,
 .presence-search-results small {
@@ -509,7 +511,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #90909c;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .presence-people .icon-button {
   flex-shrink: 0;
@@ -526,7 +528,7 @@
 }
 .presence-picker .meta {
   margin: 10px 0 0;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .presence-picker .privacy-search {
   margin: 0;
@@ -544,9 +546,13 @@
   cursor: pointer;
   border-radius: 10px;
 }
-.presence-search-results button:hover,
 .presence-search-results button[aria-pressed='true'] {
   background: #ffffff08;
+}
+@media (hover: hover) {
+  .presence-search-results button:hover {
+    background: #ffffff08;
+  }
 }
 .presence-search-results button > svg {
   flex-shrink: 0;
@@ -567,7 +573,7 @@
   align-items: center;
   color: #b8d9bd;
   margin-top: 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 @keyframes presence-enter {
   from {

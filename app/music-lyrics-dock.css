@@ -7,7 +7,7 @@
   gap: 7px;
   padding: 0 10px;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   transition:
     color 180ms,
     background 180ms;
@@ -81,7 +81,7 @@
 .music-dock-header > div {
   gap: 10px;
   color: #ffffff84;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 600;
   letter-spacing: 0.15em;
 }
@@ -112,8 +112,10 @@
   box-shadow: 0 8px 18px #0004;
   transition: transform 350ms;
 }
-.music-dock-track:hover .music-dock-artwork {
-  transform: rotate(-3deg) scale(1.04);
+@media (hover: hover) {
+  .music-dock-track:hover .music-dock-artwork {
+    transform: rotate(-3deg) scale(1.04);
+  }
 }
 .music-dock-artwork img {
   width: 100%;
@@ -131,7 +133,7 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.4;
   font-weight: 600;
   letter-spacing: -0.025em;
@@ -142,7 +144,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #ffffff70;
 }
 .music-dock-track > svg {
@@ -178,7 +180,7 @@
 }
 .music-lyrics-dock .music-lyrics-footer {
   gap: 8px;
-  font-size: 10px;
+  font-size: 0.625rem;
   min-height: 28px;
 }
 .music-lyrics-dock .music-stage-empty {
@@ -187,14 +189,14 @@
   gap: 14px;
 }
 .music-lyrics-dock .music-stage-empty h3 {
-  font-size: 21px;
+  font-size: 1.3125rem;
   line-height: 1.25;
 }
 .music-lyrics-dock .music-stage-empty p {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .music-lyrics-dock .music-stage-empty button {
-  font-size: 11px;
+  font-size: 0.6875rem;
   padding: 10px 14px;
 }
 .music-dock-footer {
@@ -208,7 +210,7 @@
 }
 .music-dock-now > span {
   color: #ffffff68;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .music-lyrics-dock .music-transport {
   gap: 5px;

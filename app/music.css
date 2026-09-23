@@ -35,7 +35,7 @@
   border: 0;
   outline: 0;
   box-shadow: none;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .music-link-search .music-link-submit {
   flex-shrink: 0;
@@ -52,9 +52,11 @@
 .music-link-submit:disabled {
   opacity: 0.3;
 }
-.music-link-submit:not(:disabled):hover {
-  transform: rotate(90deg);
-  box-shadow: 0 0 20px #ffffff1a;
+@media (hover: hover) {
+  .music-link-submit:not(:disabled):hover {
+    transform: rotate(90deg);
+    box-shadow: 0 0 20px #ffffff1a;
+  }
 }
 .music-link-submit:not(:disabled):active {
   transform: rotate(90deg) scale(0.9);
@@ -79,9 +81,11 @@
     transform 400ms cubic-bezier(0.22, 1, 0.36, 1),
     filter 300ms;
 }
-.music-page .music-track-play:hover img {
-  transform: scale(1.09);
-  filter: brightness(0.75);
+@media (hover: hover) {
+  .music-page .music-track-play:hover img {
+    transform: scale(1.09);
+    filter: brightness(0.75);
+  }
 }
 .music-page .music-track-play:active {
   transform: scale(0.94);
@@ -99,10 +103,12 @@
     padding 220ms;
   border-radius: 10px;
 }
-.music-listener:hover {
-  background: #ffffff06;
-  padding-left: 8px;
-  padding-right: 8px;
+@media (hover: hover) {
+  .music-listener:hover {
+    background: #ffffff06;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
 }
 .music-listener[data-place='1'] .music-rank {
   color: #e7d3a0;
@@ -124,7 +130,7 @@
   animation: music-score-in 280ms ease-out both;
 }
 .music-listener-score small {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: #747474;
 }
 .music-leaderboard strong,
@@ -157,10 +163,12 @@
   padding: 14px 4px;
   color: #aaa;
   gap: 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
-.music-leaderboard-toggle:hover {
-  color: #eee;
+@media (hover: hover) {
+  .music-leaderboard-toggle:hover {
+    color: #eee;
+  }
 }
 .music-leaderboard-toggle svg {
   transition: transform 300ms;
@@ -177,13 +185,15 @@
 }
 .music-listener-self em {
   margin-left: 8px;
-  font-size: 10px;
+  font-size: 0.625rem;
   color: #aaa;
   font-style: normal;
   font-weight: 400;
 }
-.music-listener-self:hover {
-  border-color: #ffffff30;
+@media (hover: hover) {
+  .music-listener-self:hover {
+    border-color: #ffffff30;
+  }
 }
 .music-leaderboard-empty {
   display: flex;
@@ -191,7 +201,7 @@
   gap: 12px;
   color: #888;
   padding: 20px 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 @keyframes music-content-in {
   from {
@@ -237,7 +247,7 @@
   align-items: center;
   gap: 6px;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .music-search-duration {
   color: var(--muted-foreground);
@@ -278,14 +288,14 @@
 }
 .music-intro h2 {
   margin: 0;
-  font-size: 23px;
+  font-size: 1.4375rem;
   font-weight: 500;
   letter-spacing: -0.65px;
 }
 .music-intro p {
   margin: 4px 0 0;
   color: var(--muted-foreground);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .music-intro > button {
   margin-left: auto;
@@ -307,7 +317,7 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  font-size: 14px;
+  font-size: 0.875rem;
   margin-bottom: 12px;
 }
 .music-add form {
@@ -322,7 +332,7 @@
 .music-footnote,
 .music-connections p {
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
   margin: 12px 0 0;
 }
@@ -334,12 +344,12 @@
 }
 .music-section-heading h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 500;
 }
 .music-section-heading > span {
   margin-left: auto;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted-foreground);
 }
 .music-track {
@@ -376,9 +386,13 @@
   opacity: 0;
   transition: opacity 0.2s;
 }
-.music-track-play:hover > span,
 .music-track-play:focus-visible > span {
   opacity: 1;
+}
+@media (hover: hover) {
+  .music-track-play:hover > span {
+    opacity: 1;
+  }
 }
 .music-track-text {
   flex: 1;
@@ -392,7 +406,7 @@
   display: block;
   max-width: 100%;
   text-align: left;
-  font-size: 14px;
+  font-size: 0.875rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -400,14 +414,14 @@
 .music-track-artist {
   color: #ffffffa6;
   text-decoration: none;
-  font-size: 13px;
+  font-size: 0.8125rem;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .music-source {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #858585;
 }
 .music-audio-upload {
@@ -418,12 +432,14 @@
   padding: 9px 12px;
   border-radius: 22px;
   border: 1px solid #ffffff20;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #ddd;
   cursor: pointer;
 }
-.music-audio-upload:hover {
-  background: #ffffff0d;
+@media (hover: hover) {
+  .music-audio-upload:hover {
+    background: #ffffff0d;
+  }
 }
 .music-audio-upload:focus-within {
   outline: 2px solid #fff9;
@@ -435,7 +451,7 @@
 }
 .music-audio-caption {
   color: #999;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .music-track button:disabled {
   cursor: default;
@@ -458,7 +474,7 @@
 }
 .music-rank {
   flex: 0 0 22px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #858585;
   font-variant-numeric: tabular-nums;
 }
@@ -469,11 +485,11 @@
 }
 .music-count strong {
   font-weight: 500;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .music-count small {
   color: #858585;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .music-empty {
   display: flex;
@@ -488,12 +504,12 @@
   margin: 3px 0 0;
   font-weight: 500;
   color: #ddd;
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 .music-empty p {
   max-width: 330px;
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.65;
 }
 .music-empty a {
@@ -540,11 +556,11 @@
   min-width: 0;
 }
 .music-ranking-row strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .music-ranking-row small {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #888;
 }
 .music-ranking-row b {
@@ -580,14 +596,14 @@
   min-width: 0;
 }
 .music-link-card strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
 }
 .music-link-card small {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #999;
 }
 .music-link-card a {
@@ -644,14 +660,14 @@ body:has(.music-player) {
 }
 .music-player-title strong {
   font-weight: 500;
-  font-size: 14px;
+  font-size: 0.875rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .music-player-title a {
   color: #aaa;
-  font-size: 12px;
+  font-size: 0.75rem;
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -672,8 +688,10 @@ body:has(.music-player) {
   background: #eee;
   color: #111;
 }
-.music-play:hover {
-  background: white;
+@media (hover: hover) {
+  .music-play:hover {
+    background: white;
+  }
 }
 .music-player .icon-button {
   width: 30px;
@@ -686,7 +704,7 @@ body:has(.music-player) {
   align-items: center;
   gap: 10px;
   margin-top: 5px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #999;
   font-variant-numeric: tabular-nums;
 }
@@ -700,13 +718,13 @@ body:has(.music-player) {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #aaa;
   margin-bottom: 10px;
 }
 .music-muted {
   color: #999;
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin: 9px 0 0;
 }
 .music-error {
@@ -715,7 +733,7 @@ body:has(.music-player) {
   color: #ffb0b0;
   border-radius: 10px;
   padding: 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.5;
 }
 .music-error button {
@@ -745,7 +763,7 @@ body:has(.music-player) {
     display: none;
   }
   .music-player-title strong {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .music-page .card {
     padding: 16px;
@@ -757,7 +775,7 @@ body:has(.music-player) {
     gap: 8px;
   }
   .music-intro h2 {
-    font-size: 21px;
+    font-size: 1.3125rem;
   }
   body:has(.music-player) {
     /* The mobile player sits 10px above the navigation; its inset is separate. */
@@ -794,11 +812,11 @@ body:has(.music-player) {
   gap: 5px;
 }
 .music-my-ranking strong {
-  font-size: 27px;
+  font-size: 1.6875rem;
   letter-spacing: -1px;
   font-variant-numeric: tabular-nums;
 }
 .music-my-ranking small {
   color: #999;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }

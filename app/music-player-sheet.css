@@ -76,10 +76,15 @@
     transform 250ms,
     background 250ms;
 }
-.music-sheet-handle:hover .music-sheet-grip,
 .music-sheet-handle:focus-visible .music-sheet-grip {
   transform: scaleX(1.2);
   background: #ffffff9c;
+}
+@media (hover: hover) {
+  .music-sheet-handle:hover .music-sheet-grip {
+    transform: scaleX(1.2);
+    background: #ffffff9c;
+  }
 }
 .music-sheet-peek {
   display: flex;
@@ -87,7 +92,7 @@
   gap: 8px;
   width: 100%;
   overflow: hidden;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.5;
   padding-inline: 3px;
   margin-top: 5px;

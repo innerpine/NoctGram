@@ -48,7 +48,7 @@
   box-sizing: border-box;
 }
 html {
-  font-size: 16px;
+  font-size: 1rem;
   scrollbar-width: thin;
   scrollbar-color: #333 #000;
 }
@@ -85,9 +85,11 @@ button,
   border-radius: 8px;
   font-weight: 500;
 }
-button:hover,
-.app-link:hover {
-  background: #ffffff0c;
+@media (hover: hover) {
+  button:hover,
+  .app-link:hover {
+    background: #ffffff0c;
+  }
 }
 button:disabled {
   opacity: 0.4;
@@ -137,11 +139,11 @@ h3 {
   font-weight: 500;
 }
 h1 {
-  font-size: 23px;
+  font-size: 1.4375rem;
   letter-spacing: -0.8px;
 }
 h2 {
-  font-size: 17px;
+  font-size: 1.0625rem;
   letter-spacing: -0.4px;
 }
 small {
@@ -156,7 +158,7 @@ small {
   gap: 10px;
 }
 .meta {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted-foreground);
   line-height: 1.5;
 }
@@ -173,11 +175,13 @@ small {
   border-radius: 50px;
   min-height: 36px;
   padding: 8px 17px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
 }
-.primary:hover {
-  background: #eaeaea;
+@media (hover: hover) {
+  .primary:hover {
+    background: #eaeaea;
+  }
 }
 .secondary {
   display: inline-flex;
@@ -188,11 +192,13 @@ small {
   background: #ffffff0d;
   border-radius: 10px;
   padding: 9px 15px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
 }
-.secondary:hover {
-  background: #ffffff1e;
+@media (hover: hover) {
+  .secondary:hover {
+    background: #ffffff1e;
+  }
 }
 .icon-button {
   min-width: 34px;
@@ -201,7 +207,7 @@ small {
   color: #a0a0a0;
 }
 .text-button {
-  font-size: 13px;
+  font-size: 0.8125rem;
   min-height: 38px;
   color: #b0b0b0;
 }
@@ -211,7 +217,7 @@ small {
   border: 1px solid #ffffff15;
   border-radius: 8px;
   padding: 2px 7px;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 500;
   white-space: nowrap;
   color: #aaa;
@@ -238,7 +244,7 @@ small {
 }
 .brand {
   font-family: 'Instrument Sans', 'Inter', sans-serif;
-  font-size: 25px;
+  font-size: 1.5625rem;
   letter-spacing: -1px;
   justify-content: flex-start;
   gap: 9px;
@@ -258,7 +264,7 @@ small {
 .alpha {
   align-self: flex-start;
   color: #777;
-  font-size: 12px;
+  font-size: 0.75rem;
   letter-spacing: 0;
   margin: 3px 0 0 -4px;
 }
@@ -271,7 +277,7 @@ small {
   height: 48px;
   justify-content: flex-start;
   padding: 0 15px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #a0a0a0;
   gap: 16px;
   border-radius: 12px;
@@ -300,7 +306,7 @@ small {
 .premium-nav {
   justify-content: flex-start;
   padding: 8px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   gap: 10px;
 }
 .premium-nav .badge {
@@ -327,10 +333,10 @@ small {
 }
 .account strong {
   font-weight: 500;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .account small {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #777;
   margin-top: 3px;
 }
@@ -338,12 +344,14 @@ small {
   display: flex;
   align-items: center;
   gap: 14px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #888;
   padding: 0 10px;
 }
-.logout:hover {
-  color: #fff;
+@media (hover: hover) {
+  .logout:hover {
+    color: #fff;
+  }
 }
 .managed-account-trigger {
   display: flex;
@@ -351,12 +359,14 @@ small {
   gap: 10px;
   padding: 10px;
   color: var(--muted-foreground, #a6a6b0);
-  font-size: 13px;
+  font-size: 0.8125rem;
   border-radius: 10px;
 }
-.managed-account-trigger:hover {
-  color: #fff;
-  background: #ffffff09;
+@media (hover: hover) {
+  .managed-account-trigger:hover {
+    color: #fff;
+    background: #ffffff09;
+  }
 }
 .managed-account-dialog {
   max-width: min(400px, calc(100vw - 32px));
@@ -377,10 +387,15 @@ small {
   border-radius: 14px;
   background: #ffffff04;
 }
-.managed-account-option:hover,
 .managed-account-option[aria-pressed='true'] {
   background: #ffffff0c;
   border-color: #ffffff2b;
+}
+@media (hover: hover) {
+  .managed-account-option:hover {
+    background: #ffffff0c;
+    border-color: #ffffff2b;
+  }
 }
 .managed-account-option > span {
   flex: 1;
@@ -389,17 +404,17 @@ small {
   gap: 4px;
 }
 .managed-account-option strong {
-  font-size: 15px;
+  font-size: 0.9375rem;
   overflow-wrap: anywhere;
 }
 .managed-account-option small {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #96969f;
   overflow-wrap: anywhere;
 }
 .sidebar-footnote {
   color: #4c4c4c;
-  font-size: 11px;
+  font-size: 0.6875rem;
   padding: 0 10px;
   margin: 0;
 }
@@ -433,7 +448,7 @@ small {
   padding: 3px;
 }
 .feed-tabs [data-slot='tabs-trigger'] {
-  font-size: 14px;
+  font-size: 0.875rem;
   height: 37px;
   border-radius: 50px;
   color: #969696;
@@ -455,7 +470,7 @@ small {
   gap: 8px;
   min-height: 64px;
   color: #777;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .tiny-line {
   width: 14px;
@@ -469,13 +484,13 @@ small {
   padding: 22px 0 0;
 }
 .welcome-banner strong {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
 }
 .welcome-banner span {
   display: block;
   color: #888;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 5px;
 }
 .welcome-banner .primary {
@@ -503,7 +518,7 @@ small {
   width: 100%;
   padding: 8px 0 12px;
   resize: vertical;
-  font-size: 16px;
+  font-size: 1rem;
 }
 .composer-top textarea::placeholder {
   color: #777;
@@ -526,7 +541,7 @@ small {
   background: #ffffff15;
 }
 .composer-hint {
-  font-size: 10px;
+  font-size: 0.625rem;
   white-space: nowrap;
 }
 .avatar {
@@ -568,7 +583,7 @@ small {
   min-height: 24px;
 }
 .author-button {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   justify-content: flex-start;
   max-width: 65%;
@@ -594,17 +609,17 @@ small {
   white-space: nowrap;
 }
 .more-mark {
-  font-size: 20px;
+  font-size: 1.25rem;
   color: #666;
   letter-spacing: 1px;
   line-height: 16px;
 }
 .post-content > time {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: #707070;
 }
 .post-text {
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.65;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -618,16 +633,20 @@ small {
   margin-top: 16px;
 }
 .post-actions button {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #818181;
   padding: 3px 0;
   min-width: 27px;
   position: relative;
 }
-.post-actions button:hover,
 .post-actions .liked,
 .post-actions button[aria-pressed='true'] {
   color: #fff;
+}
+@media (hover: hover) {
+  .post-actions button:hover {
+    color: #fff;
+  }
 }
 .media-grid {
   display: grid;
@@ -665,12 +684,14 @@ small {
   border-radius: 9px;
   background: #ffffff04;
   padding: 11px 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: left;
   font-weight: 400;
 }
-.poll > button:hover {
-  border-color: #ffffff33;
+@media (hover: hover) {
+  .poll > button:hover {
+    border-color: #ffffff33;
+  }
 }
 .poll > button.voted {
   border-color: #ffffff55;
@@ -696,7 +717,7 @@ small {
   flex-shrink: 0;
 }
 .poll > .meta {
-  font-size: 11px;
+  font-size: 0.6875rem;
   margin: 3px 0;
 }
 .feed-end {
@@ -705,7 +726,7 @@ small {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #555;
 }
 .empty {
@@ -718,7 +739,7 @@ small {
   gap: 16px;
   color: #777;
   padding: 30px;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.6;
 }
 .empty svg {
@@ -746,7 +767,7 @@ small {
   justify-content: space-between;
 }
 .side-card h2 {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .small-dot {
   width: 5px;
@@ -755,7 +776,7 @@ small {
   background: #777;
 }
 .side-lead {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #666;
   margin: 7px 0 15px;
 }
@@ -770,17 +791,17 @@ small {
   text-align: left;
 }
 .topic small {
-  font-size: 9px;
+  font-size: 0.5625rem;
   letter-spacing: 0.5px;
   color: #616161;
   font-weight: 400;
 }
 .topic strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .topic span {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 400;
   color: #777;
 }
@@ -798,7 +819,7 @@ small {
   padding: 15px 18px;
   border-top: 1px solid var(--border);
   border-radius: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #b0b0b0;
 }
 .people-card h2 {
@@ -821,7 +842,7 @@ small {
   min-width: 0;
 }
 .suggest strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   white-space: nowrap;
   display: block;
@@ -831,7 +852,7 @@ small {
 }
 .suggest small {
   color: #777;
-  font-size: 11px;
+  font-size: 0.6875rem;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 114px;
@@ -841,12 +862,14 @@ small {
   background: #fff;
   color: #000;
   padding: 6px 12px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   min-width: 56px;
   min-height: 30px;
 }
-.follow-small:hover {
-  background: #ddd;
+@media (hover: hover) {
+  .follow-small:hover {
+    background: #ddd;
+  }
 }
 .premium-card {
   display: flex;
@@ -867,12 +890,12 @@ small {
   margin-bottom: 27px;
 }
 .premium-card h2 {
-  font-size: 26px;
+  font-size: 1.625rem;
   letter-spacing: -1.1px;
   line-height: 1.1;
 }
 .premium-card p {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #888;
   line-height: 1.8;
   font-weight: 400;
@@ -881,20 +904,20 @@ small {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: 0.75rem;
   padding-top: 12px;
 }
 .aside-footer {
   padding: 22px 7px;
   color: #4c4c4c;
-  font-size: 10px;
+  font-size: 0.625rem;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
 }
 .aside-footer > span:first-child {
   font-family: 'Instrument Sans', sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .aside-footer p {
   flex-basis: 100%;
@@ -922,7 +945,7 @@ small {
   padding: 12px 0;
   border: 0;
   background: none;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .searchbox > svg {
   color: #777;
@@ -950,7 +973,7 @@ small {
 }
 .cover-monogram {
   font-family: 'Instrument Sans', sans-serif;
-  font-size: 190px;
+  font-size: 11.875rem;
   line-height: 1;
   font-weight: 500;
   letter-spacing: -18px;
@@ -995,7 +1018,7 @@ small {
   margin-bottom: 6px;
 }
 .profile-info h2 {
-  font-size: 29px;
+  font-size: 1.8125rem;
   letter-spacing: -1.2px;
   display: flex;
   align-items: center;
@@ -1020,7 +1043,7 @@ small {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: #aaa;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.65;
   margin: 17px 0 12px;
 }
@@ -1028,7 +1051,7 @@ small {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .handle-list > span,
 .handle-list > button {
@@ -1043,19 +1066,19 @@ small {
   align-items: center;
   gap: 7px;
   color: #737373;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 21px;
 }
 .profile-stats {
   display: flex;
   gap: 20px;
   color: #777;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 17px;
 }
 .profile-stats strong {
   color: #ddd;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
   margin-right: 4px;
 }
@@ -1067,7 +1090,7 @@ small {
   margin-top: 21px;
   padding: 15px 0 0;
   gap: 9px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #bbb;
 }
 .profile-tabs {
@@ -1100,7 +1123,7 @@ small {
   display: flex;
   align-items: center;
   padding: 12px 14px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #999;
   border-bottom: 1px solid var(--border);
 }
@@ -1122,11 +1145,11 @@ small {
   min-width: 0;
 }
 .thread-copy strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
 }
 .thread-copy small {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #777;
   white-space: nowrap;
   overflow: hidden;
@@ -1138,7 +1161,7 @@ small {
   color: #000;
   border-radius: 50px;
   padding: 1px 6px;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .chat-panel {
   display: flex;
@@ -1160,11 +1183,11 @@ small {
   gap: 9px;
 }
 .chat-header strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
 }
 .chat-header small {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #777;
 }
 .chat-back {
@@ -1201,7 +1224,7 @@ small {
 .bubble p {
   margin: 0;
   color: #ddd;
-  font-size: 14px;
+  font-size: 0.875rem;
   white-space: pre-wrap;
 }
 .message-time {
@@ -1210,7 +1233,7 @@ small {
   align-items: center;
   gap: 5px;
   color: #777;
-  font-size: 10px;
+  font-size: 0.625rem;
   margin-top: 5px;
 }
 .message-composer {
@@ -1230,7 +1253,7 @@ small {
   max-height: 140px;
   resize: vertical;
   padding: 10px 5px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .send-button {
   background: #fff;
@@ -1241,8 +1264,10 @@ small {
   align-self: flex-end;
   margin-bottom: 3px;
 }
-.send-button:hover {
-  background: #ddd;
+@media (hover: hover) {
+  .send-button:hover {
+    background: #ddd;
+  }
 }
 .chat-empty {
   display: flex;
@@ -1258,11 +1283,11 @@ small {
   color: #777;
 }
 .chat-empty h2 {
-  font-size: 26px;
+  font-size: 1.625rem;
   letter-spacing: -1px;
 }
 .chat-empty p {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.8;
   color: #777;
 }
@@ -1278,13 +1303,13 @@ small {
   gap: 16px !important;
 }
 .noct-dialog [data-slot='dialog-title'] {
-  font-size: 21px;
+  font-size: 1.3125rem;
   letter-spacing: -0.6px;
   margin-right: 24px;
 }
 .noct-dialog [data-slot='dialog-description'] {
   color: #888;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
 }
 [data-slot='dialog-overlay'],
@@ -1305,7 +1330,7 @@ small {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #aaa;
 }
 .edit-form label.secondary {
@@ -1314,7 +1339,7 @@ small {
   align-items: center;
   padding: 9px 11px;
   color: #ddd;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .edit-photo {
   display: flex;
@@ -1342,7 +1367,7 @@ small {
 .edit-form input,
 .edit-form textarea,
 .handle-form input {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .handle-row {
   display: flex;
@@ -1350,7 +1375,7 @@ small {
   gap: 8px;
   border-bottom: 1px solid var(--border);
   padding: 13px 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   flex-wrap: wrap;
 }
 .handle-row strong {
@@ -1358,7 +1383,7 @@ small {
   overflow-wrap: anywhere;
 }
 .handle-row .text-button {
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .handle-form {
   padding-top: 22px;
@@ -1373,7 +1398,7 @@ small {
   border-top: 1px solid var(--border);
   margin-top: 24px;
   padding-top: 18px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #777;
 }
 .premium-modal {
@@ -1390,13 +1415,13 @@ small {
   margin-bottom: 20px;
 }
 .premium-modal h2 {
-  font-size: 40px;
+  font-size: 2.5rem;
   line-height: 1;
   letter-spacing: -2px;
   margin: 18px 0;
 }
 .premium-modal > p {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .premium-modal ul {
   list-style: none;
@@ -1409,7 +1434,7 @@ small {
   gap: 12px;
   padding: 15px 0;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #b0b0b0;
 }
 .premium-modal li svg {
@@ -1424,10 +1449,10 @@ small {
   color: #aaa;
   max-height: 100px;
   overflow: auto;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .comment-context p {
-  font-size: 12px;
+  font-size: 0.75rem;
   white-space: pre-wrap;
   margin: 6px 0;
 }
@@ -1447,15 +1472,15 @@ small {
   min-width: 0;
 }
 .comment strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   display: block;
 }
 .comment time {
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .comment p {
-  font-size: 14px;
+  font-size: 0.875rem;
   margin: 6px 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1469,7 +1494,7 @@ small {
   flex: 1;
   height: 66px;
   max-height: 150px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .comment-form .primary {
   width: 40px;
@@ -1493,11 +1518,11 @@ small {
   min-width: 0;
 }
 .person-result strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
 }
 .person-result small {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #777;
   overflow-wrap: anywhere;
 }
@@ -1526,7 +1551,7 @@ small {
   display: flex;
   align-items: center;
   gap: 16px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   max-width: calc(100% - 32px);
   box-shadow: 0 8px 35px #0009;
 }
@@ -1536,13 +1561,13 @@ small {
   border-radius: 10px;
   color: #ff8787;
   padding: 8px 15px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .error-banner {
   border: 1px solid #ef444440;
   padding: 12px;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-bottom: 12px;
 }
 .error-banner button {
@@ -1574,7 +1599,7 @@ small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #aaa;
 }
 .poll-editor {
@@ -1584,19 +1609,19 @@ small {
   gap: 8px;
 }
 .poll-editor strong {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   color: #aaa;
 }
 .poll-editor input {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 9px;
 }
 .poll-editor .text-button {
   justify-content: flex-start;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .spin {
   animation: spin 1.5s linear infinite;
@@ -1624,16 +1649,16 @@ small {
     padding: 0 20px;
   }
   .brand {
-    font-size: 23px;
+    font-size: 1.4375rem;
   }
   .premium-nav {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .premium-nav .badge {
     display: none;
   }
   .author-button {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .post-author .handle {
     max-width: 100px;
@@ -1678,7 +1703,7 @@ small {
     max-width: 160px;
   }
   .sidebar nav a {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
 }
 @media (max-width: 720px) {
@@ -1741,14 +1766,14 @@ small {
     height: 74px;
   }
   .page-header h1 {
-    font-size: 22px;
+    font-size: 1.375rem;
   }
   .post {
     padding: 17px 16px;
     gap: 10px;
   }
   .post-text {
-    font-size: 15px;
+    font-size: 0.9375rem;
   }
   .post-author .handle {
     max-width: 100px;
@@ -1757,10 +1782,10 @@ small {
     gap: 13px;
   }
   .profile-stats span {
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
   .profile-stats strong {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
   .composer-hint {
     display: none;
@@ -1772,11 +1797,11 @@ small {
     align-items: flex-start;
   }
   .welcome-banner strong {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
   .welcome-banner .primary {
     padding: 7px 12px;
-    font-size: 12px;
+    font-size: 0.75rem;
   }
 }
 @media (max-width: 500px) {
@@ -1821,7 +1846,7 @@ small {
   }
   .sidebar nav a span {
     display: block;
-    font-size: 8px;
+    font-size: 0.5rem;
   }
   .sidebar nav a.active {
     background: #ffffff0c;
@@ -1834,13 +1859,13 @@ small {
     height: 68px;
   }
   .page-header h1 {
-    font-size: 22px;
+    font-size: 1.375rem;
   }
   .feed-tabs [data-slot='tabs-list'] {
     height: 43px !important;
   }
   .feed-intro {
-    font-size: 10px;
+    font-size: 0.625rem;
     min-height: 50px;
   }
   .composer {
@@ -1852,7 +1877,7 @@ small {
     height: 34px !important;
   }
   .composer-top textarea {
-    font-size: 15px;
+    font-size: 0.9375rem;
     min-height: 50px;
   }
   .toolbar {
@@ -1860,7 +1885,7 @@ small {
     padding-top: 10px;
   }
   .toolbar .primary {
-    font-size: 12px;
+    font-size: 0.75rem;
     padding: 8px 14px;
   }
   .post {
@@ -1871,7 +1896,7 @@ small {
   .post-avatar .avatar {
     width: 31px !important;
     height: 31px !important;
-    font-size: 12px !important;
+    font-size: 0.75rem !important;
   }
   .post-author {
     gap: 5px;
@@ -1879,16 +1904,16 @@ small {
   }
   .post-author .handle {
     max-width: 105px;
-    font-size: 10px;
+    font-size: 0.625rem;
   }
   .author-button {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .post-content > time {
-    font-size: 9px;
+    font-size: 0.5625rem;
   }
   .post-text {
-    font-size: 14px;
+    font-size: 0.875rem;
     margin-top: 10px;
   }
   .post-actions {
@@ -1896,10 +1921,10 @@ small {
   }
   .poll > button {
     padding: 10px 9px;
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .poll > .meta {
-    font-size: 10px;
+    font-size: 0.625rem;
   }
   .profile-cover {
     height: 140px;
@@ -1910,10 +1935,10 @@ small {
   .profile-avatar-line > .avatar {
     width: 86px !important;
     height: 86px !important;
-    font-size: 30px !important;
+    font-size: 1.875rem !important;
   }
   .profile-avatar-line > .secondary {
-    font-size: 11px;
+    font-size: 0.6875rem;
     padding: 8px 10px;
   }
   .profile-avatar-line {
@@ -1923,14 +1948,14 @@ small {
     min-width: 28px;
   }
   .profile-info h2 {
-    font-size: 27px;
+    font-size: 1.6875rem;
   }
   .profile-stats {
     gap: 12px;
     flex-wrap: wrap;
   }
   .profile-details {
-    font-size: 10px;
+    font-size: 0.625rem;
   }
   .profile-card {
     border-radius: 14px;
@@ -1941,23 +1966,23 @@ small {
   .toast {
     bottom: 78px;
     width: calc(100% - 32px);
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .noct-dialog {
     padding: 22px !important;
   }
   .noct-dialog [data-slot='dialog-title'] {
-    font-size: 19px;
+    font-size: 1.1875rem;
   }
   .edit-photo {
     gap: 7px;
   }
   .edit-photo .secondary {
-    font-size: 11px !important;
+    font-size: 0.6875rem !important;
     padding: 8px !important;
   }
   .premium-modal h2 {
-    font-size: 36px;
+    font-size: 2.25rem;
   }
   .profile-stats strong {
     display: inline;
@@ -1966,7 +1991,7 @@ small {
     padding-top: 18px;
   }
   .welcome-banner span {
-    font-size: 10px;
+    font-size: 0.625rem;
   }
   .author-button {
     max-width: 67%;

@@ -39,18 +39,18 @@
 }
 .stars-topup-copy strong {
   color: #ffe7a6;
-  font-size: 18px;
+  font-size: 1.125rem;
   line-height: 1.25;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .stars-topup-copy > span {
   color: #aaa498;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .stars-topup-check {
   color: #dfce9a;
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 .stars-topup-particles {
   position: absolute;

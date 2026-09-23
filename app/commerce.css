@@ -38,13 +38,13 @@
   justify-content: center;
   align-items: center;
   gap: 5px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 .purchase-packages small,
 .purchase-methods small {
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .purchase-form .selected {
   border-color: color-mix(in srgb, var(--accent, #b9a0df) 60%, transparent);
@@ -69,13 +69,13 @@
   flex: 1;
 }
 .purchase-methods strong {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .purchase-methods button:disabled {
   opacity: 0.4;
 }
 .purchase-terms {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted-foreground);
   line-height: 1.6;
 }
@@ -83,7 +83,7 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
 }
 .purchase-agreement [data-slot='checkbox'] {
@@ -107,15 +107,15 @@
   color: var(--accent, #b9a0df);
 }
 .purchase-receipt h3 {
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 .purchase-receipt p {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--muted-foreground);
   line-height: 1.5;
 }
 .purchase-order-id {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--muted-foreground);
   overflow-wrap: anywhere;
 }

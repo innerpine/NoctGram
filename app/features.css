@@ -35,7 +35,7 @@
   margin: 12px 0 10px;
 }
 .stars-balance strong {
-  font-size: 36px;
+  font-size: 2.25rem;
   line-height: 1.2;
   font-weight: 500;
   letter-spacing: -1px;
@@ -46,10 +46,10 @@
   border: 1px solid #ffd15220;
   border-radius: 999px;
   padding: 5px 10px;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .stars-hero .stars-help {
-  font-size: 12px;
+  font-size: 0.75rem;
   max-width: 300px;
   line-height: 1.6;
   margin: 14px 0 0;
@@ -76,18 +76,18 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .stars-stats strong {
   color: #fff;
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 500;
 }
 .stars-history {
   padding: 20px 24px 24px;
 }
 .stars-history h3 {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
 }
 .stars-history .icon-button {
@@ -108,7 +108,7 @@
   min-width: 0;
   min-height: 34px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #ffffff7a;
   border: 0;
   background: none;
@@ -133,7 +133,7 @@
   flex: 1;
 }
 .star-transaction strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   overflow: hidden;
   white-space: nowrap;
@@ -141,12 +141,12 @@
   color: #fff;
 }
 .star-transaction > div > span {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #ffffff99;
   margin-top: 3px;
 }
 .star-transaction time {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #ffffff7a;
   margin-top: 3px;
 }
@@ -154,7 +154,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   white-space: nowrap;
   color: #ffffff99;
@@ -180,7 +180,7 @@
   padding-top: 6px;
 }
 .support-panel > h3 {
-  font-size: 19px;
+  font-size: 1.1875rem;
   margin-top: 12px;
 }
 .support-panel > p {
@@ -207,7 +207,7 @@
 .support-amount input {
   max-width: 180px;
   text-align: center;
-  font-size: 32px;
+  font-size: 2rem;
   letter-spacing: -1px;
   border: 0;
   background: none;
@@ -236,7 +236,7 @@
   min-height: 36px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #ffffff99;
 }
 .star-presets > button.selected {
@@ -246,7 +246,7 @@
 }
 .support-panel fieldset > .meta {
   text-align: center;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .support-panel .form-error {
   text-align: left;
@@ -267,14 +267,14 @@
   align-items: center;
   gap: 6px;
   color: #ffffff7a;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
 .support-post {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 12px;
+  font-size: 0.75rem;
   min-height: 32px;
   padding: 0 7px;
   color: #ffffff99;
@@ -300,7 +300,7 @@
   align-items: center;
   padding: 9px 12px;
   border-bottom: 1px solid #ffffff0d;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #ffffff7a;
 }
 .post-code > div > span {
@@ -311,7 +311,7 @@
 }
 .post-code button {
   min-height: 26px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   padding: 0 6px;
   color: #ffffff99;
 }
@@ -341,14 +341,14 @@
   gap: 8px;
 }
 .code-editor strong {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   flex: 1;
 }
 .code-editor .row input {
   width: 100px;
   padding: 4px 8px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   min-height: 28px;
 }
 .code-editor textarea {
@@ -368,7 +368,7 @@
   resize: vertical;
 }
 .toolbar .adult-toggle {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
 }
 .toolbar .adult-toggle.selected {
@@ -412,11 +412,11 @@
   transform: none;
 }
 .sensitive-cover strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .sensitive-cover > span:last-child {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #ffffffbf;
   text-decoration: underline;
   text-underline-offset: 4px;
@@ -428,7 +428,7 @@
   height: 38px;
   border: 1px solid #ffffff60;
   border-radius: 50%;
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin-bottom: 2px;
 }
 .sensitive-video {
@@ -444,7 +444,7 @@
   padding: 6px 9px;
   border-radius: 999px;
   background: #000b !important;
-  font-size: 11px;
+  font-size: 0.6875rem;
   z-index: 2;
 }
 .edit-fields {
@@ -464,18 +464,18 @@
   padding-block: 18px;
 }
 .edit-usernames h3 {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
   margin-bottom: 3px;
 }
 .edit-usernames .meta {
   margin: 0;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .edit-usernames .row input {
   flex: 1;
   width: 100%;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .edit-usernames .row > button {
   min-width: 30px;
@@ -483,11 +483,11 @@
 }
 .edit-usernames .text-button {
   justify-content: flex-start;
-  font-size: 12px;
+  font-size: 0.75rem;
   min-height: 32px;
 }
 .field-label {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #aaa;
 }
 .channels-toolbar {
@@ -529,24 +529,24 @@
   flex-wrap: wrap;
   gap: 8px;
   color: #fff;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
 }
 .channel-card strong .badge {
-  font-size: 10px;
+  font-size: 0.625rem;
   white-space: nowrap;
   font-weight: 400;
 }
 .channel-card small {
   color: #ffffff7a;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 3px;
 }
 .channel-card > svg {
   color: #ffffff7a;
 }
 .channel-card p {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.55;
   color: #ffffff99;
   margin: 8px 0 0;
@@ -568,7 +568,7 @@
   margin-bottom: 20px;
 }
 .channel-editor h2 {
-  font-size: 19px;
+  font-size: 1.1875rem;
 }
 .channel-editor fieldset {
   border: 0;
@@ -583,15 +583,15 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #ffffff99;
 }
 .channel-editor input,
 .channel-editor textarea {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .channel-editor .meta {
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .channel-avatar-upload {
   display: inline-flex;
@@ -600,7 +600,7 @@
   justify-content: center;
   padding: 0 12px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .channel-editor .icon-button {
   width: 32px;
@@ -612,7 +612,7 @@
   align-items: center;
   gap: 7px;
   color: #ffffff7a;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 10px;
 }
 .publish-as {
@@ -642,19 +642,19 @@
     padding-left: 12px;
   }
   .stars-tabs [data-slot='tabs-trigger'] {
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
   .star-transaction {
     gap: 9px;
   }
   .star-transaction > div > span {
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
   .star-transaction > b {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .post-code pre {
-    font-size: 11px;
+    font-size: 0.6875rem;
     padding: 12px;
   }
   .channel-card {
@@ -663,23 +663,23 @@
   }
   .channels-toolbar .primary {
     padding: 0 12px;
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .channels-toolbar .searchbox {
     padding-inline: 10px;
   }
   .channels-toolbar input {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .publish-as {
     margin-left: 48px;
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
   .post-extras {
     margin-top: 14px;
   }
   .support-post {
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
   .sidebar nav a {
     min-width: 0;
@@ -687,7 +687,7 @@
     flex: 1;
   }
   .sidebar nav a span {
-    font-size: 9px;
+    font-size: 0.5625rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -714,12 +714,16 @@
     color 180ms,
     background-color 180ms;
 }
-.profile-stat-button:hover {
-  color: #fff;
+@media (hover: hover) {
+  .profile-stat-button:hover {
+    color: #fff;
+  }
 }
-.profile-stat-button:hover strong {
-  text-decoration: underline;
-  text-underline-offset: 4px;
+@media (hover: hover) {
+  .profile-stat-button:hover strong {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
 }
 .noct-dialog.connections-dialog {
   max-width: 440px !important;
@@ -745,8 +749,10 @@
   min-width: 0;
   transition: background-color 180ms var(--motion);
 }
-.connection-person:hover {
-  background: #ffffff08;
+@media (hover: hover) {
+  .connection-person:hover {
+    background: #ffffff08;
+  }
 }
 .connection-person-copy {
   display: grid;
@@ -761,13 +767,13 @@
   white-space: nowrap;
 }
 .connection-person strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .connection-person small,
 .connection-person > svg {
   color: #ffffff7a;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .connection-person > svg {
   flex-shrink: 0;
@@ -780,7 +786,7 @@
   gap: 12px;
   padding: 32px 12px;
   color: #ffffff99;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .connections-empty {
   flex-direction: column;
@@ -789,7 +795,7 @@
 }
 .connections-empty strong {
   color: #fff;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
 }
 .connections-empty p {
@@ -824,7 +830,7 @@
 }
 @media (max-width: 500px) {
   .profile-stat-button {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .connection-person {
     padding-inline: 4px;

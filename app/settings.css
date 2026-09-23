@@ -19,7 +19,7 @@
   flex-shrink: 0;
   padding: 22px 24px 16px;
   margin: 0 40px 0 0;
-  font-size: 18px;
+  font-size: 1.125rem;
   letter-spacing: -0.3px;
 }
 .settings-workspace[data-slot='tabs'] {
@@ -51,16 +51,18 @@
   border: 0;
   border-radius: 14px;
   color: var(--settings-muted);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   background: transparent;
   transition:
     background 160ms,
     color 160ms;
 }
-.settings-navigation .settings-tab:hover {
-  color: #eee;
-  background: #ffffff08;
+@media (hover: hover) {
+  .settings-navigation .settings-tab:hover {
+    color: #eee;
+    background: #ffffff08;
+  }
 }
 .settings-navigation .settings-tab[data-active] {
   color: #111114;
@@ -87,7 +89,7 @@
 }
 .settings-page-title {
   margin: 0 0 16px;
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 600;
   letter-spacing: -0.25px;
 }
@@ -103,12 +105,12 @@
 }
 .settings-identity strong {
   display: block;
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 .settings-identity > div > span {
   display: block;
   margin-top: 5px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--settings-muted);
 }
 .settings-link-row {
@@ -130,22 +132,24 @@
 }
 .settings-link-row strong {
   display: block;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .settings-link-row small {
   display: block;
   margin-top: 5px;
   color: var(--settings-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 .settings-link-row > svg {
   color: var(--settings-muted);
   flex-shrink: 0;
 }
-.settings-link-row:hover {
-  color: #c7c7e0;
+@media (hover: hover) {
+  .settings-link-row:hover {
+    color: #c7c7e0;
+  }
 }
 .settings-page .managed-account-trigger {
   width: 100%;
@@ -155,7 +159,7 @@
   border-radius: 0;
   background: transparent;
   justify-content: flex-start;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .settings-page .privacy-content,
 .settings-page .privacy-panel {
@@ -176,7 +180,7 @@
   padding-top: 0;
 }
 .settings-page .privacy-section h3 {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   gap: 0;
 }
@@ -184,7 +188,7 @@
   display: none;
 }
 .settings-page .privacy-section .meta {
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.55;
   color: var(--settings-muted);
 }
@@ -222,13 +226,13 @@
   border-bottom: 1px solid var(--settings-line);
 }
 .settings-page .appearance-switch strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .settings-page .privacy-toggle small,
 .settings-page .appearance-switch small {
   color: var(--settings-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   margin-top: 5px;
 }
@@ -291,7 +295,7 @@
   min-height: 32px;
   background: transparent;
   gap: 9px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .settings-page .presence-choice > svg {
   display: none;
@@ -304,7 +308,7 @@
   animation: none;
 }
 .settings-page .presence-exceptions-title h4 {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #a4a4ae;
   font-weight: 400;
 }
@@ -314,7 +318,7 @@
 .settings-page .presence-exceptions-title .secondary {
   padding: 2px 0 2px 10px;
   min-height: 30px;
-  font-size: 12px;
+  font-size: 0.75rem;
   border: 0;
   background: none;
   color: #cbcbdf;
@@ -333,11 +337,11 @@
   background: transparent;
   border: 0;
   padding: 24px 0;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .settings-page .account-note {
   margin: 16px 0 0;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .settings-page .music-activity-settings {
   margin: 0;
@@ -352,11 +356,11 @@
   display: none;
 }
 .settings-page .music-activity-setting-copy label {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .settings-page .music-activity-setting-copy p {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--settings-muted);
 }
 .settings-page .music-activity-settings [data-slot='switch'] {
@@ -390,7 +394,7 @@
   display: none;
 }
 .settings-page .account-section-heading h3 {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .settings-page .account-danger {
@@ -407,7 +411,7 @@
 }
 .settings-page .secondary {
   box-shadow: none;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .settings-page :is(button, a, input):focus-visible {
   outline: 2px solid #b5b5d4;
@@ -438,7 +442,7 @@
     padding-bottom: 12px;
   }
   .settings-navigation .settings-tab {
-    font-size: 9px;
+    font-size: 0.5625rem;
     padding-inline: 0;
     height: 56px;
     gap: 7px;

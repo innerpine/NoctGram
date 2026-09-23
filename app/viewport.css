@@ -93,7 +93,7 @@
       textarea,
       select
     ) {
-    font-size: 16px;
+    font-size: 1rem;
   }
   html:has(.messages-main),
   body:has(.messages-main) {
@@ -213,11 +213,11 @@
   .music-stage-body:not(.cover-only)
     .music-stage-track
     [data-slot='dialog-title'] {
-    font-size: 16px;
+    font-size: 1rem;
     overflow-wrap: anywhere;
   }
   .music-stage-body:not(.cover-only) .music-stage-track p {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .music-stage-aside {
     grid-column: 2;
@@ -252,7 +252,7 @@
   }
   .music-stage-body .music-lyric-line,
   .music-stage-body .music-lyrics-plain {
-    font-size: clamp(18px, calc(var(--music-text-size) * 0.65), 26px);
+    font-size: clamp(1.125rem, calc(var(--music-text-size) * 0.65), 1.625rem);
     overflow-wrap: anywhere;
   }
   .music-stage-body .music-lyric-line {
@@ -261,7 +261,7 @@
   .music-stage-body .music-lyrics-footer {
     flex-wrap: wrap;
     gap: 6px;
-    font-size: 10px;
+    font-size: 0.625rem;
   }
   .music-stage-body .music-stage-empty {
     gap: 10px;
@@ -269,13 +269,13 @@
     overflow-y: auto;
   }
   .music-stage-body .music-stage-empty h3 {
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   .music-stage-body .music-stage-empty p {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .music-stage-body .music-stage-empty button {
-    font-size: 12px;
+    font-size: 0.75rem;
     padding: 10px;
   }
   .music-stage-body.cover-only {
@@ -319,7 +319,7 @@
     padding: 4px 8px 10px;
   }
   .music-stage-body[data-pane='queue'] .music-queue-heading h3 {
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   .music-stage-body[data-pane='queue'] .music-queue-track {
     padding: 8px;
@@ -548,8 +548,10 @@
   .music-stage .music-repeat {
     grid-column: 5;
   }
-  .music-stage .music-play:hover:not(:disabled) {
-    transform: none;
+  @media (hover: hover) {
+    .music-stage .music-play:hover:not(:disabled) {
+      transform: none;
+    }
   }
 }
 @media (pointer: coarse) and (max-width: 1000px) and (max-height: 500px) {

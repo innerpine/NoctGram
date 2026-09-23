@@ -26,17 +26,17 @@
 }
 .music-chart-heading h3 {
   color: #f1f1f2;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   line-height: 1.35;
 }
 .music-chart-heading p {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #777782;
   margin-top: 6px;
 }
 .music-chart-top {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #a5a0aa;
   background: #ffffff05;
   border: 1px solid #ffffff0b;
@@ -70,7 +70,7 @@
   padding: 10px 16px;
   border: 0;
   border-radius: 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   color: #8f8d98;
   box-shadow: none;
@@ -79,9 +79,11 @@
     background 180ms ease,
     box-shadow 180ms ease;
 }
-.music-chart-controls [data-slot='tabs-trigger']:hover {
-  color: #eee;
-  background: #ffffff04;
+@media (hover: hover) {
+  .music-chart-controls [data-slot='tabs-trigger']:hover {
+    color: #eee;
+    background: #ffffff04;
+  }
 }
 .music-chart-controls [data-slot='tabs-trigger'][data-active] {
   color: #fff;
@@ -99,7 +101,7 @@
   background: transparent;
 }
 .music-chart-period [data-slot='tabs-trigger'] {
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding-inline: 14px;
 }
 .music-chart-results {
@@ -113,8 +115,10 @@
   gap: 14px;
   transition: background 180ms ease;
 }
-.music-chart .music-track:hover {
-  background: #ffffff04;
+@media (hover: hover) {
+  .music-chart .music-track:hover {
+    background: #ffffff04;
+  }
 }
 .music-chart .music-track-play {
   width: 48px;
@@ -135,16 +139,16 @@
   color: #b98e78;
 }
 .music-chart .music-track-text > button {
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .music-chart .music-count {
   padding-left: 12px;
 }
 .music-chart .music-count strong {
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 .music-chart .music-count small {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #76737e;
 }
 .music-chart .music-listener {
@@ -156,15 +160,17 @@
 .music-chart .music-listener-self > .chrome-avatar {
   margin: 5px;
 }
-.music-chart .music-listener:hover {
-  padding-left: 10px;
-  padding-right: 10px;
+@media (hover: hover) {
+  .music-chart .music-listener:hover {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
 }
 .music-chart .music-listener-score b {
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 .music-chart .music-listener-score small {
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .music-chart .music-listener-self {
   margin-top: 18px;
@@ -192,10 +198,10 @@
     border-radius: 13px;
   }
   .music-chart-heading h3 {
-    font-size: 16px;
+    font-size: 1rem;
   }
   .music-chart-top {
-    font-size: 11px;
+    font-size: 0.6875rem;
     padding: 6px 8px;
   }
   .music-chart-controls {
@@ -212,7 +218,7 @@
     padding: 10px 8px;
   }
   .music-chart-period [data-slot='tabs-trigger'] {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .music-chart .music-track {
     gap: 10px;
@@ -220,7 +226,7 @@
   }
   .music-chart .music-rank {
     flex-basis: 20px;
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .music-chart .music-track-play {
     flex-basis: 42px;
@@ -228,13 +234,13 @@
     height: 42px;
   }
   .music-chart .music-track-text > button {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .music-chart .music-count {
     padding-left: 0;
   }
   .music-chart .music-count strong {
-    font-size: 15px;
+    font-size: 0.9375rem;
   }
   .music-chart .music-count small {
     display: none;
@@ -244,10 +250,12 @@
     padding-inline: 3px;
   }
   .music-chart .music-listener-score small {
-    font-size: 10px;
+    font-size: 0.625rem;
   }
-  .music-chart .music-listener:hover {
-    padding-inline: 3px;
+  @media (hover: hover) {
+    .music-chart .music-listener:hover {
+      padding-inline: 3px;
+    }
   }
 }
 @media (prefers-reduced-motion: reduce) {

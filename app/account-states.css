@@ -33,18 +33,18 @@
   border: 1px solid #ffffff14;
 }
 .account-readonly strong {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
 }
 .account-readonly p {
   margin: 6px 0 14px;
   color: #ffffffbf;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
 }
 .account-readonly .secondary {
   min-height: 36px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .account-restriction-details {
   margin-top: 16px;
@@ -72,7 +72,7 @@
 }
 .account-blocked-card h1 {
   margin-top: 24px;
-  font-size: 36px;
+  font-size: 2.25rem;
   font-weight: 500;
   line-height: 1.08;
   letter-spacing: -1.8px;
@@ -80,7 +80,7 @@
 .account-lead {
   margin-top: 12px;
   color: #ffffffbf;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.6;
 }
 .account-decision {
@@ -93,7 +93,7 @@
   gap: 8px 20px;
   border-bottom: 1px solid #ffffff14;
   padding: 14px 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
 }
 .account-decision dt {
@@ -116,18 +116,18 @@
 .account-appeal > button {
   min-height: 40px;
   padding-inline: 16px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .account-signout {
   display: inline-flex;
   align-items: center;
   color: #ffffff99;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .account-note {
   margin-top: 14px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.6;
   color: #ffffff7a;
 }
@@ -143,7 +143,7 @@
 .account-appeal label,
 .moderation-editor label,
 .moderation-queue label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #ffffff99;
 }
 .account-appeal textarea,
@@ -166,13 +166,13 @@
   margin-top: 2px;
 }
 .account-appeal-status strong {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
 }
 .account-appeal-status p {
   margin-top: 6px;
   color: #ffffffbf;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
 }
 .account-suspended {
@@ -207,14 +207,14 @@
 }
 .account-suspended h2 {
   margin-top: 16px;
-  font-size: 29px;
+  font-size: 1.8125rem;
   font-weight: 500;
   letter-spacing: -1.2px;
   line-height: 1.1;
 }
 .account-suspended p {
   margin-top: 10px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: #ffffffbf;
   line-height: 1.6;
 }
@@ -233,7 +233,7 @@
   align-items: center;
   gap: 10px;
   color: #ffffff99;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .moderation-heading p {
   flex: 1;
@@ -243,7 +243,7 @@
 }
 .moderation-panel [data-slot='tabs-trigger'] {
   flex: 1;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .moderation-editor {
   padding: 20px;
@@ -257,13 +257,13 @@
   overflow-wrap: anywhere;
 }
 .moderation-editor-title strong {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 500;
 }
 .moderation-choice {
   display: grid;
   gap: 8px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #ffffff99;
 }
 .moderation-choice [data-slot='select-trigger'] {
@@ -298,8 +298,10 @@
   text-align: left;
   border-radius: 12px;
 }
-.moderation-user:hover {
-  background: #ffffff08;
+@media (hover: hover) {
+  .moderation-user:hover {
+    background: #ffffff08;
+  }
 }
 .moderation-user > span:nth-child(2) {
   display: grid;
@@ -309,24 +311,24 @@
 }
 .moderation-user strong {
   font-weight: 500;
-  font-size: 14px;
+  font-size: 0.875rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .moderation-user small {
   color: #ffffff7a;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .moderation-user em {
   font-style: normal;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: #ffffff99;
 }
 .moderation-history {
   padding-top: 14px;
   border-top: 1px solid #ffffff14;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .moderation-history summary {
   cursor: pointer;
@@ -341,7 +343,7 @@
 }
 .moderation-history small {
   color: #ffffff7a;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .moderation-queue {
   display: grid;
@@ -355,7 +357,7 @@
 .moderation-queue p {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
 }
 .moderation-queue small {
@@ -365,13 +367,13 @@
   padding: 12px 16px;
   border: 1px solid #ffffff24;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .moderation-empty {
   padding: 32px 12px;
   text-align: center;
   color: #ffffff7a;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 @keyframes account-rise {
   from {
@@ -391,10 +393,10 @@
     padding: 24px 20px;
   }
   .account-blocked-card h1 {
-    font-size: 30px;
+    font-size: 1.875rem;
   }
   .account-suspended h2 {
-    font-size: 25px;
+    font-size: 1.5625rem;
   }
   .account-readonly {
     padding: 16px;

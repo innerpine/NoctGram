@@ -80,12 +80,12 @@
 }
 .room-menu-copy strong {
   color: #eeeaf3;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 550;
 }
 .room-menu-copy small {
   color: #a4a0ac;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .room-menu-arrow {
   color: #83788f;
@@ -150,9 +150,11 @@
   color: #a29ba9;
   cursor: pointer;
 }
-.room-dialog-close:hover:not(:disabled) {
-  background: #ffffff0b;
-  color: #eee;
+@media (hover: hover) {
+  .room-dialog-close:hover:not(:disabled) {
+    background: #ffffff0b;
+    color: #eee;
+  }
 }
 .room-dialog-heading {
   display: flex;
@@ -167,13 +169,13 @@
 }
 .room-dialog-heading [data-slot='dialog-title'] {
   margin: 0 15px 7px 0;
-  font-size: 21px;
+  font-size: 1.3125rem;
   line-height: 1.25;
 }
 .room-dialog-heading [data-slot='dialog-description'] {
   margin: 0;
   color: #a09aa8;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .room-create-form,
 .room-members-section,
@@ -191,14 +193,14 @@
 .room-visibility > legend,
 .room-section-heading h3 {
   color: #d4cedb;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 .room-field > label > span,
 .room-section-heading h3 > span {
   margin-left: 6px;
   color: #8e8798;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 400;
 }
 .room-create-dialog .room-input,
@@ -214,7 +216,7 @@
   background: #ffffff04;
   color: #ebe5f2;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   transition:
     border-color 160ms ease,
     background-color 160ms ease;
@@ -261,7 +263,7 @@
   border: 1px solid #ffffff13;
   border-radius: 11px;
   color: #b0a6bb;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
   transition:
     background-color 160ms ease,
@@ -306,12 +308,12 @@
   color: #e9e5ed;
   outline: 0;
   box-shadow: none;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .room-note {
   margin: 0;
   color: #a49baa;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
@@ -343,7 +345,7 @@
 }
 .room-member-count {
   color: #a899b5;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-variant-numeric: tabular-nums;
 }
 .room-selected-members {
@@ -367,7 +369,7 @@
   border-radius: 8px;
   background: #c2a3dd0e;
   color: #d7c3e5;
-  font-size: 10px;
+  font-size: 0.625rem;
   cursor: pointer;
 }
 .room-selected-members button > span {
@@ -405,8 +407,10 @@
     background-color 140ms ease,
     border-color 140ms ease;
 }
-.room-person-row:hover:not(:disabled):not([data-disabled='true']) {
-  background: #ffffff06;
+@media (hover: hover) {
+  .room-person-row:hover:not(:disabled):not([data-disabled='true']) {
+    background: #ffffff06;
+  }
 }
 .room-person-row[data-selected='true'] {
   border-color: #d0b2e524;
@@ -419,7 +423,7 @@
 .room-person-copy strong {
   overflow: hidden;
   color: #e5dfeb;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -435,7 +439,7 @@
 }
 .room-person-copy small {
   color: #a398ae;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .room-person-row [data-slot='checkbox'],
 .room-person-check {
@@ -463,7 +467,7 @@
   padding: 12px 8px;
   margin: 0;
   color: #a49aaa;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
   text-align: center;
 }
@@ -481,7 +485,7 @@
 .room-error {
   margin: 0;
   color: #eab3be;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -502,7 +506,7 @@
   border: 1px solid transparent;
   border-radius: 11px;
   font: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 550;
   line-height: 1.5;
   cursor: pointer;
@@ -514,17 +518,21 @@
   background: #d1bce1;
   color: #211529;
 }
-.room-primary-button:hover:not(:disabled) {
-  background: #dfcceb;
+@media (hover: hover) {
+  .room-primary-button:hover:not(:disabled) {
+    background: #dfcceb;
+  }
 }
 .room-secondary-button {
   border-color: #ffffff18;
   background: #ffffff04;
   color: #c0b6ca;
 }
-.room-secondary-button:hover:not(:disabled) {
-  border-color: #ffffff2a;
-  background: #ffffff08;
+@media (hover: hover) {
+  .room-secondary-button:hover:not(:disabled) {
+    border-color: #ffffff2a;
+    background: #ffffff08;
+  }
 }
 .room-create-dialog button:disabled,
 .room-create-dialog input:disabled,
@@ -551,7 +559,7 @@
   gap: 10px;
   margin: 0;
   color: #a9b3b0;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.65;
 }
 .room-secret-explainer svg {
@@ -563,7 +571,7 @@
   display: block;
   margin-bottom: 3px;
   color: #d1dfd9;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 .room-secret-people {
@@ -573,8 +581,10 @@
   background: #b9d6ca;
   color: #18271f;
 }
-.room-secret-dialog .room-primary-button:hover:not(:disabled) {
-  background: #cbe4d9;
+@media (hover: hover) {
+  .room-secret-dialog .room-primary-button:hover:not(:disabled) {
+    background: #cbe4d9;
+  }
 }
 .room-spinner {
   flex: 0 0 auto;
@@ -599,15 +609,15 @@
     height: 41px;
   }
   .room-dialog-heading [data-slot='dialog-title'] {
-    font-size: 20px;
+    font-size: 1.25rem;
   }
   .room-dialog-heading [data-slot='dialog-description'] {
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
   .room-create-dialog .room-input,
   .room-create-dialog input,
   .room-create-dialog textarea {
-    font-size: 16px;
+    font-size: 1rem;
   }
   .room-dialog-actions > .room-primary-button {
     flex: 1;
@@ -616,7 +626,7 @@
   .room-secondary-button {
     padding-right: 12px;
     padding-left: 12px;
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {

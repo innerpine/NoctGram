@@ -15,12 +15,16 @@
   top: 18px;
   opacity: 0.65;
 }
-.archive-row-wrap:hover .archive-row-menu,
 .archive-row-menu:focus-visible {
   opacity: 1;
 }
+@media (hover: hover) {
+  .archive-row-wrap:hover .archive-row-menu {
+    opacity: 1;
+  }
+}
 .archive-error {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #efaaaa;
   padding: 0 14px 10px;
 }
@@ -34,8 +38,10 @@
   border-bottom: 1px solid var(--border);
   transition: background 0.2s;
 }
-.archive-folder:hover {
-  background: var(--muted);
+@media (hover: hover) {
+  .archive-folder:hover {
+    background: var(--muted);
+  }
 }
 .archive-folder > span:nth-child(2) {
   display: grid;
@@ -43,11 +49,11 @@
   flex: 1;
 }
 .archive-folder strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 550;
 }
 .archive-folder small {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted-foreground);
 }
 .archive-folder-icon {
