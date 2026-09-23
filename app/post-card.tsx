@@ -33,6 +33,7 @@ import { CodeBlock } from './code-block';
 import { MusicLinkCard } from './music-link-card';
 import { ChatVideoPlayer } from './chat-video-player';
 import { GiveawayCard } from './giveaway-card';
+import { LayoutFlip } from './layout-flip';
 import type { Post, Media } from '@/lib/client';
 import {
   memo,
@@ -332,6 +333,13 @@ export const PostCard = memo(function PostCard({
             <MentionText text={p.text} />
           </p>
         </div>
+        {/* «Ещё» opens to the measured height instead of a guessed max-height. */}
+        <LayoutFlip
+          watch={expanded}
+          mode="height"
+          duration={300}
+          targets={() => [article.current?.querySelector('.post-text-wrap')]}
+        />
         {long && (
           <button
             className="expand-post"

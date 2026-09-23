@@ -147,8 +147,9 @@
   color: #9a91a7;
   border: 1px solid #ffffff1a;
 }
+/* Moved aside with translate: margin would re-lay out every row per frame. */
 .chat-message-shell:has(.chat-message-select) > .chat-message-row.other {
-  margin-left: 39px;
+  translate: 39px 0;
   max-width: calc(100% - 45px);
 }
 .chat-message-row {

@@ -98,26 +98,20 @@
     opacity: 1;
   }
 }
+/* Reply, pin and selection bars take their height at once (the message list
+   resizes a single time) and only fade and slide; animating grid rows resized
+   the list on every frame. */
 .chat-reveal {
-  display: grid;
-  grid-template-rows: 0fr;
   flex-shrink: 0;
-  min-height: 0;
   opacity: 0;
   translate: 0 -4px;
   transition:
-    grid-template-rows 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 160ms ease,
-    translate 200ms ease;
+    translate 200ms var(--motion);
 }
 .chat-reveal[data-expanded='true'] {
-  grid-template-rows: 1fr;
   opacity: 1;
   translate: 0 0;
-}
-.chat-reveal-inner {
-  min-height: 0;
-  overflow: hidden;
 }
 .chat-message-shell {
   outline: 1px solid transparent;
@@ -127,7 +121,7 @@
 }
 .chat-message-shell > .chat-message-row.other {
   transition:
-    margin-left 200ms ease,
+    translate 200ms var(--motion),
     background-color 240ms ease;
 }
 .chat-message-shell[data-chat-removing] {

@@ -270,15 +270,9 @@
     width: 100%;
     margin-left: max(0px, calc((100% - 1200px) / 2));
     margin-right: 0;
-    transition:
-      width 440ms,
-      margin-left 440ms;
   }
-  .music-player {
-    transition:
-      left 440ms,
-      width 440ms;
-  }
+  /* The dock changes this layout once; music-player-view.tsx slides the page
+     and the player over (FLIP) instead of re-laying them out every frame. */
   body:has(.music-lyrics-dock[data-open='true']) .app-shell {
     width: calc(100% - var(--music-dock-space));
     margin-left: max(0px, calc((100% - 1200px - var(--music-dock-space)) / 2));
@@ -341,13 +335,4 @@
   animation: none !important;
   transition: none !important;
   scroll-behavior: auto !important;
-}
-@media (prefers-reduced-motion: reduce) {
-  .app-shell,
-  .music-lyrics-dock,
-  .music-lyrics-dock * {
-    animation: none !important;
-    transition: none !important;
-    scroll-behavior: auto !important;
-  }
 }

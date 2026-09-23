@@ -373,8 +373,6 @@ textarea::placeholder {
 }
 .post-text-wrap {
   overflow: hidden;
-  max-height: 260em;
-  transition: max-height 0.38s var(--motion);
 }
 .post-text-wrap.collapsed {
   max-height: 7.7em;

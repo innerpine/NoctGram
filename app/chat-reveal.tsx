@@ -12,24 +12,17 @@ export function ChatReveal({ children }: { children: ReactNode }) {
   useEffect(() => {
     let frame = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const reduced = window.matchMedia(
-      '(prefers-reduced-motion: reduce)',
-    ).matches;
-    if (open) {
-      if (reduced) setExpanded(true);
-      else
-        frame = requestAnimationFrame(() => {
-          frame = requestAnimationFrame(() => setExpanded(true));
-        });
-    } else {
+    // Reduced motion keeps the fade; the CSS drops the slide.
+    if (open)
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => setExpanded(true));
+      });
+    else {
       setExpanded(false);
-      timer = setTimeout(
-        () => {
-          retained.current = null;
-          refresh((value) => value + 1);
-        },
-        reduced ? 0 : 220,
-      );
+      timer = setTimeout(() => {
+        retained.current = null;
+        refresh((value) => value + 1);
+      }, 220);
     }
     return () => {
       cancelAnimationFrame(frame);
@@ -43,9 +36,7 @@ export function ChatReveal({ children }: { children: ReactNode }) {
       inert={!open}
       aria-hidden={!open}
     >
-      <div className="chat-reveal-inner">
-        {open ? children : retained.current}
-      </div>
+      {open ? children : retained.current}
     </div>
   );
 }
