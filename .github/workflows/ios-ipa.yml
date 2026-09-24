@@ -145,11 +145,14 @@ jobs:
           import json; m = json.load(open('ios/Tests/Fixtures/fixtures.json'))['meta']
           print(m['me'], m['bob'], m['channel'], m['post'])")
           mkdir -p shots
+          # The first launch of a freshly booted simulator is slow; warm it up.
+          xcrun simctl launch "$UDID" com.noctgram.ios -noct.server "http://127.0.0.1:8765" >/dev/null
+          sleep 25
           shot() {
             name=$1; port=$2; shift 2
             xcrun simctl terminate "$UDID" com.noctgram.ios >/dev/null 2>&1 || true
             xcrun simctl launch "$UDID" com.noctgram.ios -noct.server "http://127.0.0.1:$port" "$@" >/dev/null
-            sleep 7
+            sleep 8
             xcrun simctl io "$UDID" screenshot "shots/$name.png" >/dev/null
             echo "shot $name"
           }
@@ -168,6 +171,9 @@ jobs:
           shot 13-followers 8765 -noct.debugTab profile -noct.debugRoute "followers:$ME"
           shot 14-wallet 8765 -noct.debugRoute screen:wallet
           shot 15-settings 8765 -noct.debugTab profile -noct.debugRoute screen:settings
+          shot 16-profile-posts 8765 -noct.debugTab profile -noct.debugScroll tabs
+          shot 17-profile-gifts 8765 -noct.debugTab profile -noct.debugProfileTab gifts -noct.debugScroll tabs
+          shot 18-profile-media 8765 -noct.debugTab profile -noct.debugProfileTab media -noct.debugScroll tabs
           ls -la shots
           echo "--- crash reports"
           for report in ~/Library/Logs/DiagnosticReports/Noctgram*; do

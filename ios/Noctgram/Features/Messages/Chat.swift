@@ -298,7 +298,10 @@ struct ChatView: View {
                 Task { await store.upload(item, session: session) }
             }
         }
-        .task { await store.loadMeta(api: session.api) }
+        .task {
+            await store.loadMeta(api: session.api)
+            await GiftCatalog.shared.load(api: session.api)
+        }
         .task {
             while !Task.isCancelled {
                 await store.load(api: session.api)

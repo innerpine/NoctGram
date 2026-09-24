@@ -47,6 +47,7 @@ struct ProfileScreen: View {
                             header(profile)
                             tabs(profile)
                                 .padding(.top, 14)
+                                .id("tabs")
                             content(profile)
                                 .padding(.horizontal, 12)
                                 .padding(.top, 12)
@@ -69,6 +70,12 @@ struct ProfileScreen: View {
                 guard isRootTab, tap.tab == .profile else { return }
                 withAnimation(Noct.motion) { proxy.scrollTo("top", anchor: .top) }
             }
+            #if DEBUG
+            .onAppear {
+                guard isRootTab, UserDefaults.standard.string(forKey: "noct.debugScroll") == "tabs" else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { proxy.scrollTo("tabs", anchor: .top) }
+            }
+            #endif
         }
         .navigationTitle(profile?.name ?? "")
         .navigationBarTitleDisplayMode(.inline)
@@ -108,6 +115,9 @@ struct ProfileScreen: View {
             #if DEBUG
             if isRootTab, let tab = UserDefaults.standard.string(forKey: "noct.debugEditor").flatMap(EditorTab.init(rawValue:)) {
                 editing = tab
+            }
+            if isRootTab, let tab = UserDefaults.standard.string(forKey: "noct.debugProfileTab").flatMap(ProfileTab.init(rawValue:)) {
+                await store.select(tab, api: session.api)
             }
             #endif
         }

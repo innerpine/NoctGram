@@ -137,27 +137,30 @@ struct RemoteImage: View {
     }
 
     var body: some View {
-        ZStack {
-            placeholder
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: contentMode)
-                    .transition(.opacity)
+        // The image is an overlay, so its aspect ratio never widens the
+        // caller's frame (a fill image in a grid cell stays in its cell).
+        placeholder
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: contentMode)
+                        .transition(.opacity)
+                }
             }
-        }
-        .task(id: url) {
-            guard let url else {
-                image = nil
-                return
+            .clipped()
+            .task(id: url) {
+                guard let url else {
+                    image = nil
+                    return
+                }
+                if loadedURL == url, image != nil { return }
+                let result = await ImagePipeline.shared.image(for: url, maxPixel: maxPixel)
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    image = result
+                    loadedURL = url
+                }
             }
-            if loadedURL == url, image != nil { return }
-            let result = await ImagePipeline.shared.image(for: url, maxPixel: maxPixel)
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.2)) {
-                image = result
-                loadedURL = url
-            }
-        }
     }
 }
