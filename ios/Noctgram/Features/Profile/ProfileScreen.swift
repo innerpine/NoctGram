@@ -197,6 +197,9 @@ struct ProfileScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 avatarLine(profile)
                 identity(profile)
+                if !profile.isChannel {
+                    MusicActivityCard(profile: profile)
+                }
                 bio(profile)
                     .padding(.top, 14)
                 ProfileMetaView(profile: profile)

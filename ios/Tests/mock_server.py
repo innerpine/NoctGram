@@ -7,6 +7,7 @@ Fixtures/fixtures.json holds real responses of a local NoctGram server
 import json
 import os
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -78,6 +79,17 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, social(q))
         if url.path == "/api/gifts":
             return self.send(200, R["giftCatalog" if q.get("action") == "catalog" else "gifts"])
+        if url.path == "/api/music/activity":
+            # Activity is a heartbeat: move the captured times to now.
+            now = int(time.time() * 1000)
+            if q.get("id", META["me"]) != META["me"]:
+                return self.send(200, {"activity": None, "serverTime": now})
+            body = json.loads(json.dumps(R["musicActivity"]))
+            shift = now - body["serverTime"]
+            for key in ("updatedAt", "expiresAt"):
+                body["activity"][key] += shift
+            body["serverTime"] = now
+            return self.send(200, body)
         if url.path == "/api/rooms":
             return self.send(200, R.get("room" if q.get("action") == "room" else "rooms", {"rooms": []}))
         if url.path.startswith("/api/media/"):

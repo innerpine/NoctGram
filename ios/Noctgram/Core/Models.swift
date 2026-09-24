@@ -106,6 +106,8 @@ struct ProfileBackground: Hashable {
     var first = "#9775cf"
     var second = "#426b98"
     var intensity = 30
+    /// Music activity card colours: the track artwork or the profile palette.
+    var musicColor = "cover"
 
     init() {}
 
@@ -118,6 +120,66 @@ struct ProfileBackground: Hashable {
         if j["first"].str.hasPrefix("#") { first = j["first"].str }
         if j["second"].str.hasPrefix("#") { second = j["second"].str }
         if let value = j["intensity"].int { intensity = min(40, max(15, value)) }
+        if j["musicColor"].str == "profile" { musicColor = "profile" }
+    }
+}
+
+/// What a profile is listening to (GET /api/music/activity, lib/music-activity.ts).
+struct MusicActivity: Hashable {
+    struct Companion: Hashable {
+        var identity: Identity
+        var expiresAt: Double
+    }
+
+    var trackUrl: String
+    var title: String
+    var artist: String
+    var artwork: String
+    var provider: String
+    var playing: Bool
+    var positionMs: Double
+    var durationMs: Double
+    var updatedAt: Double
+    var expiresAt: Double
+    var companions: [Companion]
+
+    init?(_ j: JSON) {
+        guard j.object != nil, !j["title"].str.isEmpty else { return nil }
+        trackUrl = j["trackUrl"].str
+        title = j["title"].str
+        artist = j["artist"].str
+        artwork = j["artwork"].str
+        provider = j["provider"].str
+        playing = j["state"].str != "paused"
+        positionMs = j["positionMs"].double ?? 0
+        durationMs = j["durationMs"].double ?? 0
+        updatedAt = j["updatedAt"].double ?? 0
+        expiresAt = j["expiresAt"].double ?? 0
+        companions = j["listeningWith"].array.map {
+            Companion(
+                identity: Identity(id: $0["userId"].str, name: $0["name"].str, avatar: $0["avatar"].str, handle: $0["handle"].str),
+                expiresAt: $0["expiresAt"].double ?? 0
+            )
+        }
+    }
+
+    var providerName: String {
+        provider == "youtube" ? "YouTube" : provider == "spotify" ? "Spotify" : "SoundCloud"
+    }
+
+    /// Larger SoundCloud artwork, as the web player requests.
+    var largeArtwork: String {
+        artwork.replacingOccurrences(of: "-large.", with: "-t500x500.")
+    }
+
+    func position(at now: Double) -> Double {
+        let moved = playing ? max(0, now - updatedAt) : 0
+        return min(durationMs, max(0, positionMs + moved))
+    }
+
+    static func time(_ ms: Double) -> String {
+        let seconds = max(0, Int(ms / 1000))
+        return "\(seconds / 60):" + String(format: "%02d", seconds % 60)
     }
 }
 

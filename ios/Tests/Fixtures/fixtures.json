@@ -2709,6 +2709,22 @@
   },
   "rooms": {
    "rooms": []
+  },
+  "musicActivity": {
+   "activity": {
+    "trackUrl": "https://soundcloud.com/noctgram/midnight-city",
+    "title": "Midnight City",
+    "artist": "M83",
+    "artwork": "",
+    "provider": "soundcloud",
+    "state": "playing",
+    "positionMs": 61000,
+    "durationMs": 243000,
+    "updatedAt": 1790236510321,
+    "expiresAt": 1790236580321,
+    "listeningWith": []
+   },
+   "serverTime": 1790236510371
   }
  }
 }
