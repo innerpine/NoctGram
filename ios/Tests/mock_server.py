@@ -34,6 +34,19 @@ SOCIAL = {
 }
 
 
+def gift_list():
+    """The captured gifts plus catalog ones, so the gifts screen scrolls a
+    full grid (and gift playback is exercised with many tiles)."""
+    base = R["gifts"]["gifts"]
+    catalog = [c["id"] for c in R["giftCatalog"]["catalog"]]
+    gifts = list(base)
+    for index, gift_id in enumerate(catalog[:22]):
+        source = base[index % len(base)]
+        gifts.append(dict(source, id=f"{source['id']}:mock-{index}", giftId=gift_id, message="",
+                          hidden=1 if index % 7 == 3 else 0, created=source["created"] - (index + 1) * 3600000))
+    return {"gifts": gifts, "next": None}
+
+
 def photo(media_id):
     return {"id": media_id, "name": "photo.jpg", "type": "image/jpeg", "size": 184320, "kind": "image"}
 
@@ -117,7 +130,7 @@ class Handler(BaseHTTPRequestHandler):
                 # Sale quote as lib/gift-conversions.ts gives it: 85 % of the price.
                 return self.send(200, {"id": q.get("id", ""), "available": True, "reason": None, "originalPrice": 25,
                                        "amount": 21, "fee": 4, "feePercent": 15, "convertedAt": None})
-            return self.send(200, R["giftCatalog" if q.get("action") == "catalog" else "gifts"])
+            return self.send(200, R["giftCatalog"] if q.get("action") == "catalog" else gift_list())
         if url.path == "/api/music/activity":
             # Activity is a heartbeat: move the captured times to now.
             now = int(time.time() * 1000)

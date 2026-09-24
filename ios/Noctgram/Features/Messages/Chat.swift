@@ -667,7 +667,8 @@ struct MessageBubble<Menu: View>: View {
         VStack(spacing: 6) {
             GiftArt(
                 path: gift.collectible.map { "/assets/gifts/\($0.modelAsset).webp" } ?? "/assets/gifts/\(gift.giftId).webp",
-                collectible: gift.collectible
+                collectible: gift.collectible,
+                featured: true
             )
             .frame(width: 150, height: 150)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))

@@ -186,6 +186,10 @@ jobs:
           shot 19-profile-qr 8765 -noct.debugTab profile -noct.debugSheet qr
           shot 20-gifts 8765 -noct.debugTab profile -noct.debugRoute screen:gifts
           shot 21-gift 8765 -noct.debugTab profile -noct.debugRoute screen:gifts -noct.debugSheet gift
+          # Gift animations are limited to three at a time: show what played.
+          echo "--- gift playback"
+          xcrun simctl spawn "$UDID" log show --last 15m --style compact \
+            --predicate 'subsystem == "com.noctgram.ios" AND category == "gifts"' | tail -40 || true
           ls -la shots
           echo "--- crash reports"
           for report in ~/Library/Logs/DiagnosticReports/Noctgram*; do

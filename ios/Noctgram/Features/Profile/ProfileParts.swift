@@ -1,4 +1,3 @@
-import Lottie
 import SwiftUI
 
 /// Wrapping row layout for profile details (location · site · birthday · joined).
@@ -332,15 +331,15 @@ struct VerifiedNotice: View {
 }
 
 /// Gift art: plain gifts on a card, collectibles on their radial backdrop.
-/// Gift art: the static picture at once, then its Lottie animation on top
-/// once loaded, as on the web. Reduce Motion keeps the picture.
+/// Gift art: the static picture, animated with its Lottie file while
+/// GiftPlayback lets it play (a few at a time). `featured` marks the one
+/// being looked at (a gift card or a gift in a chat).
 struct GiftArt: View {
     @EnvironmentObject private var session: AppSession
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let path: String
     var collectible: Collectible?
     var animated = true
-    @State private var animation: LottieAnimation?
+    var featured = false
 
     var body: some View {
         ZStack {
@@ -354,22 +353,13 @@ struct GiftArt: View {
             } else {
                 Color.white.opacity(0.03)
             }
-            RemoteImage(url: session.api.mediaURL(path), maxPixel: 360, contentMode: .fit, placeholder: .clear)
-                .padding(collectible == nil ? 14 : 12)
-                .opacity(animation == nil ? 1 : 0)
-            if let animation {
-                GiftLottieView(animation: animation)
-                    .padding(collectible == nil ? 14 : 12)
-                    .transition(.opacity)
-                    .allowsHitTesting(false)
-            }
-        }
-        .task(id: path) {
-            guard animated, !reduceMotion,
-                  let animationPath = GiftAnimations.animationPath(forArt: path),
-                  let url = session.api.mediaURL(animationPath) else { return }
-            let loaded = await GiftAnimations.shared.animation(for: url)
-            withAnimation(.easeOut(duration: 0.25)) { animation = loaded }
+            GiftPlayer(
+                art: session.api.mediaURL(path),
+                animation: animated ? GiftAnimations.animationPath(forArt: path).flatMap { session.api.mediaURL($0) } : nil,
+                featured: featured
+            )
+            .padding(collectible == nil ? 14 : 12)
+            .allowsHitTesting(false)
         }
     }
 }
@@ -463,7 +453,7 @@ struct GiftTile: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 42, height: 42)
-                        .glassCircle()
+                        .background(Circle().fill(Color.black.opacity(0.55)))
                         .accessibilityLabel("Скрыт из профиля")
                 }
             }
@@ -474,7 +464,7 @@ struct GiftTile: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .glassCapsule()
+                        .background(Capsule().fill(Color.black.opacity(0.45)))
                         .padding(.bottom, 7)
                 }
             }
@@ -553,7 +543,7 @@ struct GiftDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
-                    GiftArt(path: gift.artPath, collectible: gift.collectible)
+                    GiftArt(path: gift.artPath, collectible: gift.collectible, featured: true)
                         .frame(width: 160, height: 160)
                         .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
                     Text(title)
