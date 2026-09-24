@@ -93,7 +93,7 @@ jobs:
   # (ios/Tests) and screenshots the main screens.
   screenshots:
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -199,6 +199,29 @@ jobs:
           done
           true
 
+      - name: Chat probes
+        run: |
+          # The dialogue scrolls itself up with one part switched off at a
+          # time, logs what it kept redoing and whether the main thread still
+          # answered, and quits (ios/Noctgram/Features/Messages/ChatProbe.swift).
+          set +e
+          BOB=$(python3 -c "import json; print(json.load(open('ios/Tests/Fixtures/fixtures.json'))['meta']['bob'])")
+          for variant in lazy vstack nogift stillgift notracker noswipe nohold nochips plainstack nobar; do
+            xcrun simctl terminate "$UDID" com.noctgram.ios >/dev/null 2>&1 || true
+            xcrun simctl launch "$UDID" com.noctgram.ios -noct.server "http://127.0.0.1:8765" \
+              -noct.debugTab messages -noct.debugRoute "chat:$BOB" -noct.chatProbe "$variant" >/dev/null
+            for second in $(seq 1 45); do
+              sleep 1
+              pgrep -x Noctgram >/dev/null || break
+            done
+            echo "$variant: $second s"
+          done
+          xcrun simctl terminate "$UDID" com.noctgram.ios >/dev/null 2>&1 || true
+          xcrun simctl spawn "$UDID" log show --last 10m --style compact \
+            --predicate 'subsystem == "com.noctgram.ios" AND category == "probe"' \
+            | sed -nE 's/.*\[com\.noctgram\.ios:probe\] //p'
+          true
+
       - name: Gesture tests
         working-directory: ios
         run: |
@@ -263,10 +286,11 @@ jobs:
           PY
           fi
           ls "$GITHUB_WORKSPACE/shots" | grep -E '^[23][0-9]-'
-          # What the chats kept redoing (debug trace lines, most repeated first).
-          xcrun simctl spawn "$UDID" log show --last 20m --style compact \
-            --predicate 'subsystem == "com.noctgram.ios" AND category == "chat"' \
-            | sed -nE 's/.*\[com\.noctgram\.ios:chat\] //p' | sort | uniq -c | sort -rn | head -30 || true
+          # What the chats kept redoing: the probes of testChatProbes, then
+          # every 4 s of the other tests while anything was counted.
+          xcrun simctl spawn "$UDID" log show --last 30m --style compact \
+            --predicate 'subsystem == "com.noctgram.ios" AND category == "probe"' \
+            | sed -nE 's/.*\[com\.noctgram\.ios:probe\] //p' | grep -v '^probe sim ' | head -250 || true
           # Which gift animations were drawn on the main thread.
           xcrun simctl spawn "$UDID" log show --last 20m --style compact \
             --predicate 'subsystem == "com.noctgram.ios" AND category == "gifts"' | grep -o 'mounted .*' | sort | uniq -c | tail -20 || true

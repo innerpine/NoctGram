@@ -193,6 +193,11 @@ final class GiftPlayerView: UIView {
         updateRegistration()
     }
 
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        ChatProbe.count("gift layout")
+    }
+
     private func updateRegistration() {
         let wanted = window != nil && animationURL != nil
         guard wanted != registered else { return }
@@ -260,6 +265,7 @@ final class GiftPlayerView: UIView {
         stepper?.invalidate()
         stepper = nil
         guard let player = lottieView else { return }
+        ChatProbe.count("gift unmount")
         lottieView = nil
         player.stop()
         player.removeFromSuperview()
@@ -268,6 +274,7 @@ final class GiftPlayerView: UIView {
 
     private func mount(_ animation: LottieAnimation) {
         guard wantsPlay, lottieView == nil else { return }
+        ChatProbe.count("gift mount")
         let player = LottieAnimationView(animation: animation)
         player.contentMode = .scaleAspectFit
         player.loopMode = .loop
@@ -318,6 +325,7 @@ struct GiftPlayer: UIViewRepresentable {
     }
 
     func updateUIView(_ view: GiftPlayerView, context: Context) {
+        ChatProbe.count("gift update")
         view.configure(art: art, animation: animation, featured: featured)
     }
 

@@ -318,12 +318,15 @@ private struct ReplyPan: UIGestureRecognizerRepresentable {
     let ended: (Bool) -> Void
 
     func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        ChatProbe.count("pan make")
         let pan = UIPanGestureRecognizer()
         pan.delegate = context.coordinator
         return pan
     }
 
-    func updateUIGestureRecognizer(_ pan: UIPanGestureRecognizer, context: Context) {}
+    func updateUIGestureRecognizer(_ pan: UIPanGestureRecognizer, context: Context) {
+        ChatProbe.count("pan update")
+    }
 
     func handleUIGestureRecognizerAction(_ pan: UIPanGestureRecognizer, context: Context) {
         let dx = pan.translation(in: pan.view).x

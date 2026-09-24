@@ -84,7 +84,11 @@ extension View {
     func glassBottomBar<Bar: View>(@ViewBuilder _ bar: () -> Bar) -> some View {
         let content = bar()
         if #available(iOS 26.0, *) {
-            safeAreaBar(edge: .bottom) { content }
+            if ChatProbe.has("nobar") {
+                safeAreaInset(edge: .bottom) { content }
+            } else {
+                safeAreaBar(edge: .bottom) { content }
+            }
         } else {
             safeAreaInset(edge: .bottom) {
                 content.background {

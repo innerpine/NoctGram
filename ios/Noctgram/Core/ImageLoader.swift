@@ -163,9 +163,7 @@ struct RemoteImage: View {
                     image = result
                     loadedURL = url
                 }
-                #if DEBUG
-                ChatTrace.note("image " + url.lastPathComponent)
-                #endif
+                ChatProbe.count("image")
             }
     }
 }

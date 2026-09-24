@@ -1,4 +1,3 @@
-import os
 import SwiftUI
 import UIKit
 
@@ -61,17 +60,6 @@ struct ChatBackdrop: View {
     }
 }
 
-#if DEBUG
-/// The UI tests count these lines to see what a chat keeps redoing.
-enum ChatTrace {
-    private static let log = Logger(subsystem: "com.noctgram.ios", category: "chat")
-
-    static func note(_ text: String) {
-        log.notice("\(text, privacy: .public)")
-    }
-}
-#endif
-
 /// Keeps a chat on its newest message, as in Telegram, while the reader is
 /// at the end: when the keyboard opens, a reply appears over the composer
 /// or a bubble grows (a reaction). Scrolls explicitly: on iOS 26 a bottom
@@ -109,13 +97,16 @@ struct ChatEndTracker: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
-            content.onScrollGeometryChange(for: Bool.self) { geometry in
-                geometry.visibleRect.maxY - geometry.contentInsets.bottom >= geometry.contentSize.height - 60
-            } action: { _, end in
-                atEnd = end
-                #if DEBUG
-                ChatTrace.note("at end \(end)")
-                #endif
+            if ChatProbe.has("notracker") {
+                content
+            } else {
+                content.onScrollGeometryChange(for: Bool.self) { geometry in
+                    ChatProbe.count("geometry y \(Int(geometry.contentOffset.y / 10) * 10) h \(Int(geometry.contentSize.height / 10) * 10)")
+                    return geometry.visibleRect.maxY - geometry.contentInsets.bottom >= geometry.contentSize.height - 60
+                } action: { _, end in
+                    atEnd = end
+                    ChatProbe.count("at end \(end)")
+                }
             }
         } else {
             content
@@ -179,12 +170,14 @@ struct BubbleShape: Shape {
 /// width), so quotes and media span the bubble while text keeps wrapping.
 struct BubbleStack: Layout {
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        ChatProbe.count("stack size")
         let width = columnWidth(proposal, subviews)
         let height = subviews.reduce(CGFloat(0)) { $0 + $1.sizeThatFits(ProposedViewSize(width: width, height: nil)).height }
         return CGSize(width: width, height: height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        ChatProbe.count("stack place")
         var y = bounds.minY
         for subview in subviews {
             let height = subview.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil)).height
@@ -269,6 +262,7 @@ struct InlineTimeText: View {
     var accent: Color = .white
 
     var body: some View {
+        let _ = ChatProbe.count("text body")
         let message = Text(RichText.attributed(text, baseURL: session.api.baseURL))
             .font(.system(size: 16))
             .foregroundColor(Color.white.opacity(0.93))
@@ -401,6 +395,7 @@ struct FlowRows: Layout {
     var spacing: CGFloat = 4
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        ChatProbe.count("flow size")
         let rows = arrange(subviews, width: proposal.width ?? .infinity)
         let width = rows.map { $0.width }.max() ?? 0
         let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(0, rows.count - 1))
@@ -408,6 +403,7 @@ struct FlowRows: Layout {
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        ChatProbe.count("flow place")
         var y = bounds.minY
         for row in arrange(subviews, width: bounds.width) {
             var x = bounds.minX

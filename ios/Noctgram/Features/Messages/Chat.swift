@@ -233,49 +233,18 @@ struct ChatView: View {
     }
 
     var body: some View {
+        let _ = ChatProbe.count("chat body")
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 0) {
-                    if !store.loaded {
-                        LoadingRow()
-                    } else if store.messages.isEmpty {
-                        EmptyState(icon: "hand.wave", text: store.error ?? "Сообщений пока нет. Напиши первым.")
-                    }
-                    ForEach(Array(store.messages.enumerated()), id: \.element.id) { index, message in
-                        let previous = index > 0 ? store.messages[index - 1] : nil
-                        let newDay = previous.map { !Calendar.current.isDate(Format.date(message.created), inSameDayAs: Format.date($0.created)) } ?? true
-                        let joins = !newDay && previous.map { Self.joins($0, message) } == true
-                        if newDay {
-                            Text(Format.day(message.created))
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(Noct.text60)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 5)
-                                // Content, not a control: a plain pill. Liquid
-                                // Glass inside the scrolling list kept iOS 26
-                                // redrawing it without end.
-                                .background(Capsule().fill(Color.white.opacity(0.08)))
-                                .padding(.top, 10)
-                                .padding(.bottom, 2)
-                        }
-                        MessageBubble(
-                            message: message,
-                            mine: message.sender == session.myId,
-                            peer: title,
-                            palette: store.palette,
-                            joinsPrevious: joins,
-                            openMedia: { items, position in viewer = MediaViewerState(items: items, index: position) },
-                            onFocus: { frame in present(message, frame: frame, joinsPrevious: joins) },
-                            onReply: canWrite ? replyAction(message) : nil,
-                            onReact: canWrite ? reactAction(message) : nil
-                        )
-                        .padding(.top, joins ? 2 : 8)
-                        .id(message.id)
-                        .modifier(ChatEndRow(isLast: message.id == store.messages.last?.id, atEnd: $atEnd))
-                    }
+                if ChatProbe.has("vstack") {
+                    VStack(spacing: 0) { rows }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 10)
+                } else {
+                    LazyVStack(spacing: 0) { rows }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 10)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 10)
             }
             .scrollDismissesKeyboard(.interactively)
             .modifier(ChatEndTracker(atEnd: $atEnd))
@@ -382,6 +351,50 @@ struct ChatView: View {
             }
         }
         .onDisappear { Task { await session.refreshCounters() } }
+        #if DEBUG
+        .task(id: store.loaded) { if store.loaded { await ChatProbe.run() } }
+        #endif
+    }
+
+    /// The messages with a day line before the first of each day.
+    @ViewBuilder private var rows: some View {
+        if !store.loaded {
+            LoadingRow()
+        } else if store.messages.isEmpty {
+            EmptyState(icon: "hand.wave", text: store.error ?? "Сообщений пока нет. Напиши первым.")
+        }
+        ForEach(Array(store.messages.enumerated()), id: \.element.id) { index, message in
+            let previous = index > 0 ? store.messages[index - 1] : nil
+            let newDay = previous.map { !Calendar.current.isDate(Format.date(message.created), inSameDayAs: Format.date($0.created)) } ?? true
+            let joins = !newDay && previous.map { Self.joins($0, message) } == true
+            if newDay {
+                Text(Format.day(message.created))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Noct.text60)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    // Content, not a control: a plain pill. Liquid
+                    // Glass inside the scrolling list kept iOS 26
+                    // redrawing it without end.
+                    .background(Capsule().fill(Color.white.opacity(0.08)))
+                    .padding(.top, 10)
+                    .padding(.bottom, 2)
+            }
+            MessageBubble(
+                message: message,
+                mine: message.sender == session.myId,
+                peer: title,
+                palette: store.palette,
+                joinsPrevious: joins,
+                openMedia: { items, position in viewer = MediaViewerState(items: items, index: position) },
+                onFocus: { frame in present(message, frame: frame, joinsPrevious: joins) },
+                onReply: canWrite ? replyAction(message) : nil,
+                onReact: canWrite ? reactAction(message) : nil
+            )
+            .padding(.top, joins ? 2 : 8)
+            .id(message.id)
+            .modifier(ChatEndRow(isLast: message.id == store.messages.last?.id, atEnd: $atEnd))
+        }
     }
 
     /// Consecutive messages of one sender within ten minutes form a group.
@@ -588,6 +601,7 @@ struct MessageBubble: View {
         }
     }
     private var files: [ChatAttachment] { message.attachments.filter { !$0.isImage && !$0.isVideo } }
+    private var reactions: [Reaction] { ChatProbe.has("nochips") ? [] : message.reactions }
     private var hasText: Bool { !message.text.isEmpty && message.gift == nil }
     private var status: MessageStatus? {
         guard mine else { return nil }
@@ -597,7 +611,7 @@ struct MessageBubble: View {
     }
     /// Nothing around the text or media: no quote, forward, files, gift or reactions.
     private var bare: Bool {
-        message.reply == nil && message.forwardedName.isEmpty && files.isEmpty && message.gift == nil && message.reactions.isEmpty
+        message.reply == nil && message.forwardedName.isEmpty && files.isEmpty && message.gift == nil && reactions.isEmpty
     }
     private var emojiOnly: Bool { hasText && media.isEmpty && bare && Emoji.isOnly(message.text, limit: 3) }
     private var mediaOnly: Bool { !media.isEmpty && !hasText && bare }
@@ -625,6 +639,7 @@ struct MessageBubble: View {
     }
 
     var body: some View {
+        let _ = ChatProbe.count("bubble body")
         if standalone {
             content
                 .opacity(message.pending ? 0.7 : 1)
@@ -637,13 +652,13 @@ struct MessageBubble: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("message-" + message.id)
                     .accessibilityAction(named: "Ответить") { onReply?() }
-                    .modifier(HoldToFocus(action: message.pending ? nil : onFocus))
+                    .modifier(HoldToFocus(action: message.pending || ChatProbe.has("nohold") ? nil : onFocus))
                 if !mine { Spacer(minLength: 52) }
             }
-            .modifier(SwipeToReply(action: message.pending ? nil : onReply))
+            .modifier(SwipeToReply(action: message.pending || ChatProbe.has("noswipe") ? nil : onReply))
             #if DEBUG
-            .onAppear { ChatTrace.note("appear " + message.id) }
-            .onDisappear { ChatTrace.note("disappear " + message.id) }
+            .onAppear { ChatProbe.count("appear " + ChatProbe.short(message.id)) }
+            .onDisappear { ChatProbe.count("disappear " + ChatProbe.short(message.id)) }
             #endif
             .task(id: media.first?.path) { await measure() }
         }
@@ -666,8 +681,17 @@ struct MessageBubble: View {
         }
     }
 
+    #if DEBUG
+    /// The «plainstack» probe stacks the parts without BubbleStack.
+    private var column: AnyLayout {
+        ChatProbe.has("plainstack") ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(BubbleStack())
+    }
+    #else
+    private var column: BubbleStack { BubbleStack() }
+    #endif
+
     private var bubble: some View {
-        BubbleStack() {
+        column {
             if !message.forwardedName.isEmpty || message.reply != nil {
                 VStack(alignment: .leading, spacing: 6) {
                     if !message.forwardedName.isEmpty {
@@ -710,7 +734,7 @@ struct MessageBubble: View {
     }
 
     @ViewBuilder private var footer: some View {
-        if hasText && message.reactions.isEmpty {
+        if hasText && reactions.isEmpty {
             InlineTimeText(text: message.text, time: time(), accent: palette.accent)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
@@ -718,16 +742,16 @@ struct MessageBubble: View {
             VStack(alignment: .leading, spacing: 6) {
                 InlineTimeText(text: message.text, accent: palette.accent)
                 HStack(alignment: .bottom, spacing: 8) {
-                    BubbleReactions(reactions: message.reactions, accent: palette.accent, reactors: reactors, toggle: onReact)
+                    BubbleReactions(reactions: reactions, accent: palette.accent, reactors: reactors, toggle: onReact)
                     Spacer(minLength: 4)
                     time()
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-        } else if !message.reactions.isEmpty {
+        } else if !reactions.isEmpty {
             HStack(alignment: .bottom, spacing: 8) {
-                BubbleReactions(reactions: message.reactions, accent: palette.accent, reactors: reactors, toggle: onReact)
+                BubbleReactions(reactions: reactions, accent: palette.accent, reactors: reactors, toggle: onReact)
                 Spacer(minLength: 4)
                 time()
             }
@@ -767,13 +791,9 @@ struct MessageBubble: View {
 
     private func giftCard(_ gift: ChatGift) -> some View {
         VStack(spacing: 6) {
-            GiftArt(
-                path: gift.collectible.map { "/assets/gifts/\($0.modelAsset).webp" } ?? "/assets/gifts/\(gift.giftId).webp",
-                collectible: gift.collectible,
-                featured: true
-            )
-            .frame(width: 150, height: 150)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            giftArt(gift)
+                .frame(width: 150, height: 150)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             Text(GiftCatalog.shared.name(for: gift.giftId).map { "Подарок «\($0)»" } ?? "Подарок")
                 .font(.system(size: 15, weight: .semibold))
             HStack(spacing: 4) {
@@ -790,6 +810,16 @@ struct MessageBubble: View {
         .frame(maxWidth: .infinity)
     }
 
+    @ViewBuilder private func giftArt(_ gift: ChatGift) -> some View {
+        let path = gift.collectible.map { "/assets/gifts/\($0.modelAsset).webp" } ?? "/assets/gifts/\(gift.giftId).webp"
+        if ChatProbe.has("nogift") {
+            // Probe: the picture alone, no gift player.
+            RemoteImage(url: session.api.mediaURL(path), maxPixel: 360, contentMode: .fit, placeholder: .clear)
+        } else {
+            GiftArt(path: path, collectible: gift.collectible, animated: !ChatProbe.has("stillgift"), featured: true)
+        }
+    }
+
     private func measure() async {
         guard ratio == nil, media.count == 1, let item = media.first, let url = session.api.mediaURL(item.path) else { return }
         let image = item.isVideo
@@ -798,7 +828,7 @@ struct MessageBubble: View {
         guard let image, image.size.height > 0 else { return }
         ratio = image.size.width / image.size.height
         #if DEBUG
-        ChatTrace.note("ratio " + message.id)
+        ChatProbe.count("ratio " + ChatProbe.short(message.id))
         #endif
     }
 }
