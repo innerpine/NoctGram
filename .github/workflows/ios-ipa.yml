@@ -209,9 +209,9 @@ jobs:
             -destination "platform=iOS Simulator,id=$UDID" \
             -derivedDataPath build -only-testing:NoctgramUITests > uitest.log 2>&1
           status=$?
-          grep -E "Test Case .*(passed|failed)|error:|Executed|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)" uitest.log | sort -u | head -80
+          grep -E "Test Case .*(passed|failed)|error:|Executed|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|moved by" uitest.log | sort -u | head -80
           [ $status -ne 0 ] && tail -n 80 uitest.log
-          ls "$GITHUB_WORKSPACE/shots" | tail -5
+          ls "$GITHUB_WORKSPACE/shots" | grep -E '^2[2-9]' 
           exit $status
 
       - uses: actions/upload-artifact@v4

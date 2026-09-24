@@ -252,6 +252,19 @@ struct RoomChatView: View {
         { frame in present(message, frame: frame, joinsPrevious: joinsPrevious) }
     }
 
+    private var reactable: Bool { !store.isSecret && !session.readOnly }
+
+    private func reactAction(_ message: RoomMessage) -> (String?) -> Void {
+        { emoji in Task { await store.react(message, emoji: emoji, session: session) } }
+    }
+
+    /// The group gives counts, not names: only a reaction of the viewer's
+    /// alone has a known face.
+    private func reactors(_ reaction: Reaction) -> [Identity]? {
+        guard reaction.own, reaction.count == 1, let me = session.me?.identity else { return nil }
+        return [me]
+    }
+
     private func replyAction(_ message: RoomMessage) -> () -> Void {
         {
             replyTo = message
@@ -325,7 +338,7 @@ struct RoomChatView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     InlineTimeText(text: message.text, accent: Noct.lilac)
                     HStack(alignment: .bottom, spacing: 8) {
-                        BubbleReactions(reactions: message.reactions, accent: Noct.lilac)
+                        BubbleReactions(reactions: message.reactions, accent: Noct.lilac, reactors: reactors, toggle: reactable ? reactAction(message) : nil)
                         Spacer(minLength: 4)
                         time
                     }
@@ -359,10 +372,10 @@ struct RoomChatView: View {
             frame: frame,
             mine: mine,
             bubble: AnyView(bubbleBody(message, joinsPrevious: joinsPrevious).environmentObject(session)),
-            reactions: session.readOnly ? [] : messageReactions,
+            reactions: reactable ? messageReactions : [],
             chosen: message.reactions.first(where: \.own)?.emoji,
             actions: actions,
-            react: { emoji in Task { await store.react(message, emoji: emoji, session: session) } }
+            react: reactAction(message)
         ))
     }
 }

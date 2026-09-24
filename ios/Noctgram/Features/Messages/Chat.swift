@@ -257,12 +257,13 @@ struct ChatView: View {
                         MessageBubble(
                             message: message,
                             mine: message.sender == session.myId,
-                            peerName: title.name,
+                            peer: title,
                             palette: store.palette,
                             joinsPrevious: joins,
                             openMedia: { items, position in viewer = MediaViewerState(items: items, index: position) },
                             onFocus: { frame in present(message, frame: frame, joinsPrevious: joins) },
-                            onReply: canWrite ? replyAction(message) : nil
+                            onReply: canWrite ? replyAction(message) : nil,
+                            onReact: canWrite ? reactAction(message) : nil
                         )
                         .padding(.top, joins ? 2 : 8)
                         .id(message.id)
@@ -394,6 +395,10 @@ struct ChatView: View {
         { reply(to: message) }
     }
 
+    private func reactAction(_ message: ChatMessage) -> (String?) -> Void {
+        { emoji in Task { await store.react(message, emoji: emoji, session: session) } }
+    }
+
     /// Lifts a held message over the blurred screen, as in Telegram.
     private func present(_ message: ChatMessage, frame: CGRect, joinsPrevious: Bool) {
         let mine = message.sender == session.myId
@@ -404,7 +409,7 @@ struct ChatView: View {
                 MessageBubble(
                     message: message,
                     mine: mine,
-                    peerName: title.name,
+                    peer: title,
                     palette: store.palette,
                     joinsPrevious: joinsPrevious,
                     openMedia: { _, _ in },
@@ -415,7 +420,7 @@ struct ChatView: View {
             reactions: canWrite ? messageReactions : [],
             chosen: message.reactions.first(where: \.own)?.emoji,
             actions: actions(for: message),
-            react: { emoji in Task { await store.react(message, emoji: emoji, session: session) } }
+            react: reactAction(message)
         ))
     }
 
@@ -552,7 +557,8 @@ struct MessageBubble: View {
     @EnvironmentObject private var session: AppSession
     let message: ChatMessage
     let mine: Bool
-    let peerName: String
+    /// The other person of the dialogue.
+    let peer: Identity
     let palette: ChatPalette
     /// The previous message is from the same sender a moment earlier.
     let joinsPrevious: Bool
@@ -563,6 +569,8 @@ struct MessageBubble: View {
     var onFocus: ((CGRect) -> Void)?
     /// Swiping left answers the message.
     var onReply: (() -> Void)?
+    /// A tap on a reaction puts it (an emoji) or takes the viewer's back (nil).
+    var onReact: ((String?) -> Void)?
     @State private var ratio: CGFloat?
 
     private let maxMedia: CGFloat = 270
@@ -595,6 +603,15 @@ struct MessageBubble: View {
               let url = session.api.mediaURL(item.path),
               let image = ImagePipeline.shared.cached(url, maxPixel: 900), image.size.height > 0 else { return nil }
         return image.size.width / image.size.height
+    }
+
+    /// A dialogue has two people, so every reaction has a face: the other
+    /// person's and the viewer's own.
+    private func reactors(_ reaction: Reaction) -> [Identity]? {
+        var people: [Identity] = []
+        if reaction.count - (reaction.own ? 1 : 0) == 1 { people.append(peer) }
+        if reaction.own, let me = session.me?.identity { people.append(me) }
+        return people.count == reaction.count ? people : nil
     }
 
     private func time(onMedia: Bool = false) -> BubbleTime {
@@ -651,7 +668,7 @@ struct MessageBubble: View {
                     }
                     if let reply = message.reply {
                         BubbleQuote(
-                            name: reply.sender == session.myId ? "Вы" : (reply.name.isEmpty ? peerName : reply.name),
+                            name: reply.sender == session.myId ? "Вы" : (reply.name.isEmpty ? peer.name : reply.name),
                             text: reply.unavailable ? "Сообщение удалено" : PremiumEmoji.replace(reply.text.isEmpty ? "Вложение" : reply.text),
                             accent: palette.accent
                         )
@@ -691,7 +708,7 @@ struct MessageBubble: View {
             VStack(alignment: .leading, spacing: 6) {
                 InlineTimeText(text: message.text, accent: palette.accent)
                 HStack(alignment: .bottom, spacing: 8) {
-                    BubbleReactions(reactions: message.reactions, accent: palette.accent)
+                    BubbleReactions(reactions: message.reactions, accent: palette.accent, reactors: reactors, toggle: onReact)
                     Spacer(minLength: 4)
                     time()
                 }
@@ -700,7 +717,7 @@ struct MessageBubble: View {
             .padding(.vertical, 7)
         } else if !message.reactions.isEmpty {
             HStack(alignment: .bottom, spacing: 8) {
-                BubbleReactions(reactions: message.reactions, accent: palette.accent)
+                BubbleReactions(reactions: message.reactions, accent: palette.accent, reactors: reactors, toggle: onReact)
                 Spacer(minLength: 4)
                 time()
             }

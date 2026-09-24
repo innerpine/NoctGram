@@ -252,21 +252,136 @@ struct BubbleQuote: View {
     }
 }
 
-/// Reactions under a message.
+/// Reactions under a message, as in Telegram: the emoji with the faces of
+/// up to three people who chose it, one behind another; from four people
+/// on, or when it is unknown who reacted, the count. The viewer's own
+/// reaction is filled with the accent. A tap puts the reaction or takes it
+/// back.
 struct BubbleReactions: View {
     let reactions: [Reaction]
     let accent: Color
+    /// Who chose the reaction, when known; nil shows the count.
+    var reactors: (Reaction) -> [Identity]? = { _ in nil }
+    var toggle: ((String?) -> Void)?
 
     var body: some View {
-        HStack(spacing: 4) {
+        FlowRows(spacing: 5) {
             ForEach(reactions, id: \.emoji) { reaction in
-                Text("\(reaction.emoji) \(reaction.count)")
-                    .font(.system(size: 13, weight: .medium))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(reaction.own ? accent.opacity(0.3) : Color.white.opacity(0.1)))
+                if let toggle {
+                    Button {
+                        toggle(reaction.own ? nil : reaction.emoji)
+                    } label: {
+                        chip(reaction)
+                    }
+                    .buttonStyle(PressableStyle())
+                } else {
+                    chip(reaction)
+                }
             }
         }
+    }
+
+    private func chip(_ reaction: Reaction) -> some View {
+        let people = reaction.count <= 3 ? reactors(reaction).flatMap { $0.count == reaction.count ? $0 : nil } : nil
+        return HStack(spacing: 4) {
+            Text(reaction.emoji)
+                .font(.system(size: 17))
+            if let people {
+                StackedAvatars(people: people, size: 24)
+            } else {
+                Text(Format.count(reaction.count))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(reaction.own ? Color.black.opacity(0.8) : accent)
+                    .monospacedDigit()
+                    .padding(.trailing, 5)
+            }
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, 3)
+        .frame(height: 30)
+        .background(Capsule().fill(reaction.own ? accent : accent.opacity(0.18)))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(people.map { "\(reaction.emoji) " + $0.map(\.name).joined(separator: ", ") } ?? "\(reaction.emoji) \(reaction.count)")
+    }
+}
+
+/// Faces overlapping from left to right, each tucked behind the one before
+/// it with a thin transparent gap, as under Telegram reactions.
+struct StackedAvatars: View {
+    let people: [Identity]
+    var size: CGFloat = 24
+    private let gap: CGFloat = 1.5
+
+    private var step: CGFloat { size * 0.62 }
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            ForEach(Array(people.enumerated()), id: \.offset) { index, person in
+                AvatarView(person: person, size: size, ring: false)
+                    .mask {
+                        Rectangle()
+                            .overlay(alignment: .leading) {
+                                if index > 0 {
+                                    Circle()
+                                        .frame(width: size + gap * 2, height: size + gap * 2)
+                                        .offset(x: -step - gap)
+                                        .blendMode(.destinationOut)
+                                }
+                            }
+                            .compositingGroup()
+                    }
+                    .offset(x: CGFloat(index) * step)
+            }
+        }
+        .frame(width: size + CGFloat(max(0, people.count - 1)) * step, height: size, alignment: .leading)
+    }
+}
+
+/// Views in rows that wrap like words (reaction chips).
+struct FlowRows: Layout {
+    var spacing: CGFloat = 4
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(subviews, width: proposal.width ?? .infinity)
+        let width = rows.map { $0.width }.max() ?? 0
+        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(0, rows.count - 1))
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(subviews, width: bounds.width) {
+            var x = bounds.minX
+            for index in row.items {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row {
+        var items: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func arrange(_ subviews: Subviews, width: CGFloat) -> [Row] {
+        var rows: [Row] = []
+        var row = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            if !row.items.isEmpty && row.width + spacing + size.width > width {
+                rows.append(row)
+                row = Row()
+            }
+            row.width += (row.items.isEmpty ? 0 : spacing) + size.width
+            row.height = max(row.height, size.height)
+            row.items.append(index)
+        }
+        if !row.items.isEmpty { rows.append(row) }
+        return rows
     }
 }
 

@@ -51,6 +51,28 @@ def gift_list():
     return {"gifts": gifts, "next": None}
 
 
+def with_own(reactions, emoji):
+    """Reactions after the viewer picks emoji or takes theirs back (None):
+    one reaction per person, as lib/message-reactions-store.ts keeps them."""
+    result = []
+    for reaction in reactions:
+        reaction = dict(reaction)
+        if reaction["own"]:
+            reaction["count"] -= 1
+            reaction["own"] = 0
+        if reaction["count"] > 0:
+            result.append(reaction)
+    if emoji:
+        for reaction in result:
+            if reaction["emoji"] == emoji:
+                reaction["count"] += 1
+                reaction["own"] = 1
+                break
+        else:
+            result.append({"emoji": emoji, "count": 1, "own": 1})
+    return result
+
+
 def photo(media_id):
     return {"id": media_id, "name": "photo.jpg", "type": "image/jpeg", "size": 184320, "kind": "image"}
 
@@ -61,29 +83,30 @@ def dialogue():
     base = R["messagesBob"]
     start = max(m["created"] for m in base)
     me, bob = META["me"], META["bob"]
+    both = [{"emoji": "🔥", "count": 2, "own": 1}]
+    from_bob = [{"emoji": "❤️", "count": 1, "own": 0}]
     extra = [
-        (bob, "", [photo("b23ae726-b170-4db7-968e-c7dadbebcdbc")], None),
-        (bob, "Смотри, какой вид с крыши 😍", [], None),
-        (me, "Красота! А это моя луна сегодня", [photo("d2d76d31-94a6-496c-8405-251c1042f0b4")], None),
-        (me, "ок", [], None),
-        (bob, "Во сколько встречаемся?", [], {"id": "x", "sender": me, "name": "", "text": "Фото", "unavailable": 0}),
-        (bob, "🔥", [], None),
+        (bob, "", [photo("b23ae726-b170-4db7-968e-c7dadbebcdbc")], None, []),
+        (bob, "Смотри, какой вид с крыши 😍", [], None, both),
+        (me, "Красота! А это моя луна сегодня", [photo("d2d76d31-94a6-496c-8405-251c1042f0b4")], None, from_bob),
+        (me, "ок", [], None, []),
+        (bob, "Во сколько встречаемся?", [], {"id": "x", "sender": me, "name": "", "text": "Фото", "unavailable": 0}, []),
+        (bob, "🔥", [], None, []),
     ]
     messages = [dict(message) for message in base]
-    for index, (sender, text, attachments, reply) in enumerate(extra):
+    for index, (sender, text, attachments, reply, reactions) in enumerate(extra):
         message = {
             "id": f"message:{sender}:mock-{index}", "sender": sender,
             "recipient": bob if sender == me else me, "text": text,
             "created": start + (index + 1) * 60000, "read": 1, "editedAt": 0, "forwardedName": "",
-            "pinnedAt": None, "reactions": [], "attachments": attachments,
+            "pinnedAt": None, "reactions": reactions, "attachments": attachments,
         }
         if reply:
             message["reply"] = reply
         messages.append(message)
     for message in messages:
-        emoji = STATE["reactions"].get(message["id"])
-        if emoji:
-            message["reactions"] = [{"emoji": emoji, "count": 1, "own": 1}]
+        if message["id"] in STATE["reactions"]:
+            message["reactions"] = with_own(message["reactions"], STATE["reactions"][message["id"]])
         if STATE["pins"].get(message["id"]):
             message["pinnedAt"] = message["created"]
     return messages
@@ -98,24 +121,26 @@ def room():
         bob: ("Боб", R["profileBob"]["avatar"]),
         carol: ("Кэрол", ""),
     }
+    # Many people: the counts show instead of faces.
+    popular = [{"emoji": "👍", "count": 5, "own": 0}, {"emoji": "🔥", "count": 2, "own": 1}]
     lines = [
-        (bob, "Всем привет! Кто сегодня гуляет?", ""),
-        (carol, "Я за! Где встречаемся?", ""),
-        (carol, "Могу взять термос с чаем ☕️", ""),
-        (me, "У набережной в девять", ""),
-        (bob, "Отлично, буду", "room:mock-3"),
-        (bob, "Возьму камеру 📷", ""),
+        (bob, "Всем привет! Кто сегодня гуляет?", "", popular),
+        (carol, "Я за! Где встречаемся?", "", []),
+        (carol, "Могу взять термос с чаем ☕️", "", []),
+        (me, "У набережной в девять", "", []),
+        (bob, "Отлично, буду", "room:mock-3", []),
+        (bob, "Возьму камеру 📷", "", []),
     ]
     messages = []
-    for index, (sender, text, reply) in enumerate(lines):
+    for index, (sender, text, reply, reactions) in enumerate(lines):
         message_id = f"room:mock-{index}"
         name, avatar = people[sender]
-        emoji = STATE["roomReactions"].get(message_id)
+        if message_id in STATE["roomReactions"]:
+            reactions = with_own(reactions, STATE["roomReactions"][message_id])
         messages.append({
             "id": message_id, "roomId": ROOM, "sender": sender, "senderName": name, "senderAvatar": avatar,
             "text": text, "ciphertext": None, "replyTo": reply, "created": ROOM_START + index * 120000,
-            "deletedAt": 0, "giveawayId": None,
-            "reactions": [{"emoji": emoji, "count": 1, "own": 1}] if emoji else [],
+            "deletedAt": 0, "giveawayId": None, "reactions": reactions,
         })
     members = [{"userId": user, "name": name, "avatar": avatar, "handle": "", "role": "owner" if user == bob else "member",
                 "status": "active", "publicKey": None, "joinedAt": ROOM_START} for user, (name, avatar) in people.items()]
