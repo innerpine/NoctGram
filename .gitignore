@@ -66,3 +66,7 @@ next-env.d.ts
 *.jks
 /ios/build/
 /ios/Noctgram.xcodeproj/
+
+# Python caches (mock server)
+__pycache__/
+*.pyc
