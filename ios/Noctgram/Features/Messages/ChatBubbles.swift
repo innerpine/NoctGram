@@ -227,7 +227,7 @@ struct BubbleTime: View {
             label(color: .white)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
-                .glassCapsule(tint: Color.black.opacity(0.35))
+                .background(Capsule().fill(Color.black.opacity(0.45)))
         } else {
             label(color: mine ? Color.white.opacity(0.6) : Noct.text48)
         }
@@ -513,7 +513,7 @@ struct ChatMedia: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 44, height: 44)
-                        .glassCircle()
+                        .background(Circle().fill(Color.black.opacity(0.45)))
                 } else {
                     RemoteImage(url: session.api.mediaURL(item.path), maxPixel: 900)
                 }

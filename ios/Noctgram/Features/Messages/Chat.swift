@@ -251,7 +251,10 @@ struct ChatView: View {
                                 .foregroundColor(Noct.text60)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 5)
-                                .glassCapsule()
+                                // Content, not a control: a plain pill. Liquid
+                                // Glass inside the scrolling list kept iOS 26
+                                // redrawing it without end.
+                                .background(Capsule().fill(Color.white.opacity(0.08)))
                                 .padding(.top, 10)
                                 .padding(.bottom, 2)
                         }
