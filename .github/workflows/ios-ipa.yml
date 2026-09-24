@@ -203,12 +203,21 @@ jobs:
           # Swipe to reply and hold for reactions, on the mock server started
           # above; the tests save their own screenshots into shots/.
           set +e
+          # Samples the app every 12 s: if a check finds its main thread busy,
+          # the busy call path is printed below.
+          samples="$RUNNER_TEMP/samples"; mkdir -p "$samples"
+          ( while sleep 12; do
+              pid=$(pgrep -x Noctgram | head -1)
+              [ -n "$pid" ] && sample "$pid" 2 -mayDie -file "$samples/$(date +%H%M%S).txt" >/dev/null 2>&1
+            done ) &
+          sampler=$!
           TEST_RUNNER_SHOTS_DIR="$GITHUB_WORKSPACE/shots" TEST_RUNNER_NOCT_SERVER="http://127.0.0.1:8765" \
           xcodebuild test \
             -project Noctgram.xcodeproj -scheme Noctgram -configuration Debug \
             -destination "platform=iOS Simulator,id=$UDID" \
             -derivedDataPath build -only-testing:NoctgramUITests > uitest.log 2>&1
           status=$?
+          kill $sampler 2>/dev/null
           grep -E "Test Case .*(passed|failed)|error:|Executed|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|moved by" uitest.log | sort -u | head -80
           if [ $status -ne 0 ]; then
             # Failed checks print the element tree of the app.
@@ -217,6 +226,28 @@ jobs:
             for report in ~/Library/Logs/DiagnosticReports/Noctgram*; do
               [ -f "$report" ] && head -c 6000 "$report"
             done
+            # The main thread's dominant call path in samples where it was busy.
+            python3 - "$samples" <<'PY'
+          import glob, os, re, sys
+          for path in sorted(glob.glob(os.path.join(sys.argv[1], "*.txt"))):
+              lines = open(path, errors="replace").read().split("\n")
+              start = next((i for i, l in enumerate(lines) if "com.apple.main-thread" in l), None)
+              if start is None:
+                  continue
+              total = int(re.search(r"(\d+)", lines[start]).group(1))
+              path_lines = []
+              for line in lines[start + 1:]:
+                  if re.match(r"^\s{4}\d+ Thread_", line) or not line.strip():
+                      break
+                  m = re.match(r"^([\s+!:|]*)(\d+) (.*)$", line)
+                  if m and int(m.group(2)) * 2 >= total:
+                      path_lines.append((len(m.group(1)), m.group(2), m.group(3)[:150]))
+              if not path_lines or "mach_msg" in path_lines[-1][2]:
+                  continue
+              print("--- busy main thread, sample", os.path.basename(path))
+              for depth, count, frame in path_lines[-45:]:
+                  print(f"{count:>5} {' ' * (depth // 2)}{frame}")
+          PY
           fi
           ls "$GITHUB_WORKSPACE/shots" | grep -E '^[23][0-9]-'
           # Which gift animations were drawn on the main thread.
