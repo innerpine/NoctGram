@@ -72,17 +72,38 @@ struct ChatFollowsEnd<Messages: Equatable>: ViewModifier {
     /// The reply or edit shown over the composer.
     let bar: String?
     let messages: Messages
+    /// The end showed when a reply bar or the keyboard began to come up: they
+    /// cover it (atEnd turns false) before the keyboard has finished rising.
+    @State private var endBeforeKeyboard = false
 
     func body(content: Content) -> some View {
         content
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in follow() }
-            .onChange(of: bar) { _ in follow() }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                if atEnd { endBeforeKeyboard = true }
+                follow()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+                if endBeforeKeyboard { scrollToEnd() }
+                endBeforeKeyboard = false
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                endBeforeKeyboard = false
+            }
+            .onChange(of: bar) { _ in
+                if atEnd { endBeforeKeyboard = true }
+                follow()
+            }
             .onChange(of: messages) { _ in follow() }
     }
 
     private func follow() {
-        guard atEnd, let last else { return }
-        // On the next pass, once the reply bar or the grown bubble is laid out.
+        if atEnd { scrollToEnd() }
+    }
+
+    private func scrollToEnd() {
+        guard let last else { return }
+        // On the next pass, once the reply bar, the keyboard's inset or the
+        // grown bubble is laid out.
         DispatchQueue.main.async {
             withAnimation(Noct.quick) { proxy.scrollTo(last, anchor: .bottom) }
         }
