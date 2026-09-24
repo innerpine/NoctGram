@@ -1,0 +1,96 @@
+name: iOS IPA
+
+# Builds an unsigned Noctgram.ipa for sideloading. The IPA is re-signed on the
+# device (ESign, Sideloadly, AltStore) with the user's own certificate.
+on:
+  push:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-ipa.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-ipa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build app (unsigned)
+        working-directory: ios
+        run: |
+          set +e
+          xcodebuild build \
+            -project Noctgram.xcodeproj -scheme Noctgram -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            > build.log 2>&1
+          status=$?
+          # Compiler errors as annotations, so they are readable without the raw log.
+          grep -E '^/.+:[0-9]+:[0-9]+: error: ' build.log | sort -u | head -50 | while IFS= read -r line; do
+            file="${line%%:*}"; rest="${line#*:}"; row="${rest%%:*}"
+            echo "::error file=${file#$GITHUB_WORKSPACE/},line=$row::${line#*error: }"
+          done
+          grep -E 'error:|BUILD (SUCCEEDED|FAILED)' build.log | sort -u | head -200
+          tail -n 30 build.log
+          exit $status
+
+      - name: Package IPA
+        run: |
+          APP="ios/build/Build/Products/Release-iphoneos/Noctgram.app"
+          # An ad-hoc signature gives every re-signer a code signature slot to replace.
+          codesign --force --sign - --timestamp=none "$APP"
+          mkdir -p dist/Payload
+          cp -R "$APP" dist/Payload/
+          cd dist
+          zip -qry Noctgram.ipa Payload
+          rm -rf Payload
+          ls -la
+          shasum -a 256 Noctgram.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Noctgram-ipa-${{ github.run_number }}
+          path: dist/Noctgram.ipa
+          retention-days: 30
+
+      - name: Publish rolling release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ios-latest --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+          gh release create ios-latest dist/Noctgram.ipa \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Noctgram iOS — сборка ${{ github.run_number }}" \
+            --notes "Неподписанный Noctgram.ipa из ветки ${GITHUB_REF_NAME} (${GITHUB_SHA::7}). Подпиши своим сертификатом в ESign и установи. Инструкция: ios/README.md."

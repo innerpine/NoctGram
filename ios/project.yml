@@ -1,0 +1,68 @@
+# XcodeGen spec for the Noctgram iOS app. `xcodegen generate` in this folder
+# creates Noctgram.xcodeproj (not committed); see README.md.
+name: Noctgram
+options:
+  bundleIdPrefix: com.noctgram
+  deploymentTarget:
+    iOS: "16.0"
+  developmentLanguage: ru
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_BITCODE: NO
+    DEAD_CODE_STRIPPING: YES
+targets:
+  Noctgram:
+    type: application
+    platform: iOS
+    sources:
+      - path: Noctgram
+    info:
+      path: Noctgram/Info.plist
+      properties:
+        CFBundleDisplayName: Noctgram
+        CFBundleName: Noctgram
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: ru
+        LSRequiresIPhoneOS: true
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+          UIImageName: Logo
+          UIImageRespectsSafeAreaInsets: true
+        UIUserInterfaceStyle: Dark
+        UIStatusBarStyle: UIStatusBarStyleLightContent
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # Keep the flat black bars of the Noctgram design on iOS 26 as well.
+        UIDesignRequiresCompatibility: true
+        ITSAppUsesNonExemptEncryption: false
+        NSPhotoLibraryUsageDescription: Noctgram открывает фото и видео, которые ты выбираешь для публикаций, аватара, обложки и сообщений.
+        NSCameraUsageDescription: Noctgram использует камеру, чтобы снять фото для публикации или сообщения.
+        NSPhotoLibraryAddUsageDescription: Noctgram сохраняет выбранные фото в твою медиатеку.
+        # A self-hosted or local development server may use plain http.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.noctgram.ios
+        PRODUCT_NAME: Noctgram
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+schemes:
+  Noctgram:
+    build:
+      targets:
+        Noctgram: all
+    run:
+      config: Debug
+    archive:
+      config: Release
