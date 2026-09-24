@@ -67,44 +67,69 @@ struct MainTabView: View {
     @StateObject private var nav = Navigator()
 
     var body: some View {
-        TabView(selection: nav.tabSelection) {
-            NavigationStack(path: $nav.feedPath) {
-                FeedView().appRoutes()
-            }
-            .tabItem { Label("Лента", systemImage: "house") }
-            .tag(AppTab.feed)
+        tabs
+            .environmentObject(nav)
+            .environment(\.openURL, OpenURLAction { url in nav.open(url) })
+            #if DEBUG
+            .onAppear { DebugLaunch.apply(nav) }
+            #endif
+    }
 
-            NavigationStack(path: $nav.searchPath) {
-                SearchView().appRoutes()
+    /// iOS 18+ tabs: on iOS 26 they float in a Liquid Glass bar that shrinks
+    /// while scrolling, with «Поиск» as the separate search button.
+    @ViewBuilder private var tabs: some View {
+        if #available(iOS 18.0, *) {
+            TabView(selection: nav.tabSelection) {
+                Tab("Лента", systemImage: "house", value: AppTab.feed) { feed }
+                Tab("Сообщения", systemImage: "bubble.left.and.bubble.right", value: AppTab.messages) { messages }
+                    .badge(session.unreadMessages)
+                Tab("Уведомления", systemImage: "bell", value: AppTab.notifications) { notifications }
+                    .badge(session.unreadNotifications)
+                Tab("Профиль", systemImage: "person.crop.circle", value: AppTab.profile) { profile }
+                Tab("Поиск", systemImage: "magnifyingglass", value: AppTab.search, role: .search) { search }
             }
-            .tabItem { Label("Поиск", systemImage: "magnifyingglass") }
-            .tag(AppTab.search)
-
-            NavigationStack(path: $nav.messagesPath) {
-                ThreadsView().appRoutes()
+            .minimizesTabBarOnScroll()
+        } else {
+            TabView(selection: nav.tabSelection) {
+                feed
+                    .tabItem { Label("Лента", systemImage: "house") }
+                    .tag(AppTab.feed)
+                search
+                    .tabItem { Label("Поиск", systemImage: "magnifyingglass") }
+                    .tag(AppTab.search)
+                messages
+                    .tabItem { Label("Сообщения", systemImage: "bubble.left.and.bubble.right") }
+                    .badge(session.unreadMessages)
+                    .tag(AppTab.messages)
+                notifications
+                    .tabItem { Label("Уведомления", systemImage: "bell") }
+                    .badge(session.unreadNotifications)
+                    .tag(AppTab.notifications)
+                profile
+                    .tabItem { Label("Профиль", systemImage: "person.crop.circle") }
+                    .tag(AppTab.profile)
             }
-            .tabItem { Label("Сообщения", systemImage: "bubble.left.and.bubble.right") }
-            .badge(session.unreadMessages)
-            .tag(AppTab.messages)
-
-            NavigationStack(path: $nav.notificationsPath) {
-                NotificationsView().appRoutes()
-            }
-            .tabItem { Label("Уведомления", systemImage: "bell") }
-            .badge(session.unreadNotifications)
-            .tag(AppTab.notifications)
-
-            NavigationStack(path: $nav.profilePath) {
-                MyProfileView().appRoutes()
-            }
-            .tabItem { Label("Профиль", systemImage: "person.crop.circle") }
-            .tag(AppTab.profile)
         }
-        .environmentObject(nav)
-        .environment(\.openURL, OpenURLAction { url in nav.open(url) })
-        #if DEBUG
-        .onAppear { DebugLaunch.apply(nav) }
-        #endif
+    }
+
+    private var feed: some View {
+        NavigationStack(path: $nav.feedPath) { FeedView().appRoutes() }
+    }
+
+    private var search: some View {
+        NavigationStack(path: $nav.searchPath) { SearchView().appRoutes() }
+    }
+
+    private var messages: some View {
+        NavigationStack(path: $nav.messagesPath) { ThreadsView().appRoutes() }
+    }
+
+    private var notifications: some View {
+        NavigationStack(path: $nav.notificationsPath) { NotificationsView().appRoutes() }
+    }
+
+    private var profile: some View {
+        NavigationStack(path: $nav.profilePath) { MyProfileView().appRoutes() }
     }
 }
 
@@ -196,11 +221,10 @@ struct ToastView: View {
             .font(.system(size: 14, weight: .medium))
             .foregroundColor(.white)
             .multilineTextAlignment(.center)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
-            .background(Capsule().fill(Noct.elevated))
-            .overlay(Capsule().stroke(Noct.borderStrong, lineWidth: 1))
-            .shadow(color: .black.opacity(0.5), radius: 16, y: 6)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .glassCapsule()
+            .shadow(color: .black.opacity(LiquidGlass.isNative ? 0 : 0.35), radius: 16, y: 6)
             .padding(.horizontal, 24)
     }
 }

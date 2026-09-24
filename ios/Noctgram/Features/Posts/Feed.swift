@@ -11,13 +11,31 @@ struct SegmentOption: Identifiable, Hashable {
     }
 }
 
-/// Capsule segments with a sliding selection (feed-tabs on the web).
+/// Segments (feed-tabs on the web). iOS 26 uses the system segmented
+/// control, whose selection is a Liquid Glass lens; earlier systems get a
+/// glass track with a sliding capsule.
 struct NoctSegments: View {
     let options: [SegmentOption]
     @Binding var selection: String
     @Namespace private var namespace
 
     var body: some View {
+        if #available(iOS 26.0, *) {
+            Picker("", selection: $selection.animation(.timingCurve(0.22, 1, 0.36, 1, duration: 0.3))) {
+                ForEach(options) { option in
+                    Text(option.title).tag(option.key)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.large)
+            .sensoryFeedback(.selection, trigger: selection)
+        } else {
+            track
+        }
+    }
+
+    private var track: some View {
         HStack(spacing: 0) {
             ForEach(options) { option in
                 Button {
@@ -32,7 +50,8 @@ struct NoctSegments: View {
                         .background {
                             if selection == option.key {
                                 Capsule()
-                                    .fill(Noct.selected)
+                                    .fill(Color.white.opacity(0.14))
+                                    .overlay(Capsule().stroke(LiquidGlass.rim, lineWidth: 0.75))
                                     .matchedGeometryEffect(id: "segment", in: namespace)
                             }
                         }
@@ -42,8 +61,7 @@ struct NoctSegments: View {
             }
         }
         .padding(4)
-        .background(Capsule().fill(Noct.card))
-        .overlay(Capsule().stroke(Noct.border, lineWidth: 1))
+        .glassCapsule()
     }
 }
 
@@ -200,9 +218,10 @@ struct FeedView: View {
                 Image(systemName: "photo")
                     .foregroundColor(Noct.text48)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .noctCard()
+            .padding(.leading, 8)
+            .padding(.trailing, 16)
+            .padding(.vertical, 8)
+            .glassCapsule(interactive: true)
         }
         .buttonStyle(PressableStyle())
     }
@@ -240,7 +259,7 @@ struct RecommendationsRow: View {
                             .foregroundColor(on ? .white : .black)
                             .padding(.horizontal, 12)
                             .frame(height: 30)
-                            .background(Capsule().fill(on ? Noct.fillStrong : Color.white))
+                            .glassCapsule(interactive: true, tint: on ? nil : .white)
                             .disabled(session.readOnly)
                         }
                         .frame(width: 132)
@@ -347,7 +366,7 @@ struct PostDetailView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Noct.background)
-        .safeAreaInset(edge: .bottom) {
+        .glassBottomBar {
             if let post, !session.readOnly {
                 ComposerBar(text: $text, placeholder: "Написать комментарий…", sending: comments.sending, focus: $focused, leading: nil) {
                     Task {

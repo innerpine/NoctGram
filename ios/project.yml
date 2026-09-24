@@ -40,8 +40,6 @@ targets:
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        # Keep the flat black bars of the Noctgram design on iOS 26 as well.
-        UIDesignRequiresCompatibility: true
         ITSAppUsesNonExemptEncryption: false
         NSPhotoLibraryUsageDescription: Noctgram открывает фото и видео, которые ты выбираешь для публикаций, аватара, обложки и сообщений.
         NSCameraUsageDescription: Noctgram использует камеру, чтобы снять фото для публикации или сообщения.

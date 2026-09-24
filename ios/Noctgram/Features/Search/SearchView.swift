@@ -36,7 +36,7 @@ struct SearchView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Noct.background)
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Публикации, люди, #теги")
+        .glassSearchable(text: $query, prompt: "Публикации, люди, #теги")
         .navigationTitle("Поиск")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: "\(term)|\(scope)") {
@@ -59,16 +59,11 @@ struct SearchView: View {
                         nav.push(.tag(topic.tag))
                     } label: {
                         HStack(spacing: 6) {
-                            Text(topic.tag).font(.system(size: 14, weight: .semibold))
+                            Text(topic.tag).foregroundColor(.white)
                             Text("\(topic.count)").font(.system(size: 12)).foregroundColor(Noct.text48)
                         }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .frame(height: 34)
-                        .background(Capsule().fill(Noct.fill))
-                        .overlay(Capsule().stroke(Noct.border, lineWidth: 1))
                     }
-                    .buttonStyle(PressableStyle())
+                    .buttonStyle(ChipButtonStyle())
                 }
             }
         }
@@ -109,7 +104,7 @@ struct SearchView: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .frame(width: 36, height: 36)
-                    .background(Circle().fill(Noct.fill))
+                    .glassCircle()
                 Text(title).font(.system(size: 15))
                 Spacer()
                 Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundColor(Noct.text48)

@@ -151,7 +151,8 @@ struct CommentRow: View {
     }
 }
 
-/// Growing text field with a send button; used by comments and chats.
+/// Growing glass field with a send button; used by comments and chats.
+/// It floats over the content like the iOS 26 Messages composer.
 struct ComposerBar: View {
     @Binding var text: String
     var placeholder: String
@@ -161,40 +162,101 @@ struct ComposerBar: View {
     let send: () -> Void
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            if let leading { leading }
-            TextField(placeholder, text: $text, axis: .vertical)
-                .lineLimit(1...6)
-                .font(.system(size: 16))
-                .focused(focus)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color(hex: 0x141416)))
-                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Noct.borderStrong, lineWidth: 1))
-            Button(action: send) {
-                ZStack {
-                    if sending {
-                        ProgressView().tint(.black)
-                    } else {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: 16, weight: .bold))
+        GlassGroup(spacing: 6) {
+            HStack(alignment: .bottom, spacing: 8) {
+                if let leading { leading }
+                TextField(placeholder, text: $text, axis: .vertical)
+                    .lineLimit(1...6)
+                    .font(.system(size: 16))
+                    .focused(focus)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 11)
+                    .frame(minHeight: 44)
+                    .glassRect(22)
+                Button(action: send) {
+                    ZStack {
+                        if sending {
+                            ProgressView().tint(.black)
+                        } else {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 17, weight: .bold))
+                        }
                     }
                 }
-                .foregroundColor(.black)
-                .frame(width: 40, height: 40)
-                .background(Circle().fill(Color.white.opacity(canSend ? 1 : 0.35)))
+                .buttonStyle(CircleButtonStyle(size: 44, tint: canSend || sending ? .white : nil))
+                .disabled(!canSend)
+                .accessibilityLabel("Отправить")
             }
-            .buttonStyle(PressableStyle())
-            .disabled(!canSend)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.black.opacity(0.96).ignoresSafeArea(edges: .bottom))
-        .overlay(alignment: .top) { Rectangle().fill(Noct.border).frame(height: 0.5) }
+        .padding(.top, 6)
+        .padding(.bottom, 8)
     }
 
     private var canSend: Bool {
         !sending && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+/// «Ответ …» or «Редактирование» strip above a composer.
+struct ComposerContext: View {
+    let title: String
+    let text: String
+    let close: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Capsule().fill(Color.white).frame(width: 3, height: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(text)
+                    .font(.system(size: 12))
+                    .foregroundColor(Noct.text60)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            Button(action: close) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Noct.text60)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableStyle())
+            .accessibilityLabel("Отменить")
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 6)
+        .padding(.vertical, 6)
+        .glassRect(18)
+        .padding(.horizontal, 12)
+        .padding(.top, 6)
+    }
+}
+
+/// Why sending is unavailable, on glass in place of the composer.
+struct ComposerNotice: View {
+    let text: String
+    var action: String?
+    var perform: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(text)
+                .font(.system(size: 14))
+                .foregroundColor(Noct.text60)
+                .multilineTextAlignment(.center)
+            if let action, let perform {
+                Button(action, action: perform)
+                    .buttonStyle(SecondaryButtonStyle())
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(14)
+        .glassRect(22)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 }
 
@@ -244,8 +306,8 @@ struct CommentsSheet: View {
                     if let id { withAnimation { proxy.scrollTo(id, anchor: .bottom) } }
                 }
             }
-            .background(Noct.elevated.ignoresSafeArea())
-            .safeAreaInset(edge: .bottom) {
+            .sheetSurface()
+            .glassBottomBar {
                 if !session.readOnly {
                     ComposerBar(text: $text, placeholder: "Написать комментарий…", sending: store.sending, focus: $focused, leading: nil) {
                         Task {
@@ -306,12 +368,13 @@ struct SupportSheet: View {
             }
             HStack(spacing: 8) {
                 ForEach([1, 10, 50, 100, 500], id: \.self) { preset in
-                    Button("\(preset)") { amount = Double(min(preset, max(1, maximum))) }
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity, minHeight: 36)
-                        .background(Capsule().fill(Int(amount) == preset ? Noct.fillHeavy : Noct.fill))
-                        .disabled(preset > maximum)
+                    Button {
+                        amount = Double(min(preset, max(1, maximum)))
+                    } label: {
+                        Text("\(preset)").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(ChipButtonStyle(selected: Int(amount) == preset))
+                    .disabled(preset > maximum)
                 }
             }
             .padding(.horizontal, 20)
@@ -332,7 +395,7 @@ struct SupportSheet: View {
             .disabled(sending || maximum < 1 || Int(amount) > maximum)
             Spacer(minLength: 0)
         }
-        .background(Noct.elevated.ignoresSafeArea())
+        .sheetSurface()
         .presentationDetents([.height(520)])
         .task {
             if let wallet = try? await session.api.social("wallet") {

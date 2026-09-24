@@ -82,7 +82,7 @@ struct LoginView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Noct.background.ignoresSafeArea())
+        .background(NightAurora())
         .animation(Noct.motion, value: step)
         .onReceive(timer) { now = $0 }
         .sheet(isPresented: $showServer) {
@@ -105,7 +105,7 @@ struct LoginView: View {
                 .focused($focus, equals: .email)
                 .submitLabel(.continue)
                 .onSubmit { Task { await start() } }
-                .noctField()
+                .glassField()
             Button {
                 Task { await start() }
             } label: {
@@ -148,10 +148,10 @@ struct LoginView: View {
                         Text(index < characters.count ? String(characters[index]) : "")
                             .font(.system(size: 24, weight: .semibold, design: .rounded))
                             .frame(width: 46, height: 56)
-                            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(hex: 0x111113)))
+                            .glassRect(14)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(index == characters.count && focus == .code ? Color.white.opacity(0.6) : Noct.borderStrong, lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.white.opacity(index == characters.count && focus == .code ? 0.7 : 0), lineWidth: 1.5)
                             )
                     }
                 }
@@ -277,7 +277,7 @@ struct OnboardingView: View {
                     .foregroundColor(Noct.text60)
                 PhotosPicker(selection: $item, matching: .images) {
                     ZStack {
-                        Circle().fill(Noct.avatarFill)
+                        Circle().fill(Color.white.opacity(0.04))
                         if let preview {
                             Image(uiImage: preview).resizable().scaledToFill()
                         } else {
@@ -292,7 +292,7 @@ struct OnboardingView: View {
                     }
                     .frame(width: 104, height: 104)
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Noct.borderStrong, lineWidth: 1))
+                    .glassCircle(interactive: true)
                 }
                 Text("Аватарку можно пропустить")
                     .font(.system(size: 12))
@@ -300,7 +300,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Имя").font(.system(size: 13)).foregroundColor(Noct.text60)
                     TextField("Как тебя зовут", text: Binding(get: { name }, set: { name = String($0.prefix(40)) }))
-                        .noctField()
+                        .glassField()
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Юзернейм").font(.system(size: 13)).foregroundColor(Noct.text60)
@@ -313,7 +313,7 @@ struct OnboardingView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     }
-                    .noctField()
+                    .glassField()
                     Text("4–24 латинские буквы, цифры или _")
                         .font(.system(size: 12))
                         .foregroundColor(validHandle || handle.isEmpty ? Noct.text48 : Noct.red)
@@ -342,7 +342,7 @@ struct OnboardingView: View {
             .frame(maxWidth: .infinity)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Noct.background.ignoresSafeArea())
+        .background(NightAurora())
         .onChange(of: item) { value in
             guard let value else { return }
             Task { await upload(value) }
@@ -413,7 +413,7 @@ struct ServerSheet: View {
                 Spacer()
             }
             .padding(20)
-            .background(Noct.elevated.ignoresSafeArea())
+            .sheetSurface()
             .navigationTitle("Сервер")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

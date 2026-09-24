@@ -100,7 +100,7 @@ struct ProfileEditorView: View {
                     PrivacyEditor()
                 }
             }
-            .background(Noct.elevated.ignoresSafeArea())
+            .sheetSurface()
             .navigationTitle(profile.isChannel ? "Канал" : "Редактировать")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -203,7 +203,7 @@ struct ProfileEditorView: View {
 
                 ZStack {
                     AvatarView(person: Identity(id: profile.id, name: name, avatar: avatar, handle: mainHandle, kind: profile.kind, appearance: profile.appearance), size: 76, ring: false)
-                        .overlay(Circle().stroke(Noct.elevated, lineWidth: 4))
+                        .overlay(Circle().stroke(LiquidGlass.isNative ? Color.black : Noct.elevated, lineWidth: 4))
                     if uploadingAvatar {
                         Circle().fill(Color.black.opacity(0.45)).frame(width: 76, height: 76)
                         ProgressView().tint(.white)

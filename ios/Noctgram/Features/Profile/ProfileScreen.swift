@@ -27,6 +27,8 @@ struct ProfileScreen: View {
     @State private var showGift = false
     @State private var showComposer = false
     @State private var confirmBlock = false
+    /// Whether the name is on screen; the bar shows the name once it is not.
+    @State private var nameVisible = true
 
     private var profile: Profile? { store.profile }
     private var own: Bool { profile?.id == session.myId }
@@ -35,49 +37,20 @@ struct ProfileScreen: View {
         return own || (profile.isChannel && profile.canEditProfile)
     }
 
+    /// On iOS 26 the cover runs under the transparent bar with its glass
+    /// buttons; earlier systems keep it below the frosted bar.
+    private var coverUnderBar: Bool { LiquidGlass.isNative }
+
+    private var titleShown: Bool {
+        if #available(iOS 18.0, *) { return !nameVisible }
+        return true
+    }
+
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 0, pinnedViews: []) {
-                    Color.clear.frame(height: 0).id("top")
-                    if let profile {
-                        if profile.blocked {
-                            BlockedProfileView(profile: profile)
-                        } else {
-                            header(profile)
-                            tabs(profile)
-                                .padding(.top, 14)
-                                .id("tabs")
-                            content(profile)
-                                .padding(.horizontal, 12)
-                                .padding(.top, 12)
-                                .padding(.bottom, 24)
-                        }
-                    } else if let error = store.error {
-                        ErrorBanner(text: error) { Task { await store.load(target, api: session.api) } }
-                            .padding(.top, 60)
-                    } else {
-                        LoadingRow().padding(.top, 80)
-                    }
-                }
-            }
-            .background(Noct.background)
-            .refreshable {
-                await store.load(target, api: session.api)
-                if own { await session.refreshMe() }
-            }
-            .onChange(of: nav.rootTap) { tap in
-                guard isRootTab, tap.tab == .profile else { return }
-                withAnimation(Noct.motion) { proxy.scrollTo("top", anchor: .top) }
-            }
-            #if DEBUG
-            .onAppear {
-                guard isRootTab, UserDefaults.standard.string(forKey: "noct.debugScroll") == "tabs" else { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { proxy.scrollTo("tabs", anchor: .top) }
-            }
-            #endif
+        GeometryReader { geometry in
+            scroll(topInset: coverUnderBar ? geometry.safeAreaInsets.top : 0)
         }
-        .navigationTitle(profile?.name ?? "")
+        .navigationTitle(titleShown ? profile?.name ?? "" : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
         .sheet(item: $editing) { tab in
@@ -127,6 +100,54 @@ struct ProfileScreen: View {
         }
     }
 
+    private func scroll(topInset: CGFloat) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 0, pinnedViews: []) {
+                    Color.clear.frame(height: 0).id("top")
+                    if let profile {
+                        if profile.blocked {
+                            BlockedProfileView(profile: profile)
+                                .padding(.top, topInset)
+                        } else {
+                            header(profile, topInset: topInset)
+                            tabs(profile)
+                                .padding(.top, 14)
+                                .id("tabs")
+                            content(profile)
+                                .padding(.horizontal, 12)
+                                .padding(.top, 12)
+                                .padding(.bottom, 24)
+                        }
+                    } else if let error = store.error {
+                        ErrorBanner(text: error) { Task { await store.load(target, api: session.api) } }
+                            .padding(.top, 60 + topInset)
+                    } else {
+                        LoadingRow().padding(.top, 80 + topInset)
+                    }
+                }
+            }
+            .background(Noct.background)
+            .ignoresSafeArea(.container, edges: coverUnderBar ? .top : [])
+            .refreshable {
+                await store.load(target, api: session.api)
+                if own { await session.refreshMe() }
+            }
+            .onChange(of: nav.rootTap) { tap in
+                guard isRootTab, tap.tab == .profile else { return }
+                withAnimation(Noct.motion) { proxy.scrollTo("top", anchor: .top) }
+            }
+            #if DEBUG
+            .onAppear {
+                guard isRootTab, UserDefaults.standard.string(forKey: "noct.debugScroll") == "tabs" else { return }
+                // Under the iOS 26 bar the tabs stop below it, not at the screen edge.
+                let anchor = coverUnderBar ? UnitPoint(x: 0.5, y: 0.14) : .top
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { proxy.scrollTo("tabs", anchor: anchor) }
+            }
+            #endif
+        }
+    }
+
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
             if let profile {
@@ -163,7 +184,7 @@ struct ProfileScreen: View {
                         }
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: LiquidGlass.moreIcon)
                 }
             }
         }
@@ -171,26 +192,23 @@ struct ProfileScreen: View {
 
     // MARK: Header
 
-    @ViewBuilder private func header(_ profile: Profile) -> some View {
+    @ViewBuilder private func header(_ profile: Profile, topInset: CGFloat) -> some View {
         let look = profile.appearance
         let premiumSurface = look.premium && !profile.isChannel && profile.background.mode != "none"
         VStack(alignment: .leading, spacing: 0) {
-            ProfileCover(profile: profile)
+            ProfileCover(profile: profile, height: 160 + topInset)
                 .overlay(alignment: .topTrailing) {
                     if editable {
                         Button {
                             editing = .profile
                         } label: {
                             Image(systemName: "camera")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
-                                .background(Circle().fill(Color.black.opacity(0.6)))
-                                .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1))
                         }
-                        .buttonStyle(PressableStyle())
-                        .padding(12)
+                        .buttonStyle(CircleButtonStyle(size: 36))
+                        .padding(.trailing, 12)
+                        .padding(.top, topInset + (topInset > 0 ? 6 : 12))
                         .disabled(session.readOnly && !own)
+                        .accessibilityLabel("Сменить обложку")
                     }
                 }
 
@@ -225,10 +243,9 @@ struct ProfileScreen: View {
                                 .foregroundColor(Noct.text48)
                         }
                         .foregroundColor(Color.white.opacity(0.85))
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .frame(minHeight: 48)
-                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.016)))
-                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Noct.border, lineWidth: 1))
+                        .glassRect(16, interactive: true)
                     }
                     .buttonStyle(PressableStyle())
                     .padding(.top, 18)
@@ -298,6 +315,12 @@ struct ProfileScreen: View {
     }
 
     private func actions(_ profile: Profile, compact: Bool) -> some View {
+        GlassGroup(spacing: 4) {
+            actionButtons(profile, compact: compact)
+        }
+    }
+
+    private func actionButtons(_ profile: Profile, compact: Bool) -> some View {
         HStack(spacing: 8) {
             if editable {
                 if compact {
@@ -392,6 +415,9 @@ struct ProfileScreen: View {
         return VStack(alignment: .leading, spacing: 0) {
             DisplayName(person: profile.identity, size: 29, weight: .semibold, tracking: -1.2)
                 .padding(.top, 14)
+                .onScrollVisible { visible in
+                    withAnimation(Noct.quick) { nameVisible = visible }
+                }
             HStack(spacing: 8) {
                 Button {
                     session.copy("@" + profile.handle, message: "Юзернейм скопирован")

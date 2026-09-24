@@ -145,8 +145,8 @@ struct ComposerView: View {
                 .padding(16)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Noct.elevated.ignoresSafeArea())
-            .safeAreaInset(edge: .bottom) { bottomBar }
+            .sheetSurface()
+            .glassBottomBar { bottomBar }
             .navigationTitle("Новая публикация")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -196,8 +196,8 @@ struct ComposerView: View {
                             if item.isVideo && item.uploadId != nil {
                                 Image(systemName: "play.fill")
                                     .foregroundColor(.white)
-                                    .padding(8)
-                                    .background(Circle().fill(Color.black.opacity(0.5)))
+                                    .frame(width: 34, height: 34)
+                                    .glassCircle()
                             }
                         }
                         .frame(width: 104, height: 104)
@@ -208,9 +208,10 @@ struct ComposerView: View {
                             Image(systemName: "xmark")
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
-                                .frame(width: 24, height: 24)
-                                .background(Circle().fill(Color.black.opacity(0.7)))
+                                .frame(width: 26, height: 26)
+                                .glassCircle(interactive: true)
                         }
+                        .buttonStyle(PressableStyle())
                         .padding(5)
                     }
                 }
@@ -260,34 +261,45 @@ struct ComposerView: View {
     }
 
     private var bottomBar: some View {
-        HStack(spacing: 18) {
-            PhotosPicker(
-                selection: $picked,
-                maxSelectionCount: max(1, 4 - attachments.count),
-                matching: .any(of: [.images, .videos])
-            ) {
-                Image(systemName: "photo.on.rectangle")
-                    .font(.system(size: 20))
+        let mediaLocked = attachments.count >= 4 || pollEnabled
+        return GlassGroup(spacing: 6) {
+            HStack(spacing: 10) {
+                PhotosPicker(
+                    selection: $picked,
+                    maxSelectionCount: max(1, 4 - attachments.count),
+                    matching: .any(of: [.images, .videos])
+                ) {
+                    Image(systemName: "photo.on.rectangle")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
+                }
+                .glassCircle(interactive: true)
+                .opacity(mediaLocked ? 0.45 : 1)
+                .disabled(mediaLocked)
+                .accessibilityLabel("Фото или видео")
+                Button {
+                    withAnimation(Noct.quick) { pollEnabled.toggle() }
+                } label: {
+                    Image(systemName: pollEnabled ? "chart.bar.fill" : "chart.bar")
+                }
+                .buttonStyle(CircleButtonStyle(size: 44, tint: pollEnabled ? .white : nil))
+                .disabled(!attachments.isEmpty)
+                .accessibilityLabel("Опрос")
+                Spacer()
+                Text("\(text.count)/5000")
+                    .font(.system(size: 12))
+                    .foregroundColor(text.count > 5000 ? Noct.red : Noct.text60)
+                    .monospacedDigit()
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
+                    .glassCapsule()
             }
-            .disabled(attachments.count >= 4 || pollEnabled)
-            Button {
-                withAnimation(Noct.quick) { pollEnabled.toggle() }
-            } label: {
-                Image(systemName: pollEnabled ? "chart.bar.fill" : "chart.bar")
-                    .font(.system(size: 20))
-            }
-            .disabled(!attachments.isEmpty)
-            Spacer()
-            Text("\(text.count)/5000")
-                .font(.system(size: 12))
-                .foregroundColor(text.count > 5000 ? Noct.red : Noct.text48)
-                .monospacedDigit()
         }
-        .foregroundColor(.white)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .background(Noct.elevated)
-        .overlay(alignment: .top) { Rectangle().fill(Noct.border).frame(height: 0.5) }
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
     }
 
     private func update(_ id: UUID, _ change: (inout ComposerAttachment) -> Void) {

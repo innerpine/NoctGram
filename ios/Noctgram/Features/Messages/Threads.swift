@@ -273,18 +273,18 @@ struct NewChatSheet: View {
                     } label: {
                         PersonRow(person: person.identity)
                     }
-                    .listRowBackground(Noct.elevated)
+                    .listRowBackground(Noct.sheetRow)
                 }
                 if people.isEmpty && !searching {
                     Text(query.isEmpty ? "Начни вводить имя или юзернейм" : "Никого не нашли")
                         .font(.system(size: 14))
                         .foregroundColor(Noct.text48)
-                        .listRowBackground(Noct.elevated)
+                        .listRowBackground(Noct.sheetRow)
                 }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(Noct.elevated.ignoresSafeArea())
+            .sheetSurface()
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Имя или @юзернейм")
             .navigationTitle("Новое сообщение")
             .navigationBarTitleDisplayMode(.inline)

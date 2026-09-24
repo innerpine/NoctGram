@@ -119,7 +119,7 @@ extension Appearance {
 
 // MARK: - Buttons
 
-/// White capsule used for the main action (Подписаться, Опубликовать).
+/// Main action (Подписаться, Опубликовать): bright white glass, dark label.
 struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
 
@@ -129,41 +129,62 @@ struct PrimaryButtonStyle: ButtonStyle {
             .foregroundColor(.black)
             .padding(.horizontal, 18)
             .frame(minHeight: 38)
-            .background(Capsule().fill(Color.white.opacity(enabled ? 1 : 0.4)))
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .glassCapsule(interactive: true, tint: .white)
+            .opacity(enabled ? 1 : 0.45)
+            .scaleEffect(configuration.isPressed && !LiquidGlass.isNative ? 0.97 : 1)
             .animation(Noct.quick, value: configuration.isPressed)
     }
 }
 
-/// Dark outlined capsule (Редактировать, Вы подписаны).
+/// Glass capsule with a white label (Редактировать, Вы подписаны).
 struct SecondaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 15, weight: .medium))
-            .foregroundColor(.white.opacity(enabled ? 1 : 0.4))
+            .foregroundColor(.white)
             .padding(.horizontal, 16)
             .frame(minHeight: 38)
-            .background(Capsule().fill(configuration.isPressed ? Noct.fillHeavy : Noct.fill))
-            .overlay(Capsule().stroke(Noct.borderStrong, lineWidth: 1))
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .glassCapsule(interactive: true)
+            .opacity(enabled ? 1 : 0.45)
+            .scaleEffect(configuration.isPressed && !LiquidGlass.isNative ? 0.97 : 1)
             .animation(Noct.quick, value: configuration.isPressed)
     }
 }
 
-/// Round icon button on a translucent fill.
+/// Round glass icon button.
 struct CircleButtonStyle: ButtonStyle {
     var size: CGFloat = 38
+    var tint: Color?
+    @Environment(\.isEnabled) private var enabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 16, weight: .medium))
-            .foregroundColor(.white)
+            .foregroundColor(tint == nil ? .white : .black)
             .frame(width: size, height: size)
-            .background(Circle().fill(configuration.isPressed ? Noct.fillHeavy : Noct.fill))
-            .overlay(Circle().stroke(Noct.border, lineWidth: 1))
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .glassCircle(interactive: true, tint: tint)
+            .opacity(enabled ? 1 : 0.45)
+            .scaleEffect(configuration.isPressed && !LiquidGlass.isNative ? 0.94 : 1)
+            .animation(Noct.quick, value: configuration.isPressed)
+    }
+}
+
+/// Small glass chip for filters and topics; the selected one is bright.
+struct ChipButtonStyle: ButtonStyle {
+    var selected = false
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(selected ? .black : Noct.text75)
+            .padding(.horizontal, 14)
+            .frame(height: 34)
+            .glassCapsule(interactive: true, tint: selected ? .white : nil)
+            .opacity(enabled ? 1 : 0.45)
+            .scaleEffect(configuration.isPressed && !LiquidGlass.isNative ? 0.96 : 1)
             .animation(Noct.quick, value: configuration.isPressed)
     }
 }
@@ -186,12 +207,13 @@ extension View {
             .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous).stroke(Noct.border, lineWidth: 1))
     }
 
-    /// Input field surface used in forms.
+    /// Input field surface used in forms; translucent, so it sits on black
+    /// pages and on glass sheets alike.
     func noctField() -> some View {
         padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(hex: 0x111113)))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Noct.borderStrong, lineWidth: 1))
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.06)))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Noct.borderStrong, lineWidth: 1))
     }
 
     func hairlineDivider() -> some View {
@@ -213,12 +235,19 @@ enum Haptics {
     }
 }
 
-/// Black, non-translucent system bars so every screen keeps the Noctgram look.
+/// System bars. iOS 26 draws Liquid Glass bars itself (a custom background
+/// would hide the glass); earlier systems get frosted, translucent bars.
 enum BarAppearance {
     static func apply() {
+        if #available(iOS 26.0, *) {
+            UINavigationBar.appearance().tintColor = .white
+            return
+        }
+        let blur = UIBlurEffect(style: .systemUltraThinMaterialDark)
         let nav = UINavigationBarAppearance()
-        nav.configureWithOpaqueBackground()
-        nav.backgroundColor = .black
+        nav.configureWithDefaultBackground()
+        nav.backgroundEffect = blur
+        nav.backgroundColor = UIColor.black.withAlphaComponent(0.5)
         nav.shadowColor = UIColor.white.withAlphaComponent(0.08)
         nav.titleTextAttributes = [.foregroundColor: UIColor.white, .font: UIFont.systemFont(ofSize: 17, weight: .semibold)]
         nav.largeTitleTextAttributes = [.foregroundColor: UIColor.white, .font: UIFont.systemFont(ofSize: 30, weight: .bold)]
@@ -228,8 +257,9 @@ enum BarAppearance {
         UINavigationBar.appearance().tintColor = .white
 
         let tab = UITabBarAppearance()
-        tab.configureWithOpaqueBackground()
-        tab.backgroundColor = .black
+        tab.configureWithDefaultBackground()
+        tab.backgroundEffect = blur
+        tab.backgroundColor = UIColor.black.withAlphaComponent(0.5)
         tab.shadowColor = UIColor.white.withAlphaComponent(0.08)
         let item = UITabBarItemAppearance()
         item.normal.iconColor = UIColor.white.withAlphaComponent(0.45)

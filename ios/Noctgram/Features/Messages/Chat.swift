@@ -198,10 +198,10 @@ struct ChatView: View {
                         if index == 0 || !Calendar.current.isDate(Format.date(message.created), inSameDayAs: Format.date(store.messages[index - 1].created)) {
                             Text(Format.day(message.created))
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(Noct.text48)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(Capsule().fill(Noct.fill))
+                                .foregroundColor(Noct.text60)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
+                                .glassCapsule()
                                 .padding(.vertical, 8)
                         }
                         MessageBubble(
@@ -227,7 +227,7 @@ struct ChatView: View {
                 if let id = store.messages.last?.id { proxy.scrollTo(id, anchor: .bottom) }
             }
         }
-        .safeAreaInset(edge: .bottom) { bottom }
+        .glassBottomBar { bottom }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
@@ -262,7 +262,7 @@ struct ChatView: View {
                         Label(store.blockedByMe ? "Разблокировать" : "Заблокировать", systemImage: "hand.raised")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: LiquidGlass.moreIcon)
                 }
             }
         }
@@ -364,38 +364,24 @@ struct ChatView: View {
 
     @ViewBuilder private var bottom: some View {
         if store.blockedByMe {
-            notice("Ты заблокировал(а) этого пользователя.", action: "Разблокировать") {
+            ComposerNotice(text: "Ты заблокировал(а) этого пользователя.", action: "Разблокировать") {
                 Task { await store.setBlocked(false, session: session) }
             }
         } else if !store.allowed && store.loaded {
-            notice("Пользователь ограничил входящие сообщения.", action: nil, perform: nil)
+            ComposerNotice(text: "Пользователь ограничил входящие сообщения.")
         } else if session.readOnly {
-            notice("В режиме только для чтения отправка недоступна.", action: nil, perform: nil)
+            ComposerNotice(text: "В режиме только для чтения отправка недоступна.")
         } else {
             VStack(spacing: 0) {
                 if let context = replyTo ?? editing {
-                    HStack(spacing: 10) {
-                        Rectangle().fill(Color.white).frame(width: 2, height: 30)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(editing != nil ? "Редактирование" : (context.sender == session.myId ? "Ответ себе" : "Ответ \(peer.name)"))
-                                .font(.system(size: 12, weight: .semibold))
-                            Text(context.text.isEmpty ? "Вложение" : context.text)
-                                .font(.system(size: 12))
-                                .foregroundColor(Noct.text60)
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                        Button {
-                            if editing != nil { text = "" }
-                            replyTo = nil
-                            editing = nil
-                        } label: {
-                            Image(systemName: "xmark").font(.system(size: 13, weight: .semibold)).foregroundColor(Noct.text60)
-                        }
+                    ComposerContext(
+                        title: editing != nil ? "Редактирование" : (context.sender == session.myId ? "Ответ себе" : "Ответ \(peer.name)"),
+                        text: context.text.isEmpty ? "Вложение" : context.text
+                    ) {
+                        if editing != nil { text = "" }
+                        replyTo = nil
+                        editing = nil
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Noct.card)
                 }
                 if !store.attachments.isEmpty || store.uploading > 0 {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -413,7 +399,7 @@ struct ChatView: View {
                                         }
                                     }
                                     .frame(width: 64, height: 64)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                     Button {
                                         store.attachments.removeAll { $0.id == file.id }
                                     } label: {
@@ -424,13 +410,15 @@ struct ChatView: View {
                                 }
                             }
                             if store.uploading > 0 {
-                                ProgressView().tint(.white).frame(width: 64, height: 64)
+                                ProgressView()
+                                    .tint(.white)
+                                    .frame(width: 64, height: 64)
+                                    .glassRect(12)
                             }
                         }
                         .padding(.horizontal, 12)
                         .padding(.top, 8)
                     }
-                    .background(Color.black)
                 }
                 ComposerBar(
                     text: $text,
@@ -457,28 +445,14 @@ struct ChatView: View {
 
     private var attachButton: some View {
         PhotosPicker(selection: $picked, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
-            Image(systemName: "paperclip")
+            Image(systemName: "plus")
                 .font(.system(size: 19, weight: .medium))
-                .foregroundColor(Noct.text75)
-                .frame(width: 36, height: 40)
+                .foregroundColor(.white)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
-    }
-
-    private func notice(_ text: String, action: String?, perform: (() -> Void)?) -> some View {
-        VStack(spacing: 8) {
-            Text(text)
-                .font(.system(size: 14))
-                .foregroundColor(Noct.text60)
-                .multilineTextAlignment(.center)
-            if let action, let perform {
-                Button(action, action: perform)
-                    .buttonStyle(SecondaryButtonStyle())
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(16)
-        .background(Color.black)
-        .overlay(alignment: .top) { Rectangle().fill(Noct.border).frame(height: 0.5) }
+        .glassCircle(interactive: true)
+        .accessibilityLabel("Прикрепить фото или видео")
     }
 }
 

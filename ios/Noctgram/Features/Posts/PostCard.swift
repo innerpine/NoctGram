@@ -220,11 +220,14 @@ struct PostCard: View {
                             .font(.system(size: 15, weight: .semibold))
                         Text("Показать фото и видео")
                             .font(.system(size: 13))
-                            .foregroundColor(Noct.text60)
+                            .foregroundColor(Noct.text75)
                     }
                     .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 14)
+                    .glassRect(22, interactive: true)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black.opacity(0.35))
+                    .background(Color.black.opacity(0.25))
                 }
                 .buttonStyle(PressableStyle())
             }
@@ -236,9 +239,9 @@ struct PostCard: View {
                 } label: {
                     Label("Скрыть 18+", systemImage: "eye.slash")
                         .font(.system(size: 12, weight: .medium))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Color.black.opacity(0.6)))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .glassCapsule(interactive: true)
                 }
                 .buttonStyle(PressableStyle())
                 .padding(8)
@@ -392,7 +395,7 @@ struct MediaGrid: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 48, height: 48)
-                        .background(Circle().fill(Color.black.opacity(0.55)))
+                        .glassCircle()
                 } else {
                     RemoteImage(url: session.api.mediaURL(item.path), maxPixel: 1100)
                 }

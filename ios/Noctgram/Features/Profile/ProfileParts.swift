@@ -394,8 +394,8 @@ struct GiftsGrid: View {
                                 if gift.hidden {
                                     Image(systemName: "eye.slash")
                                         .font(.system(size: 10, weight: .semibold))
-                                        .padding(5)
-                                        .background(Circle().fill(Color.black.opacity(0.6)))
+                                        .frame(width: 24, height: 24)
+                                        .glassCircle()
                                         .padding(6)
                                 }
                             }
@@ -459,7 +459,8 @@ struct GiftDetailSheet: View {
                     .multilineTextAlignment(.center)
                     .padding(14)
                     .frame(maxWidth: .infinity)
-                    .noctCard(radius: 14)
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Noct.sheetRow))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Noct.border, lineWidth: 1))
                     .padding(.horizontal, 20)
             }
             if own {
@@ -484,7 +485,7 @@ struct GiftDetailSheet: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-        .background(Noct.elevated.ignoresSafeArea())
+        .sheetSurface()
         .presentationDetents([.medium, .large])
     }
 }
@@ -534,7 +535,7 @@ struct SendGiftSheet: View {
                                     }
                                 }
                                 .padding(6)
-                                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(selected == gift ? Noct.fillStrong : Noct.card))
+                                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(selected == gift ? Noct.fillHeavy : Noct.sheetRow))
                                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(selected == gift ? Color.white.opacity(0.5) : Noct.border, lineWidth: 1))
                             }
                             .buttonStyle(PressableStyle())
@@ -544,12 +545,12 @@ struct SendGiftSheet: View {
                 }
                 .padding(16)
             }
-            .background(Noct.elevated.ignoresSafeArea())
-            .safeAreaInset(edge: .bottom) {
+            .sheetSurface()
+            .glassBottomBar {
                 VStack(spacing: 10) {
                     TextField("Подпись к подарку (необязательно)", text: $message, axis: .vertical)
                         .lineLimit(1...3)
-                        .noctField()
+                        .glassField(radius: 22)
                     Button {
                         Task { await send() }
                     } label: {
@@ -562,8 +563,8 @@ struct SendGiftSheet: View {
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(selected == nil || sending)
                 }
-                .padding(16)
-                .background(Noct.elevated)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
             .navigationTitle("Подарок для \(recipient.name)")
             .navigationBarTitleDisplayMode(.inline)

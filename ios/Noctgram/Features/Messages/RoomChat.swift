@@ -175,26 +175,13 @@ struct RoomChatView: View {
                 withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .bottom) }
             }
         }
-        .safeAreaInset(edge: .bottom) {
+        .glassBottomBar {
             if store.canSend && !store.isSecret && !session.readOnly {
                 VStack(spacing: 0) {
                     if let reply = replyTo {
-                        HStack(spacing: 10) {
-                            Rectangle().fill(Color.white).frame(width: 2, height: 30)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Ответ \(reply.senderName)").font(.system(size: 12, weight: .semibold))
-                                Text(reply.text).font(.system(size: 12)).foregroundColor(Noct.text60).lineLimit(1)
-                            }
-                            Spacer()
-                            Button {
-                                replyTo = nil
-                            } label: {
-                                Image(systemName: "xmark").foregroundColor(Noct.text60)
-                            }
+                        ComposerContext(title: "Ответ \(reply.senderName)", text: reply.text) {
+                            replyTo = nil
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Noct.card)
                     }
                     ComposerBar(text: $text, placeholder: "Сообщение в группу", sending: false, focus: $focused, leading: nil) {
                         let value = text
@@ -205,12 +192,7 @@ struct RoomChatView: View {
                     }
                 }
             } else if store.loaded && !store.isSecret {
-                Text(session.readOnly ? "В режиме только для чтения отправка недоступна." : "Писать в эту группу могут только администраторы.")
-                    .font(.system(size: 13))
-                    .foregroundColor(Noct.text48)
-                    .frame(maxWidth: .infinity)
-                    .padding(14)
-                    .background(Color.black)
+                ComposerNotice(text: session.readOnly ? "В режиме только для чтения отправка недоступна." : "Писать в эту группу могут только администраторы.")
             }
         }
         .navigationBarTitleDisplayMode(.inline)

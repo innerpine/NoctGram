@@ -24,26 +24,25 @@ struct NotificationsView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(filters, id: \.id) { option in
-                                Button {
-                                    guard filter != option.id else { return }
-                                    filter = option.id
-                                    Task { await load(reset: true) }
-                                } label: {
-                                    Text(option.label)
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundColor(filter == option.id ? .black : Noct.text75)
-                                        .padding(.horizontal, 14)
-                                        .frame(height: 34)
-                                        .background(Capsule().fill(filter == option.id ? Color.white : Noct.fill))
+                        GlassGroup(spacing: 4) {
+                            HStack(spacing: 8) {
+                                ForEach(filters, id: \.id) { option in
+                                    Button {
+                                        guard filter != option.id else { return }
+                                        Haptics.tap()
+                                        withAnimation(Noct.quick) { filter = option.id }
+                                        Task { await load(reset: true) }
+                                    } label: {
+                                        Text(option.label)
+                                    }
+                                    .buttonStyle(ChipButtonStyle(selected: filter == option.id))
                                 }
-                                .buttonStyle(PressableStyle())
                             }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
                         }
-                        .padding(.horizontal, 12)
                     }
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 4)
                     .id("top")
 
                     ForEach(items) { item in
