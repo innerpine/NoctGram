@@ -53,3 +53,16 @@ next-env.d.ts
 *.p12
 *.pfx
 
+
+# app signing and builds: certificates, profiles and packages never go to Git
+*.ipa
+*.apk
+*.aab
+*.mobileprovision
+*.p8
+*.cer
+*.certSigningRequest
+*.keystore
+*.jks
+/ios/build/
+/ios/Noctgram.xcodeproj/
