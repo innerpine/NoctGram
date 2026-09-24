@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct NoctgramApp: App {
@@ -65,14 +66,34 @@ struct RootView: View {
 struct MainTabView: View {
     @EnvironmentObject private var session: AppSession
     @StateObject private var nav = Navigator()
+    /// The own avatar as the «Профиль» tab icon, as in iOS messengers.
+    @State private var avatarIcon: UIImage?
 
     var body: some View {
         tabs
             .environmentObject(nav)
             .environment(\.openURL, OpenURLAction { url in nav.open(url) })
+            .task(id: session.me?.avatar) { await loadAvatarIcon() }
             #if DEBUG
-            .onAppear { DebugLaunch.apply(nav) }
+            .onAppear { DebugLaunch.apply(nav, me: session.myId ?? "") }
             #endif
+    }
+
+    private var profileIcon: Image {
+        if let avatarIcon {
+            return Image(uiImage: avatarIcon).renderingMode(.original)
+        }
+        return Image(systemName: "person.crop.circle")
+    }
+
+    private func loadAvatarIcon() async {
+        guard let path = session.me?.avatar, !path.isEmpty,
+              let url = session.api.mediaURL(path),
+              let image = await ImagePipeline.shared.image(for: url, maxPixel: 120) else {
+            avatarIcon = nil
+            return
+        }
+        avatarIcon = TabAvatar.render(image)
     }
 
     /// iOS 18+ tabs: on iOS 26 they float in a Liquid Glass bar that shrinks
@@ -85,7 +106,11 @@ struct MainTabView: View {
                     .badge(session.unreadMessages)
                 Tab("Уведомления", systemImage: "bell", value: AppTab.notifications) { notifications }
                     .badge(session.unreadNotifications)
-                Tab("Профиль", systemImage: "person.crop.circle", value: AppTab.profile) { profile }
+                Tab(value: AppTab.profile) {
+                    profile
+                } label: {
+                    Label { Text("Профиль") } icon: { profileIcon }
+                }
                 Tab("Поиск", systemImage: "magnifyingglass", value: AppTab.search, role: .search) { search }
             }
             .minimizesTabBarOnScroll()
@@ -106,7 +131,7 @@ struct MainTabView: View {
                     .badge(session.unreadNotifications)
                     .tag(AppTab.notifications)
                 profile
-                    .tabItem { Label("Профиль", systemImage: "person.crop.circle") }
+                    .tabItem { Label { Text("Профиль") } icon: { profileIcon } }
                     .tag(AppTab.profile)
             }
         }
@@ -129,7 +154,22 @@ struct MainTabView: View {
     }
 
     private var profile: some View {
-        NavigationStack(path: $nav.profilePath) { MyProfileView().appRoutes() }
+        NavigationStack(path: $nav.profilePath) { ProfileHubView().appRoutes() }
+    }
+}
+
+/// A round avatar for the tab bar, drawn in its own colours.
+enum TabAvatar {
+    static func render(_ image: UIImage, size: CGFloat = 28) -> UIImage {
+        let side = CGSize(width: size, height: size)
+        let rendered = UIGraphicsImageRenderer(size: side).image { _ in
+            let frame = CGRect(origin: .zero, size: side)
+            UIBezierPath(ovalIn: frame).addClip()
+            let scale = max(size / max(image.size.width, 1), size / max(image.size.height, 1))
+            let drawn = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            image.draw(in: CGRect(x: (size - drawn.width) / 2, y: (size - drawn.height) / 2, width: drawn.width, height: drawn.height))
+        }
+        return rendered.withRenderingMode(.alwaysOriginal)
     }
 }
 
@@ -138,7 +178,7 @@ struct MainTabView: View {
 /// `-noct.debugRoute chat:<id>`. Launch arguments fill UserDefaults.
 enum DebugLaunch {
     @MainActor
-    static func apply(_ nav: Navigator) {
+    static func apply(_ nav: Navigator, me: String) {
         let defaults = UserDefaults.standard
         switch defaults.string(forKey: "noct.debugTab") {
         case "search": nav.tab = .search
@@ -159,6 +199,7 @@ enum DebugLaunch {
             case "settings": nav.push(.settings)
             case "wallet": nav.push(.wallet)
             case "saved": nav.push(.saved)
+            case "gifts": nav.push(.gifts(me))
             default: break
             }
         default: break

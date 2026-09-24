@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Account and app settings, in the same grouped rows as the profile tab.
 struct SettingsView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var nav: Navigator
@@ -9,62 +10,40 @@ struct SettingsView: View {
     @State private var email: String?
 
     var body: some View {
-        List {
-            if let me = session.me {
-                Section {
-                    Button {
-                        nav.push(.profile(me.id))
-                    } label: {
-                        PersonRow(person: me.identity, subtitle: email.map { "@\(me.handle) · \($0)" } ?? "@" + me.handle, avatarSize: 52)
-                    }
-                    .listRowBackground(Noct.card)
-                }
-                Section("Аккаунт") {
-                    row("Редактировать профиль", icon: "person.crop.circle") { editing = .profile }
-                    row("Оформление профиля", icon: "paintpalette") { editing = .design }
-                    row("Приватность и чёрный список", icon: "hand.raised") { editing = .privacy }
-                    row("Сохранённое", icon: "bookmark") { nav.push(.saved) }
-                    row("Noct Stars", icon: "star.circle") { nav.push(.wallet) }
-                }
-                .listRowBackground(Noct.card)
-            }
-            Section("Noctgram") {
-                row("Каналы", icon: "megaphone") { nav.push(.web(title: "Каналы", path: "/?page=channels")) }
-                row("Музыка", icon: "music.note") { nav.push(.web(title: "Музыка", path: "/?page=music")) }
-                row("Noct Market", icon: "storefront") { nav.push(.web(title: "Маркет", path: "/market")) }
-                row("Noct Premium", icon: "sparkles") { nav.push(.web(title: "Noct Premium", path: "/?page=premium")) }
-                row("Веб-версия целиком", icon: "globe") { nav.push(.web(title: "Noctgram", path: "/")) }
-            }
-            .listRowBackground(Noct.card)
-            Section {
-                Button {
-                    showServer = true
-                } label: {
-                    HStack {
-                        Label("Сервер", systemImage: "server.rack")
-                        Spacer()
-                        Text(session.serverLabel).foregroundColor(Noct.text48)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                if let me = session.me {
+                    header("Аккаунт")
+                    SettingsGroup {
+                        SettingsRow("Почта", icon: "envelope.fill", color: IconColor.blue, value: email ?? "—", chevron: false, action: nil)
+                        SettingsRow("Юзернейм", icon: "at", color: IconColor.indigo, value: "@" + me.handle, chevron: false) {
+                            session.copy("@" + me.handle, message: "Юзернейм скопирован")
+                        }
+                        SettingsRow("Редактировать профиль", icon: "pencil", color: IconColor.orange, divider: false) {
+                            editing = .profile
+                        }
                     }
                 }
-                .foregroundColor(.white)
-                HStack {
-                    Label("Версия", systemImage: "info.circle")
-                    Spacer()
-                    Text(appVersion).foregroundColor(Noct.text48)
+                header("Приложение")
+                SettingsGroup {
+                    SettingsRow("Сервер", icon: "server.rack", color: IconColor.gray, value: session.serverLabel) {
+                        showServer = true
+                    }
+                    SettingsRow("Веб-версия целиком", icon: "globe", color: IconColor.teal) {
+                        nav.push(.web(title: "Noctgram", path: "/"))
+                    }
+                    SettingsRow("Версия", icon: "info", color: IconColor.gray, value: appVersion, chevron: false, divider: false, action: nil)
                 }
-            }
-            .listRowBackground(Noct.card)
-            Section {
-                Button(role: .destructive) {
-                    confirmSignOut = true
-                } label: {
-                    Label("Выйти из аккаунта", systemImage: "rectangle.portrait.and.arrow.right")
-                        .foregroundColor(Noct.red)
+                SettingsGroup {
+                    SettingsRow("Выйти из аккаунта", titleColor: Noct.red, chevron: false, divider: false, action: { confirmSignOut = true }) {
+                        SettingsIcon(symbol: "rectangle.portrait.and.arrow.right", color: IconColor.red)
+                    }
                 }
+                .padding(.top, 24)
             }
-            .listRowBackground(Noct.card)
+            .padding(.top, 8)
+            .padding(.bottom, 32)
         }
-        .scrollContentBackground(.hidden)
         .background(Noct.background)
         .navigationTitle("Настройки")
         .navigationBarTitleDisplayMode(.inline)
@@ -93,24 +72,19 @@ struct SettingsView: View {
         }
     }
 
+    private func header(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundColor(Noct.text48)
+            .padding(.horizontal, 32)
+            .padding(.top, 16)
+    }
+
     private var appVersion: String {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = info?["CFBundleVersion"] as? String ?? "1"
         return "\(version) (\(build))"
-    }
-
-    private func row(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Label(title, systemImage: icon)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Noct.text48)
-            }
-        }
-        .foregroundColor(.white)
     }
 }
 

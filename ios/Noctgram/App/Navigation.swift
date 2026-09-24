@@ -26,6 +26,7 @@ enum Route: Hashable {
     case saved
     case tag(String)
     case wallet
+    case gifts(String)
     case settings
     case web(title: String, path: String)
 }
@@ -146,6 +147,8 @@ struct RouteView: View {
             PostListScreen(title: tag, query: FeedQuery(q: tag), empty: "Публикаций с этим тегом пока нет.")
         case .wallet:
             WalletView()
+        case .gifts(let profileId):
+            GiftsScreen(profileId: profileId)
         case .settings:
             SettingsView()
         case .web(let title, let path):

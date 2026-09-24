@@ -9,6 +9,8 @@ enum Noct {
     static let elevated = Color(hex: 0x161616)
     static let coverFill = Color(hex: 0x141414)
     static let selected = Color(hex: 0x242424)
+    /// Grouped rows of the profile and settings screens (iOS inset groups).
+    static let group = Color(hex: 0x1C1C1E)
     static let avatarFill = Color(hex: 0x202020)
 
     static let text = Color.white

@@ -513,6 +513,35 @@ struct ProfileEditorView: View {
     }
 }
 
+extension ProfileEditorView {
+    /// The POST action=profile body the editor sends when nothing but the
+    /// photo changes: every other field is sent back as the server gave it.
+    static func fields(of profile: Profile, avatar: String, own: Bool) -> [String: Any] {
+        var body: [String: Any] = [
+            "name": profile.name,
+            "bio": profile.bio,
+            "avatar": avatar,
+            "cover": profile.cover,
+        ]
+        if profile.isChannel { body["id"] = profile.id }
+        if own || profile.channelRole == "owner" {
+            body["mainHandle"] = profile.handle
+            body["extraHandles"] = profile.extraHandles
+        }
+        if own && !profile.isChannel {
+            body["location"] = profile.location
+            body["website"] = profile.website
+            body["instagram"] = profile.instagram
+            body["tiktok"] = profile.tiktok
+            body["youtube"] = profile.youtube
+            body["birthday"] = profile.birthday
+            body["showBirthYear"] = profile.showBirthYear
+            body["personalChannels"] = profile.personalChannels.map(\.id)
+        }
+        return body
+    }
+}
+
 enum BirthdayFormat {
     static var earliest: Date {
         var components = DateComponents()

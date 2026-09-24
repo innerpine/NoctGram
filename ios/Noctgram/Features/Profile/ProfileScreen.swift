@@ -1,18 +1,5 @@
 import SwiftUI
 
-/// The own profile as the root of the «Профиль» tab.
-struct MyProfileView: View {
-    @EnvironmentObject private var session: AppSession
-
-    var body: some View {
-        if let me = session.me {
-            ProfileScreen(target: .id(me.id), isRootTab: true)
-        } else {
-            LoadingRow()
-        }
-    }
-}
-
 /// A profile exactly as on the web (app/noctgram.tsx, page === 'profile'):
 /// cover, avatar line with actions, name, usernames, presence, bio, details,
 /// socials, stats, channel cards and the Публикации / Медиа / Подарки tabs.
@@ -20,7 +7,6 @@ struct ProfileScreen: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var nav: Navigator
     let target: ProfileTarget
-    var isRootTab = false
 
     @StateObject private var store = ProfileStore()
     @State private var editing: EditorTab?
@@ -45,6 +31,14 @@ struct ProfileScreen: View {
         if #available(iOS 18.0, *) { return !nameVisible }
         return true
     }
+
+    #if DEBUG
+    /// Screenshot hooks (ios/Tests) apply to the own profile only.
+    private var debugHooks: Bool {
+        if case .id(let id) = target { return id == session.myId }
+        return false
+    }
+    #endif
 
     var body: some View {
         GeometryReader { geometry in
@@ -86,10 +80,7 @@ struct ProfileScreen: View {
         .task {
             if store.profile == nil { await store.load(target, api: session.api) }
             #if DEBUG
-            if isRootTab, let tab = UserDefaults.standard.string(forKey: "noct.debugEditor").flatMap(EditorTab.init(rawValue:)) {
-                editing = tab
-            }
-            if isRootTab, let tab = UserDefaults.standard.string(forKey: "noct.debugProfileTab").flatMap(ProfileTab.init(rawValue:)) {
+            if debugHooks, let tab = UserDefaults.standard.string(forKey: "noct.debugProfileTab").flatMap(ProfileTab.init(rawValue:)) {
                 await store.select(tab, api: session.api)
             }
             #endif
@@ -133,13 +124,9 @@ struct ProfileScreen: View {
                 await store.load(target, api: session.api)
                 if own { await session.refreshMe() }
             }
-            .onChange(of: nav.rootTap) { tap in
-                guard isRootTab, tap.tab == .profile else { return }
-                withAnimation(Noct.motion) { proxy.scrollTo("top", anchor: .top) }
-            }
             #if DEBUG
             .onAppear {
-                guard isRootTab, UserDefaults.standard.string(forKey: "noct.debugScroll") == "tabs" else { return }
+                guard debugHooks, UserDefaults.standard.string(forKey: "noct.debugScroll") == "tabs" else { return }
                 // Under the iOS 26 bar the tabs stop below it, not at the screen edge.
                 let anchor = coverUnderBar ? UnitPoint(x: 0.5, y: 0.14) : .top
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) { proxy.scrollTo("tabs", anchor: anchor) }
