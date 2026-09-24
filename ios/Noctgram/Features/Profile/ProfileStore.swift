@@ -132,6 +132,13 @@ final class ProfileStore: ObservableObject {
         }
     }
 
+    /// Sells a received gift for the quoted amount; returns the new balance.
+    func sellGift(_ gift: ReceivedGift, expectedAmount: Int, api: APIClient) async throws -> Int? {
+        let data = try await api.post("/api/gifts", ["action": "convert", "id": gift.id, "expectedAmount": expectedAmount])
+        gifts.removeAll { $0.id == gift.id }
+        return data["balance"].int
+    }
+
     func setGiftHidden(_ gift: ReceivedGift, hidden: Bool, api: APIClient) async throws {
         _ = try await api.post("/api/gifts", ["action": "visibility", "id": gift.id, "hidden": hidden])
         if let index = gifts.firstIndex(where: { $0.id == gift.id }) { gifts[index].hidden = hidden }

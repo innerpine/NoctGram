@@ -180,6 +180,7 @@ jobs:
           shot 18-profile-media 8765 -noct.debugTab profile -noct.debugRoute "profile:$ME" -noct.debugProfileTab media -noct.debugScroll tabs
           shot 19-profile-qr 8765 -noct.debugTab profile -noct.debugSheet qr
           shot 20-gifts 8765 -noct.debugTab profile -noct.debugRoute screen:gifts
+          shot 21-gift 8765 -noct.debugTab profile -noct.debugRoute screen:gifts -noct.debugSheet gift
           ls -la shots
           echo "--- crash reports"
           for report in ~/Library/Logs/DiagnosticReports/Noctgram*; do

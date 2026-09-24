@@ -103,6 +103,14 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(gifts.contains { $0.artPath == "/assets/gifts/toy_bear.webp" })
         let catalog = try responses()["giftCatalog"]["catalog"].array.map { GiftDefinition($0) }
         XCTAssertTrue(catalog.contains { $0.id == "toy_bear" && $0.name == "Мишка" && $0.price == 25 })
+        XCTAssertTrue(gifts.allSatisfy { $0.recipient == "local_alice" })
+        let quote = try XCTUnwrap(JSON.parse(Data(#"{"id":"g","available":true,"reason":null,"originalPrice":25,"amount":21,"fee":4,"feePercent":15,"convertedAt":null}"#.utf8)))
+        let sale = GiftSale(quote)
+        XCTAssertTrue(sale.available)
+        XCTAssertEqual(sale.originalPrice, 25)
+        XCTAssertEqual(sale.amount, 21)
+        XCTAssertEqual(sale.feePercent, 15)
+        XCTAssertEqual(sale.reason, "")
     }
 
     func testThreadsNotificationsWallet() throws {
@@ -133,6 +141,7 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(Format.birthday("1999-03-14").hasPrefix("14 марта 1999 ("))
         XCTAssertEqual(Format.birthday("bad"), "")
         XCTAssertEqual(Format.fileSize(512), "512 Б")
+        XCTAssertNotNil(Format.receipt(1790235131598).range(of: #"^\d{2}\.\d{2}\.\d{2} в \d{2}:\d{2}$"#, options: .regularExpression))
     }
 
     func testLinksMentionsAndTags() throws {

@@ -32,7 +32,7 @@ struct ProfileHubView: View {
     }
 
     private func accent(_ me: Profile) -> Color {
-        me.appearance.premium ? me.appearance.theme.first : Noct.lilac
+        me.appearance.accent
     }
 
     private func hub(_ me: Profile) -> some View {

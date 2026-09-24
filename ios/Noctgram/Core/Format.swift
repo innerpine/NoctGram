@@ -17,6 +17,12 @@ enum Format {
     private static let time = formatter("HH:mm")
     private static let shortDay = formatter("d MMM")
     private static let fullDate = formatter("dd.MM.y HH:mm")
+    private static let numericDay: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = russian
+        formatter.dateFormat = "dd.MM.yy"
+        return formatter
+    }()
 
     private static let numbers: NumberFormatter = {
         let formatter = NumberFormatter()
@@ -54,6 +60,12 @@ enum Format {
 
     static func clock(_ ms: Double) -> String {
         time.string(from: date(ms))
+    }
+
+    /// «21.09.26 в 03:29», as on gift receipts.
+    static func receipt(_ ms: Double) -> String {
+        let value = date(ms)
+        return numericDay.string(from: value) + " в " + time.string(from: value)
     }
 
     /// Thread list: time today, otherwise the day.

@@ -602,6 +602,7 @@ struct ReceivedGift: Identifiable, Hashable {
     var id: String
     var giftId: String
     var sender: String
+    var recipient: String
     var senderName: String
     var senderAvatar: String
     var senderHandle: String
@@ -614,6 +615,7 @@ struct ReceivedGift: Identifiable, Hashable {
         id = j["id"].str
         giftId = j["giftId"].str
         sender = j["sender"].str
+        recipient = j["recipient"].str
         senderName = j["senderName"].str
         senderAvatar = j["senderAvatar"].str
         senderHandle = j["senderHandle"].str
@@ -627,6 +629,24 @@ struct ReceivedGift: Identifiable, Hashable {
     var artPath: String {
         if let collectible, !collectible.modelAsset.isEmpty { return "/assets/gifts/\(collectible.modelAsset).webp" }
         return "/assets/gifts/\(giftId).webp"
+    }
+}
+
+/// What a received gift sells for: 85 % of its price in Noct Stars
+/// (GET /api/gifts?action=convert, lib/gift-conversions.ts).
+struct GiftSale: Hashable {
+    var available: Bool
+    var reason: String
+    var originalPrice: Int
+    var amount: Int
+    var feePercent: Int
+
+    init(_ j: JSON) {
+        available = j["available"].bool
+        reason = j["reason"].str
+        originalPrice = j["originalPrice"].int ?? 0
+        amount = j["amount"].int ?? 0
+        feePercent = j["feePercent"].int ?? 15
     }
 }
 

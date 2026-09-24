@@ -117,6 +117,9 @@ enum ProfileTheme: String, CaseIterable, Identifiable {
 
 extension Appearance {
     var theme: ProfileTheme { ProfileTheme(key: profileTheme) }
+
+    /// Accent for links and highlighted rows: the Premium palette, lilac otherwise.
+    var accent: Color { premium ? theme.first : Noct.lilac }
 }
 
 // MARK: - Buttons
@@ -241,6 +244,10 @@ enum Haptics {
 /// would hide the glass); earlier systems get frosted, translucent bars.
 enum BarAppearance {
     static func apply() {
+        // Compact tab titles, so «Сообщения» fits next to the other tabs.
+        let tabTitle = UIFont.systemFont(ofSize: 10, weight: .semibold)
+        UITabBarItem.appearance().setTitleTextAttributes([.font: tabTitle], for: .normal)
+        UITabBarItem.appearance().setTitleTextAttributes([.font: tabTitle], for: .selected)
         if #available(iOS 26.0, *) {
             UINavigationBar.appearance().tintColor = .white
             return
@@ -265,9 +272,9 @@ enum BarAppearance {
         tab.shadowColor = UIColor.white.withAlphaComponent(0.08)
         let item = UITabBarItemAppearance()
         item.normal.iconColor = UIColor.white.withAlphaComponent(0.45)
-        item.normal.titleTextAttributes = [.foregroundColor: UIColor.white.withAlphaComponent(0.45)]
+        item.normal.titleTextAttributes = [.foregroundColor: UIColor.white.withAlphaComponent(0.45), .font: tabTitle]
         item.selected.iconColor = .white
-        item.selected.titleTextAttributes = [.foregroundColor: UIColor.white]
+        item.selected.titleTextAttributes = [.foregroundColor: UIColor.white, .font: tabTitle]
         item.normal.badgeBackgroundColor = .white
         item.normal.badgeTextAttributes = [.foregroundColor: UIColor.black]
         tab.stackedLayoutAppearance = item

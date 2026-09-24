@@ -354,17 +354,20 @@ struct GiftArt: View {
     }
 }
 
+/// Received gifts as in Telegram: square cards with the art, the sender's
+/// avatar in the corner and a glass eye over gifts hidden from the profile.
 struct GiftsGrid: View {
     @EnvironmentObject private var session: AppSession
+    @EnvironmentObject private var nav: Navigator
     @ObservedObject var store: ProfileStore
     let own: Bool
     @ObservedObject private var catalog = GiftCatalog.shared
     @State private var selected: ReceivedGift?
 
-    private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             if store.gifts.isEmpty {
                 if store.giftsLoading || !store.giftsLoaded {
                     LoadingRow()
@@ -372,33 +375,12 @@ struct GiftsGrid: View {
                     EmptyState(icon: "gift", text: own ? "Подарков пока нет. Они появятся здесь." : "У этого профиля пока нет подарков.")
                 }
             } else {
-                LazyVGrid(columns: columns, spacing: 8) {
+                LazyVGrid(columns: columns, spacing: 10) {
                     ForEach(store.gifts) { gift in
                         Button {
                             selected = gift
                         } label: {
-                            VStack(spacing: 0) {
-                                GiftArt(path: gift.artPath, collectible: gift.collectible)
-                                    .aspectRatio(1, contentMode: .fit)
-                                Text(gift.collectible.map { "#\($0.number)" } ?? (gift.senderName.isEmpty ? "Подарок" : gift.senderName))
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(Noct.text60)
-                                    .lineLimit(1)
-                                    .padding(.vertical, 6)
-                                    .padding(.horizontal, 6)
-                            }
-                            .background(Noct.card)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Noct.border, lineWidth: 1))
-                            .overlay(alignment: .topTrailing) {
-                                if gift.hidden {
-                                    Image(systemName: "eye.slash")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .frame(width: 24, height: 24)
-                                        .glassCircle()
-                                        .padding(6)
-                                }
-                            }
+                            GiftTile(gift: gift)
                         }
                         .buttonStyle(PressableStyle())
                         .onAppear {
@@ -409,84 +391,393 @@ struct GiftsGrid: View {
                     }
                 }
                 if store.giftsLoading { LoadingRow() }
+                if own {
+                    Text("Нажми на подарок, чтобы продать его за звёзды или изменить настройки показа.")
+                        .font(.system(size: 14))
+                        .foregroundColor(Noct.text48)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 4)
+                }
             }
         }
         .sheet(item: $selected) { gift in
-            GiftDetailSheet(gift: gift, own: own, store: store)
-                .environmentObject(session)
+            GiftDetailSheet(
+                gift: gift,
+                own: own,
+                store: store,
+                openProfile: { nav.push(.profile($0)) },
+                openWallet: { nav.push(.wallet) }
+            )
+            .environmentObject(session)
+        }
+        #if DEBUG
+        .onAppear { debugOpen() }
+        .onChange(of: store.gifts.count) { _ in debugOpen() }
+        #endif
+    }
+
+    #if DEBUG
+    /// Screenshot hook (ios/Tests): `-noct.debugSheet gift` opens the first gift.
+    private func debugOpen() {
+        guard selected == nil, UserDefaults.standard.string(forKey: "noct.debugSheet") == "gift" else { return }
+        selected = store.gifts.first { !$0.message.isEmpty } ?? store.gifts.first
+    }
+    #endif
+}
+
+struct GiftTile: View {
+    let gift: ReceivedGift
+
+    var body: some View {
+        GiftArt(path: gift.artPath, collectible: gift.collectible)
+            .aspectRatio(1, contentMode: .fit)
+            .background(Noct.group)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(alignment: .topLeading) {
+                sender.padding(8)
+            }
+            .overlay {
+                if gift.hidden {
+                    Image(systemName: "eye.slash.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 42, height: 42)
+                        .glassCircle()
+                        .accessibilityLabel("Скрыт из профиля")
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if let collectible = gift.collectible {
+                    Text("#\(collectible.number)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .glassCapsule()
+                        .padding(.bottom, 7)
+                }
+            }
+    }
+
+    /// Who sent it; a gift badge when the sender is not shown.
+    @ViewBuilder private var sender: some View {
+        if gift.sender.isEmpty {
+            Image(systemName: "gift.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(IconColor.blue))
+        } else {
+            AvatarView(person: Identity(id: gift.sender, name: gift.senderName, avatar: gift.senderAvatar, handle: gift.senderHandle), size: 22, ring: false)
         }
     }
 }
 
+/// A received gift, laid out like a Telegram gift card: the art, what can be
+/// done with it and a table with the sender, date, price and caption.
 struct GiftDetailSheet: View {
     @EnvironmentObject private var session: AppSession
     @Environment(\.dismiss) private var dismiss
     let gift: ReceivedGift
+    /// The viewer manages this profile's gifts (own profile or channel).
     let own: Bool
     @ObservedObject var store: ProfileStore
+    let openProfile: (String) -> Void
+    let openWallet: () -> Void
     @ObservedObject private var catalog = GiftCatalog.shared
+    @State private var hidden: Bool
+    @State private var sale: GiftSale?
     @State private var busy = false
+    @State private var confirmSale = false
+    @State private var giftBack = false
+
+    init(gift: ReceivedGift, own: Bool, store: ProfileStore, openProfile: @escaping (String) -> Void, openWallet: @escaping () -> Void) {
+        self.gift = gift
+        self.own = own
+        _store = ObservedObject(wrappedValue: store)
+        self.openProfile = openProfile
+        self.openWallet = openWallet
+        _hidden = State(initialValue: gift.hidden)
+    }
+
+    private var mine: Bool { !gift.recipient.isEmpty && gift.recipient == session.myId }
+    private var name: String { catalog.name(for: gift.giftId) ?? "Подарок" }
+    private var accent: Color { session.me?.appearance.accent ?? Noct.lilac }
+    private var price: Int? {
+        if let sale, sale.originalPrice > 0 { return sale.originalPrice }
+        return catalog.gifts.first { $0.id == gift.giftId }?.price
+    }
+    private var sender: Identity {
+        Identity(id: gift.sender, name: gift.senderName, avatar: gift.senderAvatar, handle: gift.senderHandle)
+    }
+
+    private var title: String {
+        if let collectible = gift.collectible { return "\(name) #\(collectible.number)" }
+        return mine ? "Подарок вам" : name
+    }
+
+    private var summary: String {
+        if let collectible = gift.collectible {
+            return collectible.modelName.isEmpty ? "Коллекционный подарок" : "Коллекционный подарок · \(collectible.modelName)"
+        }
+        guard mine else { return "Подарок в профиле" }
+        if let sale, sale.available {
+            return "Можно хранить этот подарок в профиле или продать за \(stars(sale.amount))."
+        }
+        if let sale, !sale.reason.isEmpty { return sale.reason }
+        return "Подарок хранится в твоём профиле."
+    }
 
     var body: some View {
-        VStack(spacing: 16) {
-            Capsule().fill(Noct.borderStrong).frame(width: 36, height: 5).padding(.top, 8)
-            GiftArt(path: gift.artPath, collectible: gift.collectible)
-                .frame(width: 180, height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            VStack(spacing: 6) {
-                Text(catalog.name(for: gift.giftId) ?? "Подарок")
-                    .font(.system(size: 22, weight: .semibold))
-                if let collectible = gift.collectible {
-                    Text("Коллекционный #\(collectible.number) · \(collectible.modelName)")
-                        .font(.system(size: 14))
-                        .foregroundColor(Noct.text60)
-                    if !collectible.backdropName.isEmpty {
-                        Text("Фон: \(collectible.backdropName)")
-                            .font(.system(size: 13))
-                            .foregroundColor(Noct.text48)
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    GiftArt(path: gift.artPath, collectible: gift.collectible)
+                        .frame(width: 160, height: 160)
+                        .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+                    Text(title)
+                        .font(.system(size: 24, weight: .bold))
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 14)
+                    Text(summary)
+                        .font(.system(size: 16))
+                        .foregroundColor(Noct.text75)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 8)
+                    if mine {
+                        Button {
+                            dismiss()
+                            openWallet()
+                        } label: {
+                            HStack(spacing: 3) {
+                                Text("Подробнее о звёздах")
+                                Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold))
+                            }
+                            .font(.system(size: 16))
+                            .foregroundColor(accent)
+                        }
+                        .buttonStyle(PressableStyle())
+                        .padding(.top, 4)
+                    }
+                    table
+                        .padding(.top, 22)
+                    if own {
+                        visibility
+                            .padding(.top, 16)
+                    }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("OK").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding(.top, 22)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+            }
+            .sheetSurface()
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .accessibilityLabel("Закрыть")
+                }
+            }
+        }
+        .presentationDetents([.fraction(0.86), .large])
+        .confirmationDialog("Продать подарок за \(stars(sale?.amount ?? 0))?", isPresented: $confirmSale, titleVisibility: .visible) {
+            Button("Продать", role: .destructive) { Task { await sell() } }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Подарок исчезнет из профиля, а звёзды придут на баланс. Комиссия \(sale?.feePercent ?? 15) %.")
+        }
+        .sheet(isPresented: $giftBack) {
+            SendGiftSheet(recipient: sender)
+                .environmentObject(session)
+        }
+        .task { await loadSale() }
+    }
+
+    // MARK: Table
+
+    private var table: some View {
+        VStack(spacing: 0) {
+            if !gift.sender.isEmpty {
+                row("От") {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) { senderLink; sendBack }
+                        VStack(alignment: .leading, spacing: 6) { senderLink; sendBack }
                     }
                 }
             }
-            if !gift.senderName.isEmpty {
-                Text("От \(gift.senderName) · \(Format.stamp(gift.created))")
-                    .font(.system(size: 14))
-                    .foregroundColor(Noct.text60)
+            row("Дата") {
+                Text(Format.receipt(gift.created))
+            }
+            if let price {
+                row("Стоимость", divider: gift.collectible != nil || !gift.message.isEmpty) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) { priceLabel(price); sellChip }
+                        VStack(alignment: .leading, spacing: 6) { priceLabel(price); sellChip }
+                    }
+                }
+            }
+            if let collectible = gift.collectible {
+                if !collectible.modelName.isEmpty {
+                    row("Модель") { Text(collectible.modelName) }
+                }
+                if !collectible.backdropName.isEmpty {
+                    row("Фон", divider: !gift.message.isEmpty) { Text(collectible.backdropName) }
+                }
             }
             if !gift.message.isEmpty {
                 Text(PremiumEmoji.replace(gift.message))
-                    .font(.system(size: 15))
-                    .foregroundColor(Noct.text75)
-                    .multilineTextAlignment(.center)
-                    .padding(14)
-                    .frame(maxWidth: .infinity)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Noct.sheetRow))
-                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Noct.border, lineWidth: 1))
-                    .padding(.horizontal, 20)
+                    .font(.system(size: 16))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
             }
-            if own {
-                Button {
-                    Task {
-                        busy = true
-                        defer { busy = false }
-                        do {
-                            try await store.setGiftHidden(gift, hidden: !gift.hidden, api: session.api)
-                            session.show(gift.hidden ? "Подарок снова виден в профиле" : "Подарок скрыт из профиля")
-                            dismiss()
-                        } catch {
-                            session.report(error)
-                        }
-                    }
-                } label: {
-                    Label(gift.hidden ? "Показать в профиле" : "Скрыть из профиля", systemImage: gift.hidden ? "eye" : "eye.slash")
-                }
-                .buttonStyle(SecondaryButtonStyle())
-                .disabled(busy)
-            }
-            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
-        .sheetSurface()
-        .presentationDetents([.medium, .large])
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.white.opacity(0.14), lineWidth: 1))
+    }
+
+    private func row<Content: View>(_ label: String, divider: Bool = true, @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 0) {
+            Text(label)
+                .font(.system(size: 16))
+                .foregroundColor(Noct.text75)
+                .frame(width: 96, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+            Rectangle()
+                .fill(Color.white.opacity(0.14))
+                .frame(width: 1)
+                .frame(maxHeight: .infinity)
+            content()
+                .font(.system(size: 16))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .overlay(alignment: .bottom) {
+            if divider {
+                Rectangle().fill(Color.white.opacity(0.14)).frame(height: 1)
+            }
+        }
+    }
+
+    private var senderLink: some View {
+        Button {
+            dismiss()
+            openProfile(gift.sender)
+        } label: {
+            HStack(spacing: 8) {
+                AvatarView(person: sender, size: 24, ring: false)
+                Text(gift.senderName.isEmpty ? "@" + gift.senderHandle : gift.senderName)
+                    .foregroundColor(accent)
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(PressableStyle())
+    }
+
+    @ViewBuilder private var sendBack: some View {
+        if gift.sender != session.myId && !session.readOnly {
+            chip("отправить подарок") { giftBack = true }
+        }
+    }
+
+    private func priceLabel(_ price: Int) -> some View {
+        HStack(spacing: 4) {
+            Text(Format.count(price))
+            Image("StarsIcon").resizable().scaledToFit().frame(width: 17, height: 17)
+        }
+    }
+
+    @ViewBuilder private var sellChip: some View {
+        if mine, let sale, sale.available, !session.readOnly {
+            chip("продать за \(stars(sale.amount))") { confirmSale = true }
+                .disabled(busy)
+        }
+    }
+
+    private func chip(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(accent)
+                .lineLimit(1)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(accent.opacity(0.16)))
+        }
+        .buttonStyle(PressableStyle())
+    }
+
+    private var visibility: some View {
+        HStack(spacing: 4) {
+            Text(hidden ? "Подарок скрыт из профиля." : "Подарок виден в профиле.")
+                .foregroundColor(Noct.text48)
+            Button {
+                Task { await toggleHidden() }
+            } label: {
+                HStack(spacing: 2) {
+                    Text(hidden ? "Показать" : "Скрыть")
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(accent)
+            }
+            .buttonStyle(PressableStyle())
+            .disabled(busy)
+        }
+        .font(.system(size: 15))
+    }
+
+    private func stars(_ count: Int) -> String {
+        "\(Format.count(count)) \(Format.plural(count, "звезду", "звезды", "звёзд"))"
+    }
+
+    // MARK: Actions
+
+    private func loadSale() async {
+        guard mine, gift.collectible == nil, sale == nil else { return }
+        if let data = try? await session.api.get("/api/gifts", ["action": "convert", "id": gift.id]) {
+            sale = GiftSale(data)
+        }
+    }
+
+    private func toggleHidden() async {
+        busy = true
+        defer { busy = false }
+        do {
+            try await store.setGiftHidden(gift, hidden: !hidden, api: session.api)
+            hidden.toggle()
+            Haptics.tap()
+        } catch {
+            session.report(error)
+        }
+    }
+
+    private func sell() async {
+        guard let sale else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            if let balance = try await store.sellGift(gift, expectedAmount: sale.amount, api: session.api) {
+                catalog.balance = balance
+            }
+            Haptics.success()
+            session.show("Подарок продан: +\(Format.count(sale.amount)) ⭐️")
+            dismiss()
+        } catch {
+            session.report(error)
+        }
     }
 }
 

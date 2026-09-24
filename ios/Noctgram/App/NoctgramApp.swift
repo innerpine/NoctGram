@@ -104,7 +104,7 @@ struct MainTabView: View {
                 Tab("Лента", systemImage: "house", value: AppTab.feed) { feed }
                 Tab("Сообщения", systemImage: "bubble.left.and.bubble.right", value: AppTab.messages) { messages }
                     .badge(session.unreadMessages)
-                Tab("Уведомления", systemImage: "bell", value: AppTab.notifications) { notifications }
+                Tab("Уведы", systemImage: "bell", value: AppTab.notifications) { notifications }
                     .badge(session.unreadNotifications)
                 Tab(value: AppTab.profile) {
                     profile
@@ -127,7 +127,7 @@ struct MainTabView: View {
                     .badge(session.unreadMessages)
                     .tag(AppTab.messages)
                 notifications
-                    .tabItem { Label("Уведомления", systemImage: "bell") }
+                    .tabItem { Label("Уведы", systemImage: "bell") }
                     .badge(session.unreadNotifications)
                     .tag(AppTab.notifications)
                 profile

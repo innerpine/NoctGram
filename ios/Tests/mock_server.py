@@ -78,6 +78,10 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/api/social":
             return self.send(200, social(q))
         if url.path == "/api/gifts":
+            if q.get("action") == "convert":
+                # Sale quote as lib/gift-conversions.ts gives it: 85 % of the price.
+                return self.send(200, {"id": q.get("id", ""), "available": True, "reason": None, "originalPrice": 25,
+                                       "amount": 21, "fee": 4, "feePercent": 15, "convertedAt": None})
             return self.send(200, R["giftCatalog" if q.get("action") == "catalog" else "gifts"])
         if url.path == "/api/music/activity":
             # Activity is a heartbeat: move the captured times to now.
