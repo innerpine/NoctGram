@@ -183,7 +183,9 @@ struct ProfileScreen: View {
         let look = profile.appearance
         let premiumSurface = look.premium && !profile.isChannel && profile.background.mode != "none"
         VStack(alignment: .leading, spacing: 0) {
-            ProfileCover(profile: profile, height: 160 + topInset)
+            // 140 pt as on the web on phones; under the iOS 26 bar the cover
+            // takes the bar's height and shows 84 pt below it.
+            ProfileCover(profile: profile, height: topInset > 0 ? topInset + 84 : 140)
                 .overlay(alignment: .topTrailing) {
                     if editable {
                         Button {
