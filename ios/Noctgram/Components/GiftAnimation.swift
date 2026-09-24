@@ -116,7 +116,7 @@ final class GiftPlayback: NSObject {
             if chosen.contains(where: { $0 === player }) { player.play() } else { player.stop() }
         }
         #if DEBUG
-        let next = "playing \(chosen.count) of \(visible.count) visible, \(players.count) registered"
+        let next = "playing \(chosen.count) of \(visible.count) visible (\(visible.filter(\.featured).count) featured), \(players.count) registered"
         if next != summary {
             summary = next
             log.notice("\(next, privacy: .public)")
@@ -217,13 +217,18 @@ final class GiftPlayerView: UIView {
         return frame.intersects(window.bounds) && !isCovered
     }
 
-    /// A controller above this view presents something (a sheet over the grid).
+    /// A controller above this view presents something (a sheet over the
+    /// grid). A presented controller's next responder is its presenter, so
+    /// the sheet's own content passes its presenter without being covered.
     private var isCovered: Bool {
         var responder: UIResponder? = self
+        var below: UIViewController?
         while let current = responder {
-            if let controller = current as? UIViewController,
-               let presented = controller.presentedViewController, !presented.isBeingDismissed {
-                return true
+            if let controller = current as? UIViewController {
+                if let presented = controller.presentedViewController, presented !== below, !presented.isBeingDismissed {
+                    return true
+                }
+                below = controller
             }
             responder = current.next
         }
