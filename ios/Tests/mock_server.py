@@ -73,6 +73,16 @@ def with_own(reactions, emoji):
     return result
 
 
+def feed():
+    """The captured feed with a wide video second: its preview must stay in
+    the post (sample data only)."""
+    posts = [dict(post) for post in R["feed"]]
+    video = {"id": "night-walk.mp4", "type": "video/mp4", "name": "night-walk.mp4", "size": 284443}
+    posts.insert(1, dict(posts[0], id="mock-video-post", text="Ночная прогулка по набережной 🌙",
+                         media=[video], created=posts[0]["created"] - 60000, likes=12, views=40))
+    return posts
+
+
 def photo(media_id):
     return {"id": media_id, "name": "photo.jpg", "type": "image/jpeg", "size": 184320, "kind": "image"}
 
@@ -158,7 +168,7 @@ def social(q):
         user = q.get("user")
         if user:
             return R.get({META["me"]: "feedAlice", META["bob"]: "feedBob", META["channel"]: "feedChannel"}.get(user, ""), [])
-        return R["feedFollowing" if q.get("mode") == "following" else "feed"]
+        return R["feedFollowing"] if q.get("mode") == "following" else feed()
     if action == "profile":
         key = q.get("id") or {"bob_night": META["bob"], "night_city": META["channel"]}.get(q.get("handle", ""), META["me"])
         return R[{META["bob"]: "profileBob", META["channel"]: "profileChannel"}.get(key, "profileAlice")]
@@ -177,15 +187,22 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
-    def send(self, status, body, content_type="application/json; charset=utf-8"):
+    def send(self, status, body, content_type="application/json; charset=utf-8", headers=None):
         data = body if isinstance(body, bytes) else json.dumps(body, ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
         self.end_headers()
-        self.wfile.write(data)
+        if not self.head_only:
+            self.wfile.write(data)
 
-    def do_GET(self):
+    def do_HEAD(self):
+        self.do_GET(head=True)
+
+    def do_GET(self, head=False):
+        self.head_only = head
         url = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         if url.path == "/api/auth/session":
@@ -223,12 +240,27 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, {"error": "Не найдено"})
         if not os.path.isfile(path):
             return self.send(404, {"error": "Файл не найден"})
-        kinds = {".webp": "image/webp", ".png": "image/png", ".json": "application/json", ".tgs": "application/octet-stream"}
+        kinds = {".webp": "image/webp", ".png": "image/png", ".json": "application/json",
+                 ".tgs": "application/octet-stream", ".mp4": "video/mp4"}
         kind = kinds.get(os.path.splitext(path)[1], "image/jpeg")
         with open(path, "rb") as file:
-            return self.send(200, file.read(), kind)
+            data = file.read()
+        # Byte ranges, as app/api/media/[id]/route.ts serves them: AVPlayer
+        # streams a video only from a server that answers them.
+        spec = self.headers.get("Range", "")
+        if spec.startswith("bytes="):
+            first, _, last = spec[len("bytes="):].split(",")[0].partition("-")
+            if first:
+                start, end = int(first), int(last) if last else len(data) - 1
+            else:
+                start, end = max(0, len(data) - int(last)), len(data) - 1
+            end = min(end, len(data) - 1)
+            return self.send(206, data[start:end + 1], kind,
+                             {"Content-Range": f"bytes {start}-{end}/{len(data)}", "Accept-Ranges": "bytes"})
+        return self.send(200, data, kind, {"Accept-Ranges": "bytes"})
 
     def do_POST(self):
+        self.head_only = False
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b""
         try:

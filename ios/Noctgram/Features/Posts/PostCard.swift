@@ -88,7 +88,7 @@ struct PostCard: View {
                 .environmentObject(session)
         }
         .fullScreenCover(item: $viewer) { state in
-            MediaViewer(items: state.items, index: state.index)
+            MediaViewer(state: state)
                 .environmentObject(session)
         }
         .confirmationDialog("Удалить публикацию?", isPresented: $confirmDelete, titleVisibility: .visible) {
@@ -200,7 +200,7 @@ struct PostCard: View {
     private var mediaSection: some View {
         ZStack {
             MediaGrid(items: post.media) { index in
-                viewer = MediaViewerState(items: post.media, index: index)
+                viewer = MediaViewerState(items: post.media, index: index, title: post.name, date: post.created)
             }
             .blur(radius: post.adult && !revealed ? 28 : 0)
             .allowsHitTesting(!post.adult || revealed)
@@ -347,6 +347,11 @@ enum ReportReason {
 struct MediaViewerState: Identifiable {
     let items: [MediaItem]
     let index: Int
+    /// Who sent or posted it and when, shown on top as in Telegram.
+    var title = ""
+    var date: Double = 0
+    /// Deleting from the viewer (a chat message): the viewer closes first.
+    var delete: (() -> Void)?
     var id: String { items.map(\.id).joined() + "#\(index)" }
 }
 

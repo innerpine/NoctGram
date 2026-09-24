@@ -573,7 +573,7 @@ struct MediaTabGrid: View {
             LazyVGrid(columns: columns, spacing: 3) {
                 ForEach(Array(entries.enumerated()), id: \.offset) { index, entry in
                     Button {
-                        viewer = MediaViewerState(items: entry.post.media, index: entry.post.media.firstIndex(of: entry.item) ?? 0)
+                        viewer = MediaViewerState(items: entry.post.media, index: entry.post.media.firstIndex(of: entry.item) ?? 0, title: entry.post.name, date: entry.post.created)
                     } label: {
                         Color.clear
                             .aspectRatio(1, contentMode: .fit)
@@ -614,7 +614,7 @@ struct MediaTabGrid: View {
             }
         }
         .fullScreenCover(item: $viewer) { state in
-            MediaViewer(items: state.items, index: state.index)
+            MediaViewer(state: state)
                 .environmentObject(session)
         }
     }

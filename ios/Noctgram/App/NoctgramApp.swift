@@ -3,6 +3,7 @@ import UIKit
 
 @main
 struct NoctgramApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var session = AppSession()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -29,6 +30,15 @@ struct NoctgramApp: App {
                 break
             }
         }
+    }
+}
+
+/// The app stays upright; the media viewer lets it turn (ViewerOrientation).
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    static var orientations: UIInterfaceOrientationMask = .portrait
+
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        Self.orientations
     }
 }
 
@@ -77,6 +87,10 @@ struct MainTabView: View {
     @StateObject private var nav = Navigator()
     /// The own avatar as the «Профиль» tab icon, as in iOS messengers.
     @State private var avatarIcon: UIImage?
+    #if DEBUG
+    /// Screenshot hook: the media viewer over the tabs.
+    @State private var debugViewer: MediaViewerState?
+    #endif
 
     var body: some View {
         tabs
@@ -84,7 +98,14 @@ struct MainTabView: View {
             .environment(\.openURL, OpenURLAction { url in nav.open(url) })
             .task(id: session.me?.avatar) { await loadAvatarIcon() }
             #if DEBUG
-            .onAppear { DebugLaunch.apply(nav, me: session.myId ?? "") }
+            .onAppear {
+                DebugLaunch.apply(nav, me: session.myId ?? "")
+                debugViewer = DebugLaunch.viewer()
+            }
+            .fullScreenCover(item: $debugViewer) { state in
+                MediaViewer(state: state)
+                    .environmentObject(session)
+            }
             #endif
     }
 
@@ -214,6 +235,21 @@ enum DebugLaunch {
             }
         default: break
         }
+    }
+
+    /// «-noct.debugViewer video» or «photo»: a video or a photo from Bob in
+    /// the media viewer (ios/Tests/Fixtures/media).
+    static func viewer() -> MediaViewerState? {
+        let fields: [String: JSON]
+        switch UserDefaults.standard.string(forKey: "noct.debugViewer") {
+        case "video":
+            fields = ["id": .string("night-walk.mp4"), "type": .string("video/mp4"), "name": .string("night-walk.mp4")]
+        case "photo":
+            fields = ["id": .string("b23ae726-b170-4db7-968e-c7dadbebcdbc"), "type": .string("image/jpeg"), "name": .string("photo.jpg")]
+        default:
+            return nil
+        }
+        return MediaViewerState(items: [MediaItem(JSON.object(fields))], index: 0, title: "Боб", date: Format.nowMs - 2 * 3_600_000) {}
     }
 }
 #endif

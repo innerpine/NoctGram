@@ -114,6 +114,31 @@ struct ChatEndTracker: ViewModifier {
     }
 }
 
+/// A bubble is one VoiceOver element with a line to say. Combining its
+/// children instead (reaction chips with faces among them) kept SwiftUI
+/// laying a scrolled chat out without end once accessibility asked for the
+/// elements: the UI tests hung there. «-noct.chatParts combine» brings the
+/// combined bubbles back for comparison.
+struct SpokenBubble: ViewModifier {
+    let label: String
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if ChatProbe.has("combine") {
+            content.accessibilityElement(children: .combine)
+        } else {
+            content
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(label)
+        }
+    }
+
+    /// «🔥 2», one per reaction.
+    static func reactions(_ reactions: [Reaction]) -> [String] {
+        reactions.map { "\($0.emoji) \($0.count)" }
+    }
+}
+
 /// iOS 16 and 17: the newest row tells when it comes and goes.
 struct ChatEndRow: ViewModifier {
     let isLast: Bool

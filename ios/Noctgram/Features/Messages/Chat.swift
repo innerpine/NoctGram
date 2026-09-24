@@ -303,7 +303,7 @@ struct ChatView: View {
             }
         }
         .fullScreenCover(item: $viewer) { state in
-            MediaViewer(items: state.items, index: state.index)
+            MediaViewer(state: state)
                 .environmentObject(session)
         }
         .sheet(item: $forwarding) { message in
@@ -386,7 +386,11 @@ struct ChatView: View {
                 peer: title,
                 palette: store.palette,
                 joinsPrevious: joins,
-                openMedia: { items, position in viewer = MediaViewerState(items: items, index: position) },
+                openMedia: { items, position in
+                    viewer = MediaViewerState(items: items, index: position, title: senderName(message), date: message.created) {
+                        deleting = message
+                    }
+                },
                 onFocus: { frame in present(message, frame: frame, joinsPrevious: joins) },
                 onReply: canWrite ? replyAction(message) : nil,
                 onReact: canWrite ? reactAction(message) : nil
@@ -395,6 +399,10 @@ struct ChatView: View {
             .id(message.id)
             .modifier(ChatEndRow(isLast: message.id == store.messages.last?.id, atEnd: $atEnd))
         }
+    }
+
+    private func senderName(_ message: ChatMessage) -> String {
+        message.sender == session.myId ? session.me?.name ?? "Вы" : title.name
     }
 
     /// Consecutive messages of one sender within ten minutes form a group.
@@ -597,7 +605,7 @@ struct MessageBubble: View {
     private var shape: BubbleShape { .message(mine: mine, joinsPrevious: joinsPrevious) }
     private var media: [MediaItem] {
         message.attachments.filter { $0.isImage || $0.isVideo }.map {
-            MediaItem(JSON.object(["id": .string($0.id), "type": .string($0.type), "name": .string($0.name)]))
+            MediaItem(JSON.object(["id": .string($0.id), "type": .string($0.type), "name": .string($0.name), "size": .number(Double($0.size))]))
         }
     }
     private var files: [ChatAttachment] { message.attachments.filter { !$0.isImage && !$0.isVideo } }
@@ -634,6 +642,29 @@ struct MessageBubble: View {
         return people.count == reaction.count ? people : nil
     }
 
+    /// What VoiceOver says: forward and reply, the text or what is attached,
+    /// the reactions and the time.
+    private var spoken: String {
+        var parts: [String] = []
+        if !message.forwardedName.isEmpty { parts.append("Переслано от \(message.forwardedName)") }
+        if let reply = message.reply {
+            parts.append("Ответ на «\(reply.unavailable ? "удалённое сообщение" : (reply.text.isEmpty ? "вложение" : reply.text))»")
+        }
+        if let gift = message.gift {
+            parts.append(GiftCatalog.shared.name(for: gift.giftId).map { "Подарок «\($0)»" } ?? "Подарок")
+            if !gift.message.isEmpty { parts.append(gift.message) }
+        } else if hasText {
+            parts.append(message.text)
+        }
+        let videos = media.filter(\.isVideo).count, photos = media.count - videos
+        if photos > 0 { parts.append(photos == 1 ? "Фото" : "Фото: \(photos)") }
+        if videos > 0 { parts.append(videos == 1 ? "Видео" : "Видео: \(videos)") }
+        parts += files.map { "Файл \($0.name)" }
+        parts += SpokenBubble.reactions(reactions)
+        parts.append(Format.clock(message.created))
+        return parts.joined(separator: ", ")
+    }
+
     private func time(onMedia: Bool = false) -> BubbleTime {
         BubbleTime(created: message.created, edited: message.editedAt > 0, status: status, onMedia: onMedia, mine: mine, pinned: message.pinnedAt > 0)
     }
@@ -649,7 +680,7 @@ struct MessageBubble: View {
                 if mine { Spacer(minLength: 52) }
                 content
                     .opacity(message.pending ? 0.7 : 1)
-                    .accessibilityElement(children: .combine)
+                    .modifier(SpokenBubble(label: spoken))
                     .accessibilityIdentifier("message-" + message.id)
                     .accessibilityAction(named: "Ответить") { onReply?() }
                     .modifier(HoldToFocus(action: message.pending || ChatProbe.has("nohold") ? nil : onFocus))

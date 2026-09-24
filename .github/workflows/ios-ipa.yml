@@ -188,6 +188,10 @@ jobs:
           shot 19-profile-qr 8765 -noct.debugTab profile -noct.debugSheet qr
           shot 20-gifts 8765 -noct.debugTab profile -noct.debugRoute screen:gifts
           shot 21-gift 8765 -noct.debugTab profile -noct.debugRoute screen:gifts -noct.debugSheet gift
+          # The media viewer as in Telegram: a playing video with its controls
+          # (they stay for the screenshot), then a photo.
+          WAIT=10 shot 30-video 8765 -noct.debugViewer video
+          shot 31-photo 8765 -noct.debugViewer photo
           # Gift animations are limited to three at a time: show what played.
           echo "--- gift playback"
           xcrun simctl spawn "$UDID" log show --last 15m --style compact \
@@ -197,29 +201,6 @@ jobs:
           for report in ~/Library/Logs/DiagnosticReports/Noctgram*; do
             [ -f "$report" ] && head -c 6000 "$report"
           done
-          true
-
-      - name: Chat probes
-        run: |
-          # The dialogue scrolls itself up with one part switched off at a
-          # time, logs what it kept redoing and whether the main thread still
-          # answered, and quits (ios/Noctgram/Features/Messages/ChatProbe.swift).
-          set +e
-          BOB=$(python3 -c "import json; print(json.load(open('ios/Tests/Fixtures/fixtures.json'))['meta']['bob'])")
-          for variant in lazy vstack nogift stillgift notracker noswipe nohold nochips plainstack nobar; do
-            xcrun simctl terminate "$UDID" com.noctgram.ios >/dev/null 2>&1 || true
-            xcrun simctl launch "$UDID" com.noctgram.ios -noct.server "http://127.0.0.1:8765" \
-              -noct.debugTab messages -noct.debugRoute "chat:$BOB" -noct.chatProbe "$variant" >/dev/null
-            for second in $(seq 1 45); do
-              sleep 1
-              pgrep -x Noctgram >/dev/null || break
-            done
-            echo "$variant: $second s"
-          done
-          xcrun simctl terminate "$UDID" com.noctgram.ios >/dev/null 2>&1 || true
-          xcrun simctl spawn "$UDID" log show --last 10m --style compact \
-            --predicate 'subsystem == "com.noctgram.ios" AND category == "probe"' \
-            | sed -nE 's/.*\[com\.noctgram\.ios:probe\] //p'
           true
 
       - name: Gesture tests
@@ -286,11 +267,11 @@ jobs:
           PY
           fi
           ls "$GITHUB_WORKSPACE/shots" | grep -E '^[23][0-9]-'
-          # What the chats kept redoing: the probes of testChatProbes, then
-          # every 4 s of the other tests while anything was counted.
+          # What the chats kept redoing, every 4 s while anything was counted
+          # (ChatProbe); «STUCK» marks a main thread that stopped answering.
           xcrun simctl spawn "$UDID" log show --last 30m --style compact \
             --predicate 'subsystem == "com.noctgram.ios" AND category == "probe"' \
-            | sed -nE 's/.*\[com\.noctgram\.ios:probe\] //p' | grep -v '^probe sim ' | head -250 || true
+            | sed -nE 's/.*\[com\.noctgram\.ios:probe\] //p' | cut -c1-400 | head -150 || true
           # Which gift animations were drawn on the main thread.
           xcrun simctl spawn "$UDID" log show --last 20m --style compact \
             --predicate 'subsystem == "com.noctgram.ios" AND category == "gifts"' | grep -o 'mounted .*' | sort | uniq -c | tail -20 || true

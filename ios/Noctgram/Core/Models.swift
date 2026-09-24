@@ -352,11 +352,14 @@ struct MediaItem: Identifiable, Hashable {
     var id: String
     var type: String
     var name: String
+    /// Bytes, when the server tells (chat attachments do).
+    var size: Int
 
     init(_ j: JSON) {
         id = j["id"].str
         type = j["type"].str
         name = j["name"].str
+        size = j["size"].int ?? 0
     }
 
     var isImage: Bool { type.hasPrefix("image/") }

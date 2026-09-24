@@ -22,7 +22,8 @@ final class ChatGestureTests: XCTestCase {
         let app = XCUIApplication()
         let server = ProcessInfo.processInfo.environment["NOCT_SERVER"] ?? "http://127.0.0.1:8765"
         // The app logs what it keeps redoing (ChatProbe) every few seconds.
-        app.launchArguments = ["-noct.server", server, "-noct.debugTab", "messages", "-noct.debugRoute", route, "-noct.chatCounters", "1"] + extra
+        app.launchArguments = ["-noct.server", server, "-noct.debugTab", "messages", "-noct.debugRoute", route,
+                               "-noct.chatCounters", "1", "-noct.chatProbeMode", "ui"] + extra
         app.launch()
         return app
     }
@@ -77,18 +78,6 @@ final class ChatGestureTests: XCTestCase {
         let newest = self.element(newestId, in: app)
         let above = newest.exists && element.exists && newest.frame.maxY <= element.frame.minY
         expect(above, "The newest message hides under the input", in: app, shot: shot)
-    }
-
-    /// The chat scrolls itself up with parts of it switched off in turn
-    /// (ChatProbe in the app) and quits by itself; its log tells which
-    /// part keeps the main thread busy. Only reports.
-    func testChatProbes() {
-        for variant in ["lazy", "vstack", "nogift", "stillgift", "notracker", "noswipe", "nohold", "nochips", "plainstack", "nobar"] {
-            let app = launch(["-noct.chatProbe", variant, "-noct.chatProbeMode", "ax"])
-            let quit = app.wait(for: .notRunning, timeout: 45)
-            XCTContext.runActivity(named: "Probe \(variant): \(quit ? "quit by itself" : "still running")") { _ in }
-            app.terminate()
-        }
     }
 
     func testSwipeLeftAnswersTheMessage() {

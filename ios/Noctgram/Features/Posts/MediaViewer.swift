@@ -32,106 +32,375 @@ struct VideoThumbnail: View {
     @State private var image: UIImage?
 
     var body: some View {
+        // The frame is an overlay, as in RemoteImage: a wide video filling
+        // its tile never widens the post around it.
+        Noct.coverFill
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .transition(.opacity)
+                }
+            }
+            .clipped()
+            .task(id: url) {
+                guard let url else { return }
+                let result = await VideoThumbnails.shared.thumbnail(for: url)
+                withAnimation(.easeOut(duration: 0.2)) { image = result }
+            }
+    }
+}
+
+/// Full-screen photos and videos, swiped as pages, dressed as in Telegram:
+/// back, who sent it and when, and a menu on top; under a video its
+/// controls, seek bar and actions. A tap shows or hides all of it, a playing
+/// video hides it after three quiet seconds, a double tap on a video's left
+/// or right half jumps 15 seconds.
+struct MediaViewer: View {
+    @EnvironmentObject private var session: AppSession
+    @Environment(\.dismiss) private var dismiss
+    let state: MediaViewerState
+    @State private var index: Int
+    @State private var chrome = true
+    @State private var hiding: Task<Void, Never>?
+    @State private var shared: SharedMedia?
+    @State private var preparing = false
+    @State private var notice: String?
+    @StateObject private var videos = ViewerVideos()
+
+    init(state: MediaViewerState) {
+        self.state = state
+        _index = State(initialValue: state.index)
+    }
+
+    private var items: [MediaItem] { state.items }
+    private var current: MediaItem? { items.indices.contains(index) ? items[index] : nil }
+
+    var body: some View {
         ZStack {
-            Noct.coverFill
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
+            Color.black.ignoresSafeArea()
+            TabView(selection: $index) {
+                ForEach(Array(items.enumerated()), id: \.offset) { position, item in
+                    page(item)
+                        .tag(position)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .ignoresSafeArea()
+
+            if chrome {
+                controls
                     .transition(.opacity)
             }
+            if let notice {
+                VStack {
+                    Text(notice)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .glassCapsule()
+                        .padding(.top, 64)
+                    Spacer(minLength: 0)
+                }
+                .transition(.opacity)
+                .allowsHitTesting(false)
+            }
         }
-        .task(id: url) {
-            guard let url else { return }
-            let result = await VideoThumbnails.shared.thumbnail(for: url)
-            withAnimation(.easeOut(duration: 0.2)) { image = result }
+        .statusBarHidden(!chrome)
+        .onAppear {
+            ViewerOrientation.unlock()
+            if items.contains(where: \.isVideo) { PlaybackAudio.begin() }
+            show(index)
+        }
+        .onDisappear {
+            hiding?.cancel()
+            videos.pauseAll()
+            ViewerOrientation.lock()
+            PlaybackAudio.end()
+        }
+        .onChange(of: index) { position in show(position) }
+        .sheet(item: $shared) { media in
+            ActivityView(items: media.items)
+                .presentationDetents([.medium, .large])
+        }
+    }
+
+    @ViewBuilder private func page(_ item: MediaItem) -> some View {
+        if item.isVideo, let playback = playback(item) {
+            VideoPage(playback: playback, tap: toggleChrome, stopped: showChrome)
+        } else {
+            PhotoPage(url: session.api.mediaURL(item.path), tap: toggleChrome)
+        }
+    }
+
+    private func playback(_ item: MediaItem) -> VideoPlayback? {
+        guard let url = session.api.mediaURL(item.path) else { return nil }
+        // Picture in picture takes the video away: the viewer closes.
+        return videos.playback(for: item, url: url) { dismiss() }
+    }
+
+    // MARK: Chrome
+
+    private var controls: some View {
+        ZStack {
+            if let item = current {
+                if item.isVideo, let playback = playback(item) {
+                    VideoControls(
+                        playback: playback,
+                        sharing: preparing,
+                        deletable: state.delete != nil,
+                        share: { share(item) },
+                        delete: remove,
+                        touched: scheduleHide
+                    )
+                } else {
+                    photoActions(item)
+                }
+            }
+            VStack(spacing: 0) {
+                topBar
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var title: String {
+        if !state.title.isEmpty { return state.title }
+        return current?.isVideo == true ? "Видео" : "Фото"
+    }
+
+    private var subtitle: String {
+        var parts: [String] = []
+        if state.date > 0 { parts.append(Format.viewerDate(state.date)) }
+        if items.count > 1 { parts.append("\(index + 1) из \(items.count)") }
+        return parts.joined(separator: " · ")
+    }
+
+    private var topBar: some View {
+        HStack(spacing: 10) {
+            Button(action: close) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 19, weight: .semibold))
+            }
+            .buttonStyle(CircleButtonStyle(size: 46))
+            .accessibilityLabel("Назад")
+            Spacer(minLength: 0)
+            VStack(spacing: 1) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.system(size: 12.5))
+                        .foregroundColor(Noct.text60)
+                }
+            }
+            .lineLimit(1)
+            .padding(.horizontal, 20)
+            .frame(minHeight: 46)
+            .glassCapsule()
+            Spacer(minLength: 0)
+            menu
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+    }
+
+    private var menu: some View {
+        Menu {
+            if let item = current {
+                Button {
+                    save(item)
+                } label: {
+                    Label(item.isVideo ? "Сохранить видео" : "Сохранить фото", systemImage: "square.and.arrow.down")
+                }
+                Button {
+                    share(item)
+                } label: {
+                    Label("Поделиться", systemImage: "square.and.arrow.up")
+                }
+                if state.delete != nil {
+                    Button(role: .destructive, action: remove) {
+                        Label("Удалить", systemImage: "trash")
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 46, height: 46)
+                .glassCircle(interactive: true)
+        }
+        .accessibilityLabel("Ещё")
+    }
+
+    /// Photos: share on the left, delete on the right, as in Telegram.
+    private func photoActions(_ item: MediaItem) -> some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            HStack {
+                Button {
+                    share(item)
+                } label: {
+                    if preparing {
+                        ProgressView().tint(.white)
+                    } else {
+                        Image(systemName: "arrowshape.turn.up.right")
+                            .font(.system(size: 19, weight: .semibold))
+                    }
+                }
+                .buttonStyle(CircleButtonStyle(size: 50))
+                .disabled(preparing)
+                .accessibilityLabel("Поделиться")
+                Spacer(minLength: 0)
+                if state.delete != nil {
+                    Button(action: remove) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 18, weight: .semibold))
+                    }
+                    .buttonStyle(CircleButtonStyle(size: 50))
+                    .accessibilityLabel("Удалить")
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+        }
+    }
+
+    // MARK: Behaviour
+
+    private func show(_ position: Int) {
+        let item = items.indices.contains(position) ? items[position] : nil
+        videos.pauseAll(except: item?.id)
+        if let item, item.isVideo { playback(item)?.play() }
+        showChrome()
+    }
+
+    private func showChrome() {
+        withAnimation(Noct.quick) { chrome = true }
+        scheduleHide()
+    }
+
+    private func toggleChrome() {
+        withAnimation(Noct.quick) { chrome.toggle() }
+        scheduleHide()
+    }
+
+    /// A playing video hides the chrome after three quiet seconds.
+    private func scheduleHide() {
+        hiding?.cancel()
+        guard chrome else { return }
+        #if DEBUG
+        // Screenshots of the viewer keep its chrome.
+        if UserDefaults.standard.string(forKey: "noct.debugViewer") != nil { return }
+        #endif
+        hiding = Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled, let item = current, item.isVideo, playback(item)?.playing == true else { return }
+            withAnimation(.easeOut(duration: 0.25)) { chrome = false }
+        }
+    }
+
+    private func close() {
+        ViewerOrientation.lock()
+        dismiss()
+    }
+
+    /// The chat asks what to delete once the viewer is gone.
+    private func remove() {
+        guard let delete = state.delete else { return }
+        close()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { delete() }
+    }
+
+    private func tell(_ text: String) {
+        withAnimation(Noct.quick) { notice = text }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            if notice == text { withAnimation(Noct.quick) { notice = nil } }
+        }
+    }
+
+    private func share(_ item: MediaItem) {
+        guard !preparing, let url = session.api.mediaURL(item.path) else { return }
+        preparing = true
+        Task {
+            if item.isVideo {
+                if let file = await MediaFiles.download(url, name: item.name) {
+                    shared = SharedMedia(items: [file])
+                } else {
+                    tell("Не удалось загрузить видео")
+                }
+            } else if let data = await ImagePipeline.shared.data(for: url), let image = UIImage(data: data) {
+                shared = SharedMedia(items: [image])
+            } else {
+                tell("Не удалось загрузить фото")
+            }
+            preparing = false
+        }
+    }
+
+    private func save(_ item: MediaItem) {
+        guard !preparing, let url = session.api.mediaURL(item.path) else { return }
+        preparing = true
+        Task {
+            if item.isVideo {
+                if let file = await MediaFiles.download(url, name: item.name),
+                   UIVideoAtPathIsCompatibleWithSavedPhotosAlbum(file.path) {
+                    UISaveVideoAtPathToSavedPhotosAlbum(file.path, nil, nil, nil)
+                    tell("Видео сохранено")
+                } else {
+                    tell("Не удалось сохранить видео")
+                }
+            } else if let data = await ImagePipeline.shared.data(for: url), let image = UIImage(data: data) {
+                UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+                tell("Фото сохранено")
+            } else {
+                tell("Не удалось загрузить фото")
+            }
+            preparing = false
         }
     }
 }
 
-/// Full-screen photos (pinch and double-tap zoom) and videos, swiped as pages.
-struct MediaViewer: View {
-    @EnvironmentObject private var session: AppSession
-    @Environment(\.dismiss) private var dismiss
-    let items: [MediaItem]
-    @State private var index: Int
+/// The viewer's videos, made as their pages first show.
+@MainActor
+final class ViewerVideos: ObservableObject {
+    private var playbacks: [String: VideoPlayback] = [:]
 
-    init(items: [MediaItem], index: Int) {
-        self.items = items
-        _index = State(initialValue: index)
+    func playback(for item: MediaItem, url: URL, onPictureInPicture: @escaping () -> Void) -> VideoPlayback {
+        if let playback = playbacks[item.id] { return playback }
+        let playback = VideoPlayback(url: url, bytes: item.size > 0 ? item.size : nil)
+        playback.onPictureInPicture = onPictureInPicture
+        playbacks[item.id] = playback
+        return playback
     }
 
-    var body: some View {
-        ZStack(alignment: .top) {
-            Color.black.ignoresSafeArea()
-            TabView(selection: $index) {
-                ForEach(Array(items.enumerated()), id: \.offset) { position, item in
-                    Group {
-                        if item.isVideo {
-                            VideoPage(url: session.api.mediaURL(item.path), active: position == index)
-                        } else {
-                            PhotoPage(url: session.api.mediaURL(item.path))
-                        }
-                    }
-                    .tag(position)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: items.count > 1 ? .automatic : .never))
-            .ignoresSafeArea()
-
-            HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                }
-                .buttonStyle(CircleButtonStyle(size: 38))
-                Spacer()
-                if items.count > 1 {
-                    Text("\(index + 1) из \(items.count)")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Noct.text75)
-                }
-                Spacer()
-                if items.indices.contains(index), items[index].isImage {
-                    Button {
-                        Task { await save(items[index]) }
-                    } label: {
-                        Image(systemName: "square.and.arrow.down")
-                    }
-                    .buttonStyle(CircleButtonStyle(size: 38))
-                } else {
-                    Color.clear.frame(width: 38, height: 38)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+    /// A video in picture in picture keeps playing.
+    func pauseAll(except id: String? = nil) {
+        for (key, playback) in playbacks where key != id && !playback.inPictureInPicture {
+            playback.pause()
         }
-        .statusBarHidden()
-    }
-
-    private func save(_ item: MediaItem) async {
-        guard let url = session.api.mediaURL(item.path),
-              let data = await ImagePipeline.shared.data(for: url),
-              let image = UIImage(data: data) else {
-            session.show("Не удалось загрузить фото")
-            return
-        }
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-        session.show("Фото сохранено")
     }
 }
 
 private struct PhotoPage: View {
     let url: URL?
+    let tap: () -> Void
     @State private var image: UIImage?
 
     var body: some View {
         ZStack {
             if let image {
-                ZoomableImage(image: image)
+                ZoomableImage(image: image, tap: tap)
             } else {
-                ProgressView().tint(.white.opacity(0.6))
+                ProgressView()
+                    .tint(.white.opacity(0.6))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: tap)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -142,36 +411,295 @@ private struct PhotoPage: View {
     }
 }
 
+/// A video's picture. A tap shows or hides the chrome; a double tap on the
+/// left or right half jumps 15 seconds back or ahead, with a hint there.
 private struct VideoPage: View {
-    let url: URL?
-    let active: Bool
-    @State private var player: AVPlayer?
+    let playback: VideoPlayback
+    let tap: () -> Void
+    /// The video paused or ended: the chrome comes back.
+    let stopped: () -> Void
+    @State private var hint: SeekHint?
+
+    private struct SeekHint: Equatable {
+        let back: Bool
+        let id = UUID()
+    }
 
     var body: some View {
-        ZStack {
-            if let player {
-                VideoPlayer(player: player)
-            } else {
-                ProgressView().tint(.white.opacity(0.6))
+        PlayerSurface(playback: playback)
+            .overlay {
+                HStack(spacing: 0) {
+                    half(back: true)
+                    half(back: false)
+                }
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            guard player == nil, let url else { return }
-            let item = AVPlayerItem(asset: AuthorizedAsset.asset(url))
-            player = AVPlayer(playerItem: item)
-            if active { player?.play() }
-        }
-        .onChange(of: active) { isActive in
-            if isActive { player?.play() } else { player?.pause() }
-        }
-        .onDisappear { player?.pause() }
+            .overlay(alignment: hint?.back == true ? .leading : .trailing) {
+                if let hint {
+                    Label("15 с", systemImage: hint.back ? "gobackward.15" : "goforward.15")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .glassCapsule()
+                        .padding(.horizontal, 28)
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                }
+            }
+            .ignoresSafeArea()
+            .background(PlaybackWatcher(playback: playback, stopped: stopped))
+    }
+
+    /// One half of the picture: a double tap jumps, a tap toggles the chrome.
+    private func half(back: Bool) -> some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) {
+                playback.skip(back ? -15 : 15)
+                let shown = SeekHint(back: back)
+                withAnimation(Noct.quick) { hint = shown }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    if hint == shown { withAnimation(Noct.quick) { hint = nil } }
+                }
+            }
+            .onTapGesture(perform: tap)
     }
 }
 
-/// UIScrollView-based zoom: pinch, pan and double tap.
+/// Watches a video so that its page stays still while the clock ticks.
+private struct PlaybackWatcher: View {
+    @ObservedObject var playback: VideoPlayback
+    let stopped: () -> Void
+
+    var body: some View {
+        Color.clear
+            .onChange(of: playback.playing) { playing in
+                if !playing { stopped() }
+            }
+    }
+}
+
+/// Telegram's controls of a video: back and ahead by 15 seconds around the
+/// big play button; the size, the clock and the seek bar on glass; share,
+/// picture in picture, speed, full screen and delete under them.
+private struct VideoControls: View {
+    @ObservedObject var playback: VideoPlayback
+    let sharing: Bool
+    let deletable: Bool
+    let share: () -> Void
+    let delete: () -> Void
+    /// Any control used: the chrome stays a while longer.
+    let touched: () -> Void
+
+    static let speeds: [Float] = [0.5, 1, 1.25, 1.5, 2]
+
+    var body: some View {
+        ZStack {
+            center
+            VStack(spacing: 14) {
+                Spacer(minLength: 0)
+                timeline
+                actions
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+        }
+    }
+
+    private var center: some View {
+        HStack(spacing: 30) {
+            Button {
+                playback.skip(-15)
+                touched()
+            } label: {
+                Image(systemName: "gobackward.15")
+                    .font(.system(size: 26, weight: .medium))
+            }
+            .buttonStyle(CircleButtonStyle(size: 64))
+            .accessibilityLabel("Назад на 15 секунд")
+            Button {
+                playback.toggle()
+                touched()
+            } label: {
+                ZStack {
+                    if playback.waiting {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.3)
+                    } else {
+                        Image(systemName: playback.playing ? "pause.fill" : "play.fill")
+                            .font(.system(size: 36))
+                    }
+                }
+            }
+            .buttonStyle(CircleButtonStyle(size: 92))
+            .accessibilityLabel(playback.playing ? "Пауза" : "Смотреть")
+            Button {
+                playback.skip(15)
+                touched()
+            } label: {
+                Image(systemName: "goforward.15")
+                    .font(.system(size: 26, weight: .medium))
+            }
+            .buttonStyle(CircleButtonStyle(size: 64))
+            .accessibilityLabel("Вперёд на 15 секунд")
+        }
+    }
+
+    private var timeline: some View {
+        VStack(spacing: 4) {
+            if let bytes = playback.bytes {
+                Text(Format.fileSize(bytes))
+            }
+            HStack(spacing: 12) {
+                Text(Format.playback(playback.time))
+                    .monospacedDigit()
+                VideoScrubber(
+                    time: playback.time,
+                    loaded: playback.loaded,
+                    duration: playback.duration,
+                    scrub: { fraction in
+                        playback.scrub(to: fraction)
+                        touched()
+                    },
+                    commit: { fraction in
+                        playback.endScrub(at: fraction)
+                        touched()
+                    }
+                )
+                Text(Format.playback(playback.duration))
+                    .monospacedDigit()
+            }
+        }
+        .font(.system(size: 15, weight: .semibold))
+        .foregroundColor(.white)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .glassRect(28)
+    }
+
+    private var actions: some View {
+        HStack {
+            Button(action: share) {
+                if sharing {
+                    ProgressView().tint(.white)
+                } else {
+                    Image(systemName: "arrowshape.turn.up.right")
+                        .font(.system(size: 19, weight: .semibold))
+                }
+            }
+            .buttonStyle(CircleButtonStyle(size: 50))
+            .disabled(sharing)
+            .accessibilityLabel("Поделиться")
+            Spacer(minLength: 0)
+            HStack(spacing: 28) {
+                if playback.canPictureInPicture {
+                    Button {
+                        playback.togglePictureInPicture()
+                        touched()
+                    } label: {
+                        Image(systemName: "pip.enter")
+                    }
+                    .accessibilityLabel("Картинка в картинке")
+                }
+                Menu {
+                    Picker("Скорость", selection: $playback.speed) {
+                        ForEach(Self.speeds, id: \.self) { value in
+                            Text(Self.label(value)).tag(value)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .accessibilityLabel("Скорость")
+                Button {
+                    ViewerOrientation.toggleLandscape()
+                    touched()
+                } label: {
+                    Image(systemName: "viewfinder")
+                }
+                .accessibilityLabel("Во весь экран")
+            }
+            .buttonStyle(PressableStyle())
+            .font(.system(size: 20, weight: .medium))
+            .foregroundColor(.white)
+            .padding(.horizontal, 24)
+            .frame(height: 50)
+            .glassCapsule()
+            Spacer(minLength: 0)
+            if deletable {
+                Button(action: delete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .buttonStyle(CircleButtonStyle(size: 50))
+                .accessibilityLabel("Удалить")
+            } else {
+                Color.clear.frame(width: 50, height: 50)
+            }
+        }
+    }
+
+    static func label(_ speed: Float) -> String {
+        speed == 1 ? "Обычная" : String(format: "%g×", speed).replacingOccurrences(of: ".", with: ",")
+    }
+}
+
+/// The seek bar: played part white, loaded part dimmer, a knob that grows
+/// under the finger.
+private struct VideoScrubber: View {
+    let time: Double
+    let loaded: Double
+    let duration: Double
+    let scrub: (Double) -> Void
+    let commit: (Double) -> Void
+    @State private var dragged: Double?
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = max(1, geometry.size.width)
+            let progress = dragged ?? (duration > 0 ? min(1, time / duration) : 0)
+            let buffer = duration > 0 ? min(1, loaded / duration) : 0
+            let knob: CGFloat = dragged == nil ? 12 : 18
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.22))
+                Capsule().fill(Color.white.opacity(0.42)).frame(width: width * buffer)
+                Capsule().fill(Color.white).frame(width: max(knob / 2, width * progress))
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: knob, height: knob)
+                    .offset(x: min(width - knob, max(0, width * progress - knob / 2)))
+            }
+            .frame(height: dragged == nil ? 6 : 8)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let fraction = min(1, max(0, value.location.x / width))
+                        dragged = fraction
+                        scrub(fraction)
+                    }
+                    .onEnded { value in
+                        let fraction = min(1, max(0, value.location.x / width))
+                        commit(fraction)
+                        dragged = nil
+                    }
+            )
+            .animation(Noct.quick, value: dragged == nil)
+        }
+        .frame(height: 28)
+        .accessibilityElement()
+        .accessibilityLabel("Перемотка")
+        .accessibilityValue(Format.playback(time))
+    }
+}
+
+/// UIScrollView-based zoom: pinch, pan and double tap; a single tap goes
+/// to the viewer.
 struct ZoomableImage: UIViewRepresentable {
     let image: UIImage
+    var tap: (() -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -196,18 +724,28 @@ struct ZoomableImage: UIViewRepresentable {
         let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.doubleTapped(_:)))
         doubleTap.numberOfTapsRequired = 2
         scroll.addGestureRecognizer(doubleTap)
+        let singleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tapped(_:)))
+        singleTap.require(toFail: doubleTap)
+        scroll.addGestureRecognizer(singleTap)
+        context.coordinator.tap = tap
         return scroll
     }
 
     func updateUIView(_ scroll: UIScrollView, context: Context) {
         context.coordinator.imageView?.image = image
+        context.coordinator.tap = tap
     }
 
     final class Coordinator: NSObject, UIScrollViewDelegate {
         weak var imageView: UIImageView?
+        var tap: (() -> Void)?
 
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
             imageView
+        }
+
+        @objc func tapped(_ gesture: UITapGestureRecognizer) {
+            tap?()
         }
 
         @objc func doubleTapped(_ gesture: UITapGestureRecognizer) {

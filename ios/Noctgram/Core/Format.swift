@@ -83,6 +83,30 @@ enum Format {
         return dayMonth.string(from: value)
     }
 
+    /// The media viewer's subtitle, as in Telegram: «сегодня в 18:22».
+    static func viewerDate(_ ms: Double) -> String {
+        let value = date(ms)
+        let calendar = Calendar.current
+        let day: String
+        if calendar.isDateInToday(value) {
+            day = "сегодня"
+        } else if calendar.isDateInYesterday(value) {
+            day = "вчера"
+        } else if calendar.isDate(value, equalTo: Date(), toGranularity: .year) {
+            day = dayMonth.string(from: value)
+        } else {
+            day = dayMonthYear.string(from: value)
+        }
+        return day + " в " + time.string(from: value)
+    }
+
+    /// Video time: «0:07», «12:40», «1:02:03».
+    static func playback(_ seconds: Double) -> String {
+        let total = seconds.isFinite ? max(0, Int(seconds)) : 0
+        let hours = total / 3600, minutes = total % 3600 / 60, rest = total % 60
+        return hours > 0 ? String(format: "%d:%02d:%02d", hours, minutes, rest) : String(format: "%d:%02d", minutes, rest)
+    }
+
     static func count(_ value: Int) -> String {
         numbers.string(from: NSNumber(value: value)) ?? String(value)
     }

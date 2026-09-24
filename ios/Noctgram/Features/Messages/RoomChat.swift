@@ -294,12 +294,22 @@ struct RoomChatView: View {
                 .buttonStyle(PressableStyle())
             }
             bubbleBody(message, joinsPrevious: joinsPrevious)
-                .accessibilityElement(children: .combine)
+                .modifier(SpokenBubble(label: spoken(message)))
                 .accessibilityIdentifier("message-" + message.id)
                 .modifier(HoldToFocus(action: active ? focusAction(message, joinsPrevious: joinsPrevious) : nil))
             if !mine { Spacer(minLength: 52) }
         }
         .modifier(SwipeToReply(action: active && canWrite ? replyAction(message) : nil))
+    }
+
+    /// What VoiceOver says: who, what, the reactions and the time.
+    private func spoken(_ message: RoomMessage) -> String {
+        var parts: [String] = []
+        if message.sender != session.myId { parts.append(message.senderName) }
+        parts.append(message.deleted ? "Сообщение удалено" : message.text)
+        parts += SpokenBubble.reactions(message.reactions)
+        parts.append(Format.clock(message.created))
+        return parts.joined(separator: ", ")
     }
 
     private func bubbleBody(_ message: RoomMessage, joinsPrevious: Bool) -> some View {

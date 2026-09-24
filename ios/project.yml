@@ -45,8 +45,14 @@ targets:
         UIUserInterfaceStyle: Dark
         UIStatusBarStyle: UIStatusBarStyleLightContent
         UIRequiresFullScreen: true
+        # Portrait everywhere (AppDelegate); the media viewer turns for videos.
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # A video keeps playing in picture in picture outside the app.
+        UIBackgroundModes:
+          - audio
         ITSAppUsesNonExemptEncryption: false
         NSPhotoLibraryUsageDescription: Noctgram открывает фото и видео, которые ты выбираешь для публикаций, аватара, обложки и сообщений.
         NSCameraUsageDescription: Noctgram использует камеру, чтобы снять фото для публикации или сообщения.

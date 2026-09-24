@@ -9,8 +9,9 @@ import os
 /// background thread counts what the chat redoes and checks that the main
 /// thread still answers; it logs every step and quits. A variant switches
 /// parts of the chat off («nogift+noswipe»); «lazy» switches nothing off.
-/// «-noct.chatCounters 1» only logs the counts, for the UI tests. Release
-/// builds carry no probe.
+/// «-noct.chatCounters 1» only logs the counts, for the UI tests, and
+/// «-noct.chatParts» switches parts off without the probe. Release builds
+/// carry no probe.
 enum ChatProbe {
     /// Short message ids for the counts: «mock-4», «ad1fbe3a».
     static func short(_ id: String) -> String {
@@ -20,13 +21,16 @@ enum ChatProbe {
     #if DEBUG
     private static let defaults = UserDefaults.standard
     static let variant = defaults.string(forKey: "noct.chatProbe")
+    private static let parts = defaults.string(forKey: "noct.chatParts")
     static let counting = variant != nil || defaults.bool(forKey: "noct.chatCounters")
     /// «ax» when XCUITest launches the probe (accessibility on), «sim» otherwise.
     static let mode = defaults.string(forKey: "noct.chatProbeMode") ?? "sim"
     @MainActor private static var started = false
 
     static func has(_ part: String) -> Bool {
-        variant?.split(separator: "+").contains { $0 == part } ?? false
+        [variant, parts].contains { list in
+            list?.split(separator: "+").contains { $0 == part } == true
+        }
     }
 
     static func count(_ name: @autoclosure () -> String) {
