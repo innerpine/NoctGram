@@ -219,6 +219,9 @@ jobs:
             done
           fi
           ls "$GITHUB_WORKSPACE/shots" | grep -E '^[23][0-9]-'
+          # Which gift animations were drawn on the main thread.
+          xcrun simctl spawn "$UDID" log show --last 20m --style compact \
+            --predicate 'subsystem == "com.noctgram.ios" AND category == "gifts"' | grep -o 'mounted .*' | sort | uniq -c | tail -20 || true
           exit $status
 
       - uses: actions/upload-artifact@v4

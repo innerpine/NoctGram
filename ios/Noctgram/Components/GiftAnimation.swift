@@ -138,6 +138,9 @@ final class GiftPlayerView: UIView {
     private var wantsPlay = false
     private var registered = false
     private var lastFrame = CGRect.null
+    /// Steps an animation that Lottie can only draw on the main thread.
+    private var stepper: CADisplayLink?
+    private var steppedSince: CFTimeInterval = 0
 
     private(set) var featured = false
     private(set) var screenFrame = CGRect.null
@@ -254,6 +257,8 @@ final class GiftPlayerView: UIView {
         wantsPlay = false
         animationTask?.cancel()
         animationTask = nil
+        stepper?.invalidate()
+        stepper = nil
         guard let player = lottieView else { return }
         lottieView = nil
         player.stop()
@@ -272,11 +277,34 @@ final class GiftPlayerView: UIView {
         player.alpha = 0
         addSubview(player)
         lottieView = player
-        player.play()
+        if player.currentRenderingEngine == .mainThread {
+            // Merge paths and the like keep Lottie on the main thread, where
+            // 60 frames a second of a detailed gift stall scrolling: step it
+            // at 20. Core Animation plays the others off the main thread.
+            steppedSince = CACurrentMediaTime()
+            let link = CADisplayLink(target: self, selector: #selector(step(_:)))
+            link.preferredFrameRateRange = CAFrameRateRange(minimum: 15, maximum: 24, preferred: 20)
+            link.add(to: .main, forMode: .common)
+            stepper = link
+        } else {
+            player.play()
+        }
+        #if DEBUG
+        Logger(subsystem: "com.noctgram.ios", category: "gifts").notice(
+            "mounted \(self.animationURL?.lastPathComponent ?? "?", privacy: .public) on \(player.currentRenderingEngine == .mainThread ? "the main thread, 20 fps" : "Core Animation", privacy: .public)")
+        #endif
         UIView.animate(withDuration: 0.2) {
             player.alpha = 1
             self.imageView.alpha = 0
         }
+    }
+}
+
+extension GiftPlayerView {
+    @objc fileprivate func step(_ link: CADisplayLink) {
+        guard let player = lottieView, let duration = player.animation?.duration, duration > 0 else { return }
+        let elapsed = (link.timestamp - steppedSince).truncatingRemainder(dividingBy: duration)
+        player.currentProgress = CGFloat(elapsed / duration)
     }
 }
 
