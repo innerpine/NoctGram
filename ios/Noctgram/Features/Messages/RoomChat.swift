@@ -154,6 +154,7 @@ struct RoomChatView: View {
     @State private var text = ""
     @State private var replyTo: RoomMessage?
     @State private var atEnd = true
+    @State private var window = ChatWindow()
     @EnvironmentObject private var focus: MessageFocus
     @FocusState private var focused: Bool
 
@@ -166,7 +167,8 @@ struct RoomChatView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
+                ChatColumn(alignment: .leading) {
+                    let start = window.start(store.messages.count)
                     if store.isSecret {
                         EmptyState(icon: "lock", text: "Секретный чат зашифрован ключами устройства. Открой его в веб-версии Noctgram.")
                     } else if !store.loaded {
@@ -175,7 +177,14 @@ struct RoomChatView: View {
                         EmptyState(icon: "person.3", text: store.error ?? "Сообщений пока нет.")
                     }
                     if !store.isSecret {
-                        ForEach(Array(store.messages.enumerated()), id: \.element.id) { index, message in
+                        if start > 0 {
+                            EarlierMessagesButton {
+                                let first = store.messages[start].id
+                                window.hidden = max(0, start - ChatWindow.step)
+                                DispatchQueue.main.async { proxy.scrollTo(first, anchor: .top) }
+                            }
+                        }
+                        ForEach(Array(store.messages.enumerated()).dropFirst(start), id: \.element.id) { index, message in
                             let joinsPrevious = index > 0 && Self.joins(store.messages[index - 1], message)
                             let joinsNext = index + 1 < store.messages.count && Self.joins(message, store.messages[index + 1])
                             roomBubble(message, joinsPrevious: joinsPrevious, joinsNext: joinsNext)
@@ -195,6 +204,9 @@ struct RoomChatView: View {
             .onChange(of: store.messages.last?.id) { id in
                 guard let id else { return }
                 withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .bottom) }
+            }
+            .onChange(of: store.loaded) { _ in
+                window.hidden = window.start(store.messages.count)
             }
         }
         .glassBottomBar {

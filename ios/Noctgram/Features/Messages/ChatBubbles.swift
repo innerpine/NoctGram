@@ -114,23 +114,65 @@ struct ChatEndTracker: ViewModifier {
     }
 }
 
-/// A bubble is one VoiceOver element with a line to say. Combining its
-/// children instead (reaction chips with faces among them) kept SwiftUI
-/// laying a scrolled chat out without end once accessibility asked for the
-/// elements: the UI tests hung there. «-noct.chatParts combine» brings the
-/// combined bubbles back for comparison.
+/// The column of a chat's messages. From iOS 18 a plain stack: a lazy one
+/// with bubbles this different in height (a line of text next to a photo)
+/// flipped a row above the screen between its measured height and a larger
+/// estimate at some scroll offsets, and iOS 26 laid the chat out without
+/// end (the gesture tests caught it; ChatProbe counted the flips). A chat
+/// draws its newest messages only (ChatWindow), so the stack stays small.
+struct ChatColumn<Content: View>: View {
+    var alignment: HorizontalAlignment = .center
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        if #available(iOS 18.0, *) {
+            VStack(alignment: alignment, spacing: 0, content: content)
+        } else {
+            LazyVStack(alignment: alignment, spacing: 0, content: content)
+        }
+    }
+}
+
+/// How many messages a chat draws: the newest `step` when it opens, more
+/// from «Показать ранние сообщения». New messages add to the end.
+struct ChatWindow {
+    static let step = 50
+    /// Messages kept out above, fixed once the chat has loaded.
+    var hidden: Int?
+
+    func start(_ count: Int) -> Int {
+        min(hidden ?? max(0, count - Self.step), count)
+    }
+}
+
+struct EarlierMessagesButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text("Показать ранние сообщения")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(Noct.text75)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(Color.white.opacity(0.08)))
+        }
+        .buttonStyle(PressableStyle())
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+    }
+}
+
+/// A bubble is one VoiceOver element with a line to say (the text or what
+/// is attached, the reactions, the time) rather than the combined labels of
+/// its parts: the chips with faces read badly and cost a walk through them.
 struct SpokenBubble: ViewModifier {
     let label: String
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if ChatProbe.has("combine") {
-            content.accessibilityElement(children: .combine)
-        } else {
-            content
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(label)
-        }
+        content
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(label)
     }
 
     /// «🔥 2», one per reaction.

@@ -218,6 +218,7 @@ struct ChatView: View {
     @State private var deleting: ChatMessage?
     @State private var forwarding: ChatMessage?
     @State private var atEnd = true
+    @State private var window = ChatWindow()
     @EnvironmentObject private var focus: MessageFocus
     @FocusState private var focused: Bool
 
@@ -236,15 +237,9 @@ struct ChatView: View {
         let _ = ChatProbe.count("chat body")
         ScrollViewReader { proxy in
             ScrollView {
-                if ChatProbe.has("vstack") {
-                    VStack(spacing: 0) { rows }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 10)
-                } else {
-                    LazyVStack(spacing: 0) { rows }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 10)
-                }
+                ChatColumn { rows(proxy) }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 10)
             }
             .scrollDismissesKeyboard(.interactively)
             .modifier(ChatEndTracker(atEnd: $atEnd))
@@ -255,6 +250,7 @@ struct ChatView: View {
                 withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .bottom) }
             }
             .onChange(of: store.loaded) { _ in
+                window.hidden = window.start(store.messages.count)
                 if let id = store.messages.last?.id { proxy.scrollTo(id, anchor: .bottom) }
             }
         }
@@ -356,14 +352,18 @@ struct ChatView: View {
         #endif
     }
 
-    /// The messages with a day line before the first of each day.
-    @ViewBuilder private var rows: some View {
+    /// The newest messages with a day line before the first of each day.
+    @ViewBuilder private func rows(_ proxy: ScrollViewProxy) -> some View {
+        let start = window.start(store.messages.count)
         if !store.loaded {
             LoadingRow()
         } else if store.messages.isEmpty {
             EmptyState(icon: "hand.wave", text: store.error ?? "Сообщений пока нет. Напиши первым.")
         }
-        ForEach(Array(store.messages.enumerated()), id: \.element.id) { index, message in
+        if start > 0 {
+            EarlierMessagesButton { showEarlier(from: start, proxy: proxy) }
+        }
+        ForEach(Array(store.messages.enumerated()).dropFirst(start), id: \.element.id) { index, message in
             let previous = index > 0 ? store.messages[index - 1] : nil
             let newDay = previous.map { !Calendar.current.isDate(Format.date(message.created), inSameDayAs: Format.date($0.created)) } ?? true
             let joins = !newDay && previous.map { Self.joins($0, message) } == true
@@ -399,6 +399,13 @@ struct ChatView: View {
             .id(message.id)
             .modifier(ChatEndRow(isLast: message.id == store.messages.last?.id, atEnd: $atEnd))
         }
+    }
+
+    /// Draws earlier messages above, staying on the one that was first.
+    private func showEarlier(from start: Int, proxy: ScrollViewProxy) {
+        let first = store.messages[start].id
+        window.hidden = max(0, start - ChatWindow.step)
+        DispatchQueue.main.async { proxy.scrollTo(first, anchor: .top) }
     }
 
     private func senderName(_ message: ChatMessage) -> String {
