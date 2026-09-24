@@ -183,18 +183,6 @@ private struct ReactionPressStyle: ButtonStyle {
     }
 }
 
-/// UI tests switch one chat gesture off (`-noct.debugGestures hold` or
-/// `swipe`) to tell which one keeps a list from scrolling.
-enum ChatGestures {
-    #if DEBUG
-    private static let off = UserDefaults.standard.string(forKey: "noct.debugGestures") ?? ""
-    #else
-    private static let off = ""
-    #endif
-    static let hold = off != "hold"
-    static let swipe = off != "swipe"
-}
-
 /// Holding a bubble reports its frame on screen, to lift it into MessageFocus.
 /// A quick tap still reaches photos and links inside.
 struct HoldToFocus: ViewModifier {
@@ -203,7 +191,7 @@ struct HoldToFocus: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if let action, ChatGestures.hold {
+        if let action {
             content
                 .background {
                     if measuring {
@@ -247,7 +235,7 @@ struct SwipeToReply: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if let action, ChatGestures.swipe {
+        if let action {
             if #available(iOS 18.0, *) {
                 track(content, offset: pull, armed: armed)
                     .gesture(ReplyPan(threshold: threshold, changed: follow) { replying in

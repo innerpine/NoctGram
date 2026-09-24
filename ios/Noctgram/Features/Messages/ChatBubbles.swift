@@ -60,22 +60,64 @@ struct ChatBackdrop: View {
     }
 }
 
-/// Keeps a chat on its newest message, as in Telegram, when the keyboard
-/// opens or a bubble grows (a reaction, a photo); a short chat sits at the
-/// bottom. iOS 16 only follows the keyboard.
-struct ChatBottomAnchor: ViewModifier {
+/// Keeps a chat on its newest message, as in Telegram, while the reader is
+/// at the end: when the keyboard opens, a reply appears over the composer
+/// or a bubble grows (a reaction). Scrolls explicitly: on iOS 26 a bottom
+/// scroll anchor over a lazy stack jumps when the keyboard moves.
+struct ChatFollowsEnd<Messages: Equatable>: ViewModifier {
     let proxy: ScrollViewProxy
     let last: String?
+    /// The newest message is on screen.
+    let atEnd: Bool
+    /// The reply or edit shown over the composer.
+    let bar: String?
+    let messages: Messages
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in follow() }
+            .onChange(of: bar) { _ in follow() }
+            .onChange(of: messages) { _ in follow() }
+    }
+
+    private func follow() {
+        guard atEnd, let last else { return }
+        withAnimation(Noct.quick) { proxy.scrollTo(last, anchor: .bottom) }
+    }
+}
+
+/// Whether a chat shows its end: from the scroll geometry on iOS 18 (within
+/// 60 pt of the newest message), from the newest row appearing earlier.
+struct ChatEndTracker: ViewModifier {
+    @Binding var atEnd: Bool
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 17.0, *) {
-            content.defaultScrollAnchor(.bottom)
-        } else {
-            content.onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
-                guard let last else { return }
-                withAnimation(Noct.quick) { proxy.scrollTo(last, anchor: .bottom) }
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.visibleRect.maxY - geometry.contentInsets.bottom >= geometry.contentSize.height - 60
+            } action: { _, end in
+                atEnd = end
             }
+        } else {
+            content
+        }
+    }
+}
+
+/// iOS 16 and 17: the newest row tells when it comes and goes.
+struct ChatEndRow: ViewModifier {
+    let isLast: Bool
+    @Binding var atEnd: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+        } else {
+            content
+                .onAppear { if isLast { atEnd = true } }
+                .onDisappear { if isLast { atEnd = false } }
         }
     }
 }

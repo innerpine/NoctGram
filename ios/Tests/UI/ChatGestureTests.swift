@@ -157,23 +157,6 @@ final class ChatGestureTests: XCTestCase {
         XCTAssertFalse(again.staticTexts["Ответ Боб"].exists)
     }
 
-    /// How far a drag on a bubble scrolls with each gesture switched off in
-    /// turn; the log shows it. Only reports.
-    func testScrollDiagnostics() {
-        for off in ["hold", "swipe"] {
-            let app = launch(["-noct.debugGestures", off])
-            let bubble = element(messageId, in: app)
-            if bubble.waitForExistence(timeout: 30) {
-                _ = dragDown(from: bubble.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)), watching: bubble, "On a bubble, \(off) off")
-            } else {
-                save("30-diagnostics-\(off)-off")
-                print("UI TREE (no message with \(off) off):\n" + app.debugDescription)
-                XCTContext.runActivity(named: "On a bubble, \(off) off: the message moved by nan pt (not found)") { _ in }
-            }
-            app.terminate()
-        }
-    }
-
     func testGroupHoldAndSwipe() {
         let app = launch(route: "room:room_night_walks")
         let bubble = element(groupMessageId, in: app)

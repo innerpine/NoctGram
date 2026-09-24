@@ -217,6 +217,7 @@ struct ChatView: View {
     @State private var reporting: ChatMessage?
     @State private var deleting: ChatMessage?
     @State private var forwarding: ChatMessage?
+    @State private var atEnd = true
     @EnvironmentObject private var focus: MessageFocus
     @FocusState private var focused: Bool
 
@@ -267,13 +268,15 @@ struct ChatView: View {
                         )
                         .padding(.top, joins ? 2 : 8)
                         .id(message.id)
+                        .modifier(ChatEndRow(isLast: message.id == store.messages.last?.id, atEnd: $atEnd))
                     }
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 10)
             }
             .scrollDismissesKeyboard(.interactively)
-            .modifier(ChatBottomAnchor(proxy: proxy, last: store.messages.last?.id))
+            .modifier(ChatEndTracker(atEnd: $atEnd))
+            .modifier(ChatFollowsEnd(proxy: proxy, last: store.messages.last?.id, atEnd: atEnd, bar: (replyTo ?? editing)?.id, messages: store.messages))
             .background(ChatBackdrop(palette: store.palette))
             .onChange(of: store.messages.last?.id) { id in
                 guard let id else { return }

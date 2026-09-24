@@ -153,6 +153,7 @@ struct RoomChatView: View {
     @StateObject private var store: RoomStore
     @State private var text = ""
     @State private var replyTo: RoomMessage?
+    @State private var atEnd = true
     @EnvironmentObject private var focus: MessageFocus
     @FocusState private var focused: Bool
 
@@ -180,6 +181,7 @@ struct RoomChatView: View {
                             roomBubble(message, joinsPrevious: joinsPrevious, joinsNext: joinsNext)
                                 .padding(.top, joinsPrevious ? 2 : 8)
                                 .id(message.id)
+                                .modifier(ChatEndRow(isLast: message.id == store.messages.last?.id, atEnd: $atEnd))
                         }
                     }
                 }
@@ -187,7 +189,8 @@ struct RoomChatView: View {
                 .padding(.vertical, 12)
             }
             .scrollDismissesKeyboard(.interactively)
-            .modifier(ChatBottomAnchor(proxy: proxy, last: store.messages.last?.id))
+            .modifier(ChatEndTracker(atEnd: $atEnd))
+            .modifier(ChatFollowsEnd(proxy: proxy, last: store.messages.last?.id, atEnd: atEnd, bar: replyTo?.id, messages: store.messages))
             .background(ChatBackdrop(palette: .noct))
             .onChange(of: store.messages.last?.id) { id in
                 guard let id else { return }
