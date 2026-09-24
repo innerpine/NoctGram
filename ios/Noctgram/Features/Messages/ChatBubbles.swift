@@ -1,3 +1,4 @@
+import os
 import SwiftUI
 import UIKit
 
@@ -60,6 +61,17 @@ struct ChatBackdrop: View {
     }
 }
 
+#if DEBUG
+/// The UI tests count these lines to see what a chat keeps redoing.
+enum ChatTrace {
+    private static let log = Logger(subsystem: "com.noctgram.ios", category: "chat")
+
+    static func note(_ text: String) {
+        log.notice("\(text, privacy: .public)")
+    }
+}
+#endif
+
 /// Keeps a chat on its newest message, as in Telegram, while the reader is
 /// at the end: when the keyboard opens, a reply appears over the composer
 /// or a bubble grows (a reaction). Scrolls explicitly: on iOS 26 a bottom
@@ -101,6 +113,9 @@ struct ChatEndTracker: ViewModifier {
                 geometry.visibleRect.maxY - geometry.contentInsets.bottom >= geometry.contentSize.height - 60
             } action: { _, end in
                 atEnd = end
+                #if DEBUG
+                ChatTrace.note("at end \(end)")
+                #endif
             }
         } else {
             content

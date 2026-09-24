@@ -98,10 +98,7 @@ struct WalletView: View {
         ScrollView {
             VStack(spacing: 16) {
                 VStack(spacing: 8) {
-                    Image("StarsArt")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 96)
+                    StarScene()
                     Text(wallet.map { Format.count($0.balance) } ?? "—")
                         .font(.system(size: 40, weight: .bold))
                         .foregroundColor(Noct.gold)

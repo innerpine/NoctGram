@@ -245,11 +245,26 @@ jobs:
               if not path_lines or "mach_msg" in path_lines[-1][2]:
                   continue
               print("--- busy main thread, sample", os.path.basename(path))
-              for depth, count, frame in path_lines[-45:]:
+              for depth, count, frame in path_lines[-12:]:
                   print(f"{count:>5} {' ' * (depth // 2)}{frame}")
+              # Which of the app's functions and SwiftUI bodies run most.
+              hot = {}
+              for line in lines[start + 1:]:
+                  if re.match(r"^\s{4}\d+ Thread_", line) or not line.strip():
+                      break
+                  m = re.match(r"^[\s+!:|]*(\d+) (.+?)  \(in ([^)]+)\)", line)
+                  if m and ("Noctgram" in m.group(3) or "body.getter" in m.group(2)):
+                      name = re.sub(r"\s+\[0x.*$", "", m.group(2))[:140]
+                      hot[name] = max(hot.get(name, 0), int(m.group(1)))
+              for name, count in sorted(hot.items(), key=lambda item: -item[1])[:25]:
+                  print(f"{count:>5}   {name}")
           PY
           fi
           ls "$GITHUB_WORKSPACE/shots" | grep -E '^[23][0-9]-'
+          # What the chats kept redoing (debug trace lines, most repeated first).
+          xcrun simctl spawn "$UDID" log show --last 20m --style compact \
+            --predicate 'subsystem == "com.noctgram.ios" AND category == "chat"' \
+            | sed -nE 's/.*\[com\.noctgram\.ios:chat\] //p' | sort | uniq -c | sort -rn | head -30 || true
           # Which gift animations were drawn on the main thread.
           xcrun simctl spawn "$UDID" log show --last 20m --style compact \
             --predicate 'subsystem == "com.noctgram.ios" AND category == "gifts"' | grep -o 'mounted .*' | sort | uniq -c | tail -20 || true

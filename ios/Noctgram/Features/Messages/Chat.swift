@@ -638,6 +638,10 @@ struct MessageBubble: View {
                 if !mine { Spacer(minLength: 52) }
             }
             .modifier(SwipeToReply(action: message.pending ? nil : onReply))
+            #if DEBUG
+            .onAppear { ChatTrace.note("appear " + message.id) }
+            .onDisappear { ChatTrace.note("disappear " + message.id) }
+            #endif
             .task(id: media.first?.path) { await measure() }
         }
     }
@@ -790,5 +794,8 @@ struct MessageBubble: View {
             : await ImagePipeline.shared.image(for: url, maxPixel: 900)
         guard let image, image.size.height > 0 else { return }
         ratio = image.size.width / image.size.height
+        #if DEBUG
+        ChatTrace.note("ratio " + message.id)
+        #endif
     }
 }
