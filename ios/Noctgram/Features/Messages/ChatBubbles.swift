@@ -267,16 +267,15 @@ struct BubbleReactions: View {
     var body: some View {
         FlowRows(spacing: 5) {
             ForEach(reactions, id: \.emoji) { reaction in
-                if let toggle {
-                    Button {
+                // A tap, not a button: the bubble stays one element for
+                // VoiceOver, where the held-message menu sets reactions.
+                chip(reaction)
+                    .contentShape(Capsule())
+                    .onTapGesture {
+                        guard let toggle else { return }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         toggle(reaction.own ? nil : reaction.emoji)
-                    } label: {
-                        chip(reaction)
                     }
-                    .buttonStyle(PressableStyle())
-                } else {
-                    chip(reaction)
-                }
             }
         }
     }

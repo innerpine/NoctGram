@@ -352,10 +352,13 @@ private struct ReplyPan: UIGestureRecognizerRepresentable {
     }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        /// The way the finger has gone so far decides; the speed only when
+        /// it has not moved yet.
         func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
             guard let pan = recognizer as? UIPanGestureRecognizer else { return false }
-            let velocity = pan.velocity(in: pan.view)
-            return velocity.x < 0 && abs(velocity.x) > abs(velocity.y) * 1.2
+            var way = pan.translation(in: pan.view)
+            if way == .zero { way = pan.velocity(in: pan.view) }
+            return way.x < 0 && abs(way.x) > abs(way.y) * 1.2
         }
 
         func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {

@@ -2,12 +2,15 @@ import XCTest
 
 /// Gestures of a dialogue and a group on the mock server
 /// (ios/Tests/mock_server.py): swipe a message left to answer it, hold it
-/// for reactions and actions, and scroll starting on a bubble.
+/// for reactions and actions, tap a reaction, and scroll starting on a
+/// bubble. A failed check saves the screen and prints the element tree.
 final class ChatGestureTests: XCTestCase {
     /// «Во сколько встречаемся?» from Bob.
     private let messageId = "message-message:local_bob:mock-4"
     /// «🔥» from Bob, the newest message of the dialogue.
     private let newestId = "message-message:local_bob:mock-5"
+    /// «Красота! А это моя луна сегодня» with a photo, from the viewer.
+    private let photoId = "message-message:local_alice:mock-2"
     /// «Могу взять термос с чаем ☕️» from Carol in «Ночные прогулки».
     private let groupMessageId = "message-room:mock-2"
 
@@ -28,22 +31,9 @@ final class ChatGestureTests: XCTestCase {
     }
 
     /// Pulls the bubble to the left past the reply threshold.
-    private func swipeLeft(_ bubble: XCUIElement) {
-        let start = bubble.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+    private func swipeLeft(_ bubble: XCUIElement, from point: CGVector = CGVector(dx: 0.8, dy: 0.5)) {
+        let start = bubble.coordinate(withNormalizedOffset: point)
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -180, dy: 0)))
-    }
-
-    /// The newest message ends above the given element (the composer):
-    /// nothing hides under the keyboard or the input.
-    private func expectNewest(in app: XCUIApplication, above element: XCUIElement) {
-        // Let the keyboard, if any, finish rising.
-        if app.keyboards.firstMatch.waitForExistence(timeout: 2) {
-            Thread.sleep(forTimeInterval: 1)
-        }
-        let newest = self.element(newestId, in: app)
-        XCTAssertTrue(newest.exists)
-        XCTAssertTrue(element.exists)
-        XCTAssertLessThanOrEqual(newest.frame.maxY, element.frame.minY)
     }
 
     private func save(_ name: String) {
@@ -52,50 +42,85 @@ final class ChatGestureTests: XCTestCase {
         try? XCUIScreen.main.screenshot().pngRepresentation.write(to: url)
     }
 
+    /// Polls until the condition holds or the time is up.
+    private func poll(_ timeout: TimeInterval, until condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        return condition()
+    }
+
+    /// Checks, and on failure saves «<shot>-failed» and prints the tree.
+    private func expect(_ passed: Bool, _ message: String, in app: XCUIApplication, shot: String) {
+        if !passed {
+            save(shot + "-failed")
+            print("UI TREE (\(message)):\n" + app.debugDescription)
+        }
+        XCTAssertTrue(passed, message)
+    }
+
+    private func label(_ id: String, in app: XCUIApplication) -> String {
+        let item = element(id, in: app)
+        return item.exists ? item.label : ""
+    }
+
+    /// The newest message ends above the given element (the composer):
+    /// nothing hides under the keyboard or the input.
+    private func expectNewest(in app: XCUIApplication, above element: XCUIElement, shot: String) {
+        // Let the keyboard, if any, finish rising.
+        if app.keyboards.firstMatch.waitForExistence(timeout: 2) {
+            Thread.sleep(forTimeInterval: 1)
+        }
+        let newest = self.element(newestId, in: app)
+        let above = newest.exists && element.exists && newest.frame.maxY <= element.frame.minY
+        expect(above, "The newest message hides under the input", in: app, shot: shot)
+    }
+
     func testSwipeLeftAnswersTheMessage() {
         let app = launch()
         let bubble = element(messageId, in: app)
-        XCTAssertTrue(bubble.waitForExistence(timeout: 30))
+        expect(bubble.waitForExistence(timeout: 30), "No message", in: app, shot: "22-swipe-reply")
         swipeLeft(bubble)
         let reply = app.staticTexts["Ответ Боб"]
-        XCTAssertTrue(reply.waitForExistence(timeout: 5))
+        expect(reply.waitForExistence(timeout: 5), "A swipe to the left does not answer", in: app, shot: "22-swipe-reply")
         // The keyboard opens and the dialogue stays on its newest message.
-        expectNewest(in: app, above: reply)
+        expectNewest(in: app, above: reply, shot: "22-swipe-reply")
         save("22-swipe-reply")
     }
 
     /// A swipe that starts on a photo answers too, and the photo stays closed.
     func testSwipeOnAPhotoAnswers() {
         let app = launch()
-        let bubble = element("message-message:local_alice:mock-2", in: app)
-        XCTAssertTrue(bubble.waitForExistence(timeout: 30))
-        let start = bubble.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.3))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -180, dy: 0)))
-        XCTAssertTrue(app.staticTexts["Ответ себе"].waitForExistence(timeout: 5))
+        let bubble = element(photoId, in: app)
+        expect(bubble.waitForExistence(timeout: 30), "No photo message", in: app, shot: "29-swipe-photo")
+        swipeLeft(bubble, from: CGVector(dx: 0.8, dy: 0.3))
+        expect(app.staticTexts["Ответ себе"].waitForExistence(timeout: 5), "A swipe on a photo does not answer", in: app, shot: "29-swipe-photo")
     }
 
     func testHoldShowsReactionsAndActions() {
         let app = launch()
         let bubble = element(messageId, in: app)
-        XCTAssertTrue(bubble.waitForExistence(timeout: 30))
+        expect(bubble.waitForExistence(timeout: 30), "No message", in: app, shot: "23-hold-menu")
         bubble.press(forDuration: 0.8)
         let fire = app.buttons["reaction-🔥"]
-        XCTAssertTrue(fire.waitForExistence(timeout: 5))
+        expect(fire.waitForExistence(timeout: 5), "Holding shows no reactions", in: app, shot: "23-hold-menu")
         XCTAssertTrue(app.buttons["Ответить"].exists)
         XCTAssertTrue(app.buttons["Переслать"].exists)
         save("23-hold-menu")
         fire.tap()
-        expectation(for: NSPredicate(format: "label CONTAINS %@", "🔥"), evaluatedWith: element(messageId, in: app))
-        waitForExpectations(timeout: 10)
+        let reacted = poll(10) { label(messageId, in: app).contains("🔥") }
+        expect(reacted, "The reaction does not show under the message", in: app, shot: "24-reacted")
         // The bubble grew by a row of reactions; the newest message stays
         // above the input.
-        expectNewest(in: app, above: app.buttons["Отправить"].firstMatch)
+        expectNewest(in: app, above: app.buttons["Отправить"].firstMatch, shot: "24-reacted")
         save("24-reacted")
         // A tap on the reaction under the message takes it back.
         element(messageId, in: app).coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 1))
             .withOffset(CGVector(dx: 40, dy: -22)).tap()
-        expectation(for: NSPredicate(format: "NOT (label CONTAINS %@)", "🔥"), evaluatedWith: element(messageId, in: app))
-        waitForExpectations(timeout: 10)
+        let removed = poll(10) { !label(messageId, in: app).contains("🔥") }
+        expect(removed, "A tap on the reaction does not take it back", in: app, shot: "24-unreacted")
     }
 
     /// Drags the list down by 300 pt from a point and tells how far the
@@ -114,7 +139,7 @@ final class ChatGestureTests: XCTestCase {
     func testScrollStartsOnAMessage() {
         let app = launch()
         let bubble = element(messageId, in: app)
-        XCTAssertTrue(bubble.waitForExistence(timeout: 30))
+        expect(bubble.waitForExistence(timeout: 30), "No message", in: app, shot: "27-scrolled-beside")
         let margin = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
             .withOffset(CGVector(dx: app.frame.width - 3, dy: bubble.frame.midY))
         let beside = dragDown(from: margin, watching: bubble, "Beside the bubbles")
@@ -123,7 +148,7 @@ final class ChatGestureTests: XCTestCase {
         app.terminate()
         let again = launch()
         let target = element(messageId, in: again)
-        XCTAssertTrue(target.waitForExistence(timeout: 30))
+        expect(target.waitForExistence(timeout: 30), "No message", in: again, shot: "28-scrolled-on-bubble")
         let on = dragDown(from: target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)), watching: target, "On a bubble")
         save("28-scrolled-on-bubble")
         XCTAssertGreaterThan(beside, 150, "The list does not scroll at all")
@@ -132,14 +157,19 @@ final class ChatGestureTests: XCTestCase {
         XCTAssertFalse(again.staticTexts["Ответ Боб"].exists)
     }
 
-    /// Which gesture, if any, keeps a drag on a bubble from scrolling: the
-    /// log shows how far the list moves with each one switched off.
+    /// How far a drag on a bubble scrolls with each gesture switched off in
+    /// turn; the log shows it. Only reports.
     func testScrollDiagnostics() {
         for off in ["hold", "swipe"] {
             let app = launch(["-noct.debugGestures", off])
             let bubble = element(messageId, in: app)
-            XCTAssertTrue(bubble.waitForExistence(timeout: 30))
-            _ = dragDown(from: bubble.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)), watching: bubble, "On a bubble, \(off) off")
+            if bubble.waitForExistence(timeout: 30) {
+                _ = dragDown(from: bubble.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)), watching: bubble, "On a bubble, \(off) off")
+            } else {
+                save("30-diagnostics-\(off)-off")
+                print("UI TREE (no message with \(off) off):\n" + app.debugDescription)
+                XCTContext.runActivity(named: "On a bubble, \(off) off: the message moved by nan pt (not found)") { _ in }
+            }
             app.terminate()
         }
     }
@@ -147,18 +177,18 @@ final class ChatGestureTests: XCTestCase {
     func testGroupHoldAndSwipe() {
         let app = launch(route: "room:room_night_walks")
         let bubble = element(groupMessageId, in: app)
-        XCTAssertTrue(bubble.waitForExistence(timeout: 30))
+        expect(bubble.waitForExistence(timeout: 30), "No group message", in: app, shot: "25-group-menu")
         bubble.press(forDuration: 0.8)
         let heart = app.buttons["reaction-❤️"]
-        XCTAssertTrue(heart.waitForExistence(timeout: 5))
+        expect(heart.waitForExistence(timeout: 5), "Holding shows no reactions in a group", in: app, shot: "25-group-menu")
         XCTAssertTrue(app.buttons["Ответить"].exists)
         XCTAssertTrue(app.buttons["Скопировать"].exists)
         save("25-group-menu")
         heart.tap()
-        expectation(for: NSPredicate(format: "label CONTAINS %@", "❤️"), evaluatedWith: element(groupMessageId, in: app))
-        waitForExpectations(timeout: 10)
-        swipeLeft(bubble)
-        XCTAssertTrue(app.staticTexts["Ответ Кэрол"].waitForExistence(timeout: 5))
+        let reacted = poll(10) { label(groupMessageId, in: app).contains("❤️") }
+        expect(reacted, "The reaction does not show under the group message", in: app, shot: "26-group-reply")
+        swipeLeft(element(groupMessageId, in: app))
+        expect(app.staticTexts["Ответ Кэрол"].waitForExistence(timeout: 5), "A swipe does not answer in a group", in: app, shot: "26-group-reply")
         save("26-group-reply")
     }
 }

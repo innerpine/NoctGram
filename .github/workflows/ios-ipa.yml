@@ -210,8 +210,15 @@ jobs:
             -derivedDataPath build -only-testing:NoctgramUITests > uitest.log 2>&1
           status=$?
           grep -E "Test Case .*(passed|failed)|error:|Executed|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|moved by" uitest.log | sort -u | head -80
-          [ $status -ne 0 ] && tail -n 80 uitest.log
-          ls "$GITHUB_WORKSPACE/shots" | grep -E '^2[2-9]' 
+          if [ $status -ne 0 ]; then
+            # Failed checks print the element tree of the app.
+            grep -n -A 60 "UI TREE" uitest.log | head -400
+            tail -n 60 uitest.log
+            for report in ~/Library/Logs/DiagnosticReports/Noctgram*; do
+              [ -f "$report" ] && head -c 6000 "$report"
+            done
+          fi
+          ls "$GITHUB_WORKSPACE/shots" | grep -E '^[23][0-9]-'
           exit $status
 
       - uses: actions/upload-artifact@v4
@@ -231,8 +238,10 @@ jobs:
           name: Noctgram-ipa-${{ github.run_number }}
           path: dist
 
+      # Screenshots of failed UI checks are published too, to see them.
       - uses: actions/download-artifact@v4
-        if: needs.screenshots.result == 'success'
+        if: needs.screenshots.result == 'success' || needs.screenshots.result == 'failure'
+        continue-on-error: true
         with:
           name: Noctgram-screenshots-${{ github.run_number }}
           path: dist/screenshots
