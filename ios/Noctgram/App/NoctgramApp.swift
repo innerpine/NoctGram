@@ -184,7 +184,7 @@ enum TabAvatar {
 
 #if DEBUG
 /// Simulator screenshots (ios/Tests): `-noct.debugTab profile`,
-/// `-noct.debugRoute chat:<id>`. Launch arguments fill UserDefaults.
+/// `-noct.debugRoute chat:<id>` or `room:<id>`. Launch arguments fill UserDefaults.
 enum DebugLaunch {
     @MainActor
     static func apply(_ nav: Navigator, me: String) {
@@ -202,6 +202,7 @@ enum DebugLaunch {
         case "profile": nav.push(.profile(value))
         case "post": nav.push(.post(value))
         case "chat": nav.push(.chat(Person(identity: Identity(id: value, name: "", avatar: "", handle: ""))))
+        case "room": nav.push(.room(id: value, title: ""))
         case "followers": nav.push(.connections(profileId: value, kind: .followers))
         case "screen":
             switch value {

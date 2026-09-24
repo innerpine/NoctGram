@@ -60,6 +60,26 @@ struct ChatBackdrop: View {
     }
 }
 
+/// Keeps a chat on its newest message, as in Telegram, when the keyboard
+/// opens or a bubble grows (a reaction, a photo); a short chat sits at the
+/// bottom. iOS 16 only follows the keyboard.
+struct ChatBottomAnchor: ViewModifier {
+    let proxy: ScrollViewProxy
+    let last: String?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.defaultScrollAnchor(.bottom)
+        } else {
+            content.onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+                guard let last else { return }
+                withAnimation(Noct.quick) { proxy.scrollTo(last, anchor: .bottom) }
+            }
+        }
+    }
+}
+
 /// A bubble with its own radius per corner (UnevenRoundedRectangle needs iOS 17).
 struct BubbleShape: Shape {
     var topLeading: CGFloat

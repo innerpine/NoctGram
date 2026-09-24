@@ -30,6 +30,8 @@ final class MessageFocus: ObservableObject {
     @Published private(set) var item: Item?
 
     func present(_ item: Item) {
+        // The keyboard would cover the actions of a message low on screen.
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         self.item = item
     }

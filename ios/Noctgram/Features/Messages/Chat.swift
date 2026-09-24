@@ -272,6 +272,7 @@ struct ChatView: View {
                 .padding(.vertical, 10)
             }
             .scrollDismissesKeyboard(.interactively)
+            .modifier(ChatBottomAnchor(proxy: proxy, last: store.messages.last?.id))
             .background(ChatBackdrop(palette: store.palette))
             .onChange(of: store.messages.last?.id) { id in
                 guard let id else { return }

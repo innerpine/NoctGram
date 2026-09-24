@@ -187,6 +187,7 @@ struct RoomChatView: View {
                 .padding(.vertical, 12)
             }
             .scrollDismissesKeyboard(.interactively)
+            .modifier(ChatBottomAnchor(proxy: proxy, last: store.messages.last?.id))
             .background(ChatBackdrop(palette: .noct))
             .onChange(of: store.messages.last?.id) { id in
                 guard let id else { return }

@@ -18,7 +18,9 @@ PORT, MODE, PUBLIC = int(sys.argv[1]), sys.argv[2], sys.argv[3]
 
 SIGNED_OUT = {"emailEnabled": True, "sitesEnabled": False, "user": None, "challenge": None}
 # Reactions and pins sent by the app (UI tests read them back in the dialogue).
-STATE = {"reactions": {}, "pins": {}}
+STATE = {"reactions": {}, "pins": {}, "roomReactions": {}}
+# A group for the gesture tests; its messages are an hour old when it starts.
+ROOM, ROOM_START = "room_night_walks", int(time.time() * 1000) - 3600000
 SOCIAL = {
     "bootstrap": "bootstrap",
     "post": "post",
@@ -87,6 +89,40 @@ def dialogue():
     return messages
 
 
+def room():
+    """A group of three with a reply in it, shaped as lib/rooms.ts readRoom
+    returns it (sample data only)."""
+    me, bob, carol = META["me"], META["bob"], "local_carol"
+    people = {
+        me: ("Алиса Ночная", R["profileAlice"]["avatar"]),
+        bob: ("Боб", R["profileBob"]["avatar"]),
+        carol: ("Кэрол", ""),
+    }
+    lines = [
+        (bob, "Всем привет! Кто сегодня гуляет?", ""),
+        (carol, "Я за! Где встречаемся?", ""),
+        (carol, "Могу взять термос с чаем ☕️", ""),
+        (me, "У набережной в девять", ""),
+        (bob, "Отлично, буду", "room:mock-3"),
+        (bob, "Возьму камеру 📷", ""),
+    ]
+    messages = []
+    for index, (sender, text, reply) in enumerate(lines):
+        message_id = f"room:mock-{index}"
+        name, avatar = people[sender]
+        emoji = STATE["roomReactions"].get(message_id)
+        messages.append({
+            "id": message_id, "roomId": ROOM, "sender": sender, "senderName": name, "senderAvatar": avatar,
+            "text": text, "ciphertext": None, "replyTo": reply, "created": ROOM_START + index * 120000,
+            "deletedAt": 0, "giveawayId": None,
+            "reactions": [{"emoji": emoji, "count": 1, "own": 1}] if emoji else [],
+        })
+    members = [{"userId": user, "name": name, "avatar": avatar, "handle": "", "role": "owner" if user == bob else "member",
+                "status": "active", "publicKey": None, "joinedAt": ROOM_START} for user, (name, avatar) in people.items()]
+    return {"id": ROOM, "name": "Ночные прогулки", "kind": "group", "role": "member", "memberCount": len(members),
+            "me": me, "members": members, "messages": messages, "canSend": True, "nextCursor": None}
+
+
 def social(q):
     action = q.get("action", "feed")
     if action == "feed":
@@ -151,7 +187,9 @@ class Handler(BaseHTTPRequestHandler):
             body["serverTime"] = now
             return self.send(200, body)
         if url.path == "/api/rooms":
-            return self.send(200, R.get("room" if q.get("action") == "room" else "rooms", {"rooms": []}))
+            if q.get("action") == "room":
+                return self.send(200, room()) if q.get("id") == ROOM else self.send(404, {"error": "Группа не найдена"})
+            return self.send(200, R.get("rooms", {"rooms": []}))
         if url.path.startswith("/api/media/"):
             path = os.path.join(HERE, "Fixtures", "media", os.path.basename(url.path))
         elif url.path.startswith("/assets/"):
@@ -172,11 +210,14 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw or b"{}")
         except ValueError:
             body = {}
-        if urlparse(self.path).path == "/api/social" and isinstance(body, dict):
+        path = urlparse(self.path).path
+        if path == "/api/social" and isinstance(body, dict):
             if body.get("action") == "messageReaction":
                 STATE["reactions"][body.get("id")] = body.get("emoji")
             elif body.get("action") == "messagePin":
                 STATE["pins"][body.get("id")] = bool(body.get("value"))
+        elif path == "/api/rooms" and isinstance(body, dict) and body.get("action") == "reaction":
+            STATE["roomReactions"][body.get("messageId")] = body.get("emoji")
         self.send(200, {"ok": True})
 
 
