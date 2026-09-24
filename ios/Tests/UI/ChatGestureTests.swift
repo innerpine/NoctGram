@@ -64,6 +64,16 @@ final class ChatGestureTests: XCTestCase {
         save("22-swipe-reply")
     }
 
+    /// A swipe that starts on a photo answers too, and the photo stays closed.
+    func testSwipeOnAPhotoAnswers() {
+        let app = launch()
+        let bubble = element("message-message:local_alice:mock-2", in: app)
+        XCTAssertTrue(bubble.waitForExistence(timeout: 30))
+        let start = bubble.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.3))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -180, dy: 0)))
+        XCTAssertTrue(app.staticTexts["Ответ себе"].waitForExistence(timeout: 5))
+    }
+
     func testHoldShowsReactionsAndActions() {
         let app = launch()
         let bubble = element(messageId, in: app)

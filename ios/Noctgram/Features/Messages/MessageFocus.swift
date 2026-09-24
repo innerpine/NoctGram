@@ -227,11 +227,15 @@ struct HoldToFocus: ViewModifier {
 
 /// Swipe a message left to answer it, as in Telegram: the row follows the
 /// finger, an arrow appears on the right and a tick of haptics marks the
-/// point where letting go replies.
+/// point where letting go replies. From iOS 18 a UIKit pan that starts only
+/// on a pull to the left tracks the finger: a SwiftUI drag inside a
+/// ScrollView keeps the list from scrolling on iOS 26.
 struct SwipeToReply: ViewModifier {
     let action: (() -> Void)?
     @GestureState(resetTransaction: Transaction(animation: .spring(response: 0.3, dampingFraction: 0.8)))
     private var swipe = Swipe()
+    @State private var pull: CGFloat = 0
+    @State private var armed = false
 
     private let threshold: CGFloat = 64
 
@@ -244,46 +248,118 @@ struct SwipeToReply: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if let action, ChatGestures.swipe {
-            let offset = swipe.horizontal == true ? swipe.offset : 0
-            let progress = min(1, -offset / threshold)
-            content
-                .offset(x: offset)
-                .overlay(alignment: .trailing) {
-                    Image(systemName: "arrowshape.turn.up.left.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(Color.white.opacity(swipe.armed ? 0.3 : 0.14)))
-                        .scaleEffect(0.5 + 0.5 * progress)
-                        .opacity(progress)
-                        .padding(.trailing, 10)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-                .contentShape(Rectangle())
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 14)
-                        .updating($swipe) { value, state, _ in
-                            let dx = value.translation.width, dy = value.translation.height
-                            if state.horizontal == nil {
-                                state.horizontal = dx < 0 && abs(dx) > abs(dy) * 1.2
-                            }
-                            guard state.horizontal == true else { return }
-                            let pulled = min(0, dx)
-                            state.offset = pulled > -threshold ? pulled : -threshold + (pulled + threshold) * 0.3
-                            let armed = pulled <= -threshold
-                            if armed != state.armed {
-                                state.armed = armed
-                                if armed { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-                            }
-                        }
-                        .onEnded { value in
-                            let dx = value.translation.width, dy = value.translation.height
-                            if dx <= -threshold && abs(dx) > abs(dy) * 1.2 { action() }
-                        }
-                )
+            if #available(iOS 18.0, *) {
+                track(content, offset: pull, armed: armed)
+                    .gesture(ReplyPan(threshold: threshold, changed: follow) { replying in
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { pull = 0 }
+                        armed = false
+                        if replying { action() }
+                    })
+            } else {
+                track(content, offset: swipe.horizontal == true ? swipe.offset : 0, armed: swipe.armed)
+                    .simultaneousGesture(drag(action))
+            }
         } else {
             content
+        }
+    }
+
+    private func track(_ content: Content, offset: CGFloat, armed: Bool) -> some View {
+        let progress = min(1, -offset / threshold)
+        return content
+            .offset(x: offset)
+            .overlay(alignment: .trailing) {
+                Image(systemName: "arrowshape.turn.up.left.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Color.white.opacity(armed ? 0.3 : 0.14)))
+                    .scaleEffect(0.5 + 0.5 * progress)
+                    .opacity(progress)
+                    .padding(.trailing, 10)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+    }
+
+    /// The row follows the finger up to the threshold, then stretches.
+    private func stretched(_ dx: CGFloat) -> CGFloat {
+        let pulled = min(0, dx)
+        return pulled > -threshold ? pulled : -threshold + (pulled + threshold) * 0.3
+    }
+
+    private func follow(_ dx: CGFloat) {
+        pull = stretched(dx)
+        let reached = dx <= -threshold
+        if reached != armed {
+            armed = reached
+            if reached { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+        }
+    }
+
+    /// iOS 16 and 17: a SwiftUI drag that locks to the first direction.
+    private func drag(_ action: @escaping () -> Void) -> some Gesture {
+        DragGesture(minimumDistance: 14)
+            .updating($swipe) { value, state, _ in
+                let dx = value.translation.width, dy = value.translation.height
+                if state.horizontal == nil {
+                    state.horizontal = dx < 0 && abs(dx) > abs(dy) * 1.2
+                }
+                guard state.horizontal == true else { return }
+                state.offset = stretched(dx)
+                let reached = dx <= -threshold
+                if reached != state.armed {
+                    state.armed = reached
+                    if reached { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+                }
+            }
+            .onEnded { value in
+                let dx = value.translation.width, dy = value.translation.height
+                if dx <= -threshold && abs(dx) > abs(dy) * 1.2 { action() }
+            }
+    }
+}
+
+/// A pan that begins only when the finger moves to the left more than up
+/// or down; the list waits for it to fail before it scrolls.
+@available(iOS 18.0, *)
+private struct ReplyPan: UIGestureRecognizerRepresentable {
+    let threshold: CGFloat
+    let changed: (CGFloat) -> Void
+    let ended: (Bool) -> Void
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.delegate = context.coordinator
+        return pan
+    }
+
+    func updateUIGestureRecognizer(_ pan: UIPanGestureRecognizer, context: Context) {}
+
+    func handleUIGestureRecognizerAction(_ pan: UIPanGestureRecognizer, context: Context) {
+        let dx = pan.translation(in: pan.view).x
+        switch pan.state {
+        case .began, .changed: changed(dx)
+        case .ended: ended(dx <= -threshold)
+        case .cancelled, .failed: ended(false)
+        default: break
+        }
+    }
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = recognizer as? UIPanGestureRecognizer else { return false }
+            let velocity = pan.velocity(in: pan.view)
+            return velocity.x < 0 && abs(velocity.x) > abs(velocity.y) * 1.2
+        }
+
+        func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+            other.view is UIScrollView
         }
     }
 }
