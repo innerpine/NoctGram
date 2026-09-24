@@ -34,6 +34,8 @@ struct NoctgramApp: App {
 
 struct RootView: View {
     @EnvironmentObject private var session: AppSession
+    /// A held chat message is drawn here, above the bars.
+    @StateObject private var focus = MessageFocus()
 
     var body: some View {
         ZStack {
@@ -49,6 +51,13 @@ struct RootView: View {
                 MainTabView()
             case .failed(let message):
                 ConnectionErrorView(message: message)
+            }
+        }
+        .environmentObject(focus)
+        .overlay {
+            if let item = focus.item {
+                MessageFocusView(item: item) { focus.dismiss() }
+                    .environmentObject(session)
             }
         }
         .overlay(alignment: .top) {

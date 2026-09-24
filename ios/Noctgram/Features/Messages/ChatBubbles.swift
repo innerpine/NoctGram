@@ -140,6 +140,7 @@ struct BubbleTime: View {
     var status: MessageStatus?
     var onMedia = false
     var mine = false
+    var pinned = false
 
     var body: some View {
         if onMedia {
@@ -154,6 +155,7 @@ struct BubbleTime: View {
 
     private func label(color: Color) -> some View {
         HStack(spacing: 3) {
+            if pinned { Image(systemName: "pin.fill").font(.system(size: 9)) }
             if edited { Text("изм.") }
             Text(Format.clock(created))
             if let status {
@@ -170,6 +172,7 @@ struct BubbleTime: View {
     /// last line leaves room for it (the time floats right on the web).
     var placeholder: Text {
         var text = Text("\u{2002}\u{2002}")
+        if pinned { text = text + Text(Image(systemName: "pin.fill")).font(.system(size: 9)) + Text(" ") }
         if edited { text = text + Text("изм. ") }
         text = text + Text(Format.clock(created))
         if let status { text = text + Text(" ") + Text(Image(systemName: status.symbol)) }
@@ -195,7 +198,7 @@ struct InlineTimeText: View {
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(alignment: .bottomTrailing) {
-                if let time { time }
+                if let time { time.accessibilityHidden(true) }
             }
     }
 }

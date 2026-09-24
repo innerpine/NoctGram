@@ -157,4 +157,13 @@ final class CoreTests: XCTestCase {
         XCTAssertFalse(Emoji.isOnly("1", limit: 3))
         XCTAssertFalse(Emoji.isOnly("🔥🔥🔥🔥", limit: 3))
     }
+
+    func testOneReactionPerPerson() {
+        let start = [Reaction(emoji: "👍", count: 2, own: true), Reaction(emoji: "🔥", count: 1, own: false)]
+        let fire = Reaction.applying("🔥", to: start)
+        XCTAssertEqual(fire, [Reaction(emoji: "👍", count: 1, own: false), Reaction(emoji: "🔥", count: 2, own: true)])
+        XCTAssertEqual(Reaction.applying(nil, to: fire), [Reaction(emoji: "👍", count: 1, own: false), Reaction(emoji: "🔥", count: 1, own: false)])
+        XCTAssertEqual(Reaction.applying("❤️", to: []), [Reaction(emoji: "❤️", count: 1, own: true)])
+        XCTAssertEqual(Reaction.applying(nil, to: [Reaction(emoji: "😢", count: 1, own: true)]), [])
+    }
 }

@@ -110,13 +110,27 @@ final class RoomStore: ObservableObject {
         }
     }
 
-    func react(_ message: RoomMessage, emoji: String, session: AppSession) async {
+    /// Shows the reaction at once; nil takes the viewer's reaction back.
+    func react(_ message: RoomMessage, emoji: String?, session: AppSession) async {
+        let before = messages.first { $0.id == message.id }?.reactions ?? message.reactions
+        setReactions(Reaction.applying(emoji, to: before), for: message.id)
         do {
-            _ = try await session.api.post("/api/rooms", ["action": "reaction", "id": roomId, "messageId": message.id, "emoji": emoji])
+            _ = try await session.api.post("/api/rooms", [
+                "action": "reaction",
+                "actor": session.myId ?? "",
+                "id": roomId,
+                "messageId": message.id,
+                "emoji": emoji ?? NSNull(),
+            ])
             await load(api: session.api)
         } catch {
+            setReactions(before, for: message.id)
             session.report(error)
         }
+    }
+
+    private func setReactions(_ reactions: [Reaction], for id: String) {
+        if let index = messages.firstIndex(where: { $0.id == id }) { messages[index].reactions = reactions }
     }
 
     func delete(_ message: RoomMessage, session: AppSession) async {
@@ -139,6 +153,7 @@ struct RoomChatView: View {
     @StateObject private var store: RoomStore
     @State private var text = ""
     @State private var replyTo: RoomMessage?
+    @EnvironmentObject private var focus: MessageFocus
     @FocusState private var focused: Bool
 
     init(roomId: String, title: String) {
@@ -230,13 +245,24 @@ struct RoomChatView: View {
             && Calendar.current.isDate(Format.date(previous.created), inSameDayAs: Format.date(message.created))
     }
 
+    private var canWrite: Bool { store.canSend && !store.isSecret && !session.readOnly }
+
+    private func focusAction(_ message: RoomMessage, joinsPrevious: Bool) -> (CGRect) -> Void {
+        { frame in present(message, frame: frame, joinsPrevious: joinsPrevious) }
+    }
+
+    private func replyAction(_ message: RoomMessage) -> () -> Void {
+        {
+            replyTo = message
+            focused = true
+        }
+    }
+
     /// The same bubbles as a dialogue; the author's name and avatar mark the
-    /// start and end of each group.
+    /// start and end of each group. Swipe left to answer, hold for reactions.
     private func roomBubble(_ message: RoomMessage, joinsPrevious: Bool, joinsNext: Bool) -> some View {
         let mine = message.sender == session.myId
-        let reply = message.replyTo.isEmpty ? nil : store.messages.first(where: { $0.id == message.replyTo })
-        let shape = BubbleShape.message(mine: mine, joinsPrevious: joinsPrevious)
-        let time = BubbleTime(created: message.created, status: mine ? (message.pending ? .pending : .sent) : nil, mine: mine)
+        let active = !message.deleted && !message.pending
         return HStack(alignment: .bottom, spacing: 6) {
             if mine {
                 Spacer(minLength: 52)
@@ -250,84 +276,92 @@ struct RoomChatView: View {
                 }
                 .buttonStyle(PressableStyle())
             }
-            BubbleStack() {
-                if (!mine && !joinsPrevious) || reply != nil {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if !mine && !joinsPrevious {
-                            Text(message.senderName)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(Noct.lilac)
-                                .lineLimit(1)
-                        }
-                        if let reply {
-                            BubbleQuote(name: reply.senderName, text: reply.text, accent: Noct.lilac)
-                        }
+            bubbleBody(message, joinsPrevious: joinsPrevious)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("message-" + message.id)
+                .modifier(HoldToFocus(action: active ? focusAction(message, joinsPrevious: joinsPrevious) : nil))
+            if !mine { Spacer(minLength: 52) }
+        }
+        .modifier(SwipeToReply(action: active && canWrite ? replyAction(message) : nil))
+    }
+
+    private func bubbleBody(_ message: RoomMessage, joinsPrevious: Bool) -> some View {
+        let mine = message.sender == session.myId
+        let reply = message.replyTo.isEmpty ? nil : store.messages.first(where: { $0.id == message.replyTo })
+        let shape = BubbleShape.message(mine: mine, joinsPrevious: joinsPrevious)
+        let time = BubbleTime(created: message.created, status: mine ? (message.pending ? .pending : .sent) : nil, mine: mine)
+        return BubbleStack() {
+            if (!mine && !joinsPrevious) || reply != nil {
+                VStack(alignment: .leading, spacing: 6) {
+                    if !mine && !joinsPrevious {
+                        Text(message.senderName)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Noct.lilac)
+                            .lineLimit(1)
                     }
-                    .padding(.horizontal, mine || joinsPrevious ? 8 : 12)
-                    .padding(.top, 7)
+                    if let reply {
+                        BubbleQuote(name: reply.senderName, text: reply.text, accent: Noct.lilac)
+                    }
                 }
-                if message.deleted {
+                .padding(.horizontal, mine || joinsPrevious ? 8 : 12)
+                .padding(.top, 7)
+            }
+            if message.deleted {
+                HStack(alignment: .bottom, spacing: 8) {
+                    Text("Сообщение удалено")
+                        .font(.system(size: 15).italic())
+                        .foregroundColor(Noct.text48)
+                    Spacer(minLength: 4)
+                    time
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+            } else if message.reactions.isEmpty {
+                InlineTimeText(text: message.text, time: time, accent: Noct.lilac)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    InlineTimeText(text: message.text, accent: Noct.lilac)
                     HStack(alignment: .bottom, spacing: 8) {
-                        Text("Сообщение удалено")
-                            .font(.system(size: 15).italic())
-                            .foregroundColor(Noct.text48)
+                        BubbleReactions(reactions: message.reactions, accent: Noct.lilac)
                         Spacer(minLength: 4)
                         time
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                } else if message.reactions.isEmpty {
-                    InlineTimeText(text: message.text, time: time, accent: Noct.lilac)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        InlineTimeText(text: message.text, accent: Noct.lilac)
-                        HStack(alignment: .bottom, spacing: 8) {
-                            BubbleReactions(reactions: message.reactions, accent: Noct.lilac)
-                            Spacer(minLength: 4)
-                            time
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
             }
-            .background(shape.fill(mine ? ChatPalette.noct.outgoing : ChatPalette.noct.incoming))
-            .clipShape(shape)
-            .overlay(shape.stroke(Color.white.opacity(0.06), lineWidth: 1))
-            .opacity(message.pending ? 0.7 : 1)
-            .contentShape(.contextMenuPreview, shape)
-            .contextMenu {
-                if !message.deleted && !message.pending {
-                    Button {
-                        replyTo = message
-                        focused = true
-                    } label: {
-                        Label("Ответить", systemImage: "arrowshape.turn.up.left")
-                    }
-                    Menu {
-                        ForEach(messageReactions, id: \.self) { emoji in
-                            Button(emoji) { Task { await store.react(message, emoji: emoji, session: session) } }
-                        }
-                    } label: {
-                        Label("Реакция", systemImage: "face.smiling")
-                    }
-                    Button {
-                        session.copy(message.text)
-                    } label: {
-                        Label("Скопировать", systemImage: "doc.on.doc")
-                    }
-                    if mine || store.role == "owner" || store.role == "admin" {
-                        Button(role: .destructive) {
-                            Task { await store.delete(message, session: session) }
-                        } label: {
-                            Label("Удалить", systemImage: "trash")
-                        }
-                    }
-                }
-            }
-            if !mine { Spacer(minLength: 52) }
         }
+        .background(shape.fill(mine ? ChatPalette.noct.outgoing : ChatPalette.noct.incoming))
+        .clipShape(shape)
+        .overlay(shape.stroke(Color.white.opacity(0.06), lineWidth: 1))
+        .opacity(message.pending ? 0.7 : 1)
+    }
+
+    /// Lifts a held message over the blurred screen, as in Telegram.
+    private func present(_ message: RoomMessage, frame: CGRect, joinsPrevious: Bool) {
+        let mine = message.sender == session.myId
+        var actions: [MessageAction] = []
+        if canWrite {
+            actions.append(MessageAction(title: "Ответить", icon: "arrowshape.turn.up.left", run: replyAction(message)))
+        }
+        if !message.text.isEmpty {
+            actions.append(MessageAction(title: "Скопировать", icon: "doc.on.doc") { session.copy(message.text) })
+        }
+        if mine || store.role == "owner" || store.role == "admin" {
+            actions.append(MessageAction(title: "Удалить", icon: "trash", destructive: true) {
+                Task { await store.delete(message, session: session) }
+            })
+        }
+        focus.present(MessageFocus.Item(
+            frame: frame,
+            mine: mine,
+            bubble: AnyView(bubbleBody(message, joinsPrevious: joinsPrevious).environmentObject(session)),
+            reactions: session.readOnly ? [] : messageReactions,
+            chosen: message.reactions.first(where: \.own)?.emoji,
+            actions: actions,
+            react: { emoji in Task { await store.react(message, emoji: emoji, session: session) } }
+        ))
     }
 }

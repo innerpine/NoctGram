@@ -65,6 +65,19 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_STYLE: Manual
         DEVELOPMENT_TEAM: ""
+  NoctgramUITests:
+    # Chat gestures on the mock server (see .github/workflows/ios-ipa.yml).
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/UI
+    dependencies:
+      - target: Noctgram
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.noctgram.ios.uitests
+        TEST_TARGET_NAME: Noctgram
   NoctgramTests:
     type: bundle.unit-test
     platform: iOS
@@ -84,11 +97,13 @@ schemes:
       targets:
         Noctgram: all
         NoctgramTests: [test]
+        NoctgramUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
         - NoctgramTests
+        - NoctgramUITests
     archive:
       config: Release

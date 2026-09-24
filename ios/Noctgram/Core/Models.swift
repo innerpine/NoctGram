@@ -493,6 +493,25 @@ struct Reaction: Hashable {
     var emoji: String
     var count: Int
     var own: Bool
+
+    /// Reactions after the viewer picks `emoji`, or takes theirs back with
+    /// nil: one reaction per person (lib/message-reactions.ts).
+    static func applying(_ emoji: String?, to reactions: [Reaction]) -> [Reaction] {
+        var list = reactions
+        if let index = list.firstIndex(where: \.own) {
+            list[index].count -= 1
+            list[index].own = false
+            if list[index].count <= 0 { list.remove(at: index) }
+        }
+        guard let emoji else { return list }
+        if let index = list.firstIndex(where: { $0.emoji == emoji }) {
+            list[index].count += 1
+            list[index].own = true
+        } else {
+            list.append(Reaction(emoji: emoji, count: 1, own: true))
+        }
+        return list
+    }
 }
 
 struct ReplyPreview: Hashable {

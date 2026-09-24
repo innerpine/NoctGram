@@ -17,6 +17,8 @@ META, R = DATA["meta"], DATA["responses"]
 PORT, MODE, PUBLIC = int(sys.argv[1]), sys.argv[2], sys.argv[3]
 
 SIGNED_OUT = {"emailEnabled": True, "sitesEnabled": False, "user": None, "challenge": None}
+# Reactions and pins sent by the app (UI tests read them back in the dialogue).
+STATE = {"reactions": {}, "pins": {}}
 SOCIAL = {
     "bootstrap": "bootstrap",
     "post": "post",
@@ -65,7 +67,7 @@ def dialogue():
         (bob, "Во сколько встречаемся?", [], {"id": "x", "sender": me, "name": "", "text": "Фото", "unavailable": 0}),
         (bob, "🔥", [], None),
     ]
-    messages = list(base)
+    messages = [dict(message) for message in base]
     for index, (sender, text, attachments, reply) in enumerate(extra):
         message = {
             "id": f"message:{sender}:mock-{index}", "sender": sender,
@@ -76,6 +78,12 @@ def dialogue():
         if reply:
             message["reply"] = reply
         messages.append(message)
+    for message in messages:
+        emoji = STATE["reactions"].get(message["id"])
+        if emoji:
+            message["reactions"] = [{"emoji": emoji, "count": 1, "own": 1}]
+        if STATE["pins"].get(message["id"]):
+            message["pinnedAt"] = message["created"]
     return messages
 
 
@@ -159,8 +167,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length") or 0)
-        if length:
-            self.rfile.read(length)
+        raw = self.rfile.read(length) if length else b""
+        try:
+            body = json.loads(raw or b"{}")
+        except ValueError:
+            body = {}
+        if urlparse(self.path).path == "/api/social" and isinstance(body, dict):
+            if body.get("action") == "messageReaction":
+                STATE["reactions"][body.get("id")] = body.get("emoji")
+            elif body.get("action") == "messagePin":
+                STATE["pins"][body.get("id")] = bool(body.get("value"))
         self.send(200, {"ok": True})
 
 

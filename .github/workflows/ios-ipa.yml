@@ -134,7 +134,7 @@ jobs:
           xcodebuild test \
             -project Noctgram.xcodeproj -scheme Noctgram -configuration Debug \
             -destination "platform=iOS Simulator,id=$UDID" \
-            -derivedDataPath build > test.log 2>&1
+            -derivedDataPath build -only-testing:NoctgramTests > test.log 2>&1
           status=$?
           grep -E "Test Case .*(passed|failed)|error:|Executed|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)" test.log | sort -u | head -120
           [ $status -ne 0 ] && tail -n 60 test.log
@@ -197,7 +197,25 @@ jobs:
           done
           true
 
+      - name: Gesture tests
+        working-directory: ios
+        run: |
+          # Swipe to reply and hold for reactions, on the mock server started
+          # above; the tests save their own screenshots into shots/.
+          set +e
+          TEST_RUNNER_SHOTS_DIR="$GITHUB_WORKSPACE/shots" TEST_RUNNER_NOCT_SERVER="http://127.0.0.1:8765" \
+          xcodebuild test \
+            -project Noctgram.xcodeproj -scheme Noctgram -configuration Debug \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            -derivedDataPath build -only-testing:NoctgramUITests > uitest.log 2>&1
+          status=$?
+          grep -E "Test Case .*(passed|failed)|error:|Executed|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)" uitest.log | sort -u | head -80
+          [ $status -ne 0 ] && tail -n 80 uitest.log
+          ls "$GITHUB_WORKSPACE/shots" | tail -5
+          exit $status
+
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: Noctgram-screenshots-${{ github.run_number }}
           path: shots/*.png

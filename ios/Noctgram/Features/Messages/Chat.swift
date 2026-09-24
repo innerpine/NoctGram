@@ -2,7 +2,8 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
-let messageReactions = ["👍", "❤️", "😂", "🔥", "🎉", "🤯", "😢", "👎"]
+/// The eight reactions the server accepts (lib/message-reactions.ts), ❤️ first as in Telegram.
+let messageReactions = ["❤️", "👍", "😂", "🔥", "🎉", "🤯", "😢", "👎"]
 
 @MainActor
 final class ChatStore: ObservableObject {
@@ -110,15 +111,49 @@ final class ChatStore: ObservableObject {
         }
     }
 
-    func react(_ message: ChatMessage, emoji: String, session: AppSession) async {
+    /// Shows the reaction at once; nil takes the viewer's reaction back.
+    func react(_ message: ChatMessage, emoji: String?, session: AppSession) async {
+        let before = messages.first { $0.id == message.id }?.reactions ?? message.reactions
+        setReactions(Reaction.applying(emoji, to: before), for: message.id)
         do {
             _ = try await session.api.socialPost("messageReaction", [
                 "id": message.id,
                 "peer": peer.id,
-                "emoji": emoji,
+                "emoji": emoji ?? NSNull(),
                 "expectedSender": session.myId ?? "",
             ])
             await load(api: session.api)
+        } catch {
+            setReactions(before, for: message.id)
+            session.report(error)
+        }
+    }
+
+    private func setReactions(_ reactions: [Reaction], for id: String) {
+        if let index = messages.firstIndex(where: { $0.id == id }) { messages[index].reactions = reactions }
+    }
+
+    /// Up to ten pinned messages per dialogue (lib/chat-messages.ts).
+    func pin(_ message: ChatMessage, value: Bool, session: AppSession) async {
+        do {
+            _ = try await session.api.socialPost("messagePin", ["id": message.id, "peer": peer.id, "value": value])
+            session.show(value ? "Сообщение закреплено" : "Сообщение откреплено")
+            await load(api: session.api)
+        } catch {
+            session.report(error)
+        }
+    }
+
+    func forward(_ message: ChatMessage, to person: Person, session: AppSession) async {
+        do {
+            _ = try await session.api.socialPost("messageForward", [
+                "ids": [message.id],
+                "peer": peer.id,
+                "recipient": person.id,
+                "key": UUID().uuidString.lowercased(),
+            ])
+            Haptics.success()
+            session.show("Переслано: \(person.name)")
         } catch {
             session.report(error)
         }
@@ -181,6 +216,8 @@ struct ChatView: View {
     @State private var viewer: MediaViewerState?
     @State private var reporting: ChatMessage?
     @State private var deleting: ChatMessage?
+    @State private var forwarding: ChatMessage?
+    @EnvironmentObject private var focus: MessageFocus
     @FocusState private var focused: Bool
 
     init(peer: Person) {
@@ -220,13 +257,13 @@ struct ChatView: View {
                         MessageBubble(
                             message: message,
                             mine: message.sender == session.myId,
-                            peerName: peer.name,
+                            peerName: title.name,
                             palette: store.palette,
                             joinsPrevious: joins,
-                            openMedia: { items, position in viewer = MediaViewerState(items: items, index: position) }
-                        ) {
-                            menu(message)
-                        }
+                            openMedia: { items, position in viewer = MediaViewerState(items: items, index: position) },
+                            onFocus: { frame in present(message, frame: frame, joinsPrevious: joins) },
+                            onReply: canWrite ? replyAction(message) : nil
+                        )
                         .padding(.top, joins ? 2 : 8)
                         .id(message.id)
                     }
@@ -292,6 +329,12 @@ struct ChatView: View {
             MediaViewer(items: state.items, index: state.index)
                 .environmentObject(session)
         }
+        .sheet(item: $forwarding) { message in
+            ForwardSheet { person in
+                Task { await store.forward(message, to: person, session: session) }
+            }
+            .environmentObject(session)
+        }
         .confirmationDialog("Пожаловаться на сообщение", isPresented: Binding(get: { reporting != nil }, set: { if !$0 { reporting = nil } }), titleVisibility: .visible) {
             ForEach(ReportReason.all, id: \.self) { reason in
                 Button(reason) {
@@ -338,55 +381,72 @@ struct ChatView: View {
         previous.sender == message.sender && message.created - previous.created < 10 * 60 * 1000
     }
 
-    @ViewBuilder private func menu(_ message: ChatMessage) -> some View {
+    private var canWrite: Bool { !session.readOnly && store.allowed && !store.blockedByMe }
+
+    private func reply(to message: ChatMessage) {
+        replyTo = message
+        editing = nil
+        focused = true
+    }
+
+    private func replyAction(_ message: ChatMessage) -> () -> Void {
+        { reply(to: message) }
+    }
+
+    /// Lifts a held message over the blurred screen, as in Telegram.
+    private func present(_ message: ChatMessage, frame: CGRect, joinsPrevious: Bool) {
         let mine = message.sender == session.myId
-        if !message.pending {
-            Button {
-                replyTo = message
-                editing = nil
-                focused = true
-            } label: {
-                Label("Ответить", systemImage: "arrowshape.turn.up.left")
-            }
-            Menu {
-                ForEach(messageReactions, id: \.self) { emoji in
-                    Button(emoji) { Task { await store.react(message, emoji: emoji, session: session) } }
-                }
-            } label: {
-                Label("Реакция", systemImage: "face.smiling")
-            }
+        focus.present(MessageFocus.Item(
+            frame: frame,
+            mine: mine,
+            bubble: AnyView(
+                MessageBubble(
+                    message: message,
+                    mine: mine,
+                    peerName: title.name,
+                    palette: store.palette,
+                    joinsPrevious: joinsPrevious,
+                    openMedia: { _, _ in },
+                    standalone: true
+                )
+                .environmentObject(session)
+            ),
+            reactions: canWrite ? messageReactions : [],
+            chosen: message.reactions.first(where: \.own)?.emoji,
+            actions: actions(for: message),
+            react: { emoji in Task { await store.react(message, emoji: emoji, session: session) } }
+        ))
+    }
+
+    private func actions(for message: ChatMessage) -> [MessageAction] {
+        let mine = message.sender == session.myId
+        var list: [MessageAction] = []
+        if canWrite {
+            list.append(MessageAction(title: "Ответить", icon: "arrowshape.turn.up.left") { reply(to: message) })
         }
         if !message.text.isEmpty {
-            Button {
-                session.copy(message.text)
-            } label: {
-                Label("Скопировать", systemImage: "doc.on.doc")
-            }
+            list.append(MessageAction(title: "Скопировать", icon: "doc.on.doc") { session.copy(message.text) })
         }
-        if mine && message.gift == nil && message.forwardedName.isEmpty && !message.pending {
-            Button {
+        if mine && canWrite && message.gift == nil && message.forwardedName.isEmpty {
+            list.append(MessageAction(title: "Изменить", icon: "pencil") {
                 editing = message
                 replyTo = nil
                 text = message.text
                 focused = true
-            } label: {
-                Label("Изменить", systemImage: "pencil")
-            }
+            })
         }
-        if !message.pending {
-            Button(role: .destructive) {
-                deleting = message
-            } label: {
-                Label("Удалить", systemImage: "trash")
-            }
+        if !session.readOnly {
+            let pinned = message.pinnedAt > 0
+            list.append(MessageAction(title: pinned ? "Открепить" : "Закрепить", icon: pinned ? "pin.slash" : "pin") {
+                Task { await store.pin(message, value: !pinned, session: session) }
+            })
+            list.append(MessageAction(title: "Переслать", icon: "arrowshape.turn.up.right") { forwarding = message })
         }
-        if !mine && !message.pending {
-            Button {
-                reporting = message
-            } label: {
-                Label("Пожаловаться", systemImage: "flag")
-            }
+        list.append(MessageAction(title: "Удалить", icon: "trash", destructive: true) { deleting = message })
+        if !mine {
+            list.append(MessageAction(title: "Пожаловаться", icon: "flag", destructive: true) { reporting = message })
         }
+        return list
     }
 
     @ViewBuilder private var bottom: some View {
@@ -402,7 +462,7 @@ struct ChatView: View {
             VStack(spacing: 0) {
                 if let context = replyTo ?? editing {
                     ComposerContext(
-                        title: editing != nil ? "Редактирование" : (context.sender == session.myId ? "Ответ себе" : "Ответ \(peer.name)"),
+                        title: editing != nil ? "Редактирование" : (context.sender == session.myId ? "Ответ себе" : "Ответ \(title.name)"),
                         text: context.text.isEmpty ? "Вложение" : context.text
                     ) {
                         if editing != nil { text = "" }
@@ -487,7 +547,7 @@ struct ChatView: View {
 /// A message as in Telegram, in the web's colours: the bubble hugs its
 /// text, the time sits at the end of the last line and photos run edge to
 /// edge with the time on glass.
-struct MessageBubble<Menu: View>: View {
+struct MessageBubble: View {
     @EnvironmentObject private var session: AppSession
     let message: ChatMessage
     let mine: Bool
@@ -496,7 +556,12 @@ struct MessageBubble<Menu: View>: View {
     /// The previous message is from the same sender a moment earlier.
     let joinsPrevious: Bool
     let openMedia: ([MediaItem], Int) -> Void
-    @ViewBuilder let menu: () -> Menu
+    /// Only the bubble, drawn in the held-message overlay.
+    var standalone = false
+    /// Holding lifts the bubble with reactions and actions (MessageFocus).
+    var onFocus: ((CGRect) -> Void)?
+    /// Swiping left answers the message.
+    var onReply: (() -> Void)?
     @State private var ratio: CGFloat?
 
     private let maxMedia: CGFloat = 270
@@ -532,19 +597,28 @@ struct MessageBubble<Menu: View>: View {
     }
 
     private func time(onMedia: Bool = false) -> BubbleTime {
-        BubbleTime(created: message.created, edited: message.editedAt > 0, status: status, onMedia: onMedia, mine: mine)
+        BubbleTime(created: message.created, edited: message.editedAt > 0, status: status, onMedia: onMedia, mine: mine, pinned: message.pinnedAt > 0)
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            if mine { Spacer(minLength: 52) }
+        if standalone {
             content
-                .contentShape(.contextMenuPreview, shape)
-                .contextMenu { menu() }
                 .opacity(message.pending ? 0.7 : 1)
-            if !mine { Spacer(minLength: 52) }
+                .task(id: media.first?.path) { await measure() }
+        } else {
+            HStack(spacing: 0) {
+                if mine { Spacer(minLength: 52) }
+                content
+                    .opacity(message.pending ? 0.7 : 1)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("message-" + message.id)
+                    .accessibilityAction(named: "Ответить") { onReply?() }
+                    .modifier(HoldToFocus(action: message.pending ? nil : onFocus))
+                if !mine { Spacer(minLength: 52) }
+            }
+            .modifier(SwipeToReply(action: message.pending ? nil : onReply))
+            .task(id: media.first?.path) { await measure() }
         }
-        .task(id: media.first?.path) { await measure() }
     }
 
     @ViewBuilder private var content: some View {
