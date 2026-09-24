@@ -105,6 +105,11 @@ struct ProfileScreen: View {
         }
         .task {
             if store.profile == nil { await store.load(target, api: session.api) }
+            #if DEBUG
+            if isRootTab, let tab = UserDefaults.standard.string(forKey: "noct.debugEditor").flatMap(EditorTab.init(rawValue:)) {
+                editing = tab
+            }
+            #endif
         }
         .onChange(of: session.me) { me in
             // Keep the own profile in sync after edits made elsewhere.

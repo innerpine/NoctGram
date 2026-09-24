@@ -102,8 +102,45 @@ struct MainTabView: View {
         }
         .environmentObject(nav)
         .environment(\.openURL, OpenURLAction { url in nav.open(url) })
+        #if DEBUG
+        .onAppear { DebugLaunch.apply(nav) }
+        #endif
     }
 }
+
+#if DEBUG
+/// Simulator screenshots (ios/Tests): `-noct.debugTab profile`,
+/// `-noct.debugRoute chat:<id>`. Launch arguments fill UserDefaults.
+enum DebugLaunch {
+    @MainActor
+    static func apply(_ nav: Navigator) {
+        let defaults = UserDefaults.standard
+        switch defaults.string(forKey: "noct.debugTab") {
+        case "search": nav.tab = .search
+        case "messages": nav.tab = .messages
+        case "notifications": nav.tab = .notifications
+        case "profile": nav.tab = .profile
+        default: break
+        }
+        guard let route = defaults.string(forKey: "noct.debugRoute"), let split = route.firstIndex(of: ":") else { return }
+        let kind = String(route[..<split]), value = String(route[route.index(after: split)...])
+        switch kind {
+        case "profile": nav.push(.profile(value))
+        case "post": nav.push(.post(value))
+        case "chat": nav.push(.chat(Person(identity: Identity(id: value, name: "", avatar: "", handle: ""))))
+        case "followers": nav.push(.connections(profileId: value, kind: .followers))
+        case "screen":
+            switch value {
+            case "settings": nav.push(.settings)
+            case "wallet": nav.push(.wallet)
+            case "saved": nav.push(.saved)
+            default: break
+            }
+        default: break
+        }
+    }
+}
+#endif
 
 struct SplashView: View {
     var body: some View {

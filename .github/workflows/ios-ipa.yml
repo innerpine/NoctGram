@@ -60,6 +60,8 @@ jobs:
             echo "::error file=${file#$GITHUB_WORKSPACE/},line=$row::${line#*error: }"
           done
           grep -E 'error:|BUILD (SUCCEEDED|FAILED)' build.log | sort -u | head -200
+          echo "--- Swift warnings"
+          grep -E '^/.+\.swift:[0-9]+:[0-9]+: warning: ' build.log | sed "s|$GITHUB_WORKSPACE/||" | sort -u | head -80
           tail -n 30 build.log
           exit $status
 
@@ -82,15 +84,129 @@ jobs:
           path: dist/Noctgram.ipa
           retention-days: 30
 
+  # Runs the Debug build in the iOS simulator against captured API responses
+  # (ios/Tests) and screenshots the main screens.
+  screenshots:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build for the simulator
+        working-directory: ios
+        run: |
+          set +e
+          xcodebuild build \
+            -project Noctgram.xcodeproj -scheme Noctgram -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO > build.log 2>&1
+          status=$?
+          grep -E 'error:|BUILD (SUCCEEDED|FAILED)' build.log | sort -u | head -100
+          exit $status
+
+      - name: Boot simulator
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          devices = json.load(sys.stdin)['devices']
+          runtimes = sorted((r for r in devices if 'iOS' in r), key=lambda r: [int(p) for p in r.split('iOS-')[-1].split('-')])
+          for runtime in reversed(runtimes):
+              phones = [d for d in devices[runtime] if d['name'].startswith('iPhone') and 'Plus' not in d['name'] and 'Max' not in d['name'] and 'SE' not in d['name']]
+              if phones:
+                  print(phones[0]['udid'])
+                  print(runtime, phones[0]['name'], file=sys.stderr)
+                  break
+          ")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
+          xcrun simctl install "$UDID" ios/build/Build/Products/Debug-iphonesimulator/Noctgram.app
+
+      - name: Take screenshots
+        run: |
+          set +e
+          python3 ios/Tests/mock_server.py 8765 in public > mock-in.log 2>&1 &
+          python3 ios/Tests/mock_server.py 8766 out public > mock-out.log 2>&1 &
+          sleep 2
+          read ME BOB CHANNEL POST < <(python3 -c "
+          import json; m = json.load(open('ios/Tests/Fixtures/fixtures.json'))['meta']
+          print(m['me'], m['bob'], m['channel'], m['post'])")
+          mkdir -p shots
+          shot() {
+            name=$1; port=$2; shift 2
+            xcrun simctl terminate "$UDID" com.noctgram.ios >/dev/null 2>&1 || true
+            xcrun simctl launch "$UDID" com.noctgram.ios -noct.server "http://127.0.0.1:$port" "$@" >/dev/null
+            sleep 7
+            xcrun simctl io "$UDID" screenshot "shots/$name.png" >/dev/null
+            echo "shot $name"
+          }
+          shot 01-login 8766
+          shot 02-feed 8765
+          shot 03-profile 8765 -noct.debugTab profile
+          shot 04-profile-edit 8765 -noct.debugTab profile -noct.debugEditor profile
+          shot 05-profile-design 8765 -noct.debugTab profile -noct.debugEditor design
+          shot 06-profile-other 8765 -noct.debugRoute "profile:$BOB"
+          shot 07-channel 8765 -noct.debugRoute "profile:$CHANNEL"
+          shot 08-post 8765 -noct.debugRoute "post:$POST"
+          shot 09-messages 8765 -noct.debugTab messages
+          shot 10-chat 8765 -noct.debugTab messages -noct.debugRoute "chat:$BOB"
+          shot 11-notifications 8765 -noct.debugTab notifications
+          shot 12-search 8765 -noct.debugTab search
+          shot 13-followers 8765 -noct.debugTab profile -noct.debugRoute "followers:$ME"
+          shot 14-wallet 8765 -noct.debugRoute screen:wallet
+          shot 15-settings 8765 -noct.debugTab profile -noct.debugRoute screen:settings
+          ls -la shots
+          echo "--- crash reports"
+          for report in ~/Library/Logs/DiagnosticReports/Noctgram*; do
+            [ -f "$report" ] && head -c 6000 "$report"
+          done
+          true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Noctgram-screenshots-${{ github.run_number }}
+          path: shots/*.png
+          retention-days: 30
+
+  release:
+    needs: [ipa, screenshots]
+    if: always() && needs.ipa.result == 'success' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Noctgram-ipa-${{ github.run_number }}
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        if: needs.screenshots.result == 'success'
+        with:
+          name: Noctgram-screenshots-${{ github.run_number }}
+          path: dist/screenshots
+
       - name: Publish rolling release
-        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          shopt -s nullglob
+          files=(dist/Noctgram.ipa dist/screenshots/*.png)
           gh release delete ios-latest --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
-          gh release create ios-latest dist/Noctgram.ipa \
+          gh release create ios-latest "${files[@]}" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --prerelease \
             --title "Noctgram iOS — сборка ${{ github.run_number }}" \
-            --notes "Неподписанный Noctgram.ipa из ветки ${GITHUB_REF_NAME} (${GITHUB_SHA::7}). Подпиши своим сертификатом в ESign и установи. Инструкция: ios/README.md."
+            --notes "Неподписанный Noctgram.ipa из ветки ${GITHUB_REF_NAME} (${GITHUB_SHA::7}). Подпиши своим сертификатом в ESign и установи. Инструкция: ios/README.md. Скриншоты сняты в симуляторе iOS на тестовых данных."

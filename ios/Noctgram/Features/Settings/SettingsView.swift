@@ -214,7 +214,7 @@ struct WalletView: View {
             case "telegram_test", "admin_grant": return "Пополнение"
             case "purchase": return "Покупка звёзд"
             case "market", "market_sale": return "Маркет"
-            case "welcome", "starter": return "Стартовые звёзды"
+            case "grant", "welcome", "starter": return "Стартовые звёзды"
             default: return incoming ? "Зачисление" : "Списание"
             }
         }()
