@@ -285,11 +285,36 @@ struct ProfileScreen: View {
             ProfileAvatar(person: profile.identity, size: 96)
                 .offset(y: -40)
                 .padding(.bottom, -40)
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
+            // Narrow phones and avatars with an orbiting text ring get icon buttons.
+            ViewThatFits(in: .horizontal) {
+                actions(profile, compact: false)
+                actions(profile, compact: true)
+            }
+        }
+    }
+
+    private func actions(_ profile: Profile, compact: Bool) -> some View {
+        HStack(spacing: 8) {
             if editable {
-                Button("Редактировать") { editing = .profile }
+                if compact {
+                    Button {
+                        editing = .profile
+                    } label: {
+                        Image(systemName: "pencil")
+                    }
+                    .buttonStyle(CircleButtonStyle())
+                    .accessibilityLabel("Редактировать")
+                    .disabled(session.readOnly && !own)
+                } else {
+                    Button {
+                        editing = .profile
+                    } label: {
+                        Text("Редактировать").lineLimit(1).fixedSize()
+                    }
                     .buttonStyle(SecondaryButtonStyle())
                     .disabled(session.readOnly && !own)
+                }
                 if own {
                     Button {
                         nav.push(.settings)
@@ -309,14 +334,31 @@ struct ProfileScreen: View {
                     .accessibilityLabel("Оформление профиля")
                 }
             } else {
-                if profile.followed {
-                    Button("Вы подписаны") { Task { await store.toggleFollow(session: session) } }
-                        .buttonStyle(SecondaryButtonStyle())
-                        .disabled(session.readOnly || store.followBusy)
+                if compact {
+                    Button {
+                        Task { await store.toggleFollow(session: session) }
+                    } label: {
+                        Image(systemName: profile.followed ? "person.fill.checkmark" : "person.badge.plus")
+                    }
+                    .buttonStyle(CircleButtonStyle())
+                    .accessibilityLabel(profile.followed ? "Вы подписаны" : "Подписаться")
+                    .disabled(session.readOnly || store.followBusy)
+                } else if profile.followed {
+                    Button {
+                        Task { await store.toggleFollow(session: session) }
+                    } label: {
+                        Text("Вы подписаны").lineLimit(1).fixedSize()
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .disabled(session.readOnly || store.followBusy)
                 } else {
-                    Button("Подписаться") { Task { await store.toggleFollow(session: session) } }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .disabled(session.readOnly || store.followBusy)
+                    Button {
+                        Task { await store.toggleFollow(session: session) }
+                    } label: {
+                        Text("Подписаться").lineLimit(1).fixedSize()
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(session.readOnly || store.followBusy)
                 }
                 if profile.id != "noctgram" && !profile.isChannel {
                     Button {

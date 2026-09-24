@@ -104,18 +104,6 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
-      - name: Build for the simulator
-        working-directory: ios
-        run: |
-          set +e
-          xcodebuild build \
-            -project Noctgram.xcodeproj -scheme Noctgram -configuration Debug \
-            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath build CODE_SIGNING_ALLOWED=NO > build.log 2>&1
-          status=$?
-          grep -E 'error:|BUILD (SUCCEEDED|FAILED)' build.log | sort -u | head -100
-          exit $status
-
       - name: Boot simulator
         run: |
           UDID=$(xcrun simctl list devices available -j | python3 -c "
@@ -133,7 +121,22 @@ jobs:
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
-          xcrun simctl install "$UDID" ios/build/Build/Products/Debug-iphonesimulator/Noctgram.app
+
+      - name: Unit tests
+        working-directory: ios
+        run: |
+          set +e
+          xcodebuild test \
+            -project Noctgram.xcodeproj -scheme Noctgram -configuration Debug \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            -derivedDataPath build > test.log 2>&1
+          status=$?
+          grep -E "Test Case .*(passed|failed)|error:|Executed|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)" test.log | sort -u | head -120
+          [ $status -ne 0 ] && tail -n 60 test.log
+          exit $status
+
+      - name: Install app
+        run: xcrun simctl install "$UDID" ios/build/Build/Products/Debug-iphonesimulator/Noctgram.app
 
       - name: Take screenshots
         run: |

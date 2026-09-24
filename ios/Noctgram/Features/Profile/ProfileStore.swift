@@ -19,22 +19,6 @@ enum ProfileTab: String, CaseIterable, Identifiable {
     }
 }
 
-struct GiftDefinition: Identifiable, Hashable {
-    let id: String
-    let name: String
-    let price: Int
-    let color: String
-
-    init(_ j: JSON) {
-        id = j["id"].str
-        name = j["name"].str
-        price = j["price"].int ?? 0
-        color = j["color"].str
-    }
-
-    var artPath: String { "/assets/gifts/\(id).webp" }
-}
-
 /// Gift catalog from /api/gifts?action=catalog, loaded once per session.
 @MainActor
 final class GiftCatalog: ObservableObject {

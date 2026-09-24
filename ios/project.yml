@@ -15,6 +15,8 @@ settings:
     TARGETED_DEVICE_FAMILY: "1"
     ENABLE_BITCODE: NO
     DEAD_CODE_STRIPPING: YES
+    # Simulator builds and tests are signed ad hoc; device IPAs are signed in ESign.
+    CODE_SIGN_IDENTITY[sdk=iphonesimulator*]: "-"
 targets:
   Noctgram:
     type: application
@@ -57,12 +59,30 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_STYLE: Manual
         DEVELOPMENT_TEAM: ""
+  NoctgramTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/Unit
+      - path: Tests/Fixtures/fixtures.json
+        buildPhase: resources
+    dependencies:
+      - target: Noctgram
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.noctgram.ios.tests
 schemes:
   Noctgram:
     build:
       targets:
         Noctgram: all
+        NoctgramTests: [test]
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - NoctgramTests
     archive:
       config: Release

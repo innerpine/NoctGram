@@ -111,29 +111,40 @@ struct PostCard: View {
 
     private var authorLine: some View {
         HStack(spacing: 6) {
+            // The @username gives way first when the line gets too narrow.
+            ViewThatFits(in: .horizontal) {
+                authorMeta(handle: true)
+                authorMeta(handle: false)
+            }
+            Spacer(minLength: 0)
+            menu
+        }
+    }
+
+    private func authorMeta(handle: Bool) -> some View {
+        HStack(spacing: 6) {
             Button {
                 nav.push(.profile(post.userId))
             } label: {
                 DisplayName(person: post.author, size: 15)
-                    .layoutPriority(2)
             }
             .buttonStyle(PressableStyle())
             if post.isChannel {
                 ChannelLabel(appearance: post.appearance)
-                    .layoutPriority(1)
+                    .fixedSize()
             }
-            Text("@" + post.handle)
-                .font(.system(size: 13))
-                .foregroundColor(Noct.text48)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            if handle {
+                Text("@" + post.handle)
+                    .font(.system(size: 13))
+                    .foregroundColor(Noct.text48)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
             Text("·").font(.system(size: 13)).foregroundColor(Noct.text25)
             Text(Format.ago(post.created))
                 .font(.system(size: 13))
                 .foregroundColor(Noct.text48)
                 .fixedSize()
-            Spacer(minLength: 0)
-            menu
         }
     }
 

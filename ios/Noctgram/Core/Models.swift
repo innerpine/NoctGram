@@ -568,6 +568,23 @@ struct ReceivedGift: Identifiable, Hashable {
     }
 }
 
+/// A gift from the catalog (lib/gift-catalog.ts), priced in Noct Stars.
+struct GiftDefinition: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let price: Int
+    let color: String
+
+    init(_ j: JSON) {
+        id = j["id"].str
+        name = j["name"].str
+        price = j["price"].int ?? 0
+        color = j["color"].str
+    }
+
+    var artPath: String { "/assets/gifts/\(id).webp" }
+}
+
 struct NoctNotification: Identifiable, Hashable {
     var id: String
     var actorId: String

@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 
 /// In-app link scheme produced for @mentions, #tags and Noctgram profile links.
 enum AppLink {
@@ -114,24 +114,5 @@ enum RichText {
         if let handle = items.first(where: { $0.name == "handle" })?.value { return AppLink.handle(handle) }
         if let id = items.first(where: { $0.name == "profile" })?.value { return AppLink.profile(id) }
         return nil
-    }
-}
-
-/// Text with tappable mentions, tags and links. Taps go through the app's
-/// OpenURLAction (see RootView).
-struct LinkedText: View {
-    @EnvironmentObject private var session: AppSession
-    let text: String
-    var size: CGFloat = 15
-    var color: Color = Noct.text75
-    var lineSpacing: CGFloat = 4
-
-    var body: some View {
-        Text(RichText.attributed(text, baseURL: session.api.baseURL))
-            .font(.system(size: size))
-            .foregroundColor(color)
-            .lineSpacing(lineSpacing)
-            .tint(.white)
-            .fixedSize(horizontal: false, vertical: true)
     }
 }
