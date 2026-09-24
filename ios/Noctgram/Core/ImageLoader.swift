@@ -66,11 +66,13 @@ final class ImagePipeline: @unchecked Sendable {
         lock.unlock()
     }
 
-    /// Raw bytes for sharing or saving the original file.
+    /// Raw bytes: originals for sharing and saving, gift animations.
     func data(for url: URL) async -> Data? {
-        if let file = diskFile(for: url), let data = try? Data(contentsOf: file) { return data }
+        let file = diskFile(for: url)
+        if let file, let data = try? Data(contentsOf: file) { return data }
         guard let result = try? await session.data(from: url),
               (result.1 as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        if let file { try? result.0.write(to: file, options: .atomic) }
         return result.0
     }
 

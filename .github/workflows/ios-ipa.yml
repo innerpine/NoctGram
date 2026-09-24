@@ -69,6 +69,11 @@ jobs:
         run: |
           APP="ios/build/Build/Products/Release-iphoneos/Noctgram.app"
           # An ad-hoc signature gives every re-signer a code signature slot to replace.
+          # Embedded frameworks (Lottie) are signed first, as codesign requires.
+          if [ -d "$APP/Frameworks" ]; then
+            find "$APP/Frameworks" -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -print \
+              -exec codesign --force --sign - --timestamp=none {} \;
+          fi
           codesign --force --sign - --timestamp=none "$APP"
           mkdir -p dist/Payload
           cp -R "$APP" dist/Payload/

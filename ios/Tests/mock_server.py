@@ -34,6 +34,38 @@ SOCIAL = {
 }
 
 
+def photo(media_id):
+    return {"id": media_id, "name": "photo.jpg", "type": "image/jpeg", "size": 184320, "kind": "image"}
+
+
+def dialogue():
+    """The captured dialogue plus photos, a reply and short messages, so the
+    screenshots show how the bubbles lay out (sample data only)."""
+    base = R["messagesBob"]
+    start = max(m["created"] for m in base)
+    me, bob = META["me"], META["bob"]
+    extra = [
+        (bob, "", [photo("b23ae726-b170-4db7-968e-c7dadbebcdbc")], None),
+        (bob, "Смотри, какой вид с крыши 😍", [], None),
+        (me, "Красота! А это моя луна сегодня", [photo("d2d76d31-94a6-496c-8405-251c1042f0b4")], None),
+        (me, "ок", [], None),
+        (bob, "Во сколько встречаемся?", [], {"id": "x", "sender": me, "name": "", "text": "Фото", "unavailable": 0}),
+        (bob, "🔥", [], None),
+    ]
+    messages = list(base)
+    for index, (sender, text, attachments, reply) in enumerate(extra):
+        message = {
+            "id": f"message:{sender}:mock-{index}", "sender": sender,
+            "recipient": bob if sender == me else me, "text": text,
+            "created": start + (index + 1) * 60000, "read": 1, "editedAt": 0, "forwardedName": "",
+            "pinnedAt": None, "reactions": [], "attachments": attachments,
+        }
+        if reply:
+            message["reply"] = reply
+        messages.append(message)
+    return messages
+
+
 def social(q):
     action = q.get("action", "feed")
     if action == "feed":
@@ -49,7 +81,10 @@ def social(q):
         key = q.get("id") or {"bob_night": META["bob"], "night_city": META["channel"]}.get(q.get("handle", ""), META["me"])
         return R[{META["bob"]: "profileBob", META["channel"]: "profileChannel"}.get(key, "profileAlice")]
     if action == "messages":
-        return R["messagesBob"] if q.get("peer") == META["bob"] else []
+        messages = dialogue() if q.get("peer") == META["bob"] else []
+        if q.get("includeTheme") == "1":
+            return {"messages": messages, "theme": {"shared": "noct", "personal": None, "revision": 1}}
+        return messages
     if action in ("comments", "notifications"):
         return [] if q.get("before") else R[action]
     name = SOCIAL.get(action)
@@ -104,7 +139,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, {"error": "Не найдено"})
         if not os.path.isfile(path):
             return self.send(404, {"error": "Файл не найден"})
-        kind = "image/webp" if path.endswith(".webp") else "image/png" if path.endswith(".png") else "image/jpeg"
+        kinds = {".webp": "image/webp", ".png": "image/png", ".json": "application/json", ".tgs": "application/octet-stream"}
+        kind = kinds.get(os.path.splitext(path)[1], "image/jpeg")
         with open(path, "rb") as file:
             return self.send(200, file.read(), kind)
 

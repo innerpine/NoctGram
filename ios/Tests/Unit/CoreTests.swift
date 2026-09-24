@@ -151,5 +151,10 @@ final class CoreTests: XCTestCase {
         let profile = RichText.attributed("https://noctgram.com/?handle=bob_night", baseURL: URL(string: "https://noctgram.com"))
         XCTAssertEqual(profile.runs.compactMap(\.link), [AppLink.handle("bob_night")].compactMap { $0 })
         XCTAssertEqual(PremiumEmoji.replace("Горит :noct_fire: и :noct_moon:"), "Горит 🔥 и 🌛")
+        XCTAssertTrue(Emoji.isOnly("🔥", limit: 3))
+        XCTAssertTrue(Emoji.isOnly("❤️ 👍", limit: 3))
+        XCTAssertFalse(Emoji.isOnly("ок", limit: 3))
+        XCTAssertFalse(Emoji.isOnly("1", limit: 3))
+        XCTAssertFalse(Emoji.isOnly("🔥🔥🔥🔥", limit: 3))
     }
 }

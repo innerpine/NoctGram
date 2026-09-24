@@ -50,6 +50,18 @@ enum PremiumEmoji {
 }
 
 /// Mentions, links and hashtags as tappable runs (lib/profile-links.ts mentionParts).
+enum Emoji {
+    /// Only emoji (up to `limit`, spaces aside): shown large without a bubble.
+    static func isOnly(_ text: String, limit: Int) -> Bool {
+        let characters = text.filter { !$0.isWhitespace }
+        guard !characters.isEmpty, characters.count <= limit else { return false }
+        return characters.allSatisfy { character in
+            guard let first = character.unicodeScalars.first else { return false }
+            return first.properties.isEmojiPresentation || (first.properties.isEmoji && character.unicodeScalars.count > 1)
+        }
+    }
+}
+
 enum RichText {
     private static let pattern = try? NSRegularExpression(
         pattern: #"https?://[^\s<>"\p{Cc}]+|(?<![\w/])/\?(?:profile|handle|group|invite|room)=[^\s<>"\p{Cc}]+|[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?<![\p{L}\p{N}_/@.+-])@[a-z0-9_]{4,24}(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_&])#[\p{L}\p{N}_]{1,64}"#,

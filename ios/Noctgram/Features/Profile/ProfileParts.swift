@@ -1,3 +1,4 @@
+import Lottie
 import SwiftUI
 
 /// Wrapping row layout for profile details (location · site · birthday · joined).
@@ -331,10 +332,15 @@ struct VerifiedNotice: View {
 }
 
 /// Gift art: plain gifts on a card, collectibles on their radial backdrop.
+/// Gift art: the static picture at once, then its Lottie animation on top
+/// once loaded, as on the web. Reduce Motion keeps the picture.
 struct GiftArt: View {
     @EnvironmentObject private var session: AppSession
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let path: String
     var collectible: Collectible?
+    var animated = true
+    @State private var animation: LottieAnimation?
 
     var body: some View {
         ZStack {
@@ -350,6 +356,20 @@ struct GiftArt: View {
             }
             RemoteImage(url: session.api.mediaURL(path), maxPixel: 360, contentMode: .fit, placeholder: .clear)
                 .padding(collectible == nil ? 14 : 12)
+                .opacity(animation == nil ? 1 : 0)
+            if let animation {
+                GiftLottieView(animation: animation)
+                    .padding(collectible == nil ? 14 : 12)
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+            }
+        }
+        .task(id: path) {
+            guard animated, !reduceMotion,
+                  let animationPath = GiftAnimations.animationPath(forArt: path),
+                  let url = session.api.mediaURL(animationPath) else { return }
+            let loaded = await GiftAnimations.shared.animation(for: url)
+            withAnimation(.easeOut(duration: 0.25)) { animation = loaded }
         }
     }
 }

@@ -159,6 +159,8 @@ struct ComposerBar: View {
     var sending: Bool
     var focus: FocusState<Bool>.Binding
     var leading: AnyView?
+    /// Fill of the send button (a chat theme's accent).
+    var accent: Color = .white
     let send: () -> Void
 
     var body: some View {
@@ -183,7 +185,7 @@ struct ComposerBar: View {
                         }
                     }
                 }
-                .buttonStyle(CircleButtonStyle(size: 44, tint: canSend || sending ? .white : nil))
+                .buttonStyle(CircleButtonStyle(size: 44, tint: canSend || sending ? accent : nil))
                 .disabled(!canSend)
                 .accessibilityLabel("Отправить")
             }

@@ -1,0 +1,330 @@
+import SwiftUI
+import UIKit
+
+/// Dialogue palettes of lib/chat-themes.ts: the eight themes of the web,
+/// chosen per chat on the server (action=messages&includeTheme=1).
+struct ChatPalette: Equatable {
+    let id: String
+    let base: Color
+    let glow: Color
+    let field: Color
+    let incoming: Color
+    let outgoing: Color
+    let accent: Color
+
+    private static let table: [(String, UInt32, UInt32, UInt32, UInt32, UInt32)] = [
+        ("noct", 0x0B0B0C, 0x1B1B20, 0x111113, 0x242426, 0xDEDEE6),
+        ("aurora", 0x0B1418, 0x2C706C, 0x12272B, 0x24423F, 0xB7E0D2),
+        ("dusk", 0x13111E, 0x625088, 0x201C31, 0x3D3153, 0xD6C5EE),
+        ("rose", 0x1B1218, 0x885669, 0x2E1F2A, 0x50323E, 0xEAC7D2),
+        ("amber", 0x19150F, 0x8D6D46, 0x2C241B, 0x4A3928, 0xECD4AF),
+        ("mist", 0x141A1E, 0x657C87, 0x222C33, 0x3A4B54, 0xD1E0E7),
+        ("ocean", 0x0D1422, 0x335C86, 0x18263A, 0x28405E, 0xBFD6F1),
+        ("olive", 0x141811, 0x616E49, 0x242B1D, 0x3B472E, 0xD7DFB9),
+    ]
+
+    init(id: String) {
+        let row = Self.table.first { $0.0 == id } ?? Self.table[0]
+        self.id = row.0
+        base = Color(hex: row.1)
+        glow = Color(hex: row.2)
+        field = Color(hex: row.3)
+        // The web draws bubbles at 93 % («ed») over the backdrop.
+        incoming = Color(hex: row.3, opacity: 0.93)
+        outgoing = Color(hex: row.4, opacity: 0.93)
+        accent = Color(hex: row.5)
+    }
+
+    static let noct = ChatPalette(id: "noct")
+}
+
+/// The chat backdrop of the web theme: soft gradients, no pattern.
+struct ChatBackdrop: View {
+    let palette: ChatPalette
+
+    var body: some View {
+        GeometryReader { geometry in
+            let size = max(geometry.size.width, geometry.size.height)
+            ZStack {
+                if palette.id == "noct" {
+                    LinearGradient(colors: [palette.base, Color(hex: 0x101013)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                } else {
+                    LinearGradient(colors: [palette.base, palette.field, palette.base], startPoint: UnitPoint(x: 0.3, y: 0), endPoint: UnitPoint(x: 0.7, y: 1))
+                    RadialGradient(colors: [palette.glow.opacity(0.4), .clear], center: UnitPoint(x: 0.05, y: 0.12), startRadius: 0, endRadius: size * 0.55)
+                    RadialGradient(colors: [palette.glow.opacity(0.28), .clear], center: UnitPoint(x: 0.92, y: 0.8), startRadius: 0, endRadius: size * 0.58)
+                }
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+}
+
+/// A bubble with its own radius per corner (UnevenRoundedRectangle needs iOS 17).
+struct BubbleShape: Shape {
+    var topLeading: CGFloat
+    var topTrailing: CGFloat
+    var bottomLeading: CGFloat
+    var bottomTrailing: CGFloat
+
+    /// Corners of a message: small on the sender's side where the group
+    /// continues and at the bottom, like the web's tail corner.
+    static func message(mine: Bool, joinsPrevious: Bool) -> BubbleShape {
+        let large: CGFloat = 18, small: CGFloat = 6
+        return mine
+            ? BubbleShape(topLeading: large, topTrailing: joinsPrevious ? small : large, bottomLeading: large, bottomTrailing: small)
+            : BubbleShape(topLeading: joinsPrevious ? small : large, topTrailing: large, bottomLeading: small, bottomTrailing: large)
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let limit = min(rect.width, rect.height) / 2
+        let tl = min(topLeading, limit), tr = min(topTrailing, limit)
+        let bl = min(bottomLeading, limit), br = min(bottomTrailing, limit)
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + tl, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
+        path.addArc(center: CGPoint(x: rect.maxX - tr, y: rect.minY + tr), radius: tr, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
+        path.addArc(center: CGPoint(x: rect.maxX - br, y: rect.maxY - br), radius: br, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        path.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
+        path.addArc(center: CGPoint(x: rect.minX + bl, y: rect.maxY - bl), radius: bl, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
+        path.addArc(center: CGPoint(x: rect.minX + tl, y: rect.minY + tl), radius: tl, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// Stacks a bubble's parts as wide as the widest one (capped by the offered
+/// width), so quotes and media span the bubble while text keeps wrapping.
+struct BubbleStack: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = columnWidth(proposal, subviews)
+        let height = subviews.reduce(CGFloat(0)) { $0 + $1.sizeThatFits(ProposedViewSize(width: width, height: nil)).height }
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for subview in subviews {
+            let height = subview.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil)).height
+            subview.place(at: CGPoint(x: bounds.minX, y: y), proposal: ProposedViewSize(width: bounds.width, height: height))
+            y += height
+        }
+    }
+
+    private func columnWidth(_ proposal: ProposedViewSize, _ subviews: Subviews) -> CGFloat {
+        let limit = proposal.width ?? .infinity
+        let widest = subviews.map { min($0.sizeThatFits(.unspecified).width, limit) }.max() ?? 0
+        return min(widest, limit)
+    }
+}
+
+enum MessageStatus {
+    case pending, failed, sent, read
+
+    var symbol: String {
+        switch self {
+        case .pending: return "clock"
+        case .failed: return "exclamationmark.circle"
+        case .sent: return "checkmark.circle"
+        case .read: return "checkmark.circle.fill"
+        }
+    }
+}
+
+/// «изм. 23:02 ✓», drawn at the end of the last line or over a photo.
+struct BubbleTime: View {
+    let created: Double
+    var edited = false
+    var status: MessageStatus?
+    var onMedia = false
+    var mine = false
+
+    var body: some View {
+        if onMedia {
+            label(color: .white)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .glassCapsule(tint: Color.black.opacity(0.35))
+        } else {
+            label(color: mine ? Color.white.opacity(0.6) : Noct.text48)
+        }
+    }
+
+    private func label(color: Color) -> some View {
+        HStack(spacing: 3) {
+            if edited { Text("изм.") }
+            Text(Format.clock(created))
+            if let status {
+                Image(systemName: status.symbol)
+                    .foregroundColor(status == .failed ? Noct.red : (status == .read ? .white : color))
+            }
+        }
+        .font(.system(size: 11))
+        .foregroundColor(color)
+        .fixedSize()
+    }
+
+    /// Invisible text as wide as the label, appended to the message so the
+    /// last line leaves room for it (the time floats right on the web).
+    var placeholder: Text {
+        var text = Text("\u{2002}\u{2002}")
+        if edited { text = text + Text("изм. ") }
+        text = text + Text(Format.clock(created))
+        if let status { text = text + Text(" ") + Text(Image(systemName: status.symbol)) }
+        return text.font(.system(size: 11)).foregroundColor(.clear)
+    }
+}
+
+/// Message text with tappable links and, when given, the time at the end
+/// of the last line.
+struct InlineTimeText: View {
+    @EnvironmentObject private var session: AppSession
+    let text: String
+    var time: BubbleTime?
+    var accent: Color = .white
+
+    var body: some View {
+        let message = Text(RichText.attributed(text, baseURL: session.api.baseURL))
+            .font(.system(size: 16))
+            .foregroundColor(Color.white.opacity(0.93))
+        (time.map { message + $0.placeholder } ?? message)
+            .lineSpacing(2)
+            .tint(accent)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .bottomTrailing) {
+                if let time { time }
+            }
+    }
+}
+
+/// A quoted message inside a bubble: accent bar, author and one line.
+struct BubbleQuote: View {
+    let name: String
+    let text: String
+    let accent: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Capsule().fill(accent).frame(width: 3)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(accent)
+                    .lineLimit(1)
+                Text(text)
+                    .font(.system(size: 13))
+                    .foregroundColor(Noct.text75)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 5)
+        .padding(.leading, 6)
+        .padding(.trailing, 10)
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(accent.opacity(0.13)))
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Reactions under a message.
+struct BubbleReactions: View {
+    let reactions: [Reaction]
+    let accent: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(reactions, id: \.emoji) { reaction in
+                Text("\(reaction.emoji) \(reaction.count)")
+                    .font(.system(size: 13, weight: .medium))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(reaction.own ? accent.opacity(0.3) : Color.white.opacity(0.1)))
+            }
+        }
+    }
+}
+
+/// Photos and videos of one message, edge to edge as in Telegram: one
+/// picture keeps its proportions, several share a 2 pt grid.
+struct ChatMedia: View {
+    @EnvironmentObject private var session: AppSession
+    let items: [MediaItem]
+    let size: CGSize
+    let open: (Int) -> Void
+    private let gap: CGFloat = 2
+
+    var body: some View {
+        Group {
+            switch items.count {
+            case 1:
+                tile(0)
+            case 2:
+                HStack(spacing: gap) { tile(0); tile(1) }
+            case 3:
+                VStack(spacing: gap) {
+                    tile(0).frame(height: (size.height - gap) * 0.56)
+                    HStack(spacing: gap) { tile(1); tile(2) }
+                }
+            default:
+                VStack(spacing: gap) {
+                    HStack(spacing: gap) { tile(0); tile(1) }
+                    HStack(spacing: gap) {
+                        tile(2)
+                        tile(3).overlay {
+                            if items.count > 4 {
+                                ZStack {
+                                    Color.black.opacity(0.45)
+                                    Text("+\(items.count - 4)")
+                                        .font(.system(size: 22, weight: .semibold))
+                                        .foregroundColor(.white)
+                                }
+                                .allowsHitTesting(false)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .frame(width: size.width, height: size.height)
+    }
+
+    /// Layout size for these items; one item follows its picture's shape.
+    static func size(count: Int, ratio: CGFloat?, maxWidth: CGFloat) -> CGSize {
+        switch count {
+        case 1:
+            let shape = min(max(ratio ?? 0.8, 0.56), 1.9)
+            let width = min(maxWidth, 340 * shape)
+            return CGSize(width: width, height: width / shape)
+        case 2: return CGSize(width: maxWidth, height: maxWidth * 0.62)
+        case 3: return CGSize(width: maxWidth, height: maxWidth * 0.9)
+        default: return CGSize(width: maxWidth, height: maxWidth)
+        }
+    }
+
+    private func tile(_ index: Int) -> some View {
+        let item = items[index]
+        return Button {
+            open(index)
+        } label: {
+            ZStack {
+                if item.isVideo {
+                    VideoThumbnail(url: session.api.mediaURL(item.path))
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .glassCircle()
+                } else {
+                    RemoteImage(url: session.api.mediaURL(item.path), maxPixel: 900)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle())
+    }
+}

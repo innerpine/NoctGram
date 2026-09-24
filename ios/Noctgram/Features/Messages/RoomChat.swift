@@ -150,7 +150,7 @@ struct RoomChatView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     if store.isSecret {
                         EmptyState(icon: "lock", text: "Секретный чат зашифрован ключами устройства. Открой его в веб-версии Noctgram.")
                     } else if !store.loaded {
@@ -159,8 +159,11 @@ struct RoomChatView: View {
                         EmptyState(icon: "person.3", text: store.error ?? "Сообщений пока нет.")
                     }
                     if !store.isSecret {
-                        ForEach(store.messages) { message in
-                            roomBubble(message)
+                        ForEach(Array(store.messages.enumerated()), id: \.element.id) { index, message in
+                            let joinsPrevious = index > 0 && Self.joins(store.messages[index - 1], message)
+                            let joinsNext = index + 1 < store.messages.count && Self.joins(message, store.messages[index + 1])
+                            roomBubble(message, joinsPrevious: joinsPrevious, joinsNext: joinsNext)
+                                .padding(.top, joinsPrevious ? 2 : 8)
                                 .id(message.id)
                         }
                     }
@@ -169,7 +172,7 @@ struct RoomChatView: View {
                 .padding(.vertical, 12)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Noct.background)
+            .background(ChatBackdrop(palette: .noct))
             .onChange(of: store.messages.last?.id) { id in
                 guard let id else { return }
                 withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .bottom) }
@@ -221,12 +224,24 @@ struct RoomChatView: View {
         .onDisappear { Task { await session.refreshCounters() } }
     }
 
-    private func roomBubble(_ message: RoomMessage) -> some View {
+    /// Consecutive messages of one member within ten minutes form a group.
+    static func joins(_ previous: RoomMessage, _ message: RoomMessage) -> Bool {
+        previous.sender == message.sender && message.created - previous.created < 10 * 60 * 1000
+            && Calendar.current.isDate(Format.date(previous.created), inSameDayAs: Format.date(message.created))
+    }
+
+    /// The same bubbles as a dialogue; the author's name and avatar mark the
+    /// start and end of each group.
+    private func roomBubble(_ message: RoomMessage, joinsPrevious: Bool, joinsNext: Bool) -> some View {
         let mine = message.sender == session.myId
         let reply = message.replyTo.isEmpty ? nil : store.messages.first(where: { $0.id == message.replyTo })
-        return HStack(alignment: .bottom, spacing: 8) {
+        let shape = BubbleShape.message(mine: mine, joinsPrevious: joinsPrevious)
+        let time = BubbleTime(created: message.created, status: mine ? (message.pending ? .pending : .sent) : nil, mine: mine)
+        return HStack(alignment: .bottom, spacing: 6) {
             if mine {
-                Spacer(minLength: 48)
+                Spacer(minLength: 52)
+            } else if joinsNext {
+                Color.clear.frame(width: 30, height: 1)
             } else {
                 Button {
                     nav.push(.profile(message.sender))
@@ -235,51 +250,54 @@ struct RoomChatView: View {
                 }
                 .buttonStyle(PressableStyle())
             }
-            VStack(alignment: .leading, spacing: 4) {
-                if !mine {
-                    Text(message.senderName)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Noct.lilac)
-                }
-                if let reply {
-                    HStack(spacing: 8) {
-                        Rectangle().fill(Color.white.opacity(0.7)).frame(width: 2)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(reply.senderName).font(.system(size: 12, weight: .semibold))
-                            Text(reply.text).font(.system(size: 12)).foregroundColor(Noct.text60).lineLimit(1)
+            BubbleStack() {
+                if (!mine && !joinsPrevious) || reply != nil {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if !mine && !joinsPrevious {
+                            Text(message.senderName)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(Noct.lilac)
+                                .lineLimit(1)
+                        }
+                        if let reply {
+                            BubbleQuote(name: reply.senderName, text: reply.text, accent: Noct.lilac)
                         }
                     }
-                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, mine || joinsPrevious ? 8 : 12)
+                    .padding(.top, 7)
                 }
                 if message.deleted {
-                    Text("Сообщение удалено")
-                        .font(.system(size: 14).italic())
-                        .foregroundColor(Noct.text48)
+                    HStack(alignment: .bottom, spacing: 8) {
+                        Text("Сообщение удалено")
+                            .font(.system(size: 15).italic())
+                            .foregroundColor(Noct.text48)
+                        Spacer(minLength: 4)
+                        time
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                } else if message.reactions.isEmpty {
+                    InlineTimeText(text: message.text, time: time, accent: Noct.lilac)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
                 } else {
-                    LinkedText(text: message.text, size: 15, color: .white, lineSpacing: 2)
-                }
-                HStack {
-                    Spacer(minLength: 0)
-                    Text(Format.clock(message.created))
-                        .font(.system(size: 11))
-                        .foregroundColor(Noct.text48)
-                }
-                if !message.reactions.isEmpty {
-                    HStack(spacing: 4) {
-                        ForEach(message.reactions, id: \.emoji) { reaction in
-                            Text("\(reaction.emoji) \(reaction.count)")
-                                .font(.system(size: 12, weight: .medium))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(reaction.own ? Noct.fillHeavy : Noct.fill))
+                    VStack(alignment: .leading, spacing: 6) {
+                        InlineTimeText(text: message.text, accent: Noct.lilac)
+                        HStack(alignment: .bottom, spacing: 8) {
+                            BubbleReactions(reactions: message.reactions, accent: Noct.lilac)
+                            Spacer(minLength: 4)
+                            time
                         }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(mine ? Noct.outgoing : Noct.incoming))
+            .background(shape.fill(mine ? ChatPalette.noct.outgoing : ChatPalette.noct.incoming))
+            .clipShape(shape)
+            .overlay(shape.stroke(Color.white.opacity(0.06), lineWidth: 1))
             .opacity(message.pending ? 0.7 : 1)
+            .contentShape(.contextMenuPreview, shape)
             .contextMenu {
                 if !message.deleted && !message.pending {
                     Button {
@@ -309,7 +327,7 @@ struct RoomChatView: View {
                     }
                 }
             }
-            if !mine { Spacer(minLength: 48) }
+            if !mine { Spacer(minLength: 52) }
         }
     }
 }

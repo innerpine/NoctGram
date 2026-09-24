@@ -7,6 +7,11 @@ options:
     iOS: "16.0"
   developmentLanguage: ru
   createIntermediateGroups: true
+packages:
+  # Gift animations: the same Lottie files the web plays with lottie-web.
+  Lottie:
+    url: https://github.com/airbnb/lottie-spm.git
+    from: "4.5.0"
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -22,6 +27,8 @@ targets:
     platform: iOS
     sources:
       - path: Noctgram
+    dependencies:
+      - package: Lottie
     info:
       path: Noctgram/Info.plist
       properties:

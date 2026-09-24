@@ -15,6 +15,8 @@ final class ChatStore: ObservableObject {
     @Published var profile: Profile?
     @Published var attachments: [ChatAttachment] = []
     @Published var uploading = 0
+    /// The dialogue theme chosen on the web (lib/chat-themes.ts).
+    @Published var palette = ChatPalette.noct
 
     private var pending: [ChatMessage] = []
 
@@ -25,8 +27,15 @@ final class ChatStore: ObservableObject {
     /// Opening the dialogue marks incoming messages read on the server.
     func load(api: APIClient) async {
         do {
-            let data = try await api.social("messages", ["peer": peer.id])
-            let server = data.array.map { ChatMessage($0) }
+            let data = try await api.social("messages", ["peer": peer.id, "includeTheme": "1"])
+            // With includeTheme the server wraps the list: {messages, theme}.
+            let list = data["messages"].isNull ? data : data["messages"]
+            let server = list.array.map { ChatMessage($0) }
+            let theme = data["theme"]
+            if !theme.isNull {
+                let id = theme["personal"].string ?? theme["shared"].string ?? "noct"
+                if id != palette.id { palette = ChatPalette(id: id) }
+            }
             let known = Set(server.map(\.id))
             pending.removeAll { known.contains($0.id) }
             let merged = server + pending
@@ -188,37 +197,45 @@ struct ChatView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 6) {
+                LazyVStack(spacing: 0) {
                     if !store.loaded {
                         LoadingRow()
                     } else if store.messages.isEmpty {
                         EmptyState(icon: "hand.wave", text: store.error ?? "Сообщений пока нет. Напиши первым.")
                     }
                     ForEach(Array(store.messages.enumerated()), id: \.element.id) { index, message in
-                        if index == 0 || !Calendar.current.isDate(Format.date(message.created), inSameDayAs: Format.date(store.messages[index - 1].created)) {
+                        let previous = index > 0 ? store.messages[index - 1] : nil
+                        let newDay = previous.map { !Calendar.current.isDate(Format.date(message.created), inSameDayAs: Format.date($0.created)) } ?? true
+                        let joins = !newDay && previous.map { Self.joins($0, message) } == true
+                        if newDay {
                             Text(Format.day(message.created))
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(Noct.text60)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 5)
                                 .glassCapsule()
-                                .padding(.vertical, 8)
+                                .padding(.top, 10)
+                                .padding(.bottom, 2)
                         }
                         MessageBubble(
                             message: message,
                             mine: message.sender == session.myId,
                             peerName: peer.name,
+                            palette: store.palette,
+                            joinsPrevious: joins,
                             openMedia: { items, position in viewer = MediaViewerState(items: items, index: position) }
-                        )
+                        ) {
+                            menu(message)
+                        }
+                        .padding(.top, joins ? 2 : 8)
                         .id(message.id)
-                        .contextMenu { menu(message) }
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 12)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 10)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Noct.background)
+            .background(ChatBackdrop(palette: store.palette))
             .onChange(of: store.messages.last?.id) { id in
                 guard let id else { return }
                 withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .bottom) }
@@ -231,21 +248,25 @@ struct ChatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
+            // As in Telegram: name and presence on a glass capsule, the
+            // avatar on the right opens the chat menu.
             ToolbarItem(placement: .principal) {
                 Button {
                     nav.push(.profile(peer.id))
                 } label: {
-                    HStack(spacing: 10) {
-                        AvatarView(person: title, size: 32)
-                        VStack(alignment: .leading, spacing: 1) {
-                            DisplayName(person: title, size: 15)
-                            if let presence {
-                                Text(presence)
-                                    .font(.system(size: 11))
-                                    .foregroundColor(Format.isOnline(store.profile?.lastSeen ?? 0) ? Noct.green : Noct.text48)
-                            }
+                    VStack(spacing: 1) {
+                        DisplayName(person: title, size: 16)
+                        if let presence {
+                            Text(presence)
+                                .font(.system(size: 12))
+                                .foregroundColor(Format.isOnline(store.profile?.lastSeen ?? 0) ? Noct.green : Noct.text48)
+                                .lineLimit(1)
                         }
                     }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 5)
+                    .frame(minHeight: 44)
+                    .glassCapsule(interactive: true)
                 }
                 .buttonStyle(PressableStyle())
             }
@@ -262,8 +283,9 @@ struct ChatView: View {
                         Label(store.blockedByMe ? "Разблокировать" : "Заблокировать", systemImage: "hand.raised")
                     }
                 } label: {
-                    Image(systemName: LiquidGlass.moreIcon)
+                    AvatarView(person: title, size: 36, ring: false)
                 }
+                .accessibilityLabel("Меню чата")
             }
         }
         .fullScreenCover(item: $viewer) { state in
@@ -309,6 +331,11 @@ struct ChatView: View {
             }
         }
         .onDisappear { Task { await session.refreshCounters() } }
+    }
+
+    /// Consecutive messages of one sender within ten minutes form a group.
+    static func joins(_ previous: ChatMessage, _ message: ChatMessage) -> Bool {
+        previous.sender == message.sender && message.created - previous.created < 10 * 60 * 1000
     }
 
     @ViewBuilder private func menu(_ message: ChatMessage) -> some View {
@@ -425,7 +452,8 @@ struct ChatView: View {
                     placeholder: "Сообщение",
                     sending: false,
                     focus: $focused,
-                    leading: editing == nil ? AnyView(attachButton) : nil
+                    leading: editing == nil ? AnyView(attachButton) : nil,
+                    accent: store.palette.accent
                 ) {
                     let value = text
                     if let message = editing {
@@ -445,7 +473,7 @@ struct ChatView: View {
 
     private var attachButton: some View {
         PhotosPicker(selection: $picked, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
-            Image(systemName: "plus")
+            Image(systemName: "paperclip")
                 .font(.system(size: 19, weight: .medium))
                 .foregroundColor(.white)
                 .frame(width: 44, height: 44)
@@ -456,124 +484,180 @@ struct ChatView: View {
     }
 }
 
-struct MessageBubble: View {
+/// A message as in Telegram, in the web's colours: the bubble hugs its
+/// text, the time sits at the end of the last line and photos run edge to
+/// edge with the time on glass.
+struct MessageBubble<Menu: View>: View {
     @EnvironmentObject private var session: AppSession
     let message: ChatMessage
     let mine: Bool
     let peerName: String
+    let palette: ChatPalette
+    /// The previous message is from the same sender a moment earlier.
+    let joinsPrevious: Bool
     let openMedia: ([MediaItem], Int) -> Void
+    @ViewBuilder let menu: () -> Menu
+    @State private var ratio: CGFloat?
+
+    private let maxMedia: CGFloat = 270
+
+    private var shape: BubbleShape { .message(mine: mine, joinsPrevious: joinsPrevious) }
+    private var media: [MediaItem] {
+        message.attachments.filter { $0.isImage || $0.isVideo }.map {
+            MediaItem(JSON.object(["id": .string($0.id), "type": .string($0.type), "name": .string($0.name)]))
+        }
+    }
+    private var files: [ChatAttachment] { message.attachments.filter { !$0.isImage && !$0.isVideo } }
+    private var hasText: Bool { !message.text.isEmpty && message.gift == nil }
+    private var status: MessageStatus? {
+        guard mine else { return nil }
+        if message.failed { return .failed }
+        if message.pending { return .pending }
+        return message.read ? .read : .sent
+    }
+    /// Nothing around the text or media: no quote, forward, files, gift or reactions.
+    private var bare: Bool {
+        message.reply == nil && message.forwardedName.isEmpty && files.isEmpty && message.gift == nil && message.reactions.isEmpty
+    }
+    private var emojiOnly: Bool { hasText && media.isEmpty && bare && Emoji.isOnly(message.text, limit: 3) }
+    private var mediaOnly: Bool { !media.isEmpty && !hasText && bare }
+    private var mediaSize: CGSize { ChatMedia.size(count: media.count, ratio: ratio ?? cachedRatio, maxWidth: maxMedia) }
+
+    /// A photo already in memory gives its shape at once, without a jump.
+    private var cachedRatio: CGFloat? {
+        guard media.count == 1, let item = media.first, !item.isVideo,
+              let url = session.api.mediaURL(item.path),
+              let image = ImagePipeline.shared.cached(url, maxPixel: 900), image.size.height > 0 else { return nil }
+        return image.size.width / image.size.height
+    }
+
+    private func time(onMedia: Bool = false) -> BubbleTime {
+        BubbleTime(created: message.created, edited: message.editedAt > 0, status: status, onMedia: onMedia, mine: mine)
+    }
 
     var body: some View {
-        HStack {
-            if mine { Spacer(minLength: 48) }
-            VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
+        HStack(spacing: 0) {
+            if mine { Spacer(minLength: 52) }
+            content
+                .contentShape(.contextMenuPreview, shape)
+                .contextMenu { menu() }
+                .opacity(message.pending ? 0.7 : 1)
+            if !mine { Spacer(minLength: 52) }
+        }
+        .task(id: media.first?.path) { await measure() }
+    }
+
+    @ViewBuilder private var content: some View {
+        if emojiOnly {
+            VStack(alignment: mine ? .trailing : .leading, spacing: 2) {
+                Text(message.text).font(.system(size: 46))
+                time(onMedia: true)
+            }
+        } else if mediaOnly {
+            ChatMedia(items: media, size: mediaSize) { openMedia(media, $0) }
+                .clipShape(shape)
+                .overlay(alignment: .bottomTrailing) {
+                    time(onMedia: true).padding(7)
+                }
+        } else {
+            bubble
+        }
+    }
+
+    private var bubble: some View {
+        BubbleStack() {
+            if !message.forwardedName.isEmpty || message.reply != nil {
                 VStack(alignment: .leading, spacing: 6) {
                     if !message.forwardedName.isEmpty {
                         Text("Переслано от \(message.forwardedName)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Noct.text60)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(palette.accent)
+                            .lineLimit(1)
                     }
                     if let reply = message.reply {
-                        HStack(spacing: 8) {
-                            Rectangle().fill(Color.white.opacity(0.7)).frame(width: 2)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(reply.sender == session.myId ? "Вы" : (reply.name.isEmpty ? peerName : reply.name))
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text(PremiumEmoji.replace(reply.text))
-                                    .font(.system(size: 12))
-                                    .foregroundColor(Noct.text60)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if let gift = message.gift {
-                        giftCard(gift)
-                    }
-                    if !message.attachments.isEmpty {
-                        attachmentsView
-                    }
-                    if !message.text.isEmpty && message.gift == nil {
-                        LinkedText(text: message.text, size: 15, color: .white, lineSpacing: 2)
-                    }
-                    HStack(spacing: 4) {
-                        Spacer(minLength: 0)
-                        if message.editedAt > 0 {
-                            Text("изменено").font(.system(size: 11)).foregroundColor(Noct.text48)
-                        }
-                        Text(Format.clock(message.created))
-                            .font(.system(size: 11))
-                            .foregroundColor(Noct.text48)
-                        if mine {
-                            if message.failed {
-                                Image(systemName: "exclamationmark.circle").foregroundColor(Noct.red)
-                            } else if message.pending {
-                                Image(systemName: "clock").foregroundColor(Noct.text48)
-                            } else {
-                                Image(systemName: message.read ? "checkmark.circle.fill" : "checkmark.circle")
-                                    .foregroundColor(message.read ? .white : Noct.text48)
-                            }
-                        }
-                    }
-                    .font(.system(size: 10))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(mine ? Noct.outgoing : Noct.incoming)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(mine ? Color.clear : Noct.border, lineWidth: 1)
-                )
-                if !message.reactions.isEmpty {
-                    HStack(spacing: 4) {
-                        ForEach(message.reactions, id: \.emoji) { reaction in
-                            Text("\(reaction.emoji) \(reaction.count)")
-                                .font(.system(size: 12, weight: .medium))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(reaction.own ? Noct.fillHeavy : Noct.fill))
-                                .overlay(Capsule().stroke(reaction.own ? Color.white.opacity(0.4) : Color.clear, lineWidth: 1))
-                        }
+                        BubbleQuote(
+                            name: reply.sender == session.myId ? "Вы" : (reply.name.isEmpty ? peerName : reply.name),
+                            text: reply.unavailable ? "Сообщение удалено" : PremiumEmoji.replace(reply.text.isEmpty ? "Вложение" : reply.text),
+                            accent: palette.accent
+                        )
                     }
                 }
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
+                .padding(.bottom, media.isEmpty ? 0 : 8)
             }
-            if !mine { Spacer(minLength: 48) }
-        }
-        .opacity(message.pending ? 0.7 : 1)
-    }
-
-    private var attachmentsView: some View {
-        let media = message.attachments.filter { $0.isImage || $0.isVideo }
-        let files = message.attachments.filter { !$0.isImage && !$0.isVideo }
-        let items = media.map { MediaItem(JSON.object(["id": .string($0.id), "type": .string($0.type), "name": .string($0.name)])) }
-        return VStack(alignment: .leading, spacing: 6) {
-            if !items.isEmpty {
-                MediaGrid(items: Array(items.prefix(4))) { index in openMedia(items, index) }
-                    .frame(width: 240)
-                if items.count > 4 {
-                    Text("+\(items.count - 4) ещё")
-                        .font(.system(size: 12))
-                        .foregroundColor(Noct.text60)
-                }
+            if !media.isEmpty {
+                ChatMedia(items: media, size: mediaSize) { openMedia(media, $0) }
+            }
+            if let gift = message.gift {
+                giftCard(gift)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 10)
             }
             ForEach(files) { file in
-                if let url = session.api.mediaURL(file.path + "?download=1") {
-                    Link(destination: url) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "doc.fill")
-                                .font(.system(size: 20))
-                                .frame(width: 40, height: 40)
-                                .background(Circle().fill(Noct.fillStrong))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(file.name).font(.system(size: 14, weight: .medium)).lineLimit(1)
-                                Text(Format.fileSize(file.size)).font(.system(size: 12)).foregroundColor(Noct.text48)
-                            }
+                fileRow(file)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 8)
+            }
+            footer
+        }
+        .frame(width: media.isEmpty ? nil : mediaSize.width)
+        .background(shape.fill(mine ? palette.outgoing : palette.incoming))
+        .clipShape(shape)
+        .overlay(shape.stroke(Color.white.opacity(0.06), lineWidth: 1))
+    }
+
+    @ViewBuilder private var footer: some View {
+        if hasText && message.reactions.isEmpty {
+            InlineTimeText(text: message.text, time: time(), accent: palette.accent)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+        } else if hasText {
+            VStack(alignment: .leading, spacing: 6) {
+                InlineTimeText(text: message.text, accent: palette.accent)
+                HStack(alignment: .bottom, spacing: 8) {
+                    BubbleReactions(reactions: message.reactions, accent: palette.accent)
+                    Spacer(minLength: 4)
+                    time()
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+        } else if !message.reactions.isEmpty {
+            HStack(alignment: .bottom, spacing: 8) {
+                BubbleReactions(reactions: message.reactions, accent: palette.accent)
+                Spacer(minLength: 4)
+                time()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+        } else {
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                time()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+        }
+    }
+
+    private func fileRow(_ file: ChatAttachment) -> some View {
+        Group {
+            if let url = session.api.mediaURL(file.path + "?download=1") {
+                Link(destination: url) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "doc.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(Color.black.opacity(0.8))
+                            .frame(width: 40, height: 40)
+                            .background(Circle().fill(palette.accent))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(file.name).font(.system(size: 15, weight: .medium)).lineLimit(1)
+                            Text(Format.fileSize(file.size)).font(.system(size: 12)).foregroundColor(Noct.text48)
                         }
-                        .foregroundColor(.white)
+                        Spacer(minLength: 0)
                     }
+                    .foregroundColor(.white)
                 }
             }
         }
@@ -586,20 +670,29 @@ struct MessageBubble: View {
                 collectible: gift.collectible
             )
             .frame(width: 150, height: 150)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             Text(GiftCatalog.shared.name(for: gift.giftId).map { "Подарок «\($0)»" } ?? "Подарок")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
             HStack(spacing: 4) {
-                Image("StarsIcon").resizable().scaledToFit().frame(width: 13, height: 13)
-                Text("\(gift.price)").font(.system(size: 12, weight: .semibold)).foregroundColor(Noct.gold)
+                Image("StarsIcon").resizable().scaledToFit().frame(width: 14, height: 14)
+                Text("\(gift.price)").font(.system(size: 13, weight: .semibold)).foregroundColor(Noct.gold)
             }
             if !gift.message.isEmpty {
                 Text(PremiumEmoji.replace(gift.message))
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .foregroundColor(Noct.text75)
                     .multilineTextAlignment(.center)
             }
         }
-        .frame(maxWidth: 220)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func measure() async {
+        guard ratio == nil, media.count == 1, let item = media.first, let url = session.api.mediaURL(item.path) else { return }
+        let image = item.isVideo
+            ? await VideoThumbnails.shared.thumbnail(for: url)
+            : await ImagePipeline.shared.image(for: url, maxPixel: 900)
+        guard let image, image.size.height > 0 else { return }
+        ratio = image.size.width / image.size.height
     }
 }
