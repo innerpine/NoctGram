@@ -82,7 +82,10 @@ struct ChatFollowsEnd<Messages: Equatable>: ViewModifier {
 
     private func follow() {
         guard atEnd, let last else { return }
-        withAnimation(Noct.quick) { proxy.scrollTo(last, anchor: .bottom) }
+        // On the next pass, once the reply bar or the grown bubble is laid out.
+        DispatchQueue.main.async {
+            withAnimation(Noct.quick) { proxy.scrollTo(last, anchor: .bottom) }
+        }
     }
 }
 
