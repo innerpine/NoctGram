@@ -124,13 +124,12 @@ struct MediaViewer: View {
         .onAppear {
             if items.contains(where: \.isVideo) { PlaybackAudio.begin() }
             show(index)
-            // Turning is allowed once the viewer is up, not during its
-            // arrival.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { ViewerOrientation.unlock() }
         }
         .onDisappear {
             hiding?.cancel()
             videos.pauseAll()
+            // Upright again only if full screen turned it (nothing to do
+            // otherwise: UIKit is not asked anything while the viewer goes).
             ViewerOrientation.lock()
             PlaybackAudio.end()
         }
@@ -322,6 +321,9 @@ struct MediaViewer: View {
     }
 
     private func close() {
+        // Stopped first: nothing plays or ticks while the viewer goes away.
+        hiding?.cancel()
+        videos.pauseAll()
         guard ViewerOrientation.isLandscape else {
             dismiss()
             return

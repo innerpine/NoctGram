@@ -247,22 +247,18 @@ struct PlayerSurface: UIViewRepresentable {
     func updateUIView(_ view: PlayerView, context: Context) {}
 }
 
-/// The app stays upright (AppDelegate); the media viewer turns with the
-/// phone and goes to landscape for a full-screen video, as in Telegram.
-/// UIKit hears of a change only while no presentation is under way: the
-/// viewer unlocks once it is up and locks once it is gone.
+/// The app stays upright (AppDelegate); the full-screen button of a video
+/// turns the viewer to landscape and back, as in Telegram. UIKit is asked
+/// about orientations only then, never while the viewer comes or goes: a
+/// presentation interrupted by such a question could leave an invisible
+/// layer over the app that swallowed every tap.
 @MainActor
 enum ViewerOrientation {
     static var isLandscape: Bool { scene?.interfaceOrientation.isLandscape == true }
 
-    /// The viewer is up: it may turn with the phone.
-    static func unlock() {
-        AppDelegate.orientations = .allButUpsideDown
-        refresh()
-    }
-
-    /// The viewer is gone, or about to go: portrait again.
+    /// Upright only, if full screen had turned it; otherwise nothing.
     static func lock() {
+        guard AppDelegate.orientations != .portrait || isLandscape else { return }
         AppDelegate.orientations = .portrait
         refresh()
         if isLandscape {
@@ -270,12 +266,23 @@ enum ViewerOrientation {
         }
     }
 
-    /// The full-screen button: landscape, or back to portrait.
+    /// The full-screen button: landscape, or back to portrait. While in
+    /// landscape the viewer also turns with the phone.
     static func toggleLandscape() {
         guard let scene else { return }
-        AppDelegate.orientations = .allButUpsideDown
-        refresh()
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: isLandscape ? .portrait : .landscapeRight)) { _ in }
+        if isLandscape {
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in }
+            // Upright only once it has turned back.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                guard !isLandscape else { return }
+                AppDelegate.orientations = .portrait
+                refresh()
+            }
+        } else {
+            AppDelegate.orientations = .allButUpsideDown
+            refresh()
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { _ in }
+        }
     }
 
     private static var scene: UIWindowScene? {
