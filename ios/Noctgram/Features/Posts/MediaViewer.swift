@@ -76,13 +76,19 @@ struct MediaViewer: View {
         _index = State(initialValue: state.index)
     }
 
+    /// The black behind the media fades as it is pulled away.
+    private var backdrop: Double {
+        let faded: CGFloat = min(0.75, abs(pull) / 420)
+        return Double(1 - faded)
+    }
+
     private var items: [MediaItem] { state.items }
     private var current: MediaItem? { items.indices.contains(index) ? items[index] : nil }
 
     var body: some View {
         ZStack {
             Color.black
-                .opacity(1 - min(0.75, abs(pull) / 420))
+                .opacity(backdrop)
                 .ignoresSafeArea()
             TabView(selection: $index) {
                 ForEach(Array(items.enumerated()), id: \.offset) { position, item in
