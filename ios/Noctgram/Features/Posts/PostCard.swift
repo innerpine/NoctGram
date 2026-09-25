@@ -16,7 +16,6 @@ struct PostCard: View {
     @State private var confirmDelete = false
     @State private var showReport = false
     @State private var showSupport = false
-    @State private var viewer: MediaViewerState?
     @State private var likeBump = false
 
     private var mine: Bool { post.isMine(session.myId) }
@@ -102,10 +101,6 @@ struct PostCard: View {
         }
         .sheet(isPresented: $showSupport) {
             SupportSheet(post: post)
-                .environmentObject(session)
-        }
-        .fullScreenCover(item: $viewer) { state in
-            MediaViewer(state: state)
                 .environmentObject(session)
         }
         .confirmationDialog("Удалить публикацию?", isPresented: $confirmDelete, titleVisibility: .visible) {
@@ -219,7 +214,7 @@ struct PostCard: View {
     private var mediaSection: some View {
         ZStack {
             MediaGrid(items: post.media) { index in
-                viewer = MediaViewerState(items: post.media, index: index, title: post.name, date: post.created)
+                MediaPresenter.shared.show(MediaViewerState(items: post.media, index: index, title: post.name, date: post.created))
             }
             .blur(radius: post.adult && !revealed ? 28 : 0)
             .allowsHitTesting(!post.adult || revealed)

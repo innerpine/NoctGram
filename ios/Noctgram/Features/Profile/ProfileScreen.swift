@@ -554,7 +554,6 @@ struct ProfileScreen: View {
 struct MediaTabGrid: View {
     @EnvironmentObject private var session: AppSession
     @ObservedObject var store: PostListStore
-    @State private var viewer: MediaViewerState?
 
     private let columns = [GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3)]
 
@@ -564,7 +563,7 @@ struct MediaTabGrid: View {
             LazyVGrid(columns: columns, spacing: 3) {
                 ForEach(Array(entries.enumerated()), id: \.offset) { index, entry in
                     Button {
-                        viewer = MediaViewerState(items: entry.post.media, index: entry.post.media.firstIndex(of: entry.item) ?? 0, title: entry.post.name, date: entry.post.created)
+                        MediaPresenter.shared.show(MediaViewerState(items: entry.post.media, index: entry.post.media.firstIndex(of: entry.item) ?? 0, title: entry.post.name, date: entry.post.created))
                     } label: {
                         Color.clear
                             .aspectRatio(1, contentMode: .fit)
@@ -603,10 +602,6 @@ struct MediaTabGrid: View {
             } else if store.loaded && entries.isEmpty {
                 EmptyState(icon: "photo.on.rectangle", text: "Фото и видео пока нет.")
             }
-        }
-        .fullScreenCover(item: $viewer) { state in
-            MediaViewer(state: state)
-                .environmentObject(session)
         }
     }
 }

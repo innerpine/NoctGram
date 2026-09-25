@@ -52,6 +52,27 @@ struct VideoThumbnail: View {
     }
 }
 
+/// Opens the media viewer over the whole app, tab bar included, as the top
+/// layer of the root view (RootView) rather than a full-screen presentation
+/// of the post, message or grid that asked for it: closing it can never be
+/// left half done with the viewer frozen over the app, as happened when the
+/// row that had presented it was redrawn in its lazy list.
+@MainActor
+final class MediaPresenter: ObservableObject {
+    static let shared = MediaPresenter()
+    @Published private(set) var state: MediaViewerState?
+
+    func show(_ state: MediaViewerState) {
+        // The keyboard would stay over the viewer.
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        withAnimation(.easeOut(duration: 0.22)) { self.state = state }
+    }
+
+    func close() {
+        withAnimation(.easeOut(duration: 0.2)) { state = nil }
+    }
+}
+
 /// Full-screen photos and videos, swiped as pages, dressed as in Telegram:
 /// back, who sent it and when, and a menu on top; under a video its
 /// controls, seek bar and actions. A tap shows or hides all of it, a playing
@@ -59,7 +80,6 @@ struct VideoThumbnail: View {
 /// or right half jumps 15 seconds.
 struct MediaViewer: View {
     @EnvironmentObject private var session: AppSession
-    @Environment(\.dismiss) private var dismiss
     let state: MediaViewerState
     @State private var index: Int
     @State private var chrome = true
@@ -121,6 +141,7 @@ struct MediaViewer: View {
             }
         }
         .statusBarHidden(!chrome)
+        .accessibilityAddTraits(.isModal)
         .onAppear {
             if items.contains(where: \.isVideo) { PlaybackAudio.begin() }
             show(index)
@@ -318,6 +339,10 @@ struct MediaViewer: View {
             guard !Task.isCancelled, let item = current, item.isVideo, playback(item)?.playing == true else { return }
             withAnimation(.easeOut(duration: 0.25)) { chrome = false }
         }
+    }
+
+    private func dismiss() {
+        MediaPresenter.shared.close()
     }
 
     private func close() {

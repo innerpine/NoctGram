@@ -46,6 +46,8 @@ struct RootView: View {
     @EnvironmentObject private var session: AppSession
     /// A held chat message is drawn here, above the bars.
     @StateObject private var focus = MessageFocus()
+    /// Photos and videos open here too, over the tabs and bars.
+    @ObservedObject private var media = MediaPresenter.shared
 
     var body: some View {
         ZStack {
@@ -70,6 +72,14 @@ struct RootView: View {
                     .environmentObject(session)
             }
         }
+        .overlay {
+            if let state = media.state {
+                MediaViewer(state: state)
+                    .environmentObject(session)
+                    .id(state.id)
+                    .transition(.opacity)
+            }
+        }
         .overlay(alignment: .top) {
             if let toast = session.toast {
                 ToastView(text: toast)
@@ -87,10 +97,6 @@ struct MainTabView: View {
     @StateObject private var nav = Navigator()
     /// The own avatar as the «Профиль» tab icon, as in iOS messengers.
     @State private var avatarIcon: UIImage?
-    #if DEBUG
-    /// Screenshot hook: the media viewer over the tabs.
-    @State private var debugViewer: MediaViewerState?
-    #endif
 
     var body: some View {
         tabs
@@ -100,11 +106,8 @@ struct MainTabView: View {
             #if DEBUG
             .onAppear {
                 DebugLaunch.apply(nav, me: session.myId ?? "")
-                debugViewer = DebugLaunch.viewer()
-            }
-            .fullScreenCover(item: $debugViewer) { state in
-                MediaViewer(state: state)
-                    .environmentObject(session)
+                // Screenshot hook: the media viewer over the tabs.
+                if let state = DebugLaunch.viewer() { MediaPresenter.shared.show(state) }
             }
             #endif
     }

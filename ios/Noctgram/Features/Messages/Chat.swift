@@ -213,7 +213,6 @@ struct ChatView: View {
     @State private var replyTo: ChatMessage?
     @State private var editing: ChatMessage?
     @State private var picked: [PhotosPickerItem] = []
-    @State private var viewer: MediaViewerState?
     @State private var reporting: ChatMessage?
     @State private var deleting: ChatMessage?
     @State private var forwarding: ChatMessage?
@@ -297,10 +296,6 @@ struct ChatView: View {
                 }
                 .accessibilityLabel("Меню чата")
             }
-        }
-        .fullScreenCover(item: $viewer) { state in
-            MediaViewer(state: state)
-                .environmentObject(session)
         }
         .sheet(item: $forwarding) { message in
             ForwardSheet { person in
@@ -387,9 +382,9 @@ struct ChatView: View {
                 palette: store.palette,
                 joinsPrevious: joins,
                 openMedia: { items, position in
-                    viewer = MediaViewerState(items: items, index: position, title: senderName(message), date: message.created) {
+                    MediaPresenter.shared.show(MediaViewerState(items: items, index: position, title: senderName(message), date: message.created) {
                         deleting = message
-                    }
+                    })
                 },
                 onFocus: { frame in present(message, frame: frame, joinsPrevious: joins) },
                 onReply: canWrite ? replyAction(message) : nil,
