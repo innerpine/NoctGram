@@ -194,7 +194,10 @@ struct SocialIcon: View {
 /// Twitter-style details row plus round social buttons (app/profile-details.tsx).
 struct ProfileMetaView: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.onProfileSurface) private var onSurface
     let profile: Profile
+
+    private var quiet: Color { onSurface ? Color.white.opacity(0.72) : Noct.text48 }
 
     var body: some View {
         let person = !profile.isChannel
@@ -217,7 +220,7 @@ struct ProfileMetaView: View {
                                 .lineLimit(1)
                         }
                         .font(.system(size: 13))
-                        .foregroundColor(Noct.text48)
+                        .foregroundColor(quiet)
                     }
                     .buttonStyle(PressableStyle())
                 }
@@ -235,7 +238,7 @@ struct ProfileMetaView: View {
                             SocialIcon(network: network, size: 18)
                                 .foregroundColor(Color.white.opacity(0.85))
                                 .frame(width: 36, height: 36)
-                                .background(Circle().fill(Color.white.opacity(0.06)))
+                                .background(Circle().fill(onSurface ? Color.black.opacity(0.14) : Color.white.opacity(0.06)))
                         }
                         .buttonStyle(PressableStyle())
                         .accessibilityLabel("\(network.label): @\(value(network))")
@@ -259,13 +262,14 @@ struct ProfileMetaView: View {
             Text(text).lineLimit(1)
         }
         .font(.system(size: 13))
-        .foregroundColor(Noct.text48)
+        .foregroundColor(quiet)
     }
 }
 
 /// Telegram-style personal channel cards under the stats.
 struct ChannelCardsView: View {
     @EnvironmentObject private var nav: Navigator
+    @Environment(\.onProfileSurface) private var onSurface
     let channels: [ChannelCard]
 
     var body: some View {
@@ -303,7 +307,7 @@ struct ChannelCardsView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.03)))
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(onSurface ? Color.black.opacity(0.14) : Color.white.opacity(0.03)))
                     .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Noct.border, lineWidth: 1))
                 }
                 .buttonStyle(PressableStyle())

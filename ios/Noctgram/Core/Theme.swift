@@ -77,27 +77,21 @@ enum ProfileTheme: String, CaseIterable, Identifiable {
         }
     }
 
-    var first: Color {
+    /// The two palette colours as lib/appearance.ts writes them.
+    var hexes: (first: UInt32, second: UInt32) {
         switch self {
-        case .iris: return Color(hex: 0xC9A9FF)
-        case .aurora: return Color(hex: 0x87E7D6)
-        case .ocean: return Color(hex: 0x84CEFF)
-        case .rose: return Color(hex: 0xFFA8CB)
-        case .ember: return Color(hex: 0xFFC88C)
-        case .silver: return Color(hex: 0xFAFAFF)
+        case .iris: return (0xC9A9FF, 0x9CCAFF)
+        case .aurora: return (0x87E7D6, 0xBCE8A3)
+        case .ocean: return (0x84CEFF, 0xBAB3FF)
+        case .rose: return (0xFFA8CB, 0xD7B2FF)
+        case .ember: return (0xFFC88C, 0xFFA6B3)
+        case .silver: return (0xFAFAFF, 0xA9B4CB)
         }
     }
 
-    var second: Color {
-        switch self {
-        case .iris: return Color(hex: 0x9CCAFF)
-        case .aurora: return Color(hex: 0xBCE8A3)
-        case .ocean: return Color(hex: 0xBAB3FF)
-        case .rose: return Color(hex: 0xD7B2FF)
-        case .ember: return Color(hex: 0xFFA6B3)
-        case .silver: return Color(hex: 0xA9B4CB)
-        }
-    }
+    var first: Color { Color(hex: hexes.first) }
+
+    var second: Color { Color(hex: hexes.second) }
 
     var wash: Color {
         switch self {

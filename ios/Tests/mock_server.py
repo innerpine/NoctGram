@@ -176,7 +176,12 @@ def social(q):
         return R["feedFollowing"] if q.get("mode") == "following" else feed()
     if action == "profile":
         key = q.get("id") or {"bob_night": META["bob"], "night_city": META["channel"]}.get(q.get("handle", ""), META["me"])
-        return R[{META["bob"]: "profileBob", META["channel"]: "profileChannel"}.get(key, "profileAlice")]
+        name = {META["bob"]: "profileBob", META["channel"]: "profileChannel"}.get(key, "profileAlice")
+        if name != "profileAlice":
+            return R[name]
+        # Alice's Premium background takes its colours from her cover.
+        surface = {"mode": "cover", "first": "#9775cf", "second": "#426b98", "intensity": 30, "musicColor": "cover"}
+        return dict(R[name], profileBackground=json.dumps(surface))
     if action == "messages":
         messages = dialogue() if q.get("peer") == META["bob"] else []
         if q.get("includeTheme") == "1":

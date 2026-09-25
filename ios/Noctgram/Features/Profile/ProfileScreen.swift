@@ -179,9 +179,19 @@ struct ProfileScreen: View {
 
     // MARK: Header
 
+    /// The card wears its Premium background (Профиль → Фон).
+    private func hasSurface(_ profile: Profile) -> Bool {
+        profile.appearance.premium && !profile.isChannel && profile.background.mode != "none"
+    }
+
+    /// Quiet text: brighter on a Premium background, as on the site.
+    private func quiet(_ profile: Profile) -> Color {
+        hasSurface(profile) ? Color.white.opacity(0.72) : Noct.text48
+    }
+
     @ViewBuilder private func header(_ profile: Profile, topInset: CGFloat) -> some View {
         let look = profile.appearance
-        let premiumSurface = look.premium && !profile.isChannel && profile.background.mode != "none"
+        let premiumSurface = hasSurface(profile)
         VStack(alignment: .leading, spacing: 0) {
             // 140 pt as on the web on phones; under the iOS 26 bar the cover
             // takes the bar's height and shows 84 pt below it.
@@ -234,7 +244,7 @@ struct ProfileScreen: View {
                         .foregroundColor(Color.white.opacity(0.85))
                         .padding(.horizontal, 16)
                         .frame(minHeight: 48)
-                        .glassRect(16, interactive: true)
+                        .modifier(SavedLinkSurface(onSurface: premiumSurface))
                     }
                     .buttonStyle(PressableStyle())
                     .padding(.top, 18)
@@ -257,36 +267,17 @@ struct ProfileScreen: View {
             .padding(.horizontal, 18)
             .padding(.bottom, look.verified ? 0 : 18)
             .background(
+                // A faint wash of the palette; a Premium background has none.
                 LinearGradient(
-                    colors: [look.theme.wash.opacity(look.hasDesign ? 0.08 : 0), .clear],
+                    colors: [look.theme.wash.opacity(look.hasDesign && !premiumSurface ? 0.08 : 0), .clear],
                     startPoint: .topLeading,
                     endPoint: UnitPoint(x: 0.6, y: 0.6)
                 )
             )
         }
-        .background(
-            ZStack {
-                Noct.card
-                if premiumSurface {
-                    LinearGradient(
-                        colors: surfaceColors(profile),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .opacity(Double(profile.background.intensity) / 100)
-                }
-            }
-        )
+        .environment(\.onProfileSurface, premiumSurface)
+        .background(ProfileSurfaceBackground(profile: profile, active: premiumSurface))
         .overlay(alignment: .bottom) { Rectangle().fill(Noct.border).frame(height: 0.5) }
-    }
-
-    private func surfaceColors(_ profile: Profile) -> [Color] {
-        if profile.background.mode == "custom",
-           let first = Color(hexString: profile.background.first),
-           let second = Color(hexString: profile.background.second) {
-            return [first, second]
-        }
-        return [profile.appearance.theme.first, profile.appearance.theme.second]
     }
 
     private func avatarLine(_ profile: Profile) -> some View {
@@ -434,26 +425,26 @@ struct ProfileScreen: View {
                         .frame(width: 7, height: 7)
                     Text(Format.presence(profile.lastSeen))
                         .font(.system(size: 13))
-                        .foregroundColor(online ? Noct.text75 : Noct.text48)
+                        .foregroundColor(online ? Noct.text75 : quiet(profile))
                 }
                 .padding(.top, 6)
             }
             if !profile.extraHandles.isEmpty {
-                aliasRow(prefix: "а также", values: profile.extraHandles.map { "@" + $0 }, accent: accent, message: "Юзернейм скопирован")
+                aliasRow(prefix: "а также", values: profile.extraHandles.map { "@" + $0 }, accent: accent, quiet: quiet(profile), message: "Юзернейм скопирован")
                     .padding(.top, 8)
             }
             if !profile.anonymousNumber.isEmpty {
-                aliasRow(prefix: "Анонимный номер", values: [Format.marketNumber(profile.anonymousNumber)], accent: accent, message: "Номер скопирован")
+                aliasRow(prefix: "Анонимный номер", values: [Format.marketNumber(profile.anonymousNumber)], accent: accent, quiet: quiet(profile), message: "Номер скопирован")
                     .padding(.top, 4)
             }
         }
     }
 
-    private func aliasRow(prefix: String, values: [String], accent: Color, message: String) -> some View {
+    private func aliasRow(prefix: String, values: [String], accent: Color, quiet: Color, message: String) -> some View {
         FlowLayout(spacing: 0, lineSpacing: 2) {
             Text(prefix + " ")
                 .font(.system(size: 13))
-                .foregroundColor(Noct.text48)
+                .foregroundColor(quiet)
                 .padding(.trailing, 4)
             ForEach(Array(values.enumerated()), id: \.offset) { index, value in
                 Button {
@@ -470,11 +461,11 @@ struct ProfileScreen: View {
 
     @ViewBuilder private func bio(_ profile: Profile) -> some View {
         if !profile.bio.isEmpty {
-            LinkedText(text: profile.bio, size: 15, color: Noct.text75, lineSpacing: 5)
+            LinkedText(text: profile.bio, size: 15, color: hasSurface(profile) ? Color.white.opacity(0.72) : Noct.text75, lineSpacing: 5)
         } else {
             Text(own ? "Расскажи о себе — пусть свои тебя узнают." : "Пока без описания.")
                 .font(.system(size: 15))
-                .foregroundColor(Noct.text48)
+                .foregroundColor(quiet(profile))
         }
     }
 
@@ -483,28 +474,28 @@ struct ProfileScreen: View {
             Button {
                 nav.push(.connections(profileId: profile.id, kind: .followers))
             } label: {
-                statLabel(profile.followers, Format.plural(profile.followers, "подписчик", "подписчика", "подписчиков"))
+                statLabel(profile.followers, Format.plural(profile.followers, "подписчик", "подписчика", "подписчиков"), quiet: quiet(profile))
             }
             .buttonStyle(PressableStyle())
             Button {
                 nav.push(.connections(profileId: profile.id, kind: .following))
             } label: {
-                statLabel(profile.following, Format.plural(profile.following, "подписка", "подписки", "подписок"))
+                statLabel(profile.following, Format.plural(profile.following, "подписка", "подписки", "подписок"), quiet: quiet(profile))
             }
             .buttonStyle(PressableStyle())
-            statLabel(profile.postCount, Format.plural(profile.postCount, "публикация", "публикации", "публикаций"))
+            statLabel(profile.postCount, Format.plural(profile.postCount, "публикация", "публикации", "публикаций"), quiet: quiet(profile))
             Spacer(minLength: 0)
         }
     }
 
-    private func statLabel(_ value: Int, _ label: String) -> some View {
+    private func statLabel(_ value: Int, _ label: String, quiet: Color) -> some View {
         HStack(spacing: 4) {
             Text(Format.count(value))
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.white)
             Text(label)
                 .font(.system(size: 13))
-                .foregroundColor(Noct.text48)
+                .foregroundColor(quiet)
         }
     }
 
@@ -650,5 +641,20 @@ struct BlockedProfileView: View {
                 .padding(24)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+/// «Сохранённое» under the stats: glass, or a darker patch of a Premium
+/// background (profile-design.css .profile-saved-link).
+private struct SavedLinkSurface: ViewModifier {
+    let onSurface: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if onSurface {
+            content.background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.black.opacity(0.125)))
+        } else {
+            content.glassRect(16, interactive: true)
+        }
     }
 }
