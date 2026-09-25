@@ -77,7 +77,6 @@ struct RootView: View {
                 MediaViewer(state: state)
                     .environmentObject(session)
                     .id(state.id)
-                    .transition(.opacity)
             }
         }
         .overlay(alignment: .top) {

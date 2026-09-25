@@ -62,14 +62,21 @@ final class MediaPresenter: ObservableObject {
     static let shared = MediaPresenter()
     @Published private(set) var state: MediaViewerState?
 
+    /// Without a transition either way: a layer holding a video that was
+    /// animated away could stay drawn over the app, dead to taps. The viewer
+    /// fades itself in.
     func show(_ state: MediaViewerState) {
         // The keyboard would stay over the viewer.
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        withAnimation(.easeOut(duration: 0.22)) { self.state = state }
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) { self.state = state }
     }
 
     func close() {
-        withAnimation(.easeOut(duration: 0.2)) { state = nil }
+        var instant = Transaction()
+        instant.disablesAnimations = true
+        withTransaction(instant) { state = nil }
     }
 }
 
@@ -89,6 +96,8 @@ struct MediaViewer: View {
     @State private var notice: String?
     /// How far a swipe down (or up) has pulled the media away.
     @State private var pull: CGFloat = 0
+    /// Fades in once it is up.
+    @State private var shown = false
     @StateObject private var videos = ViewerVideos()
 
     init(state: MediaViewerState) {
@@ -140,9 +149,13 @@ struct MediaViewer: View {
                 .allowsHitTesting(false)
             }
         }
+        .opacity(shown ? 1 : 0)
         .statusBarHidden(!chrome)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("media-viewer")
         .accessibilityAddTraits(.isModal)
         .onAppear {
+            withAnimation(.easeOut(duration: 0.2)) { shown = true }
             if items.contains(where: \.isVideo) { PlaybackAudio.begin() }
             show(index)
         }

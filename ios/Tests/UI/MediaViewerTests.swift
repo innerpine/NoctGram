@@ -83,7 +83,8 @@ final class MediaViewerTests: XCTestCase {
         let back = open(video, in: app, shot: "32-viewer-video")
         save("32-viewer-video")
         back.tap()
-        expect(back.waitForNonExistence(timeout: 5), "«Назад» does not close the viewer", in: app, shot: "32-viewer-video")
+        // Gone for good, not just its buttons: nothing stays over the feed.
+        expect(app.otherElements["media-viewer"].waitForNonExistence(timeout: 5), "«Назад» does not close the viewer", in: app, shot: "32-viewer-video")
 
         _ = open(video, in: app, shot: "33-viewer-menu")
         app.buttons["viewer-menu"].tap()
@@ -110,7 +111,7 @@ final class MediaViewerTests: XCTestCase {
 
         let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
         center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 0, dy: 320)))
-        expect(app.buttons["viewer-back"].waitForNonExistence(timeout: 5), "A swipe down does not close the viewer", in: app, shot: "35-viewer-swipe")
+        expect(app.otherElements["media-viewer"].waitForNonExistence(timeout: 5), "A swipe down does not close the viewer", in: app, shot: "35-viewer-swipe")
     }
 
     func testPhotoViewerCloses() {
@@ -118,11 +119,11 @@ final class MediaViewerTests: XCTestCase {
         let back = open(photo, in: app, shot: "36-viewer-photo")
         save("36-viewer-photo")
         back.tap()
-        expect(back.waitForNonExistence(timeout: 5), "«Назад» does not close the photo", in: app, shot: "36-viewer-photo")
+        expect(app.otherElements["media-viewer"].waitForNonExistence(timeout: 5), "«Назад» does not close the photo", in: app, shot: "36-viewer-photo")
 
         _ = open(photo, in: app, shot: "37-viewer-photo-swipe")
         let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 0, dy: -320)))
-        expect(app.buttons["viewer-back"].waitForNonExistence(timeout: 5), "A swipe up does not close the photo", in: app, shot: "37-viewer-photo-swipe")
+        expect(app.otherElements["media-viewer"].waitForNonExistence(timeout: 5), "A swipe up does not close the photo", in: app, shot: "37-viewer-photo-swipe")
     }
 }

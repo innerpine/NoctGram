@@ -248,6 +248,15 @@ struct PlayerSurface: UIViewRepresentable {
     }
 
     func updateUIView(_ view: PlayerView, context: Context) {}
+
+    func makeCoordinator() -> VideoPlayback { playback }
+
+    /// The picture lets go of its player as the viewer goes, unless picture
+    /// in picture has taken it.
+    static func dismantleUIView(_ view: PlayerView, coordinator: VideoPlayback) {
+        guard !coordinator.inPictureInPicture else { return }
+        view.playerLayer.player = nil
+    }
 }
 
 /// The app stays upright (AppDelegate); the full-screen button of a video
