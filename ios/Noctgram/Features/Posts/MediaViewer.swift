@@ -67,6 +67,8 @@ struct MediaViewer: View {
     @State private var shared: SharedMedia?
     @State private var preparing = false
     @State private var notice: String?
+    /// How far a swipe down (or up) has pulled the media away.
+    @State private var pull: CGFloat = 0
     @StateObject private var videos = ViewerVideos()
 
     init(state: MediaViewerState) {
@@ -79,7 +81,9 @@ struct MediaViewer: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color.black
+                .opacity(1 - min(0.75, abs(pull) / 420))
+                .ignoresSafeArea()
             TabView(selection: $index) {
                 ForEach(Array(items.enumerated()), id: \.offset) { position, item in
                     page(item)
@@ -88,8 +92,10 @@ struct MediaViewer: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .ignoresSafeArea()
+            .offset(y: pull)
+            .modifier(SwipeToClose(changed: { pull = $0 }, ended: finishPull))
 
-            if chrome {
+            if chrome && pull == 0 {
                 controls
                     .transition(.opacity)
             }
@@ -110,9 +116,11 @@ struct MediaViewer: View {
         }
         .statusBarHidden(!chrome)
         .onAppear {
-            ViewerOrientation.unlock()
             if items.contains(where: \.isVideo) { PlaybackAudio.begin() }
             show(index)
+            // Turning is allowed once the viewer is up, not during its
+            // arrival.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { ViewerOrientation.unlock() }
         }
         .onDisappear {
             hiding?.cancel()
@@ -186,6 +194,7 @@ struct MediaViewer: View {
             }
             .buttonStyle(CircleButtonStyle(size: 46))
             .accessibilityLabel("Назад")
+            .accessibilityIdentifier("viewer-back")
             Spacer(minLength: 0)
             VStack(spacing: 1) {
                 Text(title)
@@ -235,6 +244,7 @@ struct MediaViewer: View {
                 .glassCircle(interactive: true)
         }
         .accessibilityLabel("Ещё")
+        .accessibilityIdentifier("viewer-menu")
     }
 
     /// Photos: share on the left, delete on the right, as in Telegram.
@@ -294,8 +304,9 @@ struct MediaViewer: View {
         hiding?.cancel()
         guard chrome else { return }
         #if DEBUG
-        // Screenshots of the viewer keep its chrome.
-        if UserDefaults.standard.string(forKey: "noct.debugViewer") != nil { return }
+        // Screenshots and UI tests of the viewer keep its chrome.
+        let defaults = UserDefaults.standard
+        if defaults.string(forKey: "noct.debugViewer") != nil || defaults.bool(forKey: "noct.viewerKeepsChrome") { return }
         #endif
         hiding = Task {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -305,8 +316,24 @@ struct MediaViewer: View {
     }
 
     private func close() {
+        guard ViewerOrientation.isLandscape else {
+            dismiss()
+            return
+        }
+        // Upright first, then away: UIKit ignores a dismissal in the middle
+        // of turning.
         ViewerOrientation.lock()
-        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { dismiss() }
+    }
+
+    /// A pull past 110 pt, or a flick, closes the viewer; less springs back.
+    private func finishPull(_ distance: CGFloat, _ speed: CGFloat) {
+        guard abs(distance) > 110 || abs(speed) > 900 else {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { pull = 0 }
+            return
+        }
+        withAnimation(.easeOut(duration: 0.18)) { pull = distance < 0 ? -1200 : 1200 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { close() }
     }
 
     /// The chat asks what to delete once the viewer is gone.
@@ -361,6 +388,73 @@ struct MediaViewer: View {
                 tell("Не удалось загрузить фото")
             }
             preparing = false
+        }
+    }
+}
+
+/// Swiping the media down (or up) closes the viewer, as in Telegram. From
+/// iOS 18 a UIKit pan that starts only on a vertical pull: the pages keep
+/// their horizontal swipes, a zoomed photo keeps its own panning.
+private struct SwipeToClose: ViewModifier {
+    let changed: (CGFloat) -> Void
+    let ended: (CGFloat, CGFloat) -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.gesture(ClosePan(changed: changed, ended: ended))
+        } else {
+            content
+        }
+    }
+}
+
+@available(iOS 18.0, *)
+private struct ClosePan: UIGestureRecognizerRepresentable {
+    let changed: (CGFloat) -> Void
+    /// The distance pulled and the speed at the end.
+    let ended: (CGFloat, CGFloat) -> Void
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.maximumNumberOfTouches = 1
+        pan.delegate = context.coordinator
+        return pan
+    }
+
+    func updateUIGestureRecognizer(_ pan: UIPanGestureRecognizer, context: Context) {}
+
+    func handleUIGestureRecognizerAction(_ pan: UIPanGestureRecognizer, context: Context) {
+        let dy = pan.translation(in: pan.view).y
+        switch pan.state {
+        case .began, .changed: changed(dy)
+        case .ended: ended(dy, pan.velocity(in: pan.view).y)
+        case .cancelled, .failed: ended(0, 0)
+        default: break
+        }
+    }
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = recognizer as? UIPanGestureRecognizer, let view = pan.view else { return false }
+            var way = pan.translation(in: view)
+            if way == .zero { way = pan.velocity(in: view) }
+            guard abs(way.y) > abs(way.x) * 1.2 else { return false }
+            // A zoomed photo pans itself.
+            var hit = view.hitTest(pan.location(in: view), with: nil)
+            while let current = hit {
+                if let scroll = current as? UIScrollView, scroll.zoomScale > 1.01 { return false }
+                hit = current.superview
+            }
+            return true
+        }
+
+        func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+            other.view is UIScrollView
         }
     }
 }
@@ -619,6 +713,7 @@ private struct VideoControls: View {
                     Image(systemName: "viewfinder")
                 }
                 .accessibilityLabel("Во весь экран")
+                .accessibilityIdentifier("viewer-fullscreen")
             }
             .buttonStyle(PressableStyle())
             .font(.system(size: 20, weight: .medium))

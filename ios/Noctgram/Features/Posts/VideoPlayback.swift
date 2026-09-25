@@ -249,26 +249,33 @@ struct PlayerSurface: UIViewRepresentable {
 
 /// The app stays upright (AppDelegate); the media viewer turns with the
 /// phone and goes to landscape for a full-screen video, as in Telegram.
+/// UIKit hears of a change only while no presentation is under way: the
+/// viewer unlocks once it is up and locks once it is gone.
 @MainActor
 enum ViewerOrientation {
-    /// The viewer opened: it may turn with the phone.
+    static var isLandscape: Bool { scene?.interfaceOrientation.isLandscape == true }
+
+    /// The viewer is up: it may turn with the phone.
     static func unlock() {
         AppDelegate.orientations = .allButUpsideDown
         refresh()
     }
 
-    /// The viewer closed: back to portrait.
+    /// The viewer is gone, or about to go: portrait again.
     static func lock() {
         AppDelegate.orientations = .portrait
         refresh()
-        scene?.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in }
+        if isLandscape {
+            scene?.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in }
+        }
     }
 
     /// The full-screen button: landscape, or back to portrait.
     static func toggleLandscape() {
         guard let scene else { return }
-        let landscape = scene.interfaceOrientation.isLandscape
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .portrait : .landscapeRight)) { _ in }
+        AppDelegate.orientations = .allButUpsideDown
+        refresh()
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: isLandscape ? .portrait : .landscapeRight)) { _ in }
     }
 
     private static var scene: UIWindowScene? {

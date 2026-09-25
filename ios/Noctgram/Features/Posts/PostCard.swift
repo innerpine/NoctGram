@@ -410,6 +410,8 @@ struct MediaGrid: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
+        .accessibilityLabel(item.isVideo ? "Видео" : "Фото")
+        .accessibilityIdentifier("media-" + item.id)
     }
 }
 
