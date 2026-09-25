@@ -88,9 +88,14 @@ final class MediaViewerTests: XCTestCase {
         let app = launch()
         let back = open(video, in: app, shot: "32-viewer-video")
         save("32-viewer-video")
+        // Whether the round play button answers: its label flips.
+        let play = app.buttons.matching(NSPredicate(format: "label IN %@", ["Пауза", "Смотреть"])).firstMatch
+        let before = play.exists ? play.label : "none"
+        if play.exists { play.tap() }
+        let answered = poll(3) { play.exists && play.label != before }
         back.tap()
         // Gone for good, not just its buttons: nothing stays over the feed.
-        expect(viewer(app).waitForNonExistence(timeout: 5), "«Назад» does not close the viewer", in: app, shot: "32-viewer-video")
+        expect(viewer(app).waitForNonExistence(timeout: 5), "«Назад» does not close the viewer (play button \(before) answered \(answered))", in: app, shot: "32-viewer-video")
 
         _ = open(video, in: app, shot: "33-viewer-menu")
         app.buttons["viewer-menu"].tap()

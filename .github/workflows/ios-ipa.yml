@@ -280,6 +280,11 @@ jobs:
           xcrun simctl spawn "$UDID" log show --last 30m --style compact \
             --predicate 'subsystem == "com.noctgram.ios" AND category == "probe"' \
             | sed -nE 's/.*\[com\.noctgram\.ios:probe\] //p' | cut -c1-400 | head -150 || true
+          # What the media viewer did (ViewerLog): taps, closing, turning.
+          echo "--- viewer"
+          xcrun simctl spawn "$UDID" log show --last 30m --style compact \
+            --predicate 'subsystem == "com.noctgram.ios" AND category == "viewer"' \
+            | sed -nE 's/.*\[com\.noctgram\.ios:viewer\] //p' | cut -c1-300 | head -120 || true
           # Which gift animations were drawn on the main thread.
           xcrun simctl spawn "$UDID" log show --last 20m --style compact \
             --predicate 'subsystem == "com.noctgram.ios" AND category == "gifts"' | grep -o 'mounted .*' | sort | uniq -c | tail -20 || true

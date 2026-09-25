@@ -1,6 +1,9 @@
 import AVFoundation
 import AVKit
 import SwiftUI
+#if DEBUG
+import os
+#endif
 import UIKit
 
 /// AVFoundation loads media outside URLSession, so the session cookie is passed explicitly.
@@ -66,6 +69,7 @@ final class MediaPresenter: ObservableObject {
     /// animated away could stay drawn over the app, dead to taps. The viewer
     /// fades itself in.
     func show(_ state: MediaViewerState) {
+        ViewerLog.note("show \(state.id)")
         // The keyboard would stay over the viewer.
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         var instant = Transaction()
@@ -74,10 +78,23 @@ final class MediaPresenter: ObservableObject {
     }
 
     func close() {
+        ViewerLog.note("presenter close, was \(state?.id ?? "nothing")")
         var instant = Transaction()
         instant.disablesAnimations = true
         withTransaction(instant) { state = nil }
     }
+}
+
+/// What the viewer did, in debug builds: the UI tests print it (ios-ipa.yml).
+enum ViewerLog {
+    #if DEBUG
+    private static let log = Logger(subsystem: "com.noctgram.ios", category: "viewer")
+    static func note(_ text: String) {
+        log.notice("\(text, privacy: .public)")
+    }
+    #else
+    @inline(__always) static func note(_ text: @autoclosure () -> String) {}
+    #endif
 }
 
 /// Full-screen photos and videos, swiped as pages, dressed as in Telegram:
@@ -367,6 +384,7 @@ struct MediaViewer: View {
     }
 
     private func close() {
+        ViewerLog.note("close, landscape \(ViewerOrientation.isLandscape)")
         // Stopped first: nothing plays or ticks while the viewer goes away.
         hiding?.cancel()
         videos.pauseAll()
@@ -729,6 +747,7 @@ private struct VideoControls: View {
             .buttonStyle(CircleButtonStyle(size: 64))
             .accessibilityLabel("Назад на 15 секунд")
             Button {
+                ViewerLog.note("play button")
                 playback.toggle()
                 touched()
             } label: {
