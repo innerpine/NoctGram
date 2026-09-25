@@ -55,19 +55,15 @@ struct VideoThumbnail: View {
     }
 }
 
-/// Opens the media viewer over the whole app, tab bar included, as the top
-/// layer of the root view (RootView) rather than a full-screen presentation
-/// of the post, message or grid that asked for it: closing it can never be
-/// left half done with the viewer frozen over the app, as happened when the
-/// row that had presented it was redrawn in its lazy list.
+/// Opens the media viewer over the whole app from the root view (RootView),
+/// not from the post, message or grid that asked for it: a row of a lazy
+/// list can be redrawn while its presentation is up.
 @MainActor
 final class MediaPresenter: ObservableObject {
     static let shared = MediaPresenter()
     @Published private(set) var state: MediaViewerState?
 
-    /// Without a transition either way: a layer holding a video that was
-    /// animated away could stay drawn over the app, dead to taps. The viewer
-    /// fades itself in.
+    /// Without a transition either way; the viewer fades itself in.
     func show(_ state: MediaViewerState) {
         ViewerLog.note("show \(state.id)")
         // The keyboard would stay over the viewer.
@@ -82,6 +78,17 @@ final class MediaPresenter: ObservableObject {
         var instant = Transaction()
         instant.disablesAnimations = true
         withTransaction(instant) { state = nil }
+    }
+}
+
+/// The app stays visible behind the viewer while it is pulled away.
+struct SeeThroughPresentation: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 16.4, *) {
+            content.presentationBackground(.clear)
+        } else {
+            content
+        }
     }
 }
 
@@ -822,13 +829,15 @@ private struct VideoControls: View {
             .disabled(sharing)
             .accessibilityLabel("Поделиться")
             Spacer(minLength: 0)
-            HStack(spacing: 28) {
+            HStack(spacing: 6) {
                 if playback.canPictureInPicture {
                     Button {
                         playback.togglePictureInPicture()
                         touched()
                     } label: {
                         Image(systemName: "pip.enter")
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                     .accessibilityLabel("Картинка в картинке")
                 }
@@ -840,6 +849,8 @@ private struct VideoControls: View {
                     }
                 } label: {
                     Image(systemName: "gearshape")
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Скорость")
                 Button {
@@ -847,6 +858,8 @@ private struct VideoControls: View {
                     touched()
                 } label: {
                     Image(systemName: "viewfinder")
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Во весь экран")
                 .accessibilityIdentifier("viewer-fullscreen")
@@ -854,7 +867,7 @@ private struct VideoControls: View {
             .buttonStyle(PressableStyle())
             .font(.system(size: 20, weight: .medium))
             .foregroundColor(.white)
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 8)
             .frame(height: 50)
             .glassCapsule()
             Spacer(minLength: 0)

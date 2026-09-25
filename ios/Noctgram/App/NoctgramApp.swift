@@ -72,12 +72,13 @@ struct RootView: View {
                     .environmentObject(session)
             }
         }
-        .overlay {
-            if let state = media.state {
-                MediaViewer(state: state)
-                    .environmentObject(session)
-                    .id(state.id)
-            }
+        // Its own full-screen presentation, not an overlay of this view: the
+        // bars of the tabs under an overlay took the taps meant for the
+        // viewer's «Назад» and full-screen buttons.
+        .fullScreenCover(item: Binding(get: { media.state }, set: { if $0 == nil { media.close() } })) { state in
+            MediaViewer(state: state)
+                .environmentObject(session)
+                .modifier(SeeThroughPresentation())
         }
         .overlay(alignment: .top) {
             if let toast = session.toast {
