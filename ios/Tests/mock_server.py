@@ -163,8 +163,89 @@ def room():
             "me": me, "members": members, "messages": messages, "canSend": True, "nextCursor": None}
 
 
+def person(key, **extra):
+    """A profile fixture as the team's lists give people (sample data only)."""
+    profile = R[key]
+    fields = {name: profile.get(name) for name in ("id", "name", "avatar", "handle", "kind", "verified", "premium",
+                                                   "boostLevel", "profileTheme", "nameGradient")}
+    fields["kind"] = fields["kind"] or "person"
+    return dict(fields, **extra)
+
+
+def team(action, q):
+    """The team's cabinet (lib/moderation.ts, lib/content-moderation.ts,
+    lib/antispam-moderation.ts, lib/administration.ts), sample data only."""
+    now = int(time.time() * 1000)
+    hour = 3600000
+    if action == "moderationUsers":
+        people = [
+            person("profileBob", mode="read_only", reason="Реклама в комментариях", expiresAt=now + 20 * hour,
+                   restrictedAt=now - 4 * hour, moderator=0, canRestrict=True, ownerId=None, ownerName=None, ownerHandle=None),
+            person("profileChannel", mode=None, reason=None, expiresAt=None, restrictedAt=None, moderator=0,
+                   canRestrict=True, ownerId=META["me"], ownerName="Алиса Ночная", ownerHandle="alice_night"),
+            person("profileAlice", mode=None, reason=None, expiresAt=None, restrictedAt=None, moderator=1,
+                   canRestrict=False, ownerId=None, ownerName=None, ownerHandle=None),
+        ]
+        if q.get("id"):
+            people = [p for p in people if p["id"] == q["id"]]
+        elif q.get("q"):
+            text = q["q"].lstrip("@").lower()
+            people = [p for p in people if text in p["name"].lower() or text in p["handle"]]
+        return {"people": people, "hasMore": False, "nextCursor": None}
+    if action == "moderationHistory":
+        return [{"id": "event-1", "mode": "read_only", "reason": "Реклама в комментариях", "created": now - 4 * hour,
+                 "moderatorHandle": "alice_night"}] if q.get("id") == META["bob"] else []
+    if action == "moderationAppeals":
+        return [{"id": "appeal-1", "userId": META["bob"], "handle": "bob_night", "name": "Боб",
+                 "text": "Это была ссылка на мой собственный фотоблог, больше не буду.", "reason": "Реклама в комментариях",
+                 "mode": "read_only", "status": "pending", "reviewNote": "", "created": now - 2 * hour}]
+    if action == "moderationReports":
+        reports = [
+            {"id": "report-1", "targetType": "post", "targetId": META["post"], "postId": META["post"], "authorId": META["bob"],
+             "name": "Боб", "kind": "person", "handle": "bob_night", "reporterHandle": "carol_sky", "reviewerHandle": None,
+             "text": "Подпишись на мой канал и получи 1000 звёзд бесплатно!", "reason": "Спам или реклама",
+             "status": "new", "reviewNote": "", "created": now - hour, "available": 1},
+            {"id": "report-2", "targetType": "comment", "targetId": "comment-1", "postId": META["post"], "authorId": "local_carol",
+             "name": "Кэрол", "kind": "person", "handle": "carol_sky", "reporterHandle": "bob_night", "reviewerHandle": "alice_night",
+             "text": "Ну и фото, так себе", "reason": "Оскорбления или травля", "status": "reviewing", "reviewNote": "",
+             "created": now - 3 * hour, "available": 1},
+        ]
+        status = q.get("status", "all")
+        return [r for r in reports if status == "all" or r["status"] == status]
+    if action == "moderationRemovals":
+        return [{"id": "removal-1", "targetType": "post", "handle": "bob_night", "moderatorHandle": "alice_night",
+                 "text": "Купи подписчиков дёшево", "reason": "Спам или реклама", "created": now - 26 * hour}]
+    if action == "spamQueue":
+        items = [{"id": "spam-1", "kind": "comment", "targetId": "comment-2", "actorId": "local_carol", "contextId": META["post"],
+                  "payload": {"text": "Лучшие скидки на spam.example", "media": "[]"}, "text": "Лучшие скидки на spam.example",
+                  "reasons": ["Рекламный домен spam.example", "Повтор одного текста"], "status": "pending", "created": now - 30 * 60000,
+                  "reviewedAt": 0, "reviewedBy": None, "note": "", "name": "Кэрол", "handle": "carol_sky",
+                  "contextName": "Комментарии к публикации"}]
+        status = q.get("status", "pending")
+        return {"settings": {"domains": ["spam.example", "cheap-followers.example"], "raidUntil": 0, "updated": 1},
+                "items": [i for i in items if i["status"] == status], "hasMore": False}
+    if action == "administration":
+        people = [
+            person("profileAlice", moderator=1, administrator=1, balance=12500),
+            person("profileBob", moderator=0, administrator=0, balance=840),
+            person("profileChannel", moderator=0, administrator=0, balance=0),
+        ]
+        events = [{"id": "admin-1", "action": "stars", "amount": 500, "reason": "Награда за помощь в тестировании",
+                   "created": now - 5 * hour, "actorName": "Алиса Ночная", "name": "Боб", "handle": "bob_night", "payload": None}]
+        return {"people": people, "more": False, "events": events}
+    return None
+
+
 def social(q):
     action = q.get("action", "feed")
+    staff = team(action, q)
+    if staff is not None:
+        return staff
+    if action == "bootstrap":
+        # The viewer is on the team: the profile tab shows the cabinet.
+        data = json.loads(json.dumps(R["bootstrap"]))
+        data["me"].update(canModerate=True, canAdmin=True)
+        return data
     if action == "feed":
         if q.get("before"):
             return []
@@ -179,9 +260,10 @@ def social(q):
         name = {META["bob"]: "profileBob", META["channel"]: "profileChannel"}.get(key, "profileAlice")
         if name != "profileAlice":
             return R[name]
-        # Alice's Premium background takes its colours from her cover.
+        # Alice's Premium background takes its colours from her cover; she is
+        # on the team.
         surface = {"mode": "cover", "first": "#9775cf", "second": "#426b98", "intensity": 30, "musicColor": "cover"}
-        return dict(R[name], profileBackground=json.dumps(surface))
+        return dict(R[name], profileBackground=json.dumps(surface), canModerate=True, canAdmin=True)
     if action == "messages":
         messages = dialogue() if q.get("peer") == META["bob"] else []
         if q.get("includeTheme") == "1":

@@ -55,6 +55,14 @@ struct ProfileHubView: View {
                             nav.push(.profile(me.id))
                         }
                     }
+                    if me.canModerate {
+                        // The team's cabinet: only moderators and administrators see it.
+                        SettingsGroup {
+                            SettingsRow(me.canAdmin ? "Кабинет команды" : "Модерация", icon: "checkmark.shield.fill", color: IconColor.teal, divider: false) {
+                                nav.push(.team)
+                            }
+                        }
+                    }
                     SettingsGroup {
                         SettingsRow("Кошелёк", icon: "wallet.pass.fill", color: IconColor.blue, value: balance.map { Format.count($0) }) {
                             nav.push(.wallet)

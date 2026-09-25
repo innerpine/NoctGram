@@ -188,6 +188,14 @@ jobs:
           shot 19-profile-qr 8765 -noct.debugTab profile -noct.debugSheet qr
           shot 20-gifts 8765 -noct.debugTab profile -noct.debugRoute screen:gifts
           shot 21-gift 8765 -noct.debugTab profile -noct.debugRoute screen:gifts -noct.debugSheet gift
+          # A group: Bob has Premium, his name and star take his palette.
+          shot 22-group 8765 -noct.debugTab messages -noct.debugRoute room:room_night_walks
+          # The team's cabinet, which the mock viewer may open.
+          shot 42-team 8765 -noct.debugTab profile -noct.debugRoute team:cabinet
+          shot 43-team-reports 8765 -noct.debugTab profile -noct.debugRoute team:reports
+          shot 44-team-antispam 8765 -noct.debugTab profile -noct.debugRoute team:antispam
+          shot 45-team-accounts 8765 -noct.debugTab profile -noct.debugRoute team:accounts
+          shot 46-team-admin 8765 -noct.debugTab profile -noct.debugRoute team:admin
           # The media viewer as in Telegram: a playing video with its controls
           # (they stay for the screenshot), then a photo.
           WAIT=10 shot 30-video 8765 -noct.debugViewer video

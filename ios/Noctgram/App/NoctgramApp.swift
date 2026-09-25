@@ -233,6 +233,16 @@ enum DebugLaunch {
             case "gifts": nav.push(.gifts(me))
             default: break
             }
+        case "team":
+            // «team:cabinet», or a section: «team:reports».
+            nav.push(.team)
+            switch value {
+            case "antispam": nav.push(.teamSection(.antispam))
+            case "accounts": nav.push(.teamSection(.accounts(nil)))
+            case "reports": nav.push(.teamSection(.reports))
+            case "admin": nav.push(.teamSection(.administration))
+            default: break
+            }
         default: break
         }
     }

@@ -29,6 +29,9 @@ enum Route: Hashable {
     case gifts(String)
     case settings
     case web(title: String, path: String)
+    /// «Кабинет команды» and its sections, for moderators and administrators.
+    case team
+    case teamSection(TeamSection)
 }
 
 /// One navigation path per tab, so a tab keeps its stack while another is open.
@@ -153,6 +156,10 @@ struct RouteView: View {
             SettingsView()
         case .web(let title, let path):
             WebScreen(title: title, path: path)
+        case .team:
+            TeamCabinetView()
+        case .teamSection(let section):
+            TeamSectionView(section: section)
         }
     }
 }
