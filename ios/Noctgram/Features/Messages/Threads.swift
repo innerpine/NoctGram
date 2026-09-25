@@ -52,6 +52,12 @@ enum ThreadItem: Identifiable, Hashable {
         case .room(let room): return room.lastTime
         }
     }
+
+    /// A group is left rather than deleted.
+    var isRoomLeave: Bool {
+        if case .room(let room) = self { return !room.isSecret }
+        return false
+    }
 }
 
 @MainActor
@@ -77,6 +83,30 @@ final class ThreadsStore: ObservableObject {
         }
         loaded = true
     }
+
+    /// Takes a row out at once; the next load brings it back if the server
+    /// did not agree.
+    func remove(_ item: ThreadItem) {
+        items.removeAll { $0.id == item.id }
+    }
+
+    /// Deletes a whole dialogue as the server allows it: every visible
+    /// message, twenty at a time, for the viewer or for both. Gifts stay,
+    /// so a message is asked for once and the loop ends when none are new.
+    static func deleteDialogue(with peer: String, everyone: Bool, api: APIClient) async throws {
+        var asked = Set<String>()
+        for _ in 0..<60 {
+            let data = try await api.social("messages", ["peer": peer])
+            let list = data["messages"].isNull ? data : data["messages"]
+            let ids = list.array.map { $0["id"].str }.filter { $0.hasPrefix("message:") && !asked.contains($0) }
+            guard !ids.isEmpty else { return }
+            asked.formUnion(ids)
+            for start in stride(from: 0, to: ids.count, by: 20) {
+                let chunk = Array(ids[start..<min(start + 20, ids.count)])
+                _ = try await api.socialPost("messageDelete", ["ids": chunk, "peer": peer, "everyone": everyone])
+            }
+        }
+    }
 }
 
 struct ThreadsView: View {
@@ -85,6 +115,9 @@ struct ThreadsView: View {
     @StateObject private var store = ThreadsStore()
     @State private var archived = "chats"
     @State private var showNew = false
+    /// The row slid open to its actions.
+    @State private var openRow: String?
+    @State private var deleting: ThreadItem?
 
     var body: some View {
         ScrollView {
@@ -127,7 +160,24 @@ struct ThreadsView: View {
             }
             .environmentObject(session)
         }
-        .onChange(of: archived) { _ in Task { await reload() } }
+        .onChange(of: archived) { _ in
+            openRow = nil
+            Task { await reload() }
+        }
+        .confirmationDialog(deleteTitle, isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
+            if let item = deleting {
+                switch item {
+                case .direct(let person):
+                    Button("Удалить у меня", role: .destructive) { delete(item, everyone: false) }
+                    Button("Удалить у меня и у \(person.name)", role: .destructive) { delete(item, everyone: true) }
+                case .room(let room):
+                    Button(room.isSecret ? "Закрыть" : "Покинуть", role: .destructive) { delete(item, everyone: false) }
+                }
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text(deleteMessage)
+        }
         .task {
             await reload()
             // Refresh while the list is visible, like the web inbox.
@@ -144,7 +194,80 @@ struct ThreadsView: View {
         await session.refreshCounters()
     }
 
-    @ViewBuilder private func row(_ item: ThreadItem) -> some View {
+    private func row(_ item: ThreadItem) -> some View {
+        SwipeActionsRow(actions: actions(item), open: Binding(
+            get: { openRow == item.id },
+            set: { openRow = $0 ? item.id : (openRow == item.id ? nil : openRow) }
+        )) {
+            rowContent(item)
+        }
+    }
+
+    /// As in Telegram: delete, then archive on the far right.
+    private func actions(_ item: ThreadItem) -> [SwipeAction] {
+        let inArchive = archived == "archive"
+        return [
+            SwipeAction(title: item.isRoomLeave ? "Покинуть" : "Удалить", icon: item.isRoomLeave ? "rectangle.portrait.and.arrow.right" : "trash.fill", color: Noct.red) {
+                deleting = item
+            },
+            SwipeAction(title: inArchive ? "Вернуть" : "В архив", icon: inArchive ? "tray.and.arrow.up.fill" : "archivebox.fill", color: Color(hex: 0x6E6E73)) {
+                Task { await setArchived(item, !inArchive) }
+            },
+        ]
+    }
+
+    private var deleteTitle: String {
+        switch deleting {
+        case .direct(let person): return "Удалить чат с \(person.name)?"
+        case .room(let room): return room.isSecret ? "Закрыть секретный чат?" : "Покинуть «\(room.name)»?"
+        case nil: return ""
+        }
+    }
+
+    private var deleteMessage: String {
+        switch deleting {
+        case .direct: return "Сообщения удалятся без возврата."
+        case .room(let room):
+            return room.isSecret
+                ? "Переписка перестанет быть доступна обоим участникам. Для нового разговора создайте новый секретный чат."
+                : "Для возвращения понадобится действующее приглашение или публичная ссылка."
+        case nil: return ""
+        }
+    }
+
+    private func delete(_ item: ThreadItem, everyone: Bool) {
+        store.remove(item)
+        Task {
+            do {
+                switch item {
+                case .direct(let person):
+                    try await ThreadsStore.deleteDialogue(with: person.id, everyone: everyone, api: session.api)
+                case .room(let room):
+                    _ = try await session.api.post("/api/rooms", ["action": "leave", "id": room.id])
+                }
+            } catch {
+                session.report(error)
+            }
+            await reload()
+        }
+    }
+
+    private func setArchived(_ item: ThreadItem, _ value: Bool) async {
+        store.remove(item)
+        do {
+            switch item {
+            case .direct(let person):
+                _ = try await session.api.socialPost("archiveChat", ["peer": person.id, "archived": value])
+            case .room(let room):
+                _ = try await session.api.post("/api/rooms", ["action": "archive", "id": room.id, "archived": value])
+            }
+        } catch {
+            session.report(error)
+        }
+        await reload()
+    }
+
+    @ViewBuilder private func rowContent(_ item: ThreadItem) -> some View {
         switch item {
         case .direct(let person):
             Button {
@@ -162,7 +285,7 @@ struct ThreadsView: View {
             .buttonStyle(PressableStyle())
             .contextMenu {
                 Button {
-                    Task { await archive(person, value: person.archivedAt == 0) }
+                    Task { await setArchived(item, person.archivedAt == 0) }
                 } label: {
                     Label(person.archivedAt == 0 ? "В архив" : "Вернуть из архива", systemImage: "archivebox")
                 }
@@ -189,14 +312,6 @@ struct ThreadsView: View {
         }
     }
 
-    private func archive(_ person: Person, value: Bool) async {
-        do {
-            _ = try await session.api.socialPost("archiveChat", ["peer": person.id, "archived": value])
-            await store.load(api: session.api, archived: archived == "archive")
-        } catch {
-            session.report(error)
-        }
-    }
 }
 
 struct ThreadRow: View {
