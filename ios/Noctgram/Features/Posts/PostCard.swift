@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// A publication card (app/post-card.tsx): author line, text with «Ещё»,
-/// code, media with the 18+ cover, poll, actions, views and Stars.
+/// code, media with the 18+ cover, poll, actions, views and Stars. The
+/// sizes and gaps are those of the site on a phone (redesign.css, ≤500 px).
 struct PostCard: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var nav: Navigator
@@ -21,13 +22,15 @@ struct PostCard: View {
     private var mine: Bool { post.isMine(session.myId) }
     private var canManage: Bool { mine || post.canManagePosts }
     private var long: Bool { post.text.count > 220 }
+    /// A long text shows its first 7.7 lines of 15 pt and fades out.
+    private var collapsed: Bool { long && !expanded && !detail }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 10) {
             Button {
                 nav.push(.profile(post.userId))
             } label: {
-                AvatarView(person: post.author, size: 40)
+                AvatarView(person: post.author, size: 36)
             }
             .buttonStyle(PressableStyle())
 
@@ -36,20 +39,33 @@ struct PostCard: View {
                     Label(post.isChannel ? "Закреплено в канале" : "Закреплено в профиле", systemImage: "pin.fill")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(Noct.text48)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, 8)
                 }
                 authorLine
                 if !post.text.isEmpty {
-                    LinkedText(text: post.text, size: 15, color: Noct.text75)
-                        .lineLimit(long && !expanded && !detail ? 7 : nil)
-                        .padding(.top, 6)
+                    LinkedText(text: post.text, size: 15, color: Noct.text75, lineSpacing: 6)
+                        .frame(maxHeight: collapsed ? 116 : nil, alignment: .top)
+                        .clipped()
+                        .mask {
+                            LinearGradient(
+                                stops: [
+                                    .init(color: .black, location: 0),
+                                    .init(color: .black, location: collapsed ? 0.8 : 1),
+                                    .init(color: collapsed ? .clear : .black, location: 1),
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        }
+                        .padding(.top, 8)
                     if long && !detail {
                         Button(expanded ? "Свернуть" : "Ещё") {
                             withAnimation(Noct.quick) { expanded.toggle() }
                         }
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white)
-                        .padding(.top, 4)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Noct.text60)
+                        .frame(minHeight: 24)
+                        .padding(.top, 6)
                     }
                 }
                 if !post.code.isEmpty {
@@ -61,14 +77,15 @@ struct PostCard: View {
                 }
                 if !post.poll.isEmpty {
                     PollView(post: post)
-                        .padding(.top, 14)
+                        .padding(.top, 12)
                 }
-                actions.padding(.top, 12)
-                extras.padding(.top, 8)
+                actions.padding(.top, 18)
+                extras.padding(.top, 14)
             }
         }
-        .padding(16)
-        .noctCard()
+        .padding(.vertical, 16)
+        .padding(.horizontal, 14)
+        .noctCard(radius: 14)
         .contentShape(Rectangle())
         .onTapGesture {
             if !detail { nav.push(.post(post.id)) }
@@ -126,7 +143,7 @@ struct PostCard: View {
             Button {
                 nav.push(.profile(post.userId))
             } label: {
-                DisplayName(person: post.author, size: 15)
+                DisplayName(person: post.author, size: 14, weight: .medium)
             }
             .buttonStyle(PressableStyle())
             if post.isChannel {
@@ -135,14 +152,16 @@ struct PostCard: View {
             }
             if handle {
                 Text("@" + post.handle)
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                     .foregroundColor(Noct.text48)
                     .lineLimit(1)
                     .fixedSize()
             }
-            Text("·").font(.system(size: 13)).foregroundColor(Noct.text25)
+            Circle()
+                .fill(Noct.text48)
+                .frame(width: 3, height: 3)
             Text(Format.ago(post.created))
-                .font(.system(size: 13))
+                .font(.system(size: 12))
                 .foregroundColor(Noct.text48)
                 .fixedSize()
         }
@@ -251,22 +270,23 @@ struct PostCard: View {
 
     // MARK: Actions
 
+    /// Like and comments on the left, save on the right; sharing lives in
+    /// the «…» menu, as on the site.
     private var actions: some View {
-        HStack(spacing: 22) {
+        HStack(spacing: 20) {
             Button {
                 likeBump = !post.liked
                 Task { await PostActions.toggleLike(post, session: session) }
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: post.liked ? "heart.fill" : "heart")
                         .font(.system(size: 17, weight: .medium))
                         .scaleEffect(likeBump && post.liked ? 1.18 : 1)
                         .animation(.spring(response: 0.32, dampingFraction: 0.45), value: post.liked)
-                    Text(Format.count(post.likes))
-                        .font(.system(size: 14, weight: .medium))
-                        .monospacedDigit()
+                    count(post.likes)
                 }
                 .foregroundColor(post.liked ? .white : Noct.text60)
+                .modifier(TallTapArea())
             }
             .buttonStyle(PressableStyle())
             .disabled(session.readOnly)
@@ -275,24 +295,17 @@ struct PostCard: View {
                 if detail { return }
                 showComments = true
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "bubble.left")
-                        .font(.system(size: 16, weight: .medium))
-                    Text(Format.count(post.comments))
-                        .font(.system(size: 14, weight: .medium))
-                        .monospacedDigit()
+                        .font(.system(size: 16.5, weight: .medium))
+                    count(post.comments)
                 }
                 .foregroundColor(Noct.text60)
+                .modifier(TallTapArea())
             }
             .buttonStyle(PressableStyle())
 
-            Spacer()
-
-            ShareLink(item: PostActions.link(post, session: session)) {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(Noct.text60)
-            }
+            Spacer(minLength: 0)
 
             Button {
                 Task { await PostActions.toggleSave(post, session: session) }
@@ -300,36 +313,75 @@ struct PostCard: View {
                 Image(systemName: post.saved ? "bookmark.fill" : "bookmark")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(post.saved ? .white : Noct.text60)
+                    .frame(width: 30)
+                    .modifier(TallTapArea())
             }
             .buttonStyle(PressableStyle())
+            .accessibilityLabel(post.saved ? "Убрать из сохранённого" : "Сохранить публикацию")
         }
+        .frame(minHeight: 24)
     }
 
+    private func count(_ value: Int) -> some View {
+        Text(Format.count(value))
+            .font(.system(size: 13, weight: .medium))
+            .monospacedDigit()
+            .frame(minWidth: 22, alignment: .leading)
+    }
+
+    /// Views on the left, Stars for the author on the right, under a thin line.
     private var extras: some View {
-        HStack(spacing: 14) {
-            Label(Format.count(post.views), systemImage: "eye")
-                .font(.system(size: 13))
-                .foregroundColor(Noct.text48)
-            Button {
-                if !mine { showSupport = true }
-            } label: {
-                HStack(spacing: 5) {
-                    Image("StarsIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                    Text(Format.count(post.stars))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Noct.gold)
-                    Text(mine ? "От читателей" : "Поддержать")
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.white.opacity(0.024))
+                .frame(height: 1)
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Image(systemName: "eye")
                         .font(.system(size: 13))
-                        .foregroundColor(Noct.text48)
+                    Text(Format.count(post.views))
+                        .monospacedDigit()
                 }
+                .font(.system(size: 12))
+                .foregroundColor(Noct.text48)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Просмотры: \(Format.count(post.views))")
+                Spacer(minLength: 0)
+                Button {
+                    if !mine { showSupport = true }
+                } label: {
+                    HStack(spacing: 7) {
+                        Image("StarsIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 19, height: 19)
+                        Text(Format.count(post.stars))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(Color(hex: 0xEDD07B))
+                        Text(mine ? "От читателей" : "Поддержать")
+                            .font(.system(size: 12))
+                            .foregroundColor(Noct.text60)
+                    }
+                    .frame(minHeight: 30)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableStyle())
+                .disabled(mine || session.readOnly)
+                .opacity(mine ? 0.7 : 1)
             }
-            .buttonStyle(PressableStyle())
-            .disabled(mine || session.readOnly)
-            Spacer()
+            .padding(.top, 8)
         }
+    }
+}
+
+/// A 44 pt tall place to tap around a small action without making its row
+/// any taller (the site does it with negative margins).
+private struct TallTapArea: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+            .padding(.vertical, -10)
     }
 }
 
@@ -362,7 +414,7 @@ struct MediaGrid: View {
     let open: (Int) -> Void
 
     var body: some View {
-        let gap: CGFloat = 6
+        let gap: CGFloat = 8
         if items.count == 1 {
             tile(0).frame(height: 300)
         } else if items.count == 3 {
@@ -406,7 +458,8 @@ struct MediaGrid: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Noct.border, lineWidth: 1))
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())

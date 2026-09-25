@@ -72,7 +72,7 @@ struct PostListContent: View {
     let empty: String
 
     var body: some View {
-        LazyVStack(spacing: 12) {
+        LazyVStack(spacing: 16) {
             ForEach(store.posts) { post in
                 PostCard(post: post)
                     .onAppear {
