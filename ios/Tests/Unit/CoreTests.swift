@@ -166,4 +166,44 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(Reaction.applying("❤️", to: []), [Reaction(emoji: "❤️", count: 1, own: true)])
         XCTAssertEqual(Reaction.applying(nil, to: [Reaction(emoji: "😢", count: 1, own: true)]), [])
     }
+
+    /// The same two colours as lib/image-palette.ts finds (checked with the
+    /// site's function on the same pixels).
+    func testPaletteMatchesTheSite() {
+        func pixels(_ runs: [(count: Int, red: UInt8, green: UInt8, blue: UInt8)]) -> [UInt8] {
+            var bytes: [UInt8] = []
+            for run in runs {
+                for _ in 0..<run.count { bytes += [run.red, run.green, run.blue, 255] }
+            }
+            return bytes
+        }
+        // Nearly black and nearly white pixels do not count: #28785a, #c83c8c.
+        let plain = ImagePalette.palette(pixels([(300, 40, 120, 90), (200, 200, 60, 140), (50, 10, 10, 10), (26, 250, 250, 250)]))
+        XCTAssertEqual(plain, [RGBColor(0x28785A), RGBColor(0xC83C8C)])
+        // A second colour too close to the first gives way: #28785a, #e6c828.
+        let close = ImagePalette.palette(pixels([(300, 40, 120, 90), (200, 50, 125, 100), (76, 230, 200, 40)]))
+        XCTAssertEqual(close, [RGBColor(0x28785A), RGBColor(0xE6C828)])
+        XCTAssertNil(ImagePalette.palette(pixels([(10, 5, 5, 5)])))
+        // color-mix(in srgb, #87e7d6 30%, #0b0b10).
+        XCTAssertEqual(RGBColor(0x87E7D6).mixed(into: RGBColor(0x0B0B10), amount: 0.3), RGBColor(red: 48.2, green: 77, blue: 75.4))
+    }
+
+    func testTeamRowsReadAsTheSiteShowsThem() throws {
+        func json(_ text: String) throws -> JSON { try XCTUnwrap(JSON.parse(Data(text.utf8))) }
+        let report = TeamReport(try json(#"{"id":"r","targetType":"post","kind":"channel","handle":"night_city","status":"new","available":1}"#))
+        XCTAssertEqual(report.title, "@night_city · Пост канала")
+        XCTAssertTrue(report.canOpenPost)
+        XCTAssertEqual(report.removeTitle, "Удалить пост")
+        XCTAssertEqual(TeamReport(try json(#"{"targetType":"message","handle":null}"#)).title, "Удалённый аккаунт · Личное сообщение")
+        let event = TeamAdminEvent(try json(#"{"id":"e","action":"starsDebit","amount":1500,"actorName":"Алиса","handle":"bob_night"}"#))
+        XCTAssertEqual(event.title, "Отнять Stars −1\u{00A0}500")
+        XCTAssertEqual(event.subtitle, "Алиса → @bob_night")
+        let account = TeamAccount(try json(#"{"id":"u","mode":"blocked","reason":"Спам","expiresAt":null,"canRestrict":1}"#))
+        XCTAssertEqual(account.status.title, "Заблокирован")
+        XCTAssertEqual(account.current, "Сейчас: блокировка, бессрочно. Спам")
+        XCTAssertTrue(account.canRestrict)
+        let message = RoomMessage(try json(#"{"id":"m","sender":"b","senderName":"Боб","senderAppearance":{"premium":1,"profileTheme":"aurora"}}"#))
+        XCTAssertTrue(message.senderAppearance.premium)
+        XCTAssertEqual(message.senderAppearance.theme, .aurora)
+    }
 }
