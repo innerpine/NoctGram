@@ -5,6 +5,8 @@ struct RoomMessage: Identifiable, Hashable {
     var sender: String
     var senderName: String
     var senderAvatar: String
+    /// Premium palette and badges of the author, for the name above the bubble.
+    var senderAppearance = Appearance()
     var text: String
     var encrypted: Bool
     var replyTo: String
@@ -18,6 +20,7 @@ struct RoomMessage: Identifiable, Hashable {
         sender = j["sender"].str
         senderName = j["senderName"].str
         senderAvatar = j["senderAvatar"].str
+        senderAppearance = Appearance(j["senderAppearance"])
         text = j["text"].str
         encrypted = !j["ciphertext"].isNull
         replyTo = j["replyTo"].str
@@ -301,7 +304,7 @@ struct RoomChatView: View {
                 Button {
                     nav.push(.profile(message.sender))
                 } label: {
-                    AvatarView(person: Identity(id: message.sender, name: message.senderName, avatar: message.senderAvatar, handle: ""), size: 30)
+                    AvatarView(person: Identity(id: message.sender, name: message.senderName, avatar: message.senderAvatar, handle: "", appearance: message.senderAppearance), size: 30)
                 }
                 .buttonStyle(PressableStyle())
             }
@@ -333,10 +336,7 @@ struct RoomChatView: View {
             if (!mine && !joinsPrevious) || reply != nil {
                 VStack(alignment: .leading, spacing: 6) {
                     if !mine && !joinsPrevious {
-                        Text(message.senderName)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(Noct.lilac)
-                            .lineLimit(1)
+                        SenderName(name: message.senderName, look: message.senderAppearance)
                     }
                     if let reply {
                         BubbleQuote(name: reply.senderName, text: reply.text, accent: Noct.lilac)
@@ -402,5 +402,38 @@ struct RoomChatView: View {
             actions: actions,
             react: reactAction(message)
         ))
+    }
+}
+
+/// The author above a bubble in a group, as in Telegram: the name in the
+/// colour of their Premium palette with the badges after it.
+private struct SenderName: View {
+    let name: String
+    let look: Appearance
+
+    var body: some View {
+        HStack(spacing: 4) {
+            styled
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+            if look.verified {
+                VerifiedBadge(appearance: look, size: 14)
+            }
+            if look.premium {
+                PremiumBadge(appearance: look, size: 14)
+            }
+        }
+    }
+
+    @ViewBuilder private var styled: some View {
+        if look.hasDesign && look.nameGradient {
+            Text(name).foregroundStyle(
+                LinearGradient(colors: [look.theme.first, look.theme.second], startPoint: .leading, endPoint: .trailing)
+            )
+        } else if look.hasDesign {
+            Text(name).foregroundColor(look.theme.first)
+        } else {
+            Text(name).foregroundColor(Noct.lilac)
+        }
     }
 }

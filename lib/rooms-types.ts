@@ -25,6 +25,8 @@ export type RoomMessage = {
   replyTo: string | null;
   created: number;
   deletedAt: number;
+  /** The sender's premium, theme and badges (appearanceColumns). */
+  senderAppearance?: import('./appearance').Appearance;
 };
 export type RoomPreview = {
   id: string;

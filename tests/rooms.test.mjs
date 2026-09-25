@@ -232,6 +232,10 @@ await change('alice', {
   messageId: first.id,
 });
 assert.equal((await api.readRoom('bob', group.id)).messages[0].text, '');
+const sender = (await api.readRoom('bob', group.id)).messages[0];
+assert.equal(sender.senderAppearance.profileTheme, 'iris');
+assert.ok(!sender.senderAppearance.premium, 'Senders carry their appearance');
+assert.equal(sender.profileTheme, undefined);
 
 const invite = await change('alice', { action: 'invite', id: group.id });
 assert.match(invite.token, /^[a-f0-9]{64}$/);

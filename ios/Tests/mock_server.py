@@ -131,6 +131,9 @@ def room():
         bob: ("Боб", R["profileBob"]["avatar"]),
         carol: ("Кэрол", ""),
     }
+    # Bob has Premium: his name and star take his palette.
+    looks = {bob: {"verified": 0, "premium": 1, "boostLevel": 0, "profileTheme": "aurora", "nameGradient": 0}}
+    plain = {"verified": 0, "premium": 0, "boostLevel": 0, "profileTheme": "iris", "nameGradient": 0}
     # Many people: the counts show instead of faces.
     popular = [{"emoji": "👍", "count": 5, "own": 0}, {"emoji": "🔥", "count": 2, "own": 1}]
     lines = [
@@ -149,6 +152,7 @@ def room():
             reactions = with_own(reactions, STATE["roomReactions"][message_id])
         messages.append({
             "id": message_id, "roomId": ROOM, "sender": sender, "senderName": name, "senderAvatar": avatar,
+            "senderAppearance": looks.get(sender, plain),
             "text": text, "ciphertext": None, "replyTo": reply, "created": ROOM_START + index * 120000,
             "deletedAt": 0, "giveawayId": None, "reactions": reactions,
         })

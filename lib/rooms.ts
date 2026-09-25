@@ -9,6 +9,8 @@ import {
 import { parseReactions } from './message-reactions';
 import { COMMUNITY_ROOM_ID } from './community-group';
 import { ApiError } from './api-error';
+import { appearanceColumns, appearanceFrom } from './premium-access';
+import type { Appearance } from './appearance';
 import {
   validateSecretPublicKey,
   validateSecretEnvelope,
@@ -274,6 +276,18 @@ export async function resolveRoomInvite(
   if (!row) throw new ApiError(404, 'Приглашение отозвано или недоступно');
   return { room: preview(row) };
 }
+const APPEARANCE_KEYS = [
+  'verified',
+  'premium',
+  'boostLevel',
+  'profileTheme',
+  'nameGradient',
+  'ringText',
+  'chromeFlow',
+  'chromeTempo',
+  'avatarMotion',
+  'avatarMotionType',
+] as const;
 export async function readRoom(
   me: string,
   roomId: string,
@@ -308,6 +322,7 @@ export async function readRoom(
     .all<Omit<RoomMember, 'publicKey'> & { publicKey: string }>();
   const messages = await viewerQuery(
     `SELECT msg.id,msg.roomId,msg.sender,u.name AS senderName,u.avatar AS senderAvatar,msg.text,msg.ciphertext,msg.replyTo,msg.created,msg.deletedAt,msg.giveawayId,
+    ${appearanceColumns('u')},
     CASE WHEN r.kind='group' AND msg.deletedAt=0 AND msg.ciphertext IS NULL
       THEN ${reactionSummarySql('chat_room_message_reactions', 'msg.id', ':viewer')} ELSE '[]' END AS reactionData
     FROM chat_room_messages msg JOIN users u ON u.id=msg.sender JOIN chat_rooms r ON r.id=msg.roomId
@@ -319,7 +334,7 @@ export async function readRoom(
       roomId,
       ...(cursor ? [cursor.created, cursor.created, cursor.id] : []),
     )
-    .all<RoomMessage & { reactionData: string }>();
+    .all<RoomMessage & { reactionData: string } & Appearance>();
   const permission = await viewerQuery(
     `SELECT 1 FROM chat_rooms r WHERE r.id=? AND ${canSend('r', ':viewer')}`,
     me,
@@ -335,12 +350,18 @@ export async function readRoom(
       ...m,
       publicKey: m.publicKey ? JSON.parse(m.publicKey) : null,
     })),
-    messages: page.reverse().map(({ reactionData, ...message }) => ({
-      ...message,
-      ...(row.kind === 'group'
-        ? { reactions: parseReactions(reactionData) }
-        : {}),
-    })),
+    messages: page.reverse().map(({ reactionData, ...fields }) => {
+      // The sender's premium, theme and badge travel apart from the message.
+      const message: Record<string, unknown> = { ...fields };
+      for (const key of APPEARANCE_KEYS) delete message[key];
+      return {
+        ...(message as RoomMessage),
+        senderAppearance: appearanceFrom(fields) as Appearance,
+        ...(row.kind === 'group'
+          ? { reactions: parseReactions(reactionData) }
+          : {}),
+      };
+    }),
     canSend: !!permission,
     nextCursor:
       messages.results.length > PAGE_SIZE && oldest
