@@ -2,6 +2,9 @@ import AVFoundation
 import AVKit
 import SwiftUI
 import UIKit
+#if DEBUG
+import os
+#endif
 
 /// One video of the media viewer: the player, its time, what is loaded and
 /// how fast it plays, plus picture in picture. Controls are drawn by
@@ -266,22 +269,20 @@ enum ViewerOrientation {
         }
     }
 
-    /// The full-screen button: landscape, or back to portrait. While in
-    /// landscape the viewer also turns with the phone.
+    /// The full-screen button: landscape, or back to portrait. Only the
+    /// orientation asked for is allowed meanwhile: with portrait still
+    /// allowed UIKit kept the app upright. In full screen the video turns
+    /// between the two landscapes with the phone.
     static func toggleLandscape() {
         guard let scene else { return }
-        if isLandscape {
-            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in }
-            // Upright only once it has turned back.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                guard !isLandscape else { return }
-                AppDelegate.orientations = .portrait
-                refresh()
-            }
-        } else {
-            AppDelegate.orientations = .allButUpsideDown
-            refresh()
-            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { _ in }
+        let landscape = !isLandscape
+        AppDelegate.orientations = landscape ? .landscape : .portrait
+        refresh()
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeRight : .portrait)) { error in
+            #if DEBUG
+            Logger(subsystem: "com.noctgram.ios", category: "probe")
+                .notice("viewer rotation refused: \(error.localizedDescription, privacy: .public)")
+            #endif
         }
     }
 

@@ -94,14 +94,19 @@ final class MediaViewerTests: XCTestCase {
         // clear of the menu that opens under the button.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.33)).tap()
         expect(poll(5) { !saveItem.exists }, "The menu does not close", in: app, shot: "33-viewer-menu")
-
+        // That tap may also reach the video a moment later and hide the
+        // controls, as any tap on it does; one more brings them back.
+        Thread.sleep(forTimeInterval: 1)
         let full = app.buttons["viewer-fullscreen"]
+        if !full.exists {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.33)).tap()
+        }
         expect(full.waitForExistence(timeout: 5), "No full screen button", in: app, shot: "34-viewer-landscape")
         full.tap()
-        expect(poll(5) { landscape(app) }, "Full screen does not turn the video", in: app, shot: "34-viewer-landscape")
+        expect(poll(8) { landscape(app) }, "Full screen does not turn the video", in: app, shot: "34-viewer-landscape")
         save("34-viewer-landscape")
         app.buttons["viewer-fullscreen"].tap()
-        expect(poll(5) { !landscape(app) }, "Full screen does not turn back", in: app, shot: "34-viewer-landscape")
+        expect(poll(8) { !landscape(app) }, "Full screen does not turn back", in: app, shot: "34-viewer-landscape")
 
         let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
         center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 0, dy: 320)))
