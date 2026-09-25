@@ -78,13 +78,19 @@ final class MediaViewerTests: XCTestCase {
         return frame.width > frame.height
     }
 
+    /// The viewer itself, whatever XCUITest makes of it (it is modal, so it
+    /// may show as an alert).
+    private func viewer(_ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["media-viewer"]
+    }
+
     func testVideoViewerAnswersAndSwipesAway() {
         let app = launch()
         let back = open(video, in: app, shot: "32-viewer-video")
         save("32-viewer-video")
         back.tap()
         // Gone for good, not just its buttons: nothing stays over the feed.
-        expect(app.otherElements["media-viewer"].waitForNonExistence(timeout: 5), "«Назад» does not close the viewer", in: app, shot: "32-viewer-video")
+        expect(viewer(app).waitForNonExistence(timeout: 5), "«Назад» does not close the viewer", in: app, shot: "32-viewer-video")
 
         _ = open(video, in: app, shot: "33-viewer-menu")
         app.buttons["viewer-menu"].tap()
@@ -95,23 +101,28 @@ final class MediaViewerTests: XCTestCase {
         // clear of the menu that opens under the button.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.33)).tap()
         expect(poll(5) { !saveItem.exists }, "The menu does not close", in: app, shot: "33-viewer-menu")
-        // That tap may also reach the video a moment later and hide the
-        // controls, as any tap on it does; one more brings them back.
-        Thread.sleep(forTimeInterval: 1)
-        let full = app.buttons["viewer-fullscreen"]
-        if !full.exists {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.33)).tap()
-        }
-        expect(full.waitForExistence(timeout: 5), "No full screen button", in: app, shot: "34-viewer-landscape")
-        full.tap()
-        expect(poll(8) { landscape(app) }, "Full screen does not turn the video", in: app, shot: "34-viewer-landscape")
-        save("34-viewer-landscape")
-        app.buttons["viewer-fullscreen"].tap()
-        expect(poll(8) { !landscape(app) }, "Full screen does not turn back", in: app, shot: "34-viewer-landscape")
 
         let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
         center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 0, dy: 320)))
-        expect(app.otherElements["media-viewer"].waitForNonExistence(timeout: 5), "A swipe down does not close the viewer", in: app, shot: "35-viewer-swipe")
+        expect(viewer(app).waitForNonExistence(timeout: 5), "A swipe down does not close the viewer", in: app, shot: "35-viewer-swipe")
+        // And the feed answers again.
+        _ = open(video, in: app, shot: "35-viewer-swipe")
+    }
+
+    func testVideoFullScreenTurns() {
+        let app = launch()
+        _ = open(video, in: app, shot: "34-viewer-landscape")
+        let full = app.buttons["viewer-fullscreen"]
+        expect(full.waitForExistence(timeout: 5), "No full screen button", in: app, shot: "34-viewer-landscape")
+        let before = "button \(full.frame), hittable \(full.isHittable)"
+        full.tap()
+        let turned = poll(8) { landscape(app) }
+        expect(turned, "Full screen does not turn the video (\(before); window after \(app.windows.firstMatch.frame), button there \(full.exists))", in: app, shot: "34-viewer-landscape")
+        save("34-viewer-landscape")
+        app.buttons["viewer-fullscreen"].tap()
+        expect(poll(8) { !landscape(app) }, "Full screen does not turn back", in: app, shot: "34-viewer-landscape")
+        app.buttons["viewer-back"].tap()
+        expect(viewer(app).waitForNonExistence(timeout: 5), "«Назад» does not close the viewer after full screen", in: app, shot: "34-viewer-landscape")
     }
 
     func testPhotoViewerCloses() {
@@ -119,11 +130,11 @@ final class MediaViewerTests: XCTestCase {
         let back = open(photo, in: app, shot: "36-viewer-photo")
         save("36-viewer-photo")
         back.tap()
-        expect(app.otherElements["media-viewer"].waitForNonExistence(timeout: 5), "«Назад» does not close the photo", in: app, shot: "36-viewer-photo")
+        expect(viewer(app).waitForNonExistence(timeout: 5), "«Назад» does not close the photo", in: app, shot: "36-viewer-photo")
 
         _ = open(photo, in: app, shot: "37-viewer-photo-swipe")
         let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 0, dy: -320)))
-        expect(app.otherElements["media-viewer"].waitForNonExistence(timeout: 5), "A swipe up does not close the photo", in: app, shot: "37-viewer-photo-swipe")
+        expect(viewer(app).waitForNonExistence(timeout: 5), "A swipe up does not close the photo", in: app, shot: "37-viewer-photo-swipe")
     }
 }
