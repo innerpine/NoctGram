@@ -200,6 +200,7 @@ struct ThreadsView: View {
             set: { openRow = $0 ? item.id : (openRow == item.id ? nil : openRow) }
         )) {
             rowContent(item)
+                .accessibilityIdentifier("thread-" + item.id)
         }
     }
 

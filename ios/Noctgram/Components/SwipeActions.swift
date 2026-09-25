@@ -44,15 +44,16 @@ struct SwipeActionsRow<Content: View>: View {
                         .fill(Noct.card)
                         .opacity(progress > 0 ? 1 : 0)
                 }
-                .offset(x: offset)
                 .overlay {
                     if open {
-                        // An open row closes on a tap instead of opening the chat.
+                        // An open row closes on a tap instead of opening the
+                        // chat; it moves with the row, so the buttons stay free.
                         Color.clear
                             .contentShape(Rectangle())
                             .onTapGesture { close() }
                     }
                 }
+                .offset(x: offset)
                 .modifier(RevealGesture(open: open, changed: { drag = $0 }, ended: finish))
                 .accessibilityActions {
                     ForEach(actions) { action in
@@ -84,7 +85,9 @@ struct SwipeActionsRow<Content: View>: View {
                     .frame(width: slot)
                 }
                 .buttonStyle(PressableStyle())
-                .accessibilityHidden(true)
+                .accessibilityLabel(action.title)
+                .accessibilityIdentifier("swipe-" + action.title)
+                .accessibilityHidden(!open)
             }
         }
         .padding(.trailing, 6)

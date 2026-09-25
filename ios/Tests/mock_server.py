@@ -17,8 +17,9 @@ META, R = DATA["meta"], DATA["responses"]
 PORT, MODE, PUBLIC = int(sys.argv[1]), sys.argv[2], sys.argv[3]
 
 SIGNED_OUT = {"emailEnabled": True, "sitesEnabled": False, "user": None, "challenge": None}
-# Reactions and pins sent by the app (UI tests read them back in the dialogue).
-STATE = {"reactions": {}, "pins": {}, "roomReactions": {}}
+# Reactions and pins sent by the app (UI tests read them back in the dialogue),
+# and the dialogues it moved to the archive.
+STATE = {"reactions": {}, "pins": {}, "roomReactions": {}, "archived": set()}
 # A group for the gesture tests; its messages are an hour old when it starts.
 ROOM, ROOM_START = "room_night_walks", int(time.time() * 1000) - 3600000
 SOCIAL = {
@@ -181,6 +182,10 @@ def social(q):
         if q.get("includeTheme") == "1":
             return {"messages": messages, "theme": {"shared": "noct", "personal": None, "revision": 1}}
         return messages
+    if action == "threads":
+        # The archive holds what the app archived (ThreadSwipeTests).
+        rows = [dict(row, archivedAt=1 if row["id"] in STATE["archived"] else 0) for row in R["threads"]]
+        return [row for row in rows if bool(row["archivedAt"]) == (q.get("archived") == "1")]
     if action in ("comments", "notifications"):
         return [] if q.get("before") else R[action]
     name = SOCIAL.get(action)
@@ -277,6 +282,11 @@ class Handler(BaseHTTPRequestHandler):
                 STATE["reactions"][body.get("id")] = body.get("emoji")
             elif body.get("action") == "messagePin":
                 STATE["pins"][body.get("id")] = bool(body.get("value"))
+            elif body.get("action") == "archiveChat":
+                if body.get("archived"):
+                    STATE["archived"].add(body.get("peer"))
+                else:
+                    STATE["archived"].discard(body.get("peer"))
         elif path == "/api/rooms" and isinstance(body, dict) and body.get("action") == "reaction":
             STATE["roomReactions"][body.get("messageId")] = body.get("emoji")
         self.send(200, {"ok": True})
