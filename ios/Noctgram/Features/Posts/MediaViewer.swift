@@ -96,6 +96,8 @@ struct MediaViewer: View {
     @State private var notice: String?
     /// How far a swipe down (or up) has pulled the media away.
     @State private var pull: CGFloat = 0
+    /// How far a sideways swipe has moved the pages.
+    @State private var slide: CGFloat = 0
     /// Fades in once it is up.
     @State private var shown = false
     @StateObject private var videos = ViewerVideos()
@@ -119,16 +121,22 @@ struct MediaViewer: View {
             Color.black
                 .opacity(backdrop)
                 .ignoresSafeArea()
-            TabView(selection: $index) {
-                ForEach(Array(items.enumerated()), id: \.offset) { position, item in
-                    page(item)
-                        .tag(position)
+            // The pages side by side, moved by one pan for paging and
+            // closing. A TabView pager is not used: on iOS 26 the buttons
+            // drawn over it did not get their taps, the page under them did,
+            // so «Назад» only hid the controls.
+            GeometryReader { geometry in
+                HStack(spacing: 0) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                        page(item)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                    }
                 }
+                .offset(x: slide - CGFloat(index) * geometry.size.width)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
             .ignoresSafeArea()
             .offset(y: pull)
-            .modifier(SwipeToClose(changed: { pull = $0 }, ended: finishPull))
+            .modifier(ViewerDrag(pages: items.count > 1, changed: dragChanged, ended: dragEnded))
 
             if chrome && pull == 0 {
                 controls
@@ -372,6 +380,32 @@ struct MediaViewer: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { dismiss() }
     }
 
+    private func dragChanged(_ axis: ViewerAxis, _ distance: CGFloat) {
+        switch axis {
+        case .vertical:
+            pull = distance
+        case .horizontal:
+            // The first and the last page only give a little.
+            let beyond = (index == 0 && distance > 0) || (index == items.count - 1 && distance < 0)
+            slide = beyond ? distance / 3 : distance
+        }
+    }
+
+    /// Past a fifth of the screen, or a flick, turns the page.
+    private func dragEnded(_ axis: ViewerAxis, _ distance: CGFloat, _ speed: CGFloat) {
+        guard axis == .horizontal else {
+            finishPull(distance, speed)
+            return
+        }
+        var next = index
+        if distance < -80 || speed < -600 { next = min(items.count - 1, index + 1) }
+        if distance > 80 || speed > 600 { next = max(0, index - 1) }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
+            index = next
+            slide = 0
+        }
+    }
+
     /// A pull past 110 pt, or a flick, closes the viewer; less springs back.
     private func finishPull(_ distance: CGFloat, _ speed: CGFloat) {
         guard abs(distance) > 110 || abs(speed) > 900 else {
@@ -438,28 +472,53 @@ struct MediaViewer: View {
     }
 }
 
-/// Swiping the media down (or up) closes the viewer, as in Telegram. From
-/// iOS 18 a UIKit pan that starts only on a vertical pull: the pages keep
-/// their horizontal swipes, a zoomed photo keeps its own panning.
-private struct SwipeToClose: ViewModifier {
-    let changed: (CGFloat) -> Void
-    let ended: (CGFloat, CGFloat) -> Void
+/// Which way a drag of the viewer goes.
+enum ViewerAxis {
+    case horizontal, vertical
+}
+
+/// Dragging the media sideways turns the pages; down (or up) closes the
+/// viewer, as in Telegram. From iOS 18 one UIKit pan decides which by the
+/// first move; a zoomed photo keeps its own panning.
+private struct ViewerDrag: ViewModifier {
+    let pages: Bool
+    let changed: (ViewerAxis, CGFloat) -> Void
+    /// The way, the distance dragged and the speed at the end.
+    let ended: (ViewerAxis, CGFloat, CGFloat) -> Void
+    @State private var axis: ViewerAxis?
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
-            content.gesture(ClosePan(changed: changed, ended: ended))
+            content.gesture(ViewerPan(pages: pages, changed: changed, ended: ended))
         } else {
-            content
+            content.gesture(
+                DragGesture(minimumDistance: 12)
+                    .onChanged { value in
+                        let dx = value.translation.width, dy = value.translation.height
+                        if axis == nil {
+                            axis = abs(dy) > abs(dx) * 1.2 || !pages ? .vertical : .horizontal
+                        }
+                        guard let axis else { return }
+                        changed(axis, axis == .horizontal ? dx : dy)
+                    }
+                    .onEnded { value in
+                        let way = axis ?? .vertical
+                        axis = nil
+                        let distance = way == .horizontal ? value.translation.width : value.translation.height
+                        let predicted = way == .horizontal ? value.predictedEndTranslation.width : value.predictedEndTranslation.height
+                        ended(way, distance, (predicted - distance) * 4)
+                    }
+            )
         }
     }
 }
 
 @available(iOS 18.0, *)
-private struct ClosePan: UIGestureRecognizerRepresentable {
-    let changed: (CGFloat) -> Void
-    /// The distance pulled and the speed at the end.
-    let ended: (CGFloat, CGFloat) -> Void
+private struct ViewerPan: UIGestureRecognizerRepresentable {
+    let pages: Bool
+    let changed: (ViewerAxis, CGFloat) -> Void
+    let ended: (ViewerAxis, CGFloat, CGFloat) -> Void
 
     func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
         let pan = UIPanGestureRecognizer()
@@ -468,14 +527,18 @@ private struct ClosePan: UIGestureRecognizerRepresentable {
         return pan
     }
 
-    func updateUIGestureRecognizer(_ pan: UIPanGestureRecognizer, context: Context) {}
+    func updateUIGestureRecognizer(_ pan: UIPanGestureRecognizer, context: Context) {
+        context.coordinator.pages = pages
+    }
 
     func handleUIGestureRecognizerAction(_ pan: UIPanGestureRecognizer, context: Context) {
-        let dy = pan.translation(in: pan.view).y
+        let axis = context.coordinator.axis
+        let move = pan.translation(in: pan.view), speed = pan.velocity(in: pan.view)
+        let distance = axis == .horizontal ? move.x : move.y
         switch pan.state {
-        case .began, .changed: changed(dy)
-        case .ended: ended(dy, pan.velocity(in: pan.view).y)
-        case .cancelled, .failed: ended(0, 0)
+        case .began, .changed: changed(axis, distance)
+        case .ended: ended(axis, distance, axis == .horizontal ? speed.x : speed.y)
+        case .cancelled, .failed: ended(axis, 0, 0)
         default: break
         }
     }
@@ -485,17 +548,25 @@ private struct ClosePan: UIGestureRecognizerRepresentable {
     }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var pages = false
+        var axis: ViewerAxis = .vertical
+
         func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
             guard let pan = recognizer as? UIPanGestureRecognizer, let view = pan.view else { return false }
             var way = pan.translation(in: view)
             if way == .zero { way = pan.velocity(in: view) }
-            guard abs(way.y) > abs(way.x) * 1.2 else { return false }
             // A zoomed photo pans itself.
             var hit = view.hitTest(pan.location(in: view), with: nil)
             while let current = hit {
                 if let scroll = current as? UIScrollView, scroll.zoomScale > 1.01 { return false }
                 hit = current.superview
             }
+            if abs(way.y) > abs(way.x) * 1.2 {
+                axis = .vertical
+                return true
+            }
+            guard pages, abs(way.x) > abs(way.y) else { return false }
+            axis = .horizontal
             return true
         }
 
