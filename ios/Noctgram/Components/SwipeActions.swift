@@ -37,7 +37,12 @@ struct SwipeActionsRow<Content: View>: View {
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            buttons
+            // Only a row being pulled or open has its buttons, so closed
+            // rows carry no hidden ones.
+            if open || drag != 0 {
+                buttons
+                    .transition(.opacity)
+            }
             content()
                 .background {
                     RoundedRectangle(cornerRadius: 26, style: .continuous)

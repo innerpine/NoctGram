@@ -64,6 +64,8 @@ final class MediaViewerTests: XCTestCase {
             app.swipeUp(velocity: .slow)
         }
         expect(tile.exists, "No media tile in the feed", in: app, shot: shot)
+        // A viewer that left something behind would cover the feed here.
+        expect(poll(10) { tile.isHittable }, "The media tile cannot be tapped: something covers the feed", in: app, shot: shot)
         tile.tap()
         let back = app.buttons["viewer-back"]
         expect(back.waitForExistence(timeout: 10), "The viewer does not open", in: app, shot: shot)

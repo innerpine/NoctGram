@@ -49,6 +49,20 @@ final class ThreadSwipeTests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -220, dy: 0)))
     }
 
+    /// A button of the open row. Should there be several, they are printed
+    /// and the one that can be tapped is taken.
+    private func action(_ title: String, in app: XCUIApplication, shot: String) -> XCUIElement {
+        let matches = app.buttons.matching(identifier: "swipe-" + title)
+        expect(matches.firstMatch.waitForExistence(timeout: 5), "A swipe shows no «\(title)»", in: app, shot: shot)
+        let all = matches.allElementsBoundByIndex
+        if all.count > 1 {
+            for (index, match) in all.enumerated() {
+                print("swipe-\(title) #\(index): \(match.frame), hittable \(match.isHittable)")
+            }
+        }
+        return all.first { $0.isHittable } ?? matches.firstMatch
+    }
+
     private func row(in app: XCUIApplication, shot: String) -> XCUIElement {
         let row = app.buttons[carol]
         expect(row.waitForExistence(timeout: 20), "No chat with Carol", in: app, shot: shot)
@@ -58,8 +72,7 @@ final class ThreadSwipeTests: XCTestCase {
     func testSwipeArchivesAndReturnsAChat() {
         let app = launch()
         swipeLeft(row(in: app, shot: "38-thread-swipe"))
-        let archive = app.buttons["swipe-В архив"]
-        expect(archive.waitForExistence(timeout: 5), "A swipe shows no «В архив»", in: app, shot: "38-thread-swipe")
+        let archive = action("В архив", in: app, shot: "38-thread-swipe")
         expect(app.buttons["swipe-Удалить"].exists, "A swipe shows no «Удалить»", in: app, shot: "38-thread-swipe")
         save("38-thread-swipe")
         archive.tap()
@@ -67,8 +80,7 @@ final class ThreadSwipeTests: XCTestCase {
 
         app.buttons["Архив"].firstMatch.tap()
         swipeLeft(row(in: app, shot: "39-thread-archive"))
-        let back = app.buttons["swipe-Вернуть"]
-        expect(back.waitForExistence(timeout: 5), "No «Вернуть» in the archive", in: app, shot: "39-thread-archive")
+        let back = action("Вернуть", in: app, shot: "39-thread-archive")
         save("39-thread-archive")
         back.tap()
         expect(poll(8) { !app.buttons[carol].exists }, "The chat stays in the archive", in: app, shot: "39-thread-archive")
@@ -79,9 +91,7 @@ final class ThreadSwipeTests: XCTestCase {
     func testDeleteAsksAndATapCloses() {
         let app = launch()
         swipeLeft(row(in: app, shot: "40-thread-delete"))
-        let delete = app.buttons["swipe-Удалить"]
-        expect(delete.waitForExistence(timeout: 5), "A swipe shows no «Удалить»", in: app, shot: "40-thread-delete")
-        delete.tap()
+        action("Удалить", in: app, shot: "40-thread-delete").tap()
         let cancel = app.buttons["Отмена"]
         expect(cancel.waitForExistence(timeout: 5), "«Удалить» does not ask first", in: app, shot: "40-thread-delete")
         expect(app.buttons["Удалить у меня"].exists, "No «Удалить у меня»", in: app, shot: "40-thread-delete")
