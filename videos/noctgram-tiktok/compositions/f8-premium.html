@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-cyrillic.woff2) format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212, U+FEFF, U+FFFD; }
+        #root { position: absolute; inset: 0; color: #fff; font-family: 'Onest', sans-serif; perspective: 1800px; }
+        .f8-scene { position: absolute; inset: 0; }
+        .f8-label { position: absolute; left: 80px; top: 236px; font-family: 'JetBrains Mono', monospace; font-size: 34px; color: rgba(255, 255, 255, 0.62); display: flex; align-items: center; gap: 16px; }
+        .f8-label i { display: block; width: 14px; height: 14px; border-radius: 50%; background: #af9add; }
+        .f8-halo { position: absolute; left: 190px; top: 470px; width: 700px; height: 700px; border-radius: 50%; background: radial-gradient(closest-side, rgba(175, 154, 221, 0.5), rgba(120, 150, 255, 0.12) 60%, rgba(0, 0, 0, 0)); }
+        .f8-ring { position: absolute; left: 290px; top: 570px; width: 500px; height: 500px; }
+        .f8-ring text { font-family: 'JetBrains Mono', monospace; font-size: 29px; letter-spacing: 3px; fill: #c9b6ff; }
+        .f8-ava { position: absolute; left: 390px; top: 670px; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #e4dbff, #7b64bb 55%, #3a2d66); display: grid; place-items: center; font-weight: 800; font-size: 140px; color: #140f24; box-shadow: 0 0 0 6px #000, 0 0 0 9px rgba(175, 154, 221, 0.8); }
+        .f8-badge { position: absolute; left: 610px; top: 870px; width: 120px; }
+        .f8-gift { position: absolute; left: 0; top: 0; width: 250px; height: 250px; margin: -125px 0 0 -125px; transform-style: preserve-3d; }
+        .f8-gift div { width: 100%; height: 100%; }
+        .f8-chan { position: absolute; left: 80px; right: 80px; top: 1300px; height: 170px; border-radius: 40px; background: #0c0c0c; border: 2px solid rgba(255, 255, 255, 0.14); display: flex; align-items: center; gap: 26px; padding: 0 30px; }
+        .f8-chava { width: 108px; height: 108px; border-radius: 30px; background: #1a1530; position: relative; overflow: hidden; flex: none; }
+        .f8-chava span { position: absolute; left: 30px; top: 22px; width: 60px; height: 60px; border-radius: 50%; box-shadow: -14px 8px 0 0 #fff1c9; }
+        .f8-chname { font-weight: 800; font-size: 44px; letter-spacing: -0.02em; }
+        .f8-chmeta { font-family: 'JetBrains Mono', monospace; font-size: 26px; color: rgba(255, 255, 255, 0.55); margin-top: 4px; }
+        .f8-sub { margin-left: auto; height: 80px; padding: 0 34px; border-radius: 40px; background: #fff; color: #000; display: grid; place-items: center; font-weight: 800; font-size: 32px; }
+      </style>
+      <div id="root" data-composition-id="f8-premium" data-width="1080" data-height="1920">
+        <div class="f8-scene" id="f8-scene">
+          <div class="f8-label"><i></i><span>premium · подарки · каналы</span></div>
+          <div class="f8-halo" id="f8-halo"></div>
+          <svg class="f8-ring" id="f8-ring" viewBox="0 0 500 500">
+            <defs><path id="f8-circle" d="M250,250 m-212,0 a212,212 0 1,1 424,0 a212,212 0 1,1 -424,0" /></defs>
+            <text><textPath href="#f8-circle">NOCT PREMIUM · NOCT PREMIUM · NOCT PREMIUM · NOCT PREMIUM ·</textPath></text>
+          </svg>
+          <div class="f8-ava" id="f8-ava">л</div>
+          <img class="f8-badge" id="f8-badge" src="assets/noct-premium.png" alt="" />
+          <div class="f8-gift" data-angle="-145"><div id="f8-g1"></div></div>
+          <div class="f8-gift" data-angle="-35"><div id="f8-g2"></div></div>
+          <div class="f8-gift" data-angle="150"><div id="f8-g3"></div></div>
+          <div class="f8-chan" id="f8-chan">
+            <span class="f8-chava"><span></span></span>
+            <div><div class="f8-chname">ночные рисунки</div><div class="f8-chmeta">канал · @night.art</div></div>
+            <span class="f8-sub" id="f8-sub">Подписаться</span>
+          </div>
+        </div>
+      </div>
+      <script src="assets/lottie.min.js"></script>
+      <script>
+        (() => {
+          // Настоящие анимированные подарки из приложения (Lottie), сикаются рантаймом.
+          window.__hfLottie = window.__hfLottie || [];
+          [["f8-g1", "astral_shard"], ["f8-g2", "chill_flame"], ["f8-g3", "bonded_ring"]].forEach(([id, name]) => {
+            window.__hfLottie.push(lottie.loadAnimation({ container: document.getElementById(id), renderer: "svg", loop: true, autoplay: false, path: `assets/gifts/${name}.json` }));
+          });
+          const CX = 540, CY = 820, RX = 390, RY = 470;
+          const tl = gsap.timeline({ paused: true });
+          tl.fromTo(".f8-label", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.05);
+          // Вход после zoom-through: аватар из приближения и размытия.
+          tl.fromTo("#f8-ava", { scale: 1.5, opacity: 0, filter: "blur(18px)" }, { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.6, ease: "expo.out" }, 0);
+          tl.fromTo("#f8-halo", { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.9, ease: "power2.out" }, 0.1);
+          tl.fromTo("#f8-ring", { opacity: 0, rotation: -40, scale: 0.9 }, { opacity: 1, rotation: 0, scale: 1, duration: 0.8, ease: "power3.out" }, 0.25);
+          tl.to("#f8-ring", { rotation: 55, duration: 1.95, ease: "none" }, 1.05);
+          tl.fromTo("#f8-badge", { scale: 0.4, opacity: 0, rotation: -25 }, { scale: 1, opacity: 1, rotation: 0, duration: 0.5, ease: "power3.out" }, 0.45);
+          // Подарки: разворот из 3D на своих местах орбиты, затем медленный конечный ход по эллипсу.
+          document.querySelectorAll(".f8-gift").forEach((g, i) => {
+            const a0 = (Number(g.dataset.angle) * Math.PI) / 180;
+            const orbit = { p: 0 };
+            const place = () => {
+              const a = a0 + orbit.p * 0.45;
+              gsap.set(g, { x: CX + Math.cos(a) * RX, y: CY + Math.sin(a) * RY });
+            };
+            place();
+            tl.fromTo(g, { rotationY: -100, rotationX: 40, z: -500, opacity: 0 }, { rotationY: 0, rotationX: 0, z: 0, opacity: 1, duration: 0.7, ease: "power3.out" }, 0.55 + i * 0.12);
+            tl.fromTo(orbit, { p: 0 }, { p: 1, duration: 3, ease: "none", onUpdate: place }, 0);
+          });
+          tl.fromTo("#f8-chan", { opacity: 0, y: 120, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.55, ease: "expo.out" }, 1.55);
+          tl.fromTo("#f8-sub", { scale: 1 }, { scale: 0.94, duration: 0.09, ease: "power2.in", yoyo: true, repeat: 1 }, 2.3);
+          tl.to("#f8-sub", { backgroundColor: "#242424", color: "#ffffff", duration: 0.15, ease: "power2.out" }, 2.36);
+          tl.set("#f8-sub", { textContent: "Вы подписаны" }, 2.36);
+          tl.to("#f8-scene", { opacity: 0, scale: 0.96, filter: "blur(12px)", duration: 0.25, ease: "power2.in" }, 2.75);
+          window.__timelines["f8-premium"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

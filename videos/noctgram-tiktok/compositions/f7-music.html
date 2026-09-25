@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-cyrillic.woff2) format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212, U+FEFF, U+FFFD; }
+        #root { position: absolute; inset: 0; color: #fff; font-family: 'Onest', sans-serif; perspective: 1600px; }
+        .f7-label { position: absolute; left: 80px; top: 236px; font-family: 'JetBrains Mono', monospace; font-size: 34px; color: rgba(255, 255, 255, 0.62); display: flex; align-items: center; gap: 16px; }
+        .f7-label i { display: block; width: 14px; height: 14px; border-radius: 50%; background: #af9add; }
+        .f7-card { position: absolute; left: 110px; top: 400px; width: 860px; padding: 44px; border-radius: 48px; background: #0c0c0c; border: 2px solid rgba(255, 255, 255, 0.14); box-shadow: 0 60px 140px rgba(0, 0, 0, 0.7); }
+        .f7-cover { position: relative; width: 772px; height: 640px; border-radius: 32px; overflow: hidden; background: radial-gradient(circle at 70% 25%, #d7c8ff 0%, #8c74c9 28%, #2b2150 62%, #0e0b1c 100%); }
+        .f7-moon { position: absolute; left: 250px; top: 150px; width: 270px; height: 270px; border-radius: 50%; box-shadow: -46px 26px 0 0 #fff1c9; }
+        .f7-coverlab { position: absolute; left: 34px; bottom: 30px; font-family: 'JetBrains Mono', monospace; font-size: 26px; color: rgba(255, 255, 255, 0.75); }
+        .f7-row { display: flex; align-items: center; margin-top: 34px; }
+        .f7-title { font-weight: 800; font-size: 60px; letter-spacing: -0.03em; }
+        .f7-artist { font-family: 'JetBrains Mono', monospace; font-size: 30px; color: rgba(255, 255, 255, 0.55); margin-top: 6px; }
+        .f7-eq { margin-left: auto; display: flex; align-items: flex-end; gap: 10px; height: 90px; }
+        .f7-eq i { display: block; width: 16px; height: 90px; border-radius: 8px; background: #af9add; transform-origin: 50% 100%; }
+        .f7-bar { position: relative; height: 8px; margin-top: 34px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); }
+        .f7-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 4px; background: #fff; transform-origin: 0 50%; }
+        .f7-times { display: flex; justify-content: space-between; margin-top: 14px; font-family: 'JetBrains Mono', monospace; font-size: 26px; color: rgba(255, 255, 255, 0.5); }
+        .f7-together { position: absolute; left: 110px; top: 1420px; display: flex; align-items: center; gap: 22px; font-family: 'JetBrains Mono', monospace; font-size: 30px; color: rgba(255, 255, 255, 0.7); }
+        .f7-avas { display: flex; }
+        .f7-avas span { width: 76px; height: 76px; border-radius: 50%; border: 5px solid #000; margin-right: -22px; display: block; }
+      </style>
+      <div id="root" data-composition-id="f7-music" data-width="1080" data-height="1920">
+        <div class="f7-label" id="f7-label"><i></i><span>музыка</span></div>
+        <div class="f7-card" id="f7-card">
+          <div class="f7-cover"><span class="f7-moon"></span><span class="f7-coverlab">noct lofi · ночной альбом</span></div>
+          <div class="f7-row">
+            <div><div class="f7-title">лунный вальс</div><div class="f7-artist">noct lofi</div></div>
+            <div class="f7-eq"><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="f7-bar"><span class="f7-fill" id="f7-fill"></span></div>
+          <div class="f7-times"><span>1:12</span><span>2:48</span></div>
+        </div>
+        <div class="f7-together" id="f7-together">
+          <span class="f7-avas">
+            <span style="background: radial-gradient(circle at 35% 30%, #d9ccff, #6d58a8)"></span>
+            <span style="background: radial-gradient(circle at 35% 30%, #f7d3dc, #9a5a78)"></span>
+            <span style="background: radial-gradient(circle at 35% 30%, #bfe6dc, #3d7a6a)"></span>
+          </span>
+          <span>слушают вместе · 3</span>
+        </div>
+      </div>
+      <script>
+        (() => {
+          const tl = gsap.timeline({ paused: true });
+          tl.fromTo("#f7-label", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.05);
+          // Плеер приходит справа с 3D-поворотом и остаётся чуть развёрнутым.
+          tl.fromTo("#f7-card", { x: 260, rotationY: -34, rotationX: 6, opacity: 0, filter: "blur(14px)" }, { x: 0, rotationY: -9, rotationX: 3, opacity: 1, filter: "blur(0px)", duration: 0.8, ease: "expo.out" }, 0);
+          tl.fromTo("#f7-fill", { scaleX: 0.42 }, { scaleX: 0.47, duration: 2, ease: "none" }, 0);
+          // Эквалайзер на доли 120 BPM (0.5 с): удар на каждой доле, конечное число повторов.
+          document.querySelectorAll(".f7-eq i").forEach((bar, i) => {
+            const lo = 0.25 + ((i * 3) % 5) * 0.08;
+            tl.fromTo(bar, { scaleY: 1 - (i % 2) * 0.35 }, { scaleY: lo, duration: 0.5, ease: "power2.out", repeat: 3 }, 0);
+          });
+          tl.fromTo("#f7-together", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.75);
+          tl.fromTo(".f7-avas span", { scale: 0.6, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.35, ease: "power3.out", stagger: 0.07 }, 0.8);
+          // Zoom-through в Premium.
+          tl.to(["#f7-card", "#f7-together", "#f7-label"], { scale: 1.25, opacity: 0, filter: "blur(14px)", duration: 0.22, ease: "power2.in" }, 1.78);
+          window.__timelines["f7-music"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

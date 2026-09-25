@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-cyrillic.woff2) format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212, U+FEFF, U+FFFD; }
+        #root { position: absolute; inset: 0; color: #fff; font-family: 'Onest', sans-serif; }
+        .f3-block { position: absolute; left: 80px; right: 80px; top: 640px; }
+        .f3-lead { display: block; font-weight: 300; font-size: 112px; line-height: 1.08; letter-spacing: -0.035em; }
+        .f3-lead.f3-dim { color: rgba(255, 255, 255, 0.6); }
+        .f3-pill { position: relative; margin-top: 56px; height: 214px; width: 400px; border-radius: 107px; background: #af9add; overflow: hidden; }
+        .f3-tok { position: absolute; left: 56px; top: 0; height: 214px; display: flex; align-items: center; white-space: nowrap; color: #0b0914; font-weight: 800; font-size: 150px; letter-spacing: -0.045em; line-height: 1; }
+        .f3-rule { position: absolute; left: 80px; width: 920px; top: 1210px; height: 4px; border-radius: 2px; background: rgba(175, 154, 221, 0.45); transform-origin: 0 50%; }
+        .f3-count { position: absolute; right: 80px; top: 1240px; font-family: 'JetBrains Mono', monospace; font-size: 32px; color: rgba(255, 255, 255, 0.6); }
+      </style>
+      <div id="root" data-composition-id="f3-tokens" data-width="1080" data-height="1920">
+        <div class="f3-block" id="f3-block">
+          <span class="f3-lead" id="f3-l1">Всё, что нужно</span>
+          <span class="f3-lead f3-dim" id="f3-l2">ночью:</span>
+          <div class="f3-pill" id="f3-pill">
+            <span class="f3-tok">лента</span>
+            <span class="f3-tok">истории</span>
+            <span class="f3-tok">чаты</span>
+            <span class="f3-tok">звонки</span>
+            <span class="f3-tok">музыка</span>
+          </div>
+        </div>
+        <div class="f3-rule" id="f3-rule"></div>
+        <div class="f3-count" id="f3-count">01 / 05</div>
+      </div>
+      <script>
+        (() => {
+          document.fonts.ready.then(() => {
+            const tl = gsap.timeline({ paused: true });
+            const toks = Array.from(document.querySelectorAll(".f3-tok"));
+            const widths = toks.map((t) => t.offsetWidth + 112);
+            const AT = [0.5, 1.0, 1.5, 2.0, 2.5]; // доли 120 BPM
+            // Вход после zoom-through: из лёгкого приближения и размытия.
+            tl.fromTo(["#f3-l1", "#f3-l2"], { opacity: 0, scale: 1.12, filter: "blur(18px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.55, ease: "power3.out", stagger: 0.1, transformOrigin: "0% 50%" }, 0.02);
+            gsap.set("#f3-pill", { width: widths[0] });
+            tl.fromTo("#f3-pill", { opacity: 0, scaleX: 0.2 }, { opacity: 1, scaleX: 1, duration: 0.4, ease: "expo.out", transformOrigin: "0% 50%" }, AT[0] - 0.18);
+            gsap.set(toks, { opacity: 0 });
+            toks.forEach((tok, i) => {
+              if (i > 0) {
+                tl.to("#f3-pill", { width: widths[i], duration: 0.22, ease: "power3.inOut" }, AT[i] - 0.08);
+                tl.to(toks[i - 1], { opacity: 0, y: -60, duration: 0.1, ease: "power2.in" }, AT[i] - 0.06);
+              }
+              tl.fromTo(tok, { opacity: 0, y: 70, filter: "blur(10px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.26, ease: "expo.out" }, AT[i]);
+              tl.set("#f3-count", { textContent: `0${i + 1} / 05` }, AT[i]);
+            });
+            tl.fromTo("#f3-rule", { scaleX: 0 }, { scaleX: 1, duration: 2.3, ease: "none" }, 0.5);
+            tl.fromTo("#f3-count", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 0.5);
+            // Cut-the-curve влево: следующая сцена приходит справа налево.
+            tl.to(["#f3-block", "#f3-rule", "#f3-count"], { x: -180, opacity: 0, filter: "blur(10px)", duration: 0.22, ease: "power2.in", stagger: 0.02 }, 2.76);
+            window.__timelines["f3-tokens"] = tl;
+          });
+        })();
+      </script>
+    </template>
+  </body>
+</html>

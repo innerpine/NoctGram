@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-cyrillic.woff2) format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212, U+FEFF, U+FFFD; }
+        #root { position: absolute; inset: 0; color: #fff; font-family: 'Onest', sans-serif; }
+        .f1-time { position: absolute; left: 80px; top: 236px; display: flex; align-items: center; gap: 16px; font-family: 'JetBrains Mono', monospace; font-size: 34px; color: rgba(255, 255, 255, 0.6); letter-spacing: 0.02em; }
+        .f1-dot { display: block; width: 14px; height: 14px; border-radius: 50%; background: #af9add; }
+        .f1-stack { position: absolute; left: 80px; right: 80px; top: 760px; height: 420px; }
+        .f1-line { position: absolute; left: 0; top: 0; display: flex; flex-wrap: wrap; column-gap: 0.26em; font-weight: 800; font-size: 168px; line-height: 1.02; letter-spacing: -0.045em; }
+        .f1-w { display: block; }
+        .f1-accent { color: #af9add; }
+      </style>
+      <div id="root" data-composition-id="f1-hook" data-width="1080" data-height="1920">
+        <div class="f1-time"><span class="f1-dot"></span><span>02:14 · ночь</span></div>
+        <div class="f1-stack">
+          <div class="f1-line" id="f1-a"><span class="f1-w">Не</span><span class="f1-w">спится?</span></div>
+          <div class="f1-line" id="f1-b"><span class="f1-w">Нам</span><span class="f1-w f1-accent">тоже.</span></div>
+        </div>
+      </div>
+      <script>
+        (() => {
+          const tl = gsap.timeline({ paused: true });
+          const wa = document.querySelectorAll("#f1-a .f1-w");
+          const wb = document.querySelectorAll("#f1-b .f1-w");
+          tl.fromTo(".f1-time", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.8, ease: "power2.out" }, 0.1);
+          // «Не спится?» — по словам, из размытия.
+          tl.fromTo(wa, { opacity: 0, y: 46, filter: "blur(22px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: "power3.out", stagger: 0.16 }, 0.22);
+          // Склейка на пике скорости: первая строка уходит вверх, вторая приходит снизу тем же направлением.
+          tl.to(wa, { opacity: 0, y: -90, filter: "blur(14px)", duration: 0.2, ease: "power2.in", stagger: 0.03 }, 1.42);
+          tl.fromTo(wb, { opacity: 0, y: 110, filter: "blur(16px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.5, ease: "expo.out", stagger: 0.09 }, 1.6);
+          // Выход в знак: лёгкое отдаление и размытие.
+          tl.to(".f1-stack", { scale: 0.94, opacity: 0, filter: "blur(12px)", duration: 0.25, ease: "power2.in", transformOrigin: "0% 50%" }, 2.75);
+          tl.to(".f1-time", { opacity: 0, duration: 0.2, ease: "power2.in" }, 2.8);
+          window.__timelines["f1-hook"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

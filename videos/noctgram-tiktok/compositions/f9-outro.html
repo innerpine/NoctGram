@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-cyrillic.woff2) format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212, U+FEFF, U+FFFD; }
+        @font-face { font-family: 'Instrument Sans'; font-weight: 600; src: url(assets/fonts/instrumentsans-600-latin.woff2) format('woff2'); }
+        #root { position: absolute; inset: 0; color: #fff; font-family: 'Onest', sans-serif; }
+        .f9-all { position: absolute; inset: 0; }
+        .f9-slogan { position: absolute; left: 80px; right: 80px; top: 700px; }
+        .f9-line { display: flex; flex-wrap: wrap; column-gap: 0.26em; font-weight: 800; font-size: 176px; line-height: 1.12; letter-spacing: -0.05em; }
+        .f9-w { display: block; }
+        .f9-accent { color: #af9add; }
+        .f9-lock { position: absolute; left: 0; right: 0; top: 0; bottom: 0; }
+        .f9-bloom { position: absolute; left: 240px; top: 530px; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(closest-side, rgba(175, 154, 221, 0.5), rgba(175, 154, 221, 0.1) 60%, rgba(0, 0, 0, 0)); }
+        .f9-logo { position: absolute; left: 400px; top: 690px; width: 280px; height: 280px; }
+        .f9-mask { position: absolute; left: 0; right: 0; top: 1010px; height: 180px; overflow: hidden; display: flex; justify-content: center; }
+        .f9-word { display: block; font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 140px; line-height: 1.22; letter-spacing: -0.035em; }
+        .f9-sub { position: absolute; left: 0; right: 0; top: 1210px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 34px; color: rgba(255, 255, 255, 0.62); }
+      </style>
+      <div id="root" data-composition-id="f9-outro" data-width="1080" data-height="1920">
+        <div class="f9-all" id="f9-all">
+          <div class="f9-slogan" id="f9-slogan">
+            <div class="f9-line"><span class="f9-w">Ночью</span></div>
+            <div class="f9-line"><span class="f9-w">не</span><span class="f9-w f9-accent">одиноко.</span></div>
+          </div>
+          <div class="f9-lock">
+            <div class="f9-bloom" id="f9-bloom"></div>
+            <img class="f9-logo" id="f9-logo" src="assets/noctgram-logo.png" alt="" />
+            <div class="f9-mask"><span class="f9-word" id="f9-word">noctgram</span></div>
+            <div class="f9-sub" id="f9-sub">соцсеть для тех, кто не спит</div>
+          </div>
+        </div>
+      </div>
+      <script>
+        (() => {
+          const tl = gsap.timeline({ paused: true });
+          // Слоган по словам; самое медленное появление в ролике — вес и пауза.
+          tl.fromTo(".f9-w", { opacity: 0, y: 60, filter: "blur(26px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.85, ease: "power3.out", stagger: 0.2 }, 0.12);
+          tl.to("#f9-slogan", { y: -120, opacity: 0, filter: "blur(14px)", duration: 0.3, ease: "power2.in" }, 1.7);
+          // Локап: знак из размытия, свечение, слово маской.
+          tl.fromTo("#f9-bloom", { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 1.2, ease: "power2.out" }, 1.95);
+          tl.fromTo("#f9-logo", { opacity: 0, scale: 0.72, filter: "blur(20px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.8, ease: "expo.out" }, 2.0);
+          tl.fromTo("#f9-word", { yPercent: 105 }, { yPercent: 0, duration: 0.65, ease: "expo.out" }, 2.3);
+          tl.fromTo("#f9-sub", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 2.6);
+          // Единственный выход в конце ролика — в чёрное.
+          tl.to("#f9-all", { opacity: 0, duration: 0.45, ease: "power2.in" }, 3.55);
+          window.__timelines["f9-outro"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

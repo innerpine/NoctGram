@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        #root { position: absolute; inset: 0; overflow: hidden; background: #000; }
+        .bg-glow { position: absolute; left: 50%; top: 50%; width: 1800px; height: 1800px; margin: -900px 0 0 -900px; border-radius: 50%; background: radial-gradient(closest-side, rgba(175, 154, 221, 0.2), rgba(175, 154, 221, 0.07) 55%, rgba(0, 0, 0, 0) 100%); }
+        .bg-grain { position: absolute; inset: -600px; background-image: url(assets/grain.png); background-size: 512px 512px; mix-blend-mode: overlay; opacity: 0.16; }
+      </style>
+      <div id="root" data-composition-id="bg" data-width="1080" data-height="1920">
+        <div class="bg-glow" id="bg-glow"></div>
+        <div class="bg-grain" id="bg-grain"></div>
+      </div>
+      <script>
+        (() => {
+          const tl = gsap.timeline({ paused: true });
+          // Зерно плёнки скачет по 1/12 с — детерминированно.
+          tl.fromTo("#bg-grain", { x: 0, y: 0 }, { x: -173 * 3, y: -97 * 3, duration: 28, ease: "steps(336)" }, 0);
+          // Свечение переезжает только на склейках — мотивированно, без «дыхания».
+          const keys = [[3, 0, -80, 1.15], [6, -220, 120, 1.0], [9, 0, 0, 1.25], [12, 160, 60, 1.0], [15.5, -160, 160, 1.0], [19, 120, -60, 1.1], [21, 0, -120, 1.2], [24, 0, 120, 1.05]];
+          tl.set("#bg-glow", { x: 0, y: 420, scale: 1 }, 0);
+          keys.forEach(([t, x, y, s]) => tl.to("#bg-glow", { x, y, scale: s, duration: 0.6, ease: "power3.inOut" }, t - 0.2));
+          tl.to("#bg-glow", { opacity: 0, duration: 0.5, ease: "power2.in" }, 27.4);
+          window.__timelines["bg"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

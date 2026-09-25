@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-cyrillic.woff2) format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212, U+FEFF, U+FFFD; }
+        #root { position: absolute; inset: 0; color: #fff; font-family: 'Onest', sans-serif; }
+        .f5-scene { position: absolute; inset: 0; }
+        .f5-label { position: absolute; left: 80px; top: 236px; height: 44px; width: 600px; font-family: 'JetBrains Mono', monospace; font-size: 34px; color: rgba(255, 255, 255, 0.62); }
+        .f5-label span { position: absolute; left: 30px; top: 0; white-space: nowrap; }
+        .f5-label i { position: absolute; left: 0; top: 14px; width: 14px; height: 14px; border-radius: 50%; background: #af9add; }
+        .f5-card { position: absolute; left: 80px; top: 450px; width: 920px; padding: 40px; border-radius: 40px; background: #0c0c0c; border: 2px solid rgba(255, 255, 255, 0.14); overflow: hidden; }
+        .f5-head { display: flex; align-items: center; gap: 22px; }
+        .f5-ava { width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #d9ccff, #6d58a8); display: grid; place-items: center; font-weight: 800; font-size: 44px; color: #120e20; flex: none; }
+        .f5-name { font-weight: 800; font-size: 42px; letter-spacing: -0.02em; }
+        .f5-handle { font-family: 'JetBrains Mono', monospace; font-size: 28px; color: rgba(255, 255, 255, 0.55); margin-top: 4px; }
+        .f5-more { margin-left: auto; font-weight: 800; font-size: 44px; color: rgba(255, 255, 255, 0.6); }
+        .f5-text { margin-top: 30px; font-weight: 400; font-size: 42px; line-height: 1.3; }
+        .f5-img { display: block; margin-top: 26px; width: 836px; height: 600px; object-fit: cover; border-radius: 26px; }
+        .f5-actions { display: flex; align-items: center; gap: 44px; margin-top: 30px; font-size: 36px; color: rgba(255, 255, 255, 0.75); }
+        .f5-act { display: flex; align-items: center; gap: 14px; }
+        .f5-ic { position: relative; width: 48px; height: 48px; }
+        .f5-ic svg { position: absolute; inset: 0; width: 48px; height: 48px; }
+        .f5-tick { position: relative; height: 44px; overflow: hidden; }
+        .f5-tick div { height: 44px; line-height: 44px; }
+        .f5-views { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 28px; color: rgba(255, 255, 255, 0.5); }
+        .f5-gold { color: #ffd36a; }
+        .f5-sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 590px; padding: 30px 40px 40px; background: #161616; border-top: 2px solid rgba(255, 255, 255, 0.14); border-radius: 40px 40px 0 0; }
+        .f5-grab { width: 90px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.2); margin: 0 auto 30px; }
+        .f5-sh-head { display: flex; align-items: center; gap: 24px; }
+        .f5-sh-head img { width: 118px; }
+        .f5-sh-title { font-weight: 800; font-size: 48px; letter-spacing: -0.02em; }
+        .f5-sh-sub { font-family: 'JetBrains Mono', monospace; font-size: 26px; color: rgba(255, 255, 255, 0.55); margin-top: 6px; }
+        .f5-chips { display: flex; gap: 18px; margin-top: 34px; }
+        .f5-chip { flex: 1; height: 96px; border-radius: 48px; display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-size: 36px; background: rgba(255, 255, 255, 0.06); border: 2px solid rgba(255, 255, 255, 0.1); }
+        .f5-chip.f5-on { background: #ffd36a; color: #1d1604; border-color: #ffd36a; }
+        .f5-send { margin-top: 34px; height: 116px; border-radius: 58px; background: #fff; color: #000; display: grid; place-items: center; font-weight: 800; font-size: 42px; }
+        .f5-touch { position: absolute; left: 0; top: 0; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 50%; background: rgba(255, 255, 255, 0.26); border: 3px solid rgba(255, 255, 255, 0.85); }
+        .f5-ripple { position: absolute; left: 0; top: 0; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.8); opacity: 0; }
+        .f5-spark { position: absolute; left: 0; top: 0; width: 40px; height: 40px; margin: -20px 0 0 -20px; opacity: 0; }
+        .f5-plus { position: absolute; left: 0; top: 0; font-family: 'JetBrains Mono', monospace; font-size: 44px; color: #ffd36a; opacity: 0; white-space: nowrap; }
+      </style>
+      <div id="root" data-composition-id="f5-feed" data-width="1080" data-height="1920">
+        <div class="f5-scene" id="f5-scene">
+          <div class="f5-label"><i></i><span id="f5-lab1">лента</span><span id="f5-lab2">noct stars</span></div>
+          <div class="f5-card" id="f5-card">
+            <div class="f5-head">
+              <span class="f5-ava">л</span>
+              <div><div class="f5-name">лёва</div><div class="f5-handle">@leva.moon · 2 мин</div></div>
+              <span class="f5-more">···</span>
+            </div>
+            <div class="f5-text">нарисовал луну, пока не спалось</div>
+            <img class="f5-img" src="assets/post-moon.jpg" alt="" />
+            <div class="f5-actions">
+              <div class="f5-act">
+                <span class="f5-ic" id="f5-heart">
+                  <svg viewBox="0 0 24 24"><path fill="none" stroke="#fff" stroke-width="1.8" d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.6l.9.9.9-.9A4.6 4.6 0 0 1 19.4 13z"/></svg>
+                  <svg viewBox="0 0 24 24" id="f5-heart-fill" style="opacity: 0"><path fill="#fff" d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.6l.9.9.9-.9A4.6 4.6 0 0 1 19.4 13z"/></svg>
+                </span>
+                <span class="f5-tick"><div id="f5-count"><div>128</div><div>129</div></div></span>
+              </div>
+              <div class="f5-act">
+                <span class="f5-ic"><svg viewBox="0 0 24 24"><path fill="none" stroke="#fff" stroke-width="1.8" d="M4 5h16v11H9l-5 4z"/></svg></span>
+                <span>14</span>
+              </div>
+              <div class="f5-act f5-gold" id="f5-starbtn">
+                <span class="f5-ic"><svg viewBox="0 0 24 24"><path fill="none" stroke="#ffd36a" stroke-width="1.8" d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-2.9-5.4 2.9 1.1-6-4.5-4.2 6.1-.8z"/></svg></span>
+                <span>поддержать</span>
+              </div>
+              <span class="f5-views">2,4 тыс.</span>
+            </div>
+            <div class="f5-sheet" id="f5-sheet">
+              <div class="f5-grab"></div>
+              <div class="f5-sh-head">
+                <img src="assets/noct-stars.png" alt="" />
+                <div><div class="f5-sh-title">Поддержать автора</div><div class="f5-sh-sub">noct stars · @leva.moon</div></div>
+              </div>
+              <div class="f5-chips"><span class="f5-chip">10</span><span class="f5-chip f5-on">50</span><span class="f5-chip">100</span><span class="f5-chip">500</span></div>
+              <div class="f5-send" id="f5-send">Отправить 50 ★</div>
+            </div>
+          </div>
+          <div class="f5-ripple" id="f5-rip1"></div>
+          <div class="f5-ripple" id="f5-rip2"></div>
+          <div class="f5-touch" id="f5-touch"></div>
+          <div class="f5-plus" id="f5-plus">+50 ★</div>
+        </div>
+      </div>
+      <script>
+        (() => {
+          document.fonts.ready.then(() => {
+            const root = document.querySelector('[data-composition-id="f5-feed"]');
+            // Центр элемента в координатах сцены — по раскладке, без учёта трансформаций.
+            const center = (el) => {
+              let x = el.offsetWidth / 2, y = el.offsetHeight / 2;
+              while (el && el !== root) { x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent; }
+              return [x, y];
+            };
+            const scene = document.getElementById("f5-scene");
+            const sparks = [];
+            for (let i = 0; i < 14; i++) {
+              const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+              s.setAttribute("viewBox", "0 0 24 24");
+              s.setAttribute("class", "f5-spark");
+              s.innerHTML = '<path fill="#ffd36a" d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-2.9-5.4 2.9 1.1-6-4.5-4.2 6.1-.8z"/>';
+              scene.appendChild(s);
+              sparks.push(s);
+            }
+            const heart = center(document.getElementById("f5-heart"));
+            const star = center(document.getElementById("f5-starbtn"));
+            const send = center(document.getElementById("f5-send"));
+            const tl = gsap.timeline({ paused: true });
+            gsap.set("#f5-lab2", { opacity: 0 });
+            tl.fromTo(".f5-label", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.5, ease: "power2.out" }, 0.1);
+            // Пост приходит из глубины после zoom-through.
+            tl.fromTo("#f5-card", { opacity: 0, y: 180, rotationX: 20, scale: 0.9, filter: "blur(14px)", transformPerspective: 1600 }, { opacity: 1, y: 0, rotationX: 0, scale: 1, filter: "blur(0px)", duration: 0.75, ease: "power3.out", transformOrigin: "50% 100%" }, 0);
+            tl.fromTo("#f5-sheet", { yPercent: 104 }, { yPercent: 0, duration: 0.45, ease: "power3.out" }, 1.95);
+            tl.to(".f5-actions", { opacity: 0, duration: 0.15, ease: "power2.in" }, 1.98);
+            // Касание: палец → сердце.
+            tl.fromTo("#f5-touch", { x: heart[0] + 260, y: heart[1] + 420, opacity: 0, scale: 1.2 }, { x: heart[0], y: heart[1], opacity: 1, scale: 1, duration: 0.42, ease: "power3.inOut" }, 0.78);
+            tl.to("#f5-touch", { scale: 0.82, duration: 0.08, ease: "power2.in", yoyo: true, repeat: 1 }, 1.2);
+            gsap.set(["#f5-rip1", "#f5-rip2"], { x: heart[0], y: heart[1] });
+            tl.fromTo("#f5-rip1", { scale: 0.4, opacity: 0.9 }, { scale: 1.6, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false }, 1.22);
+            tl.fromTo("#f5-heart-fill", { opacity: 0 }, { opacity: 1, duration: 0.06, ease: "none" }, 1.24);
+            tl.fromTo("#f5-heart", { scale: 1 }, { scale: 1.28, duration: 0.12, ease: "power2.out", yoyo: true, repeat: 1 }, 1.24);
+            tl.fromTo("#f5-count", { y: 0 }, { y: -44, duration: 0.3, ease: "power3.out" }, 1.26);
+            // Палец → «поддержать».
+            tl.to("#f5-touch", { x: star[0], y: star[1], duration: 0.34, ease: "power3.inOut" }, 1.52);
+            tl.to("#f5-touch", { scale: 0.82, duration: 0.08, ease: "power2.in", yoyo: true, repeat: 1 }, 1.88);
+            tl.fromTo("#f5-starbtn", { scale: 1 }, { scale: 0.92, duration: 0.08, ease: "power2.in", yoyo: true, repeat: 1 }, 1.88);
+            tl.to("#f5-lab1", { opacity: 0, y: -20, duration: 0.12, ease: "power2.in" }, 1.95);
+            tl.fromTo("#f5-lab2", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 2.02);
+            // Палец → «Отправить».
+            tl.to("#f5-touch", { x: send[0] + 120, y: send[1], duration: 0.36, ease: "power3.inOut" }, 2.32);
+            tl.to("#f5-touch", { scale: 0.82, duration: 0.08, ease: "power2.in", yoyo: true, repeat: 1 }, 2.7);
+            tl.fromTo("#f5-send", { scale: 1 }, { scale: 0.95, duration: 0.09, ease: "power2.in", yoyo: true, repeat: 1 }, 2.7);
+            tl.set("#f5-rip2", { x: send[0] + 120, y: send[1] }, 2.7);
+            tl.fromTo("#f5-rip2", { scale: 0.4, opacity: 0.9 }, { scale: 1.8, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false }, 2.72);
+            tl.to("#f5-touch", { opacity: 0, duration: 0.2, ease: "power2.in" }, 2.95);
+            // Золотые искры — детерминированные углы по индексу.
+            sparks.forEach((s, i) => {
+              const a = -Math.PI / 2 + (i - 6.5) * 0.2;
+              const d = 260 + (i % 4) * 70;
+              tl.fromTo(s, { x: send[0], y: send[1], scale: 0.4, opacity: 1, rotation: 0 }, { x: send[0] + Math.cos(a) * d * 1.3, y: send[1] + Math.sin(a) * d, scale: 1 + (i % 3) * 0.3, opacity: 0, rotation: (i % 2 ? 1 : -1) * 90, duration: 0.6, ease: "power3.out", immediateRender: false }, 2.74 + (i % 5) * 0.02);
+            });
+            const hdr = center(document.querySelector(".f5-sh-title"));
+            tl.fromTo("#f5-plus", { x: 770, y: hdr[1] - 10, opacity: 0 }, { y: hdr[1] - 60, opacity: 1, duration: 0.4, ease: "power3.out" }, 2.76);
+            // Выход вверх — тем же направлением, что и вход следующей сцены.
+            tl.to("#f5-scene", { y: -260, opacity: 0, filter: "blur(12px)", duration: 0.22, ease: "power2.in" }, 3.28);
+            window.__timelines["f5-feed"] = tl;
+          });
+        })();
+      </script>
+    </template>
+  </body>
+</html>

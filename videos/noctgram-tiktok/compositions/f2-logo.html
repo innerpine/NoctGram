@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        @font-face { font-family: 'Instrument Sans'; font-weight: 600; src: url(assets/fonts/instrumentsans-600-latin.woff2) format('woff2'); }
+        #root { position: absolute; inset: 0; color: #fff; }
+        .f2-group { position: absolute; inset: 0; }
+        #f2-canvas { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+        .f2-bloom { position: absolute; left: 190px; top: 450px; width: 700px; height: 700px; border-radius: 50%; background: radial-gradient(closest-side, rgba(175, 154, 221, 0.55), rgba(175, 154, 221, 0.12) 60%, rgba(0, 0, 0, 0)); }
+        .f2-logo { position: absolute; left: 350px; top: 610px; width: 380px; height: 380px; }
+        .f2-mask { position: absolute; left: 0; right: 0; top: 1060px; height: 190px; overflow: hidden; display: flex; justify-content: center; }
+        .f2-word { display: block; font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 150px; line-height: 1.2; letter-spacing: -0.035em; }
+        .f2-sub { position: absolute; left: 0; right: 0; top: 1268px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 34px; color: rgba(255, 255, 255, 0.62); }
+      </style>
+      <div id="root" data-composition-id="f2-logo" data-width="1080" data-height="1920">
+        <div class="f2-group" id="f2-group">
+          <div class="f2-bloom" id="f2-bloom"></div>
+          <canvas id="f2-canvas" width="1080" height="1920"></canvas>
+          <img class="f2-logo" id="f2-mark" src="assets/noctgram-logo.png" alt="" />
+          <div class="f2-mask"><span class="f2-word" id="f2-word">noctgram</span></div>
+          <div class="f2-sub" id="f2-sub">соцсеть для тех, кто не спит</div>
+        </div>
+      </div>
+      <script>
+        (() => {
+          const CX = 540, CY = 800, SIZE = 380, F = 900;
+          const G = Math.PI * (3 - Math.sqrt(5));
+          const canvas = document.getElementById("f2-canvas");
+          const ctx = canvas.getContext("2d");
+          const img = new Image();
+          img.src = "assets/noctgram-logo.png";
+          img.decode().then(() => {
+            // Точки берём из белой заливки настоящего логотипа.
+            const off = document.createElement("canvas");
+            off.width = off.height = SIZE;
+            const o = off.getContext("2d");
+            o.drawImage(img, 0, 0, SIZE, SIZE);
+            const data = o.getImageData(0, 0, SIZE, SIZE).data;
+            const targets = [];
+            for (let y = 0; y < SIZE; y += 6) {
+              for (let x = 0; x < SIZE; x += 6) {
+                const k = (y * SIZE + x) * 4;
+                if (data[k + 3] > 200 && data[k] > 200) targets.push([CX - SIZE / 2 + x, CY - SIZE / 2 + y]);
+              }
+            }
+            const parts = targets.map(([tx, ty], i) => {
+              const a = i * G;
+              const r = 280 + ((i * 37) % 97) / 97 * 560;
+              return {
+                tx, ty,
+                sx: CX + Math.cos(a) * r,
+                sy: CY + Math.sin(a) * r * 1.35,
+                sz: -300 + ((i * 53) % 101) / 101 * 1500,
+                d: ((i * 7) % 31) / 31 * 0.35,
+                lilac: i % 3 === 0,
+              };
+            });
+            const state = { p: 0 };
+            const draw = () => {
+              const T = state.p * 3; // секунды внутри сцены
+              ctx.clearRect(0, 0, 1080, 1920);
+              for (const pt of parts) {
+                const q = Math.min(1, Math.max(0, (T - 0.12 - pt.d) / 1.25));
+                const e = q >= 1 ? 1 : 1 - Math.pow(2, -10 * q);
+                const swirl = (1 - e) * 0.9;
+                const dx = pt.sx - CX, dy = pt.sy - CY;
+                const rx = CX + dx * Math.cos(swirl) - dy * Math.sin(swirl);
+                const ry = CY + dx * Math.sin(swirl) + dy * Math.cos(swirl);
+                const x = rx + (pt.tx - rx) * e, y = ry + (pt.ty - ry) * e;
+                const z = pt.sz * (1 - e);
+                const s = F / (F + z);
+                const px = CX + (x - CX) * s, py = CY + (y - CY) * s;
+                ctx.globalAlpha = Math.min(1, 0.18 + 0.82 * e) * Math.min(1, T / 0.35);
+                ctx.fillStyle = pt.lilac ? "#c9b6ff" : "#ffffff";
+                ctx.beginPath();
+                ctx.arc(px, py, 2.6 * s, 0, Math.PI * 2);
+                ctx.fill();
+              }
+              ctx.globalAlpha = 1;
+            };
+            const tl = gsap.timeline({ paused: true });
+            tl.fromTo(state, { p: 0 }, { p: 1, duration: 3, ease: "none", onUpdate: draw }, 0);
+            tl.fromTo("#f2-bloom", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 1.1, ease: "power2.out" }, 1.1);
+            tl.fromTo("#f2-mark", { opacity: 0, scale: 0.97 }, { opacity: 1, scale: 1, duration: 0.45, ease: "power3.out" }, 1.38);
+            tl.fromTo("#f2-canvas", { opacity: 1 }, { opacity: 0, duration: 0.4, ease: "power2.in" }, 1.55);
+            tl.fromTo("#f2-word", { yPercent: 105 }, { yPercent: 0, duration: 0.6, ease: "expo.out" }, 1.72);
+            tl.fromTo("#f2-sub", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 2.05);
+            // Zoom-through в следующую сцену.
+            tl.to("#f2-group", { scale: 1.35, opacity: 0, filter: "blur(16px)", duration: 0.25, ease: "power2.in", transformOrigin: "50% 42%" }, 2.75);
+            window.__timelines["f2-logo"] = tl;
+          });
+        })();
+      </script>
+    </template>
+  </body>
+</html>

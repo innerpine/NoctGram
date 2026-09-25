@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-cyrillic.woff2) format('woff2'); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+        @font-face { font-family: 'Onest'; font-weight: 300 800; src: url(assets/fonts/onest-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212, U+FEFF, U+FFFD; }
+        #root { position: absolute; inset: 0; color: #fff; font-family: 'Onest', sans-serif; }
+        .f6-scene { position: absolute; inset: 0; }
+        .f6-label { position: absolute; left: 80px; top: 236px; font-family: 'JetBrains Mono', monospace; font-size: 34px; color: rgba(255, 255, 255, 0.62); display: flex; align-items: center; gap: 16px; }
+        .f6-label i { display: block; width: 14px; height: 14px; border-radius: 50%; background: #af9add; }
+        .f6-head { position: absolute; left: 80px; right: 80px; top: 360px; height: 150px; display: flex; align-items: center; gap: 26px; padding: 0 34px; border-radius: 40px; background: #0c0c0c; border: 2px solid rgba(255, 255, 255, 0.14); }
+        .f6-ava { position: relative; width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #f7d3dc, #9a5a78); display: grid; place-items: center; font-weight: 800; font-size: 44px; color: #26101a; flex: none; }
+        .f6-ava b { position: absolute; right: 0; bottom: 2px; width: 26px; height: 26px; border-radius: 50%; background: #3ecf8e; border: 5px solid #0c0c0c; }
+        .f6-name { font-weight: 800; font-size: 44px; letter-spacing: -0.02em; }
+        .f6-status { font-family: 'JetBrains Mono', monospace; font-size: 26px; color: rgba(255, 255, 255, 0.55); margin-top: 4px; }
+        .f6-list { position: absolute; left: 80px; right: 80px; top: 580px; }
+        .f6-msg { position: absolute; max-width: 700px; padding: 28px 38px; font-size: 44px; line-height: 1.25; white-space: nowrap; }
+        .f6-in { left: 0; background: #121212; border: 2px solid rgba(255, 255, 255, 0.12); border-radius: 44px 44px 44px 12px; }
+        .f6-out { right: 0; background: #242424; border-radius: 44px 44px 12px 44px; }
+        .f6-read { display: inline-block; margin-left: 16px; font-family: 'JetBrains Mono', monospace; font-size: 26px; color: rgba(255, 255, 255, 0.45); }
+        .f6-typing { position: absolute; left: 0; padding: 34px 38px; background: #121212; border: 2px solid rgba(255, 255, 255, 0.12); border-radius: 44px 44px 44px 12px; display: flex; gap: 14px; }
+        .f6-typing i { display: block; width: 18px; height: 18px; border-radius: 50%; background: rgba(255, 255, 255, 0.7); }
+        .f6-call { position: absolute; left: 80px; right: 80px; top: 1250px; height: 176px; border-radius: 88px; background: #161616; border: 2px solid rgba(255, 255, 255, 0.14); display: flex; align-items: center; gap: 26px; padding: 0 30px; }
+        .f6-call .f6-ava { width: 116px; height: 116px; }
+        .f6-ctext { font-weight: 800; font-size: 44px; }
+        .f6-timer { position: relative; height: 34px; margin-top: 6px; font-family: 'JetBrains Mono', monospace; font-size: 28px; color: rgba(255, 255, 255, 0.55); }
+        .f6-timer span { position: absolute; left: 0; top: 0; white-space: nowrap; }
+        .f6-green { position: relative; margin-left: auto; width: 116px; height: 116px; border-radius: 50%; background: #3ecf8e; display: grid; place-items: center; }
+        .f6-green svg { width: 52px; height: 52px; }
+        .f6-ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid #3ecf8e; opacity: 0; }
+      </style>
+      <div id="root" data-composition-id="f6-chat" data-width="1080" data-height="1920">
+        <div class="f6-scene" id="f6-scene">
+          <div class="f6-label"><i></i><span>сообщения · звонки</span></div>
+          <div class="f6-head" id="f6-head">
+            <span class="f6-ava">м<b></b></span>
+            <div><div class="f6-name">мила</div><div class="f6-status">в сети</div></div>
+          </div>
+          <div class="f6-list">
+            <div class="f6-msg f6-in" id="f6-m1" style="top: 0">ты тоже не спишь?</div>
+            <div class="f6-msg f6-out" id="f6-m2" style="top: 150px">рисую луну</div>
+            <div class="f6-typing" id="f6-typing" style="top: 300px"><i></i><i></i><i></i></div>
+            <div class="f6-msg f6-in" id="f6-m3" style="top: 300px">созвонимся?</div>
+            <div class="f6-msg f6-out" id="f6-m4" style="top: 450px">давай<span class="f6-read" id="f6-read">✓✓</span></div>
+          </div>
+          <div class="f6-call" id="f6-call">
+            <span class="f6-ava">м</span>
+            <div><div class="f6-ctext">мила</div><div class="f6-timer"><span id="f6-t1">вызов…</span><span id="f6-t2">00:01</span><span id="f6-t3">00:02</span></div></div>
+            <span class="f6-green" id="f6-green">
+              <span class="f6-ring" id="f6-ring1"></span><span class="f6-ring" id="f6-ring2"></span>
+              <svg viewBox="0 0 24 24"><path fill="#000" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
+            </span>
+          </div>
+        </div>
+      </div>
+      <script>
+        (() => {
+          const tl = gsap.timeline({ paused: true });
+          // Сцена приходит снизу: продолжение движения прошлой склейки вверх.
+          tl.fromTo(".f6-label", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0.05);
+          tl.fromTo("#f6-head", { opacity: 0, y: 220, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.55, ease: "expo.out" }, 0);
+          const pop = (sel, at, origin) => tl.fromTo(sel, { opacity: 0, y: 40, scale: 0.92, filter: "blur(8px)" }, { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", duration: 0.42, ease: "power3.out", transformOrigin: origin }, at);
+          pop("#f6-m1", 0.25, "0% 100%");
+          pop("#f6-m2", 0.8, "100% 100%");
+          tl.fromTo("#f6-typing", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.25, ease: "power3.out", transformOrigin: "0% 100%" }, 1.15);
+          document.querySelectorAll("#f6-typing i").forEach((d, i) => {
+            tl.fromTo(d, { y: 0, opacity: 0.4 }, { y: -10, opacity: 1, duration: 0.14, ease: "sine.inOut", yoyo: true, repeat: 3 }, 1.2 + i * 0.07);
+          });
+          tl.to("#f6-typing", { opacity: 0, duration: 0.08, ease: "power2.in" }, 1.62);
+          pop("#f6-m3", 1.65, "0% 100%");
+          pop("#f6-m4", 2.0, "100% 100%");
+          tl.fromTo("#f6-read", { color: "rgba(255,255,255,0.45)" }, { color: "#af9add", duration: 0.2, ease: "power2.out" }, 2.25);
+          // Звонок.
+          tl.fromTo("#f6-call", { opacity: 0, y: 90, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.5, ease: "expo.out" }, 2.3);
+          ["#f6-ring1", "#f6-ring2"].forEach((r, i) => {
+            tl.fromTo(r, { scale: 1, opacity: 0.8 }, { scale: 1.7, opacity: 0, duration: 0.6, ease: "power2.out", immediateRender: false }, 2.55 + i * 0.3);
+          });
+          gsap.set(["#f6-t2", "#f6-t3"], { opacity: 0 });
+          tl.set("#f6-t1", { opacity: 0 }, 2.8);
+          tl.set("#f6-t2", { opacity: 1 }, 2.8);
+          tl.set("#f6-t2", { opacity: 0 }, 3.3);
+          tl.set("#f6-t3", { opacity: 1 }, 3.3);
+          // Выход влево.
+          tl.to("#f6-scene", { x: -200, opacity: 0, filter: "blur(12px)", duration: 0.2, ease: "power2.in" }, 3.3);
+          window.__timelines["f6-chat"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>
