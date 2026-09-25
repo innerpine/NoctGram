@@ -90,8 +90,9 @@ final class MediaViewerTests: XCTestCase {
         let saveItem = app.buttons["Сохранить видео"]
         expect(saveItem.waitForExistence(timeout: 5), "The menu does not open", in: app, shot: "33-viewer-menu")
         save("33-viewer-menu")
-        // A tap beside the menu closes it.
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+        // A tap beside the menu closes it: on the black above the video,
+        // clear of the menu that opens under the button.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.33)).tap()
         expect(poll(5) { !saveItem.exists }, "The menu does not close", in: app, shot: "33-viewer-menu")
 
         let full = app.buttons["viewer-fullscreen"]
