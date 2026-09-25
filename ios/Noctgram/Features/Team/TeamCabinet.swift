@@ -112,7 +112,7 @@ struct TeamNoteField: View {
                     .font(.system(size: 13))
                     .foregroundColor(Noct.text60)
                 Spacer(minLength: 8)
-                Text("\(text.count)/\(limit)")
+                Text(verbatim: "\(text.count)/\(limit)")
                     .font(.system(size: 11))
                     .foregroundColor(Noct.text48)
             }
@@ -244,7 +244,7 @@ struct DangerButtonStyle: ButtonStyle {
             .font(.system(size: 15, weight: .semibold))
             .foregroundColor(.white)
             .padding(.horizontal, 18)
-            .frame(minHeight: 44)
+            .frame(minHeight: 38)
             .background(Capsule().fill(Noct.red.opacity(configuration.isPressed ? 0.75 : 0.9)))
             .opacity(enabled ? 1 : 0.45)
             .animation(Noct.quick, value: configuration.isPressed)

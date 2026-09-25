@@ -56,7 +56,7 @@ struct TeamAppealsView: View {
             if appeal.pending {
                 TeamNoteField(title: "Ответ пользователю", text: note(appeal.id), limit: 1000)
                 let ready = !busy && !(notes[appeal.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                HStack(spacing: 8) {
+                FlowLayout(spacing: 8, lineSpacing: 8) {
                     Button("Принять обращение") {
                         Task { await review(appeal, decision: "accepted") }
                     }
@@ -190,26 +190,24 @@ struct TeamReportsView: View {
             if !report.available {
                 TeamNote("Контент недоступен. Сохранён текст на момент жалобы.")
             }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    Button("Найти автора") {
-                        nav.push(.teamSection(.accounts(TeamTarget(id: report.authorId, handle: report.handle))))
+            FlowLayout(spacing: 8, lineSpacing: 8) {
+                Button("Найти автора") {
+                    nav.push(.teamSection(.accounts(TeamTarget(id: report.authorId, handle: report.handle))))
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .disabled(busy || report.handle.isEmpty)
+                if report.canOpenPost {
+                    Button("Открыть пост") {
+                        nav.push(.post(report.postId))
                     }
                     .buttonStyle(SecondaryButtonStyle())
-                    .disabled(busy || report.handle.isEmpty)
-                    if report.canOpenPost {
-                        Button("Открыть пост") {
-                            nav.push(.post(report.postId))
-                        }
-                        .buttonStyle(SecondaryButtonStyle())
+                }
+                if report.canRemove {
+                    Button(report.removeTitle) {
+                        removing = report
                     }
-                    if report.canRemove {
-                        Button(report.removeTitle) {
-                            removing = report
-                        }
-                        .buttonStyle(DangerButtonStyle())
-                        .disabled(busy)
-                    }
+                    .buttonStyle(DangerButtonStyle())
+                    .disabled(busy)
                 }
             }
             if report.status != "closed" {
@@ -224,7 +222,7 @@ struct TeamReportsView: View {
 
     @ViewBuilder private func reviewButtons(_ report: TeamReport) -> some View {
         let noted = !(notes[report.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        HStack(spacing: 8) {
+        FlowLayout(spacing: 8, lineSpacing: 8) {
             if report.status == "new" {
                 Button("Взять на рассмотрение") {
                     Task { await review(report, status: "reviewing") }
@@ -540,7 +538,7 @@ struct TeamAntispamView: View {
                         .noctField()
                 }
                 TeamNote("Учитываются скрытые символы, похожие буквы и кодированные ссылки. Домены также проверяются в именах, юзернеймах и описаниях.")
-                HStack(spacing: 8) {
+                FlowLayout(spacing: 8, lineSpacing: 8) {
                     Button("Сохранить защиту") {
                         Task { await saveSettings() }
                     }
@@ -584,27 +582,25 @@ struct TeamAntispamView: View {
             }
             if item.status == "pending" {
                 TeamNoteField(title: "Комментарий к решению", text: note(item.id), placeholder: "Необязательно")
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        Button {
-                            Task { await review(item, decision: "approve") }
-                        } label: {
-                            Label("Одобрить", systemImage: "checkmark")
-                        }
-                        .buttonStyle(PrimaryButtonStyle())
-                        Button {
-                            Task { await review(item, decision: "reject") }
-                        } label: {
-                            Label("Отклонить", systemImage: "xmark")
-                        }
-                        .buttonStyle(SecondaryButtonStyle())
-                        Button {
-                            nav.push(.teamSection(.accounts(TeamTarget(id: item.actorId, handle: item.handle))))
-                        } label: {
-                            Label("Ограничить автора", systemImage: "exclamationmark.shield")
-                        }
-                        .buttonStyle(SecondaryButtonStyle())
+                FlowLayout(spacing: 8, lineSpacing: 8) {
+                    Button {
+                        Task { await review(item, decision: "approve") }
+                    } label: {
+                        Label("Одобрить", systemImage: "checkmark")
                     }
+                    .buttonStyle(PrimaryButtonStyle())
+                    Button {
+                        Task { await review(item, decision: "reject") }
+                    } label: {
+                        Label("Отклонить", systemImage: "xmark")
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    Button {
+                        nav.push(.teamSection(.accounts(TeamTarget(id: item.actorId, handle: item.handle))))
+                    } label: {
+                        Label("Ограничить автора", systemImage: "exclamationmark.shield")
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
                 }
                 .disabled(busy)
             } else {

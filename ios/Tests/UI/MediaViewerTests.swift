@@ -44,32 +44,33 @@ final class MediaViewerTests: XCTestCase {
         return condition()
     }
 
-    /// Scrolls the feed to the tile and opens it; returns «Назад».
+    /// Brings the tile wholly between the bars with short drags that do not
+    /// coast, then taps it beside its middle, where a video has its play
+    /// button; returns «Назад». Should anything cover the feed (a viewer
+    /// that left something behind), the viewer does not open.
     private func open(_ id: String, in app: XCUIApplication, shot: String) -> XCUIElement {
         let tile = app.buttons["media-" + id]
-        // Between the bars: above the tab bar, below the header.
-        let bottom = app.frame.height - 150
-        for _ in 0..<10 {
-            if tile.exists {
-                if tile.frame.midY > bottom {
-                    app.swipeUp(velocity: .slow)
-                    continue
-                }
-                if tile.frame.midY < 150 {
-                    app.swipeDown(velocity: .slow)
-                    continue
-                }
-                break
+        let top: CGFloat = 180, bottom = app.frame.height - 170
+        for _ in 0..<20 {
+            guard tile.exists else {
+                drag(app, by: -280)
+                continue
             }
-            app.swipeUp(velocity: .slow)
+            let frame = tile.frame
+            if frame.minY >= top && frame.maxY <= bottom { break }
+            drag(app, by: max(-280, min(280, (top + bottom) / 2 - frame.midY)))
         }
         expect(tile.exists, "No media tile in the feed", in: app, shot: shot)
-        // A viewer that left something behind would cover the feed here.
-        expect(poll(10) { tile.isHittable }, "The media tile cannot be tapped: something covers the feed", in: app, shot: shot)
-        tile.tap()
+        tile.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.3)).tap()
         let back = app.buttons["viewer-back"]
         expect(back.waitForExistence(timeout: 10), "The viewer does not open", in: app, shot: shot)
         return back
+    }
+
+    /// A slow drag that stops where it ends, so the feed does not coast.
+    private func drag(_ app: XCUIApplication, by distance: CGFloat) {
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: distance)), withVelocity: .slow, thenHoldForDuration: 0.2)
     }
 
     private func landscape(_ app: XCUIApplication) -> Bool {

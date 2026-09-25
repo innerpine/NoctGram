@@ -92,12 +92,19 @@ final class ThreadSwipeTests: XCTestCase {
         let app = launch()
         swipeLeft(row(in: app, shot: "40-thread-delete"))
         action("Удалить", in: app, shot: "40-thread-delete").tap()
-        let cancel = app.buttons["Отмена"]
-        expect(cancel.waitForExistence(timeout: 5), "«Удалить» does not ask first", in: app, shot: "40-thread-delete")
-        expect(app.buttons["Удалить у меня"].exists, "No «Удалить у меня»", in: app, shot: "40-thread-delete")
+        let mine = app.buttons["Удалить у меня"]
+        expect(mine.waitForExistence(timeout: 5), "«Удалить» does not ask first", in: app, shot: "40-thread-delete")
+        expect(app.buttons["Удалить у меня и у Кэрол"].exists, "No «Удалить у меня и у Кэрол»", in: app, shot: "40-thread-delete")
         save("40-thread-delete")
-        cancel.tap()
-        expect(poll(5) { !cancel.exists }, "The question does not close", in: app, shot: "40-thread-delete")
+        // Nothing is deleted: «Отмена» where the question has it, a tap
+        // beside it otherwise (iOS 26 shows no cancel button there).
+        let cancel = app.buttons["Отмена"]
+        if cancel.exists {
+            cancel.tap()
+        } else {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75)).tap()
+        }
+        expect(poll(5) { !mine.exists }, "The question does not close", in: app, shot: "40-thread-delete")
 
         // A tap on an open row closes it instead of opening the chat.
         let row = row(in: app, shot: "41-thread-close")

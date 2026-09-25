@@ -235,7 +235,7 @@ jobs:
           grep -E "Test Case .*(passed|failed)|error:|Executed|TEST (SUCCEEDED|FAILED)|BUILD (SUCCEEDED|FAILED)|moved by" uitest.log | sort -u | head -80
           if [ $status -ne 0 ]; then
             # Failed checks print the element tree of the app.
-            grep -n -A 60 "UI TREE" uitest.log | head -400
+            grep -n -A 250 "UI TREE" uitest.log | head -1000
             tail -n 60 uitest.log
             for report in ~/Library/Logs/DiagnosticReports/Noctgram*; do
               [ -f "$report" ] && head -c 6000 "$report"
