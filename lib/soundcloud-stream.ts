@@ -145,20 +145,31 @@ function apiURL(value: string) {
     throw unavailable();
   return url.href;
 }
+// SoundCloud's gateway sometimes hangs ~10 s and answers 5xx on one backend
+// while a retry lands on a healthy one in ~200 ms, so short attempts win.
+// The later, longer attempts still let a slow but healthy answer through.
+export const SOUNDCLOUD_ATTEMPT_TIMEOUTS = [1500, 1500, 2500, 2500, 4000, 6000];
+async function getWithRetry(url: string, token: string) {
+  for (let attempt = 0; ; attempt++) {
+    const last = attempt === SOUNDCLOUD_ATTEMPT_TIMEOUTS.length - 1;
+    try {
+      const response = await fetch(url, {
+        headers: { Authorization: 'OAuth ' + token },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(SOUNDCLOUD_ATTEMPT_TIMEOUTS[attempt]),
+      });
+      if (response.status < 500 || last) return response;
+      await response.body?.cancel();
+    } catch {
+      if (last) throw unavailable();
+    }
+  }
+}
 async function request(path: string, redirect = true) {
   const auth = await storedToken();
   let url = apiURL(path);
   for (let hop = 0; hop < 3; hop++) {
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        headers: { Authorization: 'OAuth ' + auth.access_token },
-        redirect: 'manual',
-        signal: AbortSignal.timeout(12000),
-      });
-    } catch {
-      throw unavailable();
-    }
+    const response = await getWithRetry(url, auth.access_token);
     if (response.status === 302 && redirect) {
       url = apiURL(response.headers.get('location') || '');
       await response.body?.cancel();

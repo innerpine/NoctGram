@@ -17,7 +17,10 @@ globalThis.__scTest = {
           return this;
         },
         async first() {
-          if (holdTokenRead && sql.startsWith('SELECT * FROM music_app_tokens')) {
+          if (
+            holdTokenRead &&
+            sql.startsWith('SELECT * FROM music_app_tokens')
+          ) {
             const hold = holdTokenRead;
             holdTokenRead = null;
             await hold;
@@ -78,7 +81,8 @@ let tokens = 0,
   streamRedirect = 'https://cf-hls-media.sndcdn.com/fixture/playlist.m3u8',
   access = 'playable',
   sharing = 'public',
-  onlyPreview = false;
+  onlyPreview = false,
+  gatewayFailures = 0;
 const network = [];
 let holdResource;
 globalThis.fetch = async (input, options) => {
@@ -110,6 +114,10 @@ globalThis.fetch = async (input, options) => {
     'Never send authorization to a CDN or arbitrary redirect',
   );
   assert.match(options.headers.Authorization, /^OAuth access-/);
+  if (gatewayFailures > 0) {
+    gatewayFailures--;
+    return new Response('<html>504 Gateway Time-out</html>', { status: 504 });
+  }
   if (holdResource && u.pathname === '/resolve') {
     const hold = holdResource;
     holdResource = null;
@@ -333,6 +341,17 @@ for (const bad of [
   'https://soundcloud.com/a/b?secret_token=secret',
 ])
   await assert.rejects(api.soundcloudTrack(bad), { status: 400 });
+// A flaky gateway is retried with short attempts; a dead one gives up cleanly.
+gatewayFailures = 2;
+assert.equal((await api.soundcloudTrack(url('flaky'))).title.length > 0, true);
+assert.equal(gatewayFailures, 0);
+gatewayFailures = 100;
+const before = network.length;
+await assert.rejects(api.soundcloudTrack(url('gateway-down')), {
+  code: 'SOUNDCLOUD_UNAVAILABLE',
+});
+assert.equal(network.length - before, api.SOUNDCLOUD_ATTEMPT_TIMEOUTS.length);
+gatewayFailures = 0;
 sqlite.close();
 delete globalThis.__scTest;
 console.log(
