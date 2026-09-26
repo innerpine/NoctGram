@@ -230,7 +230,11 @@ export async function request<T>(query: string, body?: unknown): Promise<T> {
     );
   return data;
 }
-export async function upload(file: File, purpose?: 'avatar'): Promise<Media> {
+export async function upload(
+  file: File,
+  purpose?: 'avatar',
+  signal?: AbortSignal,
+): Promise<Media> {
   if (file.size > 25 * 1024 * 1024)
     throw new Error('Максимальный размер файла — 25 МБ');
   const data = new FormData();
@@ -240,7 +244,7 @@ export async function upload(file: File, purpose?: 'avatar'): Promise<Media> {
     for (const preview of await prepareAvatar(file))
       data.set(`avatar${preview.size}`, preview.file);
   }
-  const r = await fetch('/api/upload', { method: 'POST', body: data });
+  const r = await fetch('/api/upload', { method: 'POST', body: data, signal });
   const body = await readApiJson<Media>(r, 'Не удалось загрузить файл');
   if (!r.ok && ['ACCOUNT_BLOCKED', 'READ_ONLY'].includes(body.code || ''))
     window.dispatchEvent(new Event('noctgram:restriction'));

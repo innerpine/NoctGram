@@ -733,6 +733,38 @@
   background: #0c0c0c;
   overflow: hidden;
 }
+/* «Баннер» in «Дизайн»: its own card above the preview. */
+.design-banner {
+  margin-top: 10px;
+}
+.design-banner .edit-cover[data-empty] {
+  display: grid;
+  place-items: center;
+  height: 85px;
+  border: 1px dashed #ffffff24;
+  border-radius: 8px;
+  color: #ffffff7a;
+  font-size: 13px;
+}
+.design-banner-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  background: #000000b3;
+  color: #fff;
+  font-size: 13px;
+}
+.design-banner label.secondary[aria-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.design-banner .error {
+  color: #ff8a8a;
+}
 @media (prefers-reduced-motion: reduce) {
   .liquid-cover {
     transition: none;
