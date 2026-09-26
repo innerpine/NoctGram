@@ -188,6 +188,11 @@ jobs:
           shot 19-profile-qr 8765 -noct.debugTab profile -noct.debugSheet qr
           shot 20-gifts 8765 -noct.debugTab profile -noct.debugRoute screen:gifts
           shot 21-gift 8765 -noct.debugTab profile -noct.debugRoute screen:gifts -noct.debugSheet gift
+          # Upgrading it as in Telegram: the preview, then the purchase with
+          # its reveal and confetti, and the settled collectible.
+          shot 21b-gift-upgrade 8765 -noct.debugTab profile -noct.debugRoute screen:gifts -noct.debugSheet upgrade
+          WAIT=7 shot 21c-gift-reveal 8765 -noct.debugTab profile -noct.debugRoute screen:gifts -noct.debugSheet upgraded
+          sleep 6; xcrun simctl io "$UDID" screenshot shots/21d-gift-collectible.png >/dev/null
           # A group: Bob has Premium, his name and star take his palette.
           shot 22-group 8765 -noct.debugTab messages -noct.debugRoute room:room_night_walks
           # The team's cabinet, which the mock viewer may open.

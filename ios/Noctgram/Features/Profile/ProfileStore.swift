@@ -143,4 +143,27 @@ final class ProfileStore: ObservableObject {
         _ = try await api.post("/api/gifts", ["action": "visibility", "id": gift.id, "hidden": hidden])
         if let index = gifts.firstIndex(where: { $0.id == gift.id }) { gifts[index].hidden = hidden }
     }
+
+    /// What a received gift can be upgraded into (lib/gift-upgrades.ts).
+    func upgradePreview(_ gift: ReceivedGift, api: APIClient) async throws -> GiftUpgradePreview {
+        GiftUpgradePreview(try await api.get("/api/gifts", ["action": "upgrade", "id": gift.id]))
+    }
+
+    /// Upgrades a gift at the price the viewer saw; returns the collectible
+    /// and the new balance. The receipt is the server's idempotency key, so
+    /// a repeated request gets the same collectible, never a second charge.
+    func upgradeGift(_ gift: ReceivedGift, keepOriginal: Bool, expectedPrice: Int, api: APIClient) async throws -> (Collectible, Int?) {
+        let data = try await api.post("/api/gifts", [
+            "action": "upgrade", "id": gift.id, "keepOriginal": keepOriginal, "expectedPrice": expectedPrice,
+        ])
+        guard let collectible = Collectible(data["collectible"]) else {
+            throw APIError(status: 0, message: "Не удалось получить результат. Проверь улучшение ещё раз.", code: nil)
+        }
+        setCollectible(collectible, for: gift.id)
+        return (collectible, data["balance"].int)
+    }
+
+    func setCollectible(_ collectible: Collectible, for id: String) {
+        if let index = gifts.firstIndex(where: { $0.id == id }) { gifts[index].collectible = collectible }
+    }
 }

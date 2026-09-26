@@ -113,6 +113,36 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(sale.reason, "")
     }
 
+    func testGiftUpgradeReadsAsTheSite() throws {
+        func json(_ text: String) throws -> JSON { try XCTUnwrap(JSON.parse(Data(text.utf8))) }
+        let preview = GiftUpgradePreview(try json(#"""
+        {"balance":40,"collectible":null,"collection":{"id":"toy_bear","title":"Toy Bear","price":25,
+         "models":[{"id":"m1","name":"Cozy","rarityPermille":12,"asset":"collectible-toy_bear-m1"},{"id":"m2","name":"Midnight","rarityPermille":988,"asset":"collectible-toy_bear-m2"}],
+         "backdrops":[{"id":"b1","name":"Chocolate","rarityPermille":10,"centerColor":"#a46e58","edgeColor":"#74443b","patternColor":"#3e0a02","textColor":"#e4b6ac"}],
+         "symbols":[{"id":"s1","name":"Money Bag","rarityPermille":4,"asset":"gift-pattern-s1"},{"id":"s2","name":"Cap","rarityPermille":996,"asset":"gift-pattern-s2"}]}}
+        """#))
+        let collection = try XCTUnwrap(preview.collection)
+        XCTAssertEqual(preview.balance, 40)
+        XCTAssertNil(preview.collectible)
+        XCTAssertEqual(collection.price, 25)
+        // previewAttributes(): the model at step × 7, the symbol at step × 13.
+        XCTAssertEqual(collection.look(at: 1).model.id, "m2")
+        XCTAssertEqual(collection.look(at: 1).symbol.id, "s2")
+        XCTAssertEqual(collection.look(at: 2).model.id, "m1")
+        // giftRarity(): tenths of a percent with a Russian comma.
+        XCTAssertEqual(collection.models[0].rarity, "1,2%")
+        XCTAssertEqual(collection.backdrops[0].rarity, "1%")
+        XCTAssertEqual(collection.symbols[0].rarity, "0,4%")
+        XCTAssertEqual(collection.backdrops[0].pattern, "#3e0a02")
+        let collectible = try XCTUnwrap(Collectible(try json(#"{"family":"toy_bear","number":1234,"keepOriginal":1,"model":{"id":"m1","name":"Cozy","rarityPermille":12,"asset":"collectible-toy_bear-m1"},"backdrop":{"id":"b1","name":"Chocolate","rarityPermille":10},"symbol":{"id":"s1","name":"Money Bag","rarityPermille":4,"asset":"gift-pattern-s1"}}"#)))
+        XCTAssertEqual(collectible.number, 1234)
+        XCTAssertTrue(collectible.keepOriginal)
+        XCTAssertFalse(collectible.issued)
+        XCTAssertEqual(collectible.modelAsset, "collectible-toy_bear-m1")
+        XCTAssertEqual(collectible.look.backdrop.center, "#3b3b46")
+        XCTAssertNil(GiftUpgradePreview(try json(#"{"balance":0,"collection":null,"collectible":null}"#)).collection)
+    }
+
     func testThreadsNotificationsWallet() throws {
         let threads = try responses()["threads"].array.map { Person($0) }
         XCTAssertEqual(threads.map(\.handle), ["carol_sky", "bob_night"])

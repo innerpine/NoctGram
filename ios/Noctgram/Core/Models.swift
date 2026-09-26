@@ -593,30 +593,152 @@ struct ChatMessage: Identifiable, Hashable {
     }
 }
 
-/// A collectible gift: model art on a radial backdrop (lib/gift-collectibles.ts).
+/// One attribute of a collectible (lib/gift-collectibles.ts): a model or a
+/// symbol with its picture in /assets/gifts, and how many upgrades in a
+/// thousand get it.
+struct GiftAttribute: Hashable, Identifiable {
+    var id: String
+    var name: String
+    var rarityPermille: Int
+    var asset: String
+
+    init(_ j: JSON) {
+        id = j["id"].str
+        name = j["name"].str
+        rarityPermille = j["rarityPermille"].int ?? 0
+        asset = j["asset"].str
+    }
+
+    /// «1,2%», as giftRarity() writes it.
+    var rarity: String { GiftAttribute.percent(rarityPermille) }
+
+    private static let percentFormat: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 1
+        return formatter
+    }()
+
+    static func percent(_ permille: Int) -> String {
+        (percentFormat.string(from: NSNumber(value: Double(permille) / 10)) ?? String(permille / 10)) + "%"
+    }
+}
+
+/// A collectible's backdrop: a radial gradient from the centre colour to
+/// the edge one, the colour of its symbols and of the text on it.
+struct GiftBackdrop: Hashable, Identifiable {
+    var id: String
+    var name: String
+    var rarityPermille: Int
+    var center: String
+    var edge: String
+    var pattern: String
+    var text: String
+
+    init(_ j: JSON) {
+        id = j["id"].str
+        name = j["name"].str
+        rarityPermille = j["rarityPermille"].int ?? 0
+        center = j["centerColor"].string ?? "#3b3b46"
+        edge = j["edgeColor"].string ?? "#1d1d24"
+        pattern = j["patternColor"].string ?? "#101014"
+        text = j["textColor"].string ?? "#ffffff"
+    }
+
+    var rarity: String { GiftAttribute.percent(rarityPermille) }
+}
+
+/// What a collectible looks like: its model, backdrop and symbol.
+struct GiftLook: Hashable {
+    var model: GiftAttribute
+    var backdrop: GiftBackdrop
+    var symbol: GiftAttribute
+
+    init(model: GiftAttribute, backdrop: GiftBackdrop, symbol: GiftAttribute) {
+        self.model = model
+        self.backdrop = backdrop
+        self.symbol = symbol
+    }
+
+    init(_ j: JSON) {
+        model = GiftAttribute(j["model"])
+        backdrop = GiftBackdrop(j["backdrop"])
+        symbol = GiftAttribute(j["symbol"])
+    }
+}
+
+/// A collectible gift (lib/gift-collectibles.ts): the look drawn at random
+/// when the gift was upgraded, and its number in the collection.
 struct Collectible: Hashable {
     var family: String
     var number: Int
-    var modelName: String
-    var modelAsset: String
-    var backdropName: String
-    var centerColor: String
-    var edgeColor: String
-    var textColor: String
-    var symbolAsset: String
+    var look: GiftLook
+    /// The sender's name and caption stay on the collectible.
+    var keepOriginal: Bool
+    /// Issued by the Noctgram administration rather than upgraded.
+    var issued: Bool
 
     init?(_ raw: JSON) {
         let j = raw.nestedJSON
         guard j.object != nil, !j["family"].str.isEmpty else { return nil }
         family = j["family"].str
         number = j["number"].int ?? 0
-        modelName = j["model"]["name"].str
-        modelAsset = j["model"]["asset"].str
-        backdropName = j["backdrop"]["name"].str
-        centerColor = j["backdrop"]["centerColor"].string ?? "#3b3b46"
-        edgeColor = j["backdrop"]["edgeColor"].string ?? "#1d1d24"
-        textColor = j["backdrop"]["textColor"].string ?? "#ffffff"
-        symbolAsset = j["symbol"]["asset"].str
+        look = GiftLook(j)
+        keepOriginal = j["keepOriginal"].bool
+        issued = j["issuance"].str == "admin"
+    }
+
+    var modelName: String { look.model.name }
+    var modelAsset: String { look.model.asset }
+}
+
+/// Everything a gift may become when upgraded (GET /api/gifts?action=upgrade):
+/// its models, backdrops and symbols, and the price in Noct Stars.
+struct GiftCollection: Hashable {
+    var id: String
+    var title: String
+    var price: Int
+    var models: [GiftAttribute]
+    var backdrops: [GiftBackdrop]
+    var symbols: [GiftAttribute]
+
+    init?(_ j: JSON) {
+        guard j.object != nil else { return nil }
+        id = j["id"].str
+        title = j["title"].str
+        price = j["price"].int ?? 0
+        models = j["models"].array.map(GiftAttribute.init)
+        backdrops = j["backdrops"].array.map(GiftBackdrop.init)
+        symbols = j["symbols"].array.map(GiftAttribute.init)
+        guard !models.isEmpty, !backdrops.isEmpty, !symbols.isEmpty else { return nil }
+    }
+
+    /// The look the preview shows at a step, as previewAttributes() in
+    /// app/gift-upgrade-panel.tsx picks it.
+    func look(at step: Int) -> GiftLook {
+        let step = max(0, step)
+        return GiftLook(
+            model: models[step * 7 % models.count],
+            backdrop: backdrops[step * 3 % backdrops.count],
+            symbol: symbols[step * 13 % symbols.count]
+        )
+    }
+}
+
+/// GET /api/gifts?action=upgrade (lib/gift-upgrades.ts).
+struct GiftUpgradePreview {
+    var balance: Int
+    /// Nil when this gift cannot be upgraded.
+    var collection: GiftCollection?
+    /// Set when the gift has already been upgraded, on this device or another.
+    var collectible: Collectible?
+
+    init(_ j: JSON) {
+        balance = j["balance"].int ?? 0
+        collection = GiftCollection(j["collection"])
+        collectible = Collectible(j["collectible"])
     }
 }
 

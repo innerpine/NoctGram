@@ -334,10 +334,10 @@ struct VerifiedNotice: View {
     }
 }
 
-/// Gift art: plain gifts on a card, collectibles on their radial backdrop.
 /// Gift art: the static picture, animated with its Lottie file while
 /// GiftPlayback lets it play (a few at a time). `featured` marks the one
-/// being looked at (a gift card or a gift in a chat).
+/// being looked at (a gift card or a gift in a chat). A collectible stands
+/// on its backdrop with its pattern (CollectibleScene).
 struct GiftArt: View {
     @EnvironmentObject private var session: AppSession
     let path: String
@@ -346,24 +346,19 @@ struct GiftArt: View {
     var featured = false
 
     var body: some View {
-        ZStack {
-            if let collectible {
-                RadialGradient(
-                    colors: [Color(hexString: collectible.centerColor) ?? Noct.selected, Color(hexString: collectible.edgeColor) ?? Noct.card],
-                    center: .center,
-                    startRadius: 2,
-                    endRadius: 90
-                )
-            } else {
+        if let collectible {
+            CollectibleScene(look: collectible.look, animated: animated, featured: featured)
+        } else {
+            ZStack {
                 Color.white.opacity(0.03)
+                GiftPlayer(
+                    art: session.api.mediaURL(path),
+                    animation: animated ? GiftAnimations.animationPath(forArt: path).flatMap { session.api.mediaURL($0) } : nil,
+                    featured: featured
+                )
+                .padding(14)
+                .allowsHitTesting(false)
             }
-            GiftPlayer(
-                art: session.api.mediaURL(path),
-                animation: animated ? GiftAnimations.animationPath(forArt: path).flatMap { session.api.mediaURL($0) } : nil,
-                featured: featured
-            )
-            .padding(collectible == nil ? 14 : 12)
-            .allowsHitTesting(false)
         }
     }
 }
@@ -406,7 +401,7 @@ struct GiftsGrid: View {
                 }
                 if store.giftsLoading { LoadingRow() }
                 if own {
-                    Text("Нажми на подарок, чтобы продать его за звёзды или изменить настройки показа.")
+                    Text("Нажми на подарок, чтобы улучшить его, продать за звёзды или изменить настройки показа.")
                         .font(.system(size: 14))
                         .foregroundColor(Noct.text48)
                         .multilineTextAlignment(.center)
@@ -432,9 +427,11 @@ struct GiftsGrid: View {
     }
 
     #if DEBUG
-    /// Screenshot hook (ios/Tests): `-noct.debugSheet gift` opens the first gift.
+    /// Screenshot hooks (ios/Tests): `-noct.debugSheet gift` opens the first
+    /// gift with a caption; `upgrade` and `upgraded` go on to its upgrade.
     private func debugOpen() {
-        guard selected == nil, UserDefaults.standard.string(forKey: "noct.debugSheet") == "gift" else { return }
+        let hook = UserDefaults.standard.string(forKey: "noct.debugSheet") ?? ""
+        guard selected == nil, ["gift", "upgrade", "upgraded"].contains(hook) else { return }
         selected = store.gifts.first { !$0.message.isEmpty } ?? store.gifts.first
     }
     #endif
@@ -489,7 +486,10 @@ struct GiftTile: View {
 }
 
 /// A received gift, laid out like a Telegram gift card: the art, what can be
-/// done with it and a table with the sender, date, price and caption.
+/// done with it and a table with the sender, date, price, status and
+/// caption. One's own gift that can be upgraded offers «улучшить» in the
+/// status row, which turns the sheet into the upgrade (GiftUpgradeView); a
+/// collectible shows its scene and attributes (CollectibleGiftView).
 struct GiftDetailSheet: View {
     @EnvironmentObject private var session: AppSession
     @Environment(\.dismiss) private var dismiss
@@ -500,8 +500,14 @@ struct GiftDetailSheet: View {
     let openProfile: (String) -> Void
     let openWallet: () -> Void
     @ObservedObject private var catalog = GiftCatalog.shared
+    /// The gift as it is now: a collectible once upgraded.
+    @State private var current: ReceivedGift
     @State private var hidden: Bool
     @State private var sale: GiftSale?
+    @State private var upgrade: GiftUpgradePreview?
+    @State private var upgrading = false
+    @State private var reveal: GiftReveal?
+    @State private var detent: PresentationDetent
     @State private var busy = false
     @State private var confirmSale = false
     @State private var giftBack = false
@@ -512,45 +518,111 @@ struct GiftDetailSheet: View {
         _store = ObservedObject(wrappedValue: store)
         self.openProfile = openProfile
         self.openWallet = openWallet
+        _current = State(initialValue: gift)
         _hidden = State(initialValue: gift.hidden)
+        _detent = State(initialValue: gift.collectible == nil ? .fraction(0.86) : .large)
     }
 
-    private var mine: Bool { !gift.recipient.isEmpty && gift.recipient == session.myId }
-    private var name: String { catalog.name(for: gift.giftId) ?? "Подарок" }
+    private var mine: Bool { !current.recipient.isEmpty && current.recipient == session.myId }
+    private var name: String { catalog.name(for: current.giftId) ?? "Подарок" }
     private var accent: Color { session.me?.appearance.accent ?? Noct.lilac }
     private var price: Int? {
         if let sale, sale.originalPrice > 0 { return sale.originalPrice }
-        return catalog.gifts.first { $0.id == gift.giftId }?.price
+        return catalog.gifts.first { $0.id == current.giftId }?.price
     }
     private var sender: Identity {
-        Identity(id: gift.sender, name: gift.senderName, avatar: gift.senderAvatar, handle: gift.senderHandle)
+        Identity(id: current.sender, name: current.senderName, avatar: current.senderAvatar, handle: current.senderHandle)
     }
 
-    private var title: String {
-        if let collectible = gift.collectible { return "\(name) #\(collectible.number)" }
-        return mine ? "Подарок вам" : name
+    /// What the gift upgrades into, when it is one's own and can be.
+    private var collection: GiftCollection? {
+        guard mine, current.collectible == nil, !session.readOnly else { return nil }
+        return upgrade?.collection
     }
 
     private var summary: String {
-        if let collectible = gift.collectible {
-            return collectible.modelName.isEmpty ? "Коллекционный подарок" : "Коллекционный подарок · \(collectible.modelName)"
-        }
         guard mine else { return "Подарок в профиле" }
         if let sale, sale.available {
+            if collection != nil {
+                return "Можно хранить этот подарок в профиле, улучшить его или продать за \(stars(sale.amount))."
+            }
             return "Можно хранить этот подарок в профиле или продать за \(stars(sale.amount))."
         }
         if let sale, !sale.reason.isEmpty { return sale.reason }
-        return "Подарок хранится в твоём профиле."
+        return collection != nil ? "Подарок можно улучшить до коллекционного." : "Подарок хранится в твоём профиле."
     }
 
     var body: some View {
+        Group {
+            if let collectible = current.collectible {
+                CollectibleGiftView(
+                    gift: current,
+                    collectible: collectible,
+                    name: name,
+                    owner: store.profile?.identity,
+                    reveal: reveal,
+                    openProfile: { id in
+                        dismiss()
+                        openProfile(id)
+                    },
+                    close: { dismiss() }
+                ) {
+                    if own {
+                        visibility
+                    }
+                }
+                .transition(.opacity)
+            } else if upgrading, let collection = collection {
+                GiftUpgradeView(
+                    gift: current,
+                    collection: collection,
+                    balance: upgrade?.balance ?? 0,
+                    store: store,
+                    back: { withAnimation(Noct.motion) { upgrading = false } },
+                    recheck: { try await refreshUpgrade() },
+                    topUp: {
+                        dismiss()
+                        openWallet()
+                    },
+                    upgraded: { collectible, balance, step in
+                        finishUpgrade(collectible, balance: balance, collection: collection, step: step)
+                    }
+                )
+                .transition(.opacity)
+            } else {
+                card
+                    .transition(.opacity)
+            }
+        }
+        .presentationDetents([.fraction(0.86), .large], selection: $detent)
+        .confirmationDialog("Продать подарок за \(stars(sale?.amount ?? 0))?", isPresented: $confirmSale, titleVisibility: .visible) {
+            Button("Продать", role: .destructive) { Task { await sell() } }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Подарок исчезнет из профиля, а звёзды придут на баланс. Комиссия \(sale?.feePercent ?? 15) %.")
+        }
+        .sheet(isPresented: $giftBack) {
+            SendGiftSheet(recipient: sender)
+                .environmentObject(session)
+        }
+        .task { await loadSale() }
+        .task {
+            try? await refreshUpgrade()
+            #if DEBUG
+            debugUpgrade()
+            #endif
+        }
+    }
+
+    /// The gift as received, not yet a collectible.
+    private var card: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
-                    GiftArt(path: gift.artPath, collectible: gift.collectible, featured: true)
+                    GiftArt(path: current.artPath, featured: true)
                         .frame(width: 160, height: 160)
                         .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
-                    Text(title)
+                    Text(mine ? "Подарок вам" : name)
                         .font(.system(size: 24, weight: .bold))
                         .multilineTextAlignment(.center)
                         .padding(.top, 14)
@@ -604,25 +676,13 @@ struct GiftDetailSheet: View {
                 }
             }
         }
-        .presentationDetents([.fraction(0.86), .large])
-        .confirmationDialog("Продать подарок за \(stars(sale?.amount ?? 0))?", isPresented: $confirmSale, titleVisibility: .visible) {
-            Button("Продать", role: .destructive) { Task { await sell() } }
-            Button("Отмена", role: .cancel) {}
-        } message: {
-            Text("Подарок исчезнет из профиля, а звёзды придут на баланс. Комиссия \(sale?.feePercent ?? 15) %.")
-        }
-        .sheet(isPresented: $giftBack) {
-            SendGiftSheet(recipient: sender)
-                .environmentObject(session)
-        }
-        .task { await loadSale() }
     }
 
     // MARK: Table
 
     private var table: some View {
         VStack(spacing: 0) {
-            if !gift.sender.isEmpty {
+            if !current.sender.isEmpty {
                 row("От") {
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 8) { senderLink; sendBack }
@@ -631,26 +691,27 @@ struct GiftDetailSheet: View {
                 }
             }
             row("Дата") {
-                Text(Format.receipt(gift.created))
+                Text(Format.receipt(current.created))
             }
             if let price {
-                row("Стоимость", divider: gift.collectible != nil || !gift.message.isEmpty) {
+                row("Стоимость", divider: collection != nil || !current.message.isEmpty) {
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 8) { priceLabel(price); sellChip }
                         VStack(alignment: .leading, spacing: 6) { priceLabel(price); sellChip }
                     }
                 }
             }
-            if let collectible = gift.collectible {
-                if !collectible.modelName.isEmpty {
-                    row("Модель") { Text(collectible.modelName) }
-                }
-                if !collectible.backdropName.isEmpty {
-                    row("Фон", divider: !gift.message.isEmpty) { Text(collectible.backdropName) }
+            if collection != nil {
+                // As in Telegram: «Статус · Обычный» with «улучшить».
+                row("Статус", divider: !current.message.isEmpty) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) { Text("Обычный"); upgradeChip }
+                        VStack(alignment: .leading, spacing: 6) { Text("Обычный"); upgradeChip }
+                    }
                 }
             }
-            if !gift.message.isEmpty {
-                Text(PremiumEmoji.replace(gift.message))
+            if !current.message.isEmpty {
+                Text(PremiumEmoji.replace(current.message))
                     .font(.system(size: 16))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 14)
@@ -661,39 +722,17 @@ struct GiftDetailSheet: View {
     }
 
     private func row<Content: View>(_ label: String, divider: Bool = true, @ViewBuilder content: () -> Content) -> some View {
-        HStack(spacing: 0) {
-            Text(label)
-                .font(.system(size: 16))
-                .foregroundColor(Noct.text75)
-                .frame(width: 96, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 14)
-            Rectangle()
-                .fill(Color.white.opacity(0.14))
-                .frame(width: 1)
-                .frame(maxHeight: .infinity)
-            content()
-                .font(.system(size: 16))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-        }
-        .fixedSize(horizontal: false, vertical: true)
-        .overlay(alignment: .bottom) {
-            if divider {
-                Rectangle().fill(Color.white.opacity(0.14)).frame(height: 1)
-            }
-        }
+        GiftInfoRow(label, divider: divider, content: content)
     }
 
     private var senderLink: some View {
         Button {
             dismiss()
-            openProfile(gift.sender)
+            openProfile(current.sender)
         } label: {
             HStack(spacing: 8) {
                 AvatarView(person: sender, size: 24, ring: false)
-                Text(gift.senderName.isEmpty ? "@" + gift.senderHandle : gift.senderName)
+                Text(current.senderName.isEmpty ? "@" + current.senderHandle : current.senderName)
                     .foregroundColor(accent)
                     .lineLimit(1)
             }
@@ -702,7 +741,7 @@ struct GiftDetailSheet: View {
     }
 
     @ViewBuilder private var sendBack: some View {
-        if gift.sender != session.myId && !session.readOnly {
+        if current.sender != session.myId && !session.readOnly {
             chip("отправить подарок") { giftBack = true }
         }
     }
@@ -719,6 +758,15 @@ struct GiftDetailSheet: View {
             chip("продать за \(stars(sale.amount))") { confirmSale = true }
                 .disabled(busy)
         }
+    }
+
+    private var upgradeChip: some View {
+        chip("улучшить") {
+            detent = .large
+            withAnimation(Noct.motion) { upgrading = true }
+        }
+        .disabled(busy)
+        .accessibilityIdentifier("gift-upgrade-open")
     }
 
     private func chip(_ title: String, action: @escaping () -> Void) -> some View {
@@ -760,9 +808,40 @@ struct GiftDetailSheet: View {
     // MARK: Actions
 
     private func loadSale() async {
-        guard mine, gift.collectible == nil, sale == nil else { return }
-        if let data = try? await session.api.get("/api/gifts", ["action": "convert", "id": gift.id]) {
+        guard mine, current.collectible == nil, sale == nil else { return }
+        if let data = try? await session.api.get("/api/gifts", ["action": "convert", "id": current.id]) {
             sale = GiftSale(data)
+        }
+    }
+
+    /// What the gift can be upgraded into; a collectible made meanwhile (on
+    /// another device) is shown at once.
+    private func refreshUpgrade() async throws {
+        guard mine, current.collectible == nil else { return }
+        let preview = try await store.upgradePreview(current, api: session.api)
+        upgrade = preview
+        if let collectible = preview.collectible {
+            store.setCollectible(collectible, for: current.id)
+            detent = .large
+            withAnimation(Noct.motion) {
+                current.collectible = collectible
+                upgrading = false
+            }
+        }
+    }
+
+    /// The upgrade went through: the sheet becomes the collectible and its
+    /// attributes roll out of the collection the preview was showing.
+    private func finishUpgrade(_ collectible: Collectible, balance: Int?, collection: GiftCollection, step: Int) {
+        if let balance {
+            catalog.balance = balance
+            upgrade?.balance = balance
+        }
+        reveal = GiftReveal(collection: collection, start: step)
+        detent = .large
+        withAnimation(.easeInOut(duration: 0.25)) {
+            current.collectible = collectible
+            upgrading = false
         }
     }
 
@@ -770,7 +849,7 @@ struct GiftDetailSheet: View {
         busy = true
         defer { busy = false }
         do {
-            try await store.setGiftHidden(gift, hidden: !hidden, api: session.api)
+            try await store.setGiftHidden(current, hidden: !hidden, api: session.api)
             hidden.toggle()
             Haptics.tap()
         } catch {
@@ -783,7 +862,7 @@ struct GiftDetailSheet: View {
         busy = true
         defer { busy = false }
         do {
-            if let balance = try await store.sellGift(gift, expectedAmount: sale.amount, api: session.api) {
+            if let balance = try await store.sellGift(current, expectedAmount: sale.amount, api: session.api) {
                 catalog.balance = balance
             }
             Haptics.success()
@@ -793,6 +872,17 @@ struct GiftDetailSheet: View {
             session.report(error)
         }
     }
+
+    #if DEBUG
+    /// Screenshot hooks (ios/Tests): `-noct.debugSheet upgrade` opens the
+    /// upgrade and `upgraded` also buys it (GiftUpgradeView).
+    private func debugUpgrade() {
+        let hook = UserDefaults.standard.string(forKey: "noct.debugSheet")
+        guard hook == "upgrade" || hook == "upgraded", collection != nil, !upgrading else { return }
+        detent = .large
+        upgrading = true
+    }
+    #endif
 }
 
 /// Catalog of gifts for Noct Stars, sent to a person or a channel.

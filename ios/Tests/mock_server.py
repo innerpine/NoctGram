@@ -52,6 +52,41 @@ def gift_list():
     return {"gifts": gifts, "next": None}
 
 
+# What each gift upgrades into (lib/gift-upgrade-data.json), at the site's price.
+UPGRADES = {c["id"]: dict(c, price=25) for c in json.load(
+    open(os.path.join(HERE, "..", "..", "lib", "gift-upgrade-data.json"), encoding="utf-8"))}
+
+
+def received(receipt):
+    return next((g for g in gift_list()["gifts"] if g["id"] == receipt), None)
+
+
+def upgrade_preview(receipt):
+    """GET /api/gifts?action=upgrade, as lib/gift-upgrades.ts answers it."""
+    gift = received(receipt)
+    if not gift:
+        return 404, {"error": "Подарок не найден"}
+    return 200, {"balance": R["giftCatalog"].get("balance", 0), "collection": UPGRADES.get(gift["giftId"]),
+                 "collectible": gift.get("collectible")}
+
+
+def upgrade(body):
+    """POST /api/gifts {action: 'upgrade'}: a fixed draw, so screenshots and
+    tests always get the same collectible. Nothing is kept, so every run and
+    every test starts from the plain gift."""
+    gift = received(body.get("id", ""))
+    collection = UPGRADES.get(gift["giftId"]) if gift else None
+    if not collection:
+        return 400, {"error": "Этот подарок нельзя улучшить"}
+    if body.get("expectedPrice") != collection["price"]:
+        return 409, {"error": "Стоимость улучшения изменилась. Открой подарок заново."}
+    pick = lambda items, index: items[index % len(items)]
+    collectible = {"model": pick(collection["models"], 11), "backdrop": pick(collection["backdrops"], 5),
+                   "symbol": pick(collection["symbols"], 17), "family": collection["id"], "number": 1234,
+                   "keepOriginal": bool(body.get("keepOriginal")), "upgradedAt": int(time.time() * 1000)}
+    return 200, {"collectible": collectible, "balance": R["giftCatalog"].get("balance", 0) - collection["price"]}
+
+
 def with_own(reactions, emoji):
     """Reactions after the viewer picks emoji or takes theirs back (None):
     one reaction per person, as lib/message-reactions-store.ts keeps them."""
@@ -312,6 +347,8 @@ class Handler(BaseHTTPRequestHandler):
                 # Sale quote as lib/gift-conversions.ts gives it: 85 % of the price.
                 return self.send(200, {"id": q.get("id", ""), "available": True, "reason": None, "originalPrice": 25,
                                        "amount": 21, "fee": 4, "feePercent": 15, "convertedAt": None})
+            if q.get("action") == "upgrade":
+                return self.send(*upgrade_preview(q.get("id", "")))
             return self.send(200, R["giftCatalog"] if q.get("action") == "catalog" else gift_list())
         if url.path == "/api/music/activity":
             # Activity is a heartbeat: move the captured times to now.
@@ -376,6 +413,8 @@ class Handler(BaseHTTPRequestHandler):
                     STATE["archived"].discard(body.get("peer"))
         elif path == "/api/rooms" and isinstance(body, dict) and body.get("action") == "reaction":
             STATE["roomReactions"][body.get("messageId")] = body.get("emoji")
+        elif path == "/api/gifts" and isinstance(body, dict) and body.get("action") == "upgrade":
+            return self.send(*upgrade(body))
         self.send(200, {"ok": True})
 
 
