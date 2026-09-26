@@ -4,13 +4,20 @@ import UIKit
 import UniformTypeIdentifiers
 import WebKit
 
-/// Email code login (app/auth-screen.tsx): one step per screen — the address,
-/// then six digits from the letter. The server sets the noct_session cookie.
+/// Sign-in and sign-up laid out as Telegram's, in Noctgram's black and glass:
+/// a welcome with the logo and a few pages about the app, then one question
+/// per screen — the email, then the six digits from the letter — with the
+/// main button at the bottom, over the keyboard. The server sets the
+/// noct_session cookie (app/auth-screen.tsx); a new address gets an account
+/// and goes on to its profile (OnboardingView).
 struct LoginView: View {
     @EnvironmentObject private var session: AppSession
+    @State private var step = Step.welcome
+    /// Steps slide in from the right going on, from the left going back.
+    @State private var forward = true
+    @State private var page = 0
     @State private var email = ""
     @State private var code = ""
-    @State private var step = Step.email
     @State private var busy = false
     @State private var error: String?
     @State private var resendAt: Date?
@@ -18,72 +25,55 @@ struct LoginView: View {
     @State private var showServer = false
     @State private var showWebLogin = false
     @State private var now = Date()
+    /// Bumped by a wrong code, which shakes the cells.
+    @State private var shakes = 0
     @FocusState private var focus: Field?
 
-    private enum Step { case email, code }
+    private enum Step: Int { case welcome, email, code }
     private enum Field { case email, code }
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
+    /// The welcome's pages, as Telegram's intro turns through what it does.
+    private static let pages: [(title: String, text: String)] = [
+        ("Noctgram", "Место для тех, кто на своей волне. Без шума и лишнего."),
+        ("Лента", "Публикации друзей и каналов, обсуждения и ответы в комментариях."),
+        ("Сообщения", "Личные чаты и группы с реакциями, ответами и темами."),
+        ("Подарки", "Анимированные подарки и Noct Stars для самых близких."),
+    ]
+
+    private var emailValid: Bool {
+        let address = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        return address.contains("@") && address.count >= 5
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                Spacer(minLength: 60)
-                Image("Logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 78, height: 78)
-                Text("noctgram")
-                    .font(.system(size: 34, weight: .semibold))
-                    .tracking(-1.2)
-                    .padding(.top, 10)
-                Text(step == .email ? "Место для тех, кто на своей волне." : "Код отправлен на \(email)")
-                    .font(.system(size: 15))
-                    .foregroundColor(Noct.text60)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 8)
-                    .padding(.horizontal, 24)
-
-                Group {
-                    if step == .email { emailStep } else { codeStep }
-                }
-                .padding(.top, 32)
-                .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
-
-                if let error {
-                    Text(error)
-                        .font(.system(size: 14))
-                        .foregroundColor(Noct.red)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 14)
-                        .padding(.horizontal, 12)
-                }
-
-                VStack(spacing: 12) {
-                    Button {
-                        showWebLogin = true
-                    } label: {
-                        Label("Войти через сайт", systemImage: "globe")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
-                    Button {
-                        showServer = true
-                    } label: {
-                        Text("Сервер: \(session.serverLabel) · изменить")
-                            .font(.system(size: 13))
-                            .foregroundColor(Noct.text48)
-                    }
-                }
-                .padding(.top, 40)
-                Spacer(minLength: 30)
-            }
-            .padding(.horizontal, 24)
-            .frame(maxWidth: 460)
-            .frame(maxWidth: .infinity)
+        #if DEBUG
+        if UserDefaults.standard.string(forKey: "noct.debugLogin") == "profile" {
+            // Screenshot hook (ios/Tests): the profile of a new account.
+            OnboardingView()
+        } else {
+            flow
         }
-        .scrollDismissesKeyboard(.interactively)
-        .background(NightAurora())
-        .animation(Noct.motion, value: step)
+        #else
+        flow
+        #endif
+    }
+
+    private var flow: some View {
+        ZStack {
+            AuthBackground(bright: step == .welcome)
+            Group {
+                switch step {
+                case .welcome: welcome
+                case .email: emailStep
+                case .code: codeStep
+                }
+            }
+            .transition(.asymmetric(
+                insertion: .move(edge: forward ? .trailing : .leading).combined(with: .opacity),
+                removal: .move(edge: forward ? .leading : .trailing).combined(with: .opacity)
+            ))
+        }
         .onReceive(timer) { now = $0 }
         .sheet(isPresented: $showServer) {
             ServerSheet().environmentObject(session)
@@ -94,117 +84,232 @@ struct LoginView: View {
         .task { await loadStatus() }
     }
 
-    private var emailStep: some View {
-        VStack(spacing: 14) {
-            TextField("Электронная почта", text: $email)
-                .keyboardType(.emailAddress)
-                .textContentType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .font(.system(size: 17))
-                .focused($focus, equals: .email)
-                .submitLabel(.continue)
-                .onSubmit { Task { await start() } }
-                .glassField()
-            Button {
-                Task { await start() }
-            } label: {
-                HStack {
-                    if busy { ProgressView().tint(.black) }
-                    Text("Получить код")
+    // MARK: Welcome
+
+    private var welcome: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 24)
+            AuthLogo()
+            TabView(selection: $page) {
+                ForEach(Self.pages.indices, id: \.self) { index in
+                    VStack(spacing: 10) {
+                        Text(Self.pages[index].title)
+                            .font(.system(size: index == 0 ? 34 : 26, weight: .bold))
+                            .tracking(index == 0 ? -1 : -0.5)
+                        Text(Self.pages[index].text)
+                            .font(.system(size: 16))
+                            .foregroundColor(Noct.text60)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 36)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .tag(index)
                 }
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(busy || !email.contains("@") || !emailEnabled)
-            if !emailEnabled {
-                Text("На этом сервере вход по почте ещё не подключён. Используй вход через сайт.")
-                    .font(.system(size: 13))
-                    .foregroundColor(Noct.text48)
-                    .multilineTextAlignment(.center)
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: 124)
+            .padding(.top, 26)
+            PageDots(count: Self.pages.count, current: page)
+            Spacer(minLength: 24)
+            AuthButton(title: "Начать", busy: false, enabled: true) { go(.email) }
+                .accessibilityIdentifier("login-start")
+            HStack(spacing: 6) {
+                Button("Войти через сайт") { showWebLogin = true }
+                Text("·")
+                Button("Сервер: \(session.serverLabel)") { showServer = true }
             }
+            .font(.system(size: 13))
+            .foregroundColor(Noct.text48)
+            .buttonStyle(PressableStyle())
+            .lineLimit(1)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 14)
         }
     }
 
-    private var codeStep: some View {
-        VStack(spacing: 18) {
-            ZStack {
-                TextField("", text: Binding(
-                    get: { code },
-                    set: { value in
-                        code = String(value.filter(\.isNumber).prefix(6))
-                        if code.count == 6 { Task { await verify() } }
-                    }
-                ))
-                .keyboardType(.numberPad)
-                .textContentType(.oneTimeCode)
-                .focused($focus, equals: .code)
-                .foregroundColor(.clear)
-                .tint(.clear)
-                .accentColor(.clear)
-                HStack(spacing: 8) {
-                    ForEach(0..<6, id: \.self) { index in
-                        let characters = Array(code)
-                        Text(index < characters.count ? String(characters[index]) : "")
-                            .font(.system(size: 24, weight: .semibold, design: .rounded))
-                            .frame(width: 46, height: 56)
-                            .glassRect(14)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.white.opacity(index == characters.count && focus == .code ? 0.7 : 0), lineWidth: 1.5)
-                            )
-                    }
-                }
-                .allowsHitTesting(false)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { focus = .code }
+    // MARK: Email
 
-            Button {
-                Task { await verify() }
-            } label: {
-                HStack {
-                    if busy { ProgressView().tint(.black) }
-                    Text("Войти")
+    private var emailStep: some View {
+        VStack(spacing: 0) {
+            AuthBackBar(disabled: busy) { go(.welcome) }
+            ScrollView {
+                VStack(spacing: 0) {
+                    AuthIcon(symbol: "envelope.fill")
+                    AuthTitle(
+                        title: "Твоя почта",
+                        text: Text("Пришлём на неё код для входа. Если аккаунта ещё нет, создадим новый.")
+                    )
+                    HStack(spacing: 12) {
+                        Image(systemName: "at")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundColor(Noct.text48)
+                        TextField("name@example.com", text: $email)
+                            .keyboardType(.emailAddress)
+                            .textContentType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .font(.system(size: 18))
+                            .focused($focus, equals: .email)
+                            .submitLabel(.continue)
+                            .onSubmit { Task { await start() } }
+                            .accessibilityIdentifier("login-email")
+                    }
+                    .padding(.horizontal, 18)
+                    .frame(height: 56)
+                    .glassRect(18)
+                    .padding(.top, 30)
+                    if let error {
+                        AuthError(text: error)
+                    }
+                    if !emailEnabled {
+                        VStack(spacing: 12) {
+                            Text("На этом сервере вход по почте ещё не подключён.")
+                                .font(.system(size: 14))
+                                .foregroundColor(Noct.text48)
+                                .multilineTextAlignment(.center)
+                            Button {
+                                showWebLogin = true
+                            } label: {
+                                Label("Войти через сайт", systemImage: "globe")
+                            }
+                            .buttonStyle(SecondaryButtonStyle())
+                        }
+                        .padding(.top, 18)
+                    }
                 }
-                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 24)
             }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(busy || code.count != 6)
-
-            HStack(spacing: 16) {
-                Button("Изменить почту") {
-                    code = ""
-                    error = nil
-                    step = .email
-                    focus = .email
-                }
-                if let resendAt, resendAt > now {
-                    Text("Повторно через \(Int(resendAt.timeIntervalSince(now)) + 1) с")
-                        .foregroundColor(Noct.text48)
-                } else {
-                    Button("Отправить ещё раз") { Task { await start() } }
-                        .disabled(busy)
-                }
-            }
-            .font(.system(size: 14, weight: .medium))
-            .foregroundColor(Noct.text75)
+            .scrollDismissesKeyboard(.interactively)
         }
-        .onAppear { focus = .code }
+        .safeAreaInset(edge: .bottom) {
+            AuthButton(title: "Продолжить", busy: busy, enabled: emailValid && emailEnabled) {
+                Task { await start() }
+            }
+            .accessibilityIdentifier("login-continue")
+        }
+        .onAppear { focusSoon(.email) }
+    }
+
+    // MARK: Code
+
+    private var codeStep: some View {
+        VStack(spacing: 0) {
+            AuthBackBar(disabled: busy) {
+                code = ""
+                go(.email)
+            }
+            ScrollView {
+                VStack(spacing: 0) {
+                    AuthIcon(symbol: "envelope.open.fill")
+                    AuthTitle(
+                        title: "Введи код",
+                        text: Text("Отправили письмо с кодом на \(Text(email).foregroundColor(.white).fontWeight(.medium))")
+                    )
+                    ZStack {
+                        TextField("", text: Binding(
+                            get: { code },
+                            set: { value in
+                                code = String(value.filter(\.isNumber).prefix(6))
+                                if !code.isEmpty { error = nil }
+                                if code.count == 6 { Task { await verify() } }
+                            }
+                        ))
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .focused($focus, equals: .code)
+                        .foregroundColor(.clear)
+                        .tint(.clear)
+                        .accentColor(.clear)
+                        .accessibilityIdentifier("login-code")
+                        CodeCells(code: code, active: focus == .code, failed: error != nil, shakes: shakes)
+                            .allowsHitTesting(false)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { focus = .code }
+                    .padding(.top, 30)
+                    if let error {
+                        AuthError(text: error)
+                    }
+                    resend
+                        .padding(.top, 24)
+                    if busy {
+                        ProgressView()
+                            .tint(.white)
+                            .padding(.top, 18)
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .onAppear { focusSoon(.code) }
+    }
+
+    @ViewBuilder private var resend: some View {
+        if let resendAt, resendAt > now {
+            Text("Новый код можно запросить через \(clock(resendAt.timeIntervalSince(now)))")
+                .font(.system(size: 15))
+                .foregroundColor(Noct.text48)
+                .monospacedDigit()
+        } else {
+            Button("Отправить код ещё раз") { Task { await start() } }
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(AuthBackground.accent)
+                .buttonStyle(PressableStyle())
+                .disabled(busy)
+        }
+    }
+
+    private func clock(_ seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds.rounded(.up)))
+        return String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    // MARK: Actions
+
+    private func go(_ next: Step, keepError: Bool = false) {
+        guard next != step else { return }
+        forward = next.rawValue > step.rawValue
+        if !keepError { error = nil }
+        focus = nil
+        // The leaving step takes the new direction before it slides away.
+        DispatchQueue.main.async {
+            withAnimation(Noct.motion) { step = next }
+        }
+    }
+
+    /// The keyboard comes up once the step has slid in, as in Telegram.
+    private func focusSoon(_ field: Field) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { focus = field }
     }
 
     private func loadStatus() async {
+        #if DEBUG
+        // Screenshot hooks (ios/Tests): `-noct.debugLogin email|code`.
+        switch UserDefaults.standard.string(forKey: "noct.debugLogin") {
+        case "email":
+            step = .email
+            return
+        case "code":
+            email = "alice@noctgram.com"
+            resendAt = Date().addingTimeInterval(42)
+            step = .code
+            return
+        default:
+            break
+        }
+        #endif
         guard let data = try? await session.api.get("/api/auth/session") else { return }
         let status = AuthStatus(data)
         emailEnabled = status.emailEnabled
         if status.user != nil {
             await session.signedIn()
         } else if let pending = status.challengeEmail {
+            // A letter is on its way: straight to the code.
             email = pending
             resendAt = Date(timeIntervalSince1970: status.resendAt / 1000)
             step = .code
-        } else {
-            focus = .email
         }
     }
 
@@ -219,8 +324,11 @@ struct LoginView: View {
             email = address
             code = ""
             resendAt = Date(timeIntervalSince1970: (data["resendAt"].double ?? Format.nowMs + 60000) / 1000)
-            step = .code
-            focus = .code
+            if step == .code {
+                session.show("Отправили новый код")
+            } else {
+                go(.code)
+            }
         } catch let failure as APIError where failure.code == "EMAIL_NOT_CONFIGURED" {
             emailEnabled = false
             error = failure.message
@@ -241,15 +349,18 @@ struct LoginView: View {
         } catch let failure as APIError {
             code = ""
             error = failure.message
+            shakes += 1
             Haptics.error()
-            if failure.code == "CODE_EXPIRED" { step = .email }
+            if failure.code == "CODE_EXPIRED" { go(.email, keepError: true) }
         } catch {
             self.error = error.userMessage
         }
     }
 }
 
-/// First profile setup (/welcome): name, username and an optional avatar.
+/// The profile of a new account (/welcome), as Telegram asks for it: the
+/// photo in a circle, the name and the username in one group, the button at
+/// the bottom. The photo can wait.
 struct OnboardingView: View {
     @EnvironmentObject private var session: AppSession
     @State private var name = ""
@@ -260,93 +371,136 @@ struct OnboardingView: View {
     @State private var uploading = false
     @State private var busy = false
     @State private var error: String?
+    @FocusState private var focus: Field?
+
+    private enum Field { case name, handle }
 
     private var validHandle: Bool {
         handle.range(of: "^[a-z0-9_]{4,24}$", options: .regularExpression) != nil
     }
 
+    private var ready: Bool {
+        !uploading && !name.trimmingCharacters(in: .whitespaces).isEmpty && validHandle
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                Text("Добро пожаловать")
-                    .font(.system(size: 28, weight: .semibold))
-                    .tracking(-0.8)
-                    .padding(.top, 50)
-                Text("Как тебя будут видеть в Noctgram")
-                    .font(.system(size: 15))
-                    .foregroundColor(Noct.text60)
-                PhotosPicker(selection: $item, matching: .images) {
-                    ZStack {
-                        Circle().fill(Color.white.opacity(0.04))
-                        if let preview {
-                            Image(uiImage: preview).resizable().scaledToFill()
-                        } else {
-                            Image(systemName: "camera")
-                                .font(.system(size: 26, weight: .light))
-                                .foregroundColor(Noct.text60)
+        ZStack {
+            AuthBackground(bright: false)
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    Button("Выйти") { Task { await session.signOut() } }
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(Noct.text60)
+                        .buttonStyle(PressableStyle())
+                        .disabled(busy)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        photo
+                            .padding(.top, 16)
+                        AuthTitle(
+                            title: "Твой профиль",
+                            text: Text("Имя и фото увидят все. Юзернейм — короткая ссылка на тебя в Noctgram.")
+                        )
+                        fields
+                            .padding(.top, 28)
+                        Text(validHandle || handle.isEmpty ? "Юзернейм: 4–24 латинские буквы, цифры или _" : "Только латинские буквы, цифры и _, от 4 до 24 знаков")
+                            .font(.system(size: 13))
+                            .foregroundColor(validHandle || handle.isEmpty ? Noct.text48 : Noct.red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 10)
+                        if let error {
+                            AuthError(text: error)
                         }
-                        if uploading {
-                            Color.black.opacity(0.45)
-                            ProgressView().tint(.white)
-                        }
                     }
-                    .frame(width: 104, height: 104)
-                    .clipShape(Circle())
-                    .glassCircle(interactive: true)
+                    .padding(.horizontal, 24)
                 }
-                Text("Аватарку можно пропустить")
-                    .font(.system(size: 12))
-                    .foregroundColor(Noct.text48)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Имя").font(.system(size: 13)).foregroundColor(Noct.text60)
-                    TextField("Как тебя зовут", text: Binding(get: { name }, set: { name = String($0.prefix(40)) }))
-                        .glassField()
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Юзернейм").font(.system(size: 13)).foregroundColor(Noct.text60)
-                    HStack(spacing: 4) {
-                        Text("@").foregroundColor(Noct.text48)
-                        TextField("username", text: Binding(
-                            get: { handle },
-                            set: { handle = String($0.lowercased().replacingOccurrences(of: "@", with: "").prefix(24)) }
-                        ))
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    }
-                    .glassField()
-                    Text("4–24 латинские буквы, цифры или _")
-                        .font(.system(size: 12))
-                        .foregroundColor(validHandle || handle.isEmpty ? Noct.text48 : Noct.red)
-                }
-                if let error {
-                    Text(error).font(.system(size: 14)).foregroundColor(Noct.red).multilineTextAlignment(.center)
-                }
-                Button {
-                    Task { await finish() }
-                } label: {
-                    HStack {
-                        if busy { ProgressView().tint(.black) }
-                        Text("Продолжить")
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(busy || uploading || name.trimmingCharacters(in: .whitespaces).isEmpty || !validHandle)
-                Button("Выйти") { Task { await session.signOut() } }
-                    .font(.system(size: 14))
-                    .foregroundColor(Noct.text48)
-                    .padding(.top, 8)
+                .scrollDismissesKeyboard(.interactively)
             }
-            .padding(.horizontal, 24)
-            .frame(maxWidth: 460)
-            .frame(maxWidth: .infinity)
         }
-        .scrollDismissesKeyboard(.interactively)
-        .background(NightAurora())
+        .safeAreaInset(edge: .bottom) {
+            AuthButton(title: "Продолжить", busy: busy, enabled: ready) {
+                Task { await finish() }
+            }
+        }
         .onChange(of: item) { value in
             guard let value else { return }
             Task { await upload(value) }
         }
+    }
+
+    private var photo: some View {
+        PhotosPicker(selection: $item, matching: .images) {
+            ZStack {
+                Circle().fill(Color.white.opacity(0.05))
+                if let preview {
+                    Image(uiImage: preview).resizable().scaledToFill()
+                } else {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor(AuthBackground.accent)
+                }
+                if uploading {
+                    Color.black.opacity(0.45)
+                    ProgressView().tint(.white)
+                }
+            }
+            .frame(width: 112, height: 112)
+            .clipShape(Circle())
+            .glassCircle(interactive: true)
+            .overlay(alignment: .bottomTrailing) {
+                if preview == nil {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.black)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(Color.white))
+                        .overlay(Circle().stroke(Color.black, lineWidth: 3))
+                }
+            }
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel(preview == nil ? "Добавить фото" : "Сменить фото")
+    }
+
+    /// The name and the username in one glass group, as Telegram's first
+    /// and last name.
+    private var fields: some View {
+        VStack(spacing: 0) {
+            TextField("Имя", text: Binding(get: { name }, set: { name = String($0.prefix(40)) }))
+                .font(.system(size: 17))
+                .textContentType(.name)
+                .submitLabel(.next)
+                .focused($focus, equals: .name)
+                .onSubmit { focus = .handle }
+                .padding(.horizontal, 16)
+                .frame(height: 54)
+            Rectangle()
+                .fill(Noct.borderStrong)
+                .frame(height: 0.5)
+                .padding(.leading, 16)
+            HStack(spacing: 2) {
+                Text("@")
+                    .foregroundColor(Noct.text48)
+                TextField("юзернейм", text: Binding(
+                    get: { handle },
+                    set: { handle = String($0.lowercased().replacingOccurrences(of: "@", with: "").prefix(24)) }
+                ))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.done)
+                .focused($focus, equals: .handle)
+                .onSubmit { if ready { Task { await finish() } } }
+            }
+            .font(.system(size: 17))
+            .padding(.horizontal, 16)
+            .frame(height: 54)
+        }
+        .glassRect(18)
     }
 
     private func upload(_ item: PhotosPickerItem) async {
@@ -368,6 +522,7 @@ struct OnboardingView: View {
     }
 
     private func finish() async {
+        guard ready, !busy else { return }
         busy = true
         error = nil
         defer { busy = false }
@@ -382,6 +537,242 @@ struct OnboardingView: View {
         } catch {
             self.error = error.userMessage
         }
+    }
+}
+
+// MARK: - Parts of the sign-in screens
+
+/// Black with a faint lilac glow from the top; brighter on the welcome.
+private struct AuthBackground: View {
+    let bright: Bool
+
+    static let accent = Color(hex: 0xB9A2EA)
+
+    var body: some View {
+        ZStack {
+            Color.black
+            RadialGradient(
+                colors: [Color(hex: 0x7A56C4).opacity(bright ? 0.34 : 0.2), .clear],
+                center: UnitPoint(x: 0.5, y: 0),
+                startRadius: 0,
+                endRadius: 480
+            )
+            .animation(.easeInOut(duration: 0.5), value: bright)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+}
+
+/// The logo on a glow that breathes, floating a little, as Telegram's intro
+/// shows its plane.
+private struct AuthLogo: View {
+    @State private var breathe = false
+    @State private var shown = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(RadialGradient(
+                    colors: [Color(hex: 0x9C7BE0).opacity(0.6), .clear],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: 120
+                ))
+                .frame(width: 240, height: 240)
+                .scaleEffect(breathe ? 1.08 : 0.92)
+                .opacity(breathe ? 0.95 : 0.6)
+            Image("Logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 112, height: 112)
+                .offset(y: breathe ? -4 : 4)
+        }
+        .frame(height: 200)
+        .scaleEffect(shown ? 1 : 0.8)
+        .opacity(shown ? 1 : 0)
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) { shown = true }
+            guard !UIAccessibility.isReduceMotionEnabled else { return }
+            withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) { breathe = true }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// The picture over a step: a symbol on glass over a soft glow.
+private struct AuthIcon: View {
+    let symbol: String
+    @State private var shown = false
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 34, weight: .medium))
+            .foregroundColor(.white)
+            .frame(width: 92, height: 92)
+            .glassCircle()
+            .background(
+                Circle()
+                    .fill(Color(hex: 0x9C7BE0).opacity(0.35))
+                    .frame(width: 150, height: 150)
+                    .blur(radius: 30)
+            )
+            .scaleEffect(shown ? 1 : 0.7)
+            .opacity(shown ? 1 : 0)
+            .padding(.top, 28)
+            .onAppear {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.65).delay(0.1)) { shown = true }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+private struct AuthTitle: View {
+    let title: String
+    let text: Text
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(title)
+                .font(.system(size: 28, weight: .bold))
+                .tracking(-0.6)
+                .multilineTextAlignment(.center)
+            text
+                .font(.system(size: 16))
+                .foregroundColor(Noct.text60)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 26)
+    }
+}
+
+private struct AuthError: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 14))
+            .foregroundColor(Noct.red)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 14)
+    }
+}
+
+/// The main button of a step, across the bottom, over the keyboard.
+private struct AuthButton: View {
+    let title: String
+    let busy: Bool
+    let enabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                if busy {
+                    ProgressView().tint(.black)
+                }
+                Text(title)
+            }
+            .font(.system(size: 17, weight: .semibold))
+            .frame(maxWidth: .infinity, minHeight: 52)
+        }
+        .buttonStyle(PrimaryButtonStyle())
+        .disabled(busy || !enabled)
+        .padding(.horizontal, 24)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+    }
+}
+
+private struct AuthBackBar: View {
+    let disabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        HStack {
+            Button(action: action) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+            }
+            .buttonStyle(CircleButtonStyle(size: 40))
+            .disabled(disabled)
+            .accessibilityLabel("Назад")
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+}
+
+/// Page dots under the welcome's pages; the current one is wider.
+private struct PageDots: View {
+    let count: Int
+    let current: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<count, id: \.self) { index in
+                Capsule()
+                    .fill(Color.white.opacity(index == current ? 0.9 : 0.25))
+                    .frame(width: index == current ? 18 : 6, height: 6)
+            }
+        }
+        .animation(Noct.quick, value: current)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Six cells for the digits from the letter: the next one is lit, and a
+/// wrong code shakes them and turns them red until the next digit.
+private struct CodeCells: View {
+    let code: String
+    let active: Bool
+    let failed: Bool
+    let shakes: Int
+
+    var body: some View {
+        let digits = Array(code)
+        HStack(spacing: 8) {
+            ForEach(0..<6, id: \.self) { index in
+                let filled = index < digits.count
+                Text(filled ? String(digits[index]) : "")
+                    .font(.system(size: 26, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: 52)
+                    .frame(height: 60)
+                    .glassRect(14)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(stroke(index, count: digits.count), lineWidth: 1.5)
+                    )
+                    .scaleEffect(filled ? 1 : 0.96)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.6), value: filled)
+            }
+        }
+        .modifier(Shake(amount: CGFloat(shakes)))
+        .animation(.linear(duration: 0.4), value: shakes)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Код: \(code.count) из 6 цифр")
+    }
+
+    private func stroke(_ index: Int, count: Int) -> Color {
+        if failed { return Noct.red.opacity(0.85) }
+        return active && index == min(count, 5) ? AuthBackground.accent : .clear
+    }
+}
+
+/// A horizontal shake, one for each whole step of `amount`.
+private struct Shake: GeometryEffect {
+    var amount: CGFloat
+    var animatableData: CGFloat {
+        get { amount }
+        set { amount = newValue }
+    }
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        ProjectionTransform(CGAffineTransform(translationX: 10 * sin(amount * .pi * 4), y: 0))
     }
 }
 

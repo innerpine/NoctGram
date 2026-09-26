@@ -165,6 +165,10 @@ jobs:
             echo "shot $name"
           }
           WAIT=16 shot 01-login 8766
+          # Sign-in as in Telegram: the email, the code and a new account's profile.
+          shot 01b-login-email 8766 -noct.debugLogin email
+          shot 01c-login-code 8766 -noct.debugLogin code
+          shot 01d-login-profile 8766 -noct.debugLogin profile
           shot 02-feed 8765
           shot 03-profile 8765 -noct.debugTab profile
           shot 03b-my-profile 8765 -noct.debugTab profile -noct.debugRoute "profile:$ME"
@@ -173,6 +177,9 @@ jobs:
           shot 06-profile-other 8765 -noct.debugRoute "profile:$BOB"
           shot 07-channel 8765 -noct.debugRoute "profile:$CHANNEL"
           shot 08-post 8765 -noct.debugRoute "post:$POST"
+          # Comments with an answer that quotes the comment it answers, and
+          # «Ответ …» over the field.
+          shot 08b-comment-reply 8765 -noct.debugRoute "post:$POST" -noct.debugSheet comments-reply
           shot 09-messages 8765 -noct.debugTab messages
           shot 10-chat 8765 -noct.debugTab messages -noct.debugRoute "chat:$BOB"
           shot 11-notifications 8765 -noct.debugTab notifications
