@@ -25,8 +25,37 @@ import {
   type PremiumEmoji as Emoji,
 } from '@/lib/premium-emoji';
 import { mountGiftAnimation } from '@/lib/gift-animation-runtime';
+import { appleEmojiUrl, chatEmojiParts } from '@/lib/chat-emoji';
 
 const ChatEmojiPicker = lazy(() => import('./chat-emoji-picker'));
+
+/** Apple artwork over the real character, so copying and screen readers keep the emoji. */
+export function AppleEmoji({
+  text,
+  unified,
+  large = false,
+}: {
+  text: string;
+  unified: string;
+  large?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className={'chat-emoji' + (failed ? ' chat-emoji-fallback' : '')}>
+      <span className="chat-emoji-character">{text}</span>
+      {!failed && (
+        <img
+          src={appleEmojiUrl(unified, large)}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          decoding="async"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </span>
+  );
+}
 
 export function PremiumEmoji({ emoji }: { emoji: Emoji }) {
   const host = useRef<HTMLSpanElement>(null),
@@ -60,12 +89,15 @@ export function PremiumEmoji({ emoji }: { emoji: Emoji }) {
     </span>
   );
 }
+// Posts, comments, bios and gift notes draw emoji with the same Apple set as chats.
 export function EmojiText({ text }: { text: string }) {
   return (
     <>
-      {emojiParts(text).map((p, i) =>
-        p.emoji ? (
-          <PremiumEmoji key={i} emoji={p.emoji} />
+      {chatEmojiParts(text).map((p, i) =>
+        p.premium ? (
+          <PremiumEmoji key={i} emoji={p.premium} />
+        ) : p.unified ? (
+          <AppleEmoji key={i} text={p.text} unified={p.unified} />
         ) : (
           <Fragment key={i}>{p.text}</Fragment>
         ),
