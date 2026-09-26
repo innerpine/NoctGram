@@ -6,16 +6,18 @@ import SwiftUI
 /// #0B0B10 at the chosen strength (15–40 %), in a gradient at 145°.
 /// «Обложка» takes its colours from the cover, or from the avatar when
 /// there is no cover picture, the way lib/image-palette.ts finds them.
+/// Below, the colour melts into the black page instead of ending at a line.
 struct ProfileSurfaceBackground: View {
     @EnvironmentObject private var session: AppSession
     let profile: Profile
-    let active: Bool
     @State private var sampled: (url: URL, colors: [RGBColor])?
 
     private static let base = RGBColor(0x0B0B10)
+    /// How far the colour takes to melt away at the bottom.
+    private static let melt: CGFloat = 240
 
     private var source: URL? {
-        guard active, profile.background.mode == "cover" else { return nil }
+        guard profile.background.mode == "cover" else { return nil }
         return session.api.mediaURL(profile.coverImage) ?? session.api.mediaURL(profile.avatar)
     }
 
@@ -34,16 +36,35 @@ struct ProfileSurfaceBackground: View {
     }
 
     var body: some View {
-        ZStack {
-            Noct.card
-            if active {
-                let strength = Double(profile.background.intensity) / 100
-                CSSLinearGradient(angle: 145, colors: colors.map { $0.mixed(into: Self.base, amount: strength).color })
+        let strength = Double(profile.background.intensity) / 100
+        CSSLinearGradient(angle: 145, colors: colors.map { $0.mixed(into: Self.base, amount: strength).color })
+            .mask { MeltMask(length: Self.melt) }
+            .task(id: source) {
+                guard let source, let colors = await ImagePalette.colors(at: source) else { return }
+                withAnimation(.easeOut(duration: 0.3)) { sampled = (source, colors) }
             }
-        }
-        .task(id: source) {
-            guard let source, let colors = await ImagePalette.colors(at: source) else { return }
-            withAnimation(.easeOut(duration: 0.3)) { sampled = (source, colors) }
+    }
+}
+
+/// Opaque, then fading out over the last `length` points (at most 55 % of
+/// the height) along a smoothstep curve, so neither the start nor the end
+/// of the fade shows as a line.
+struct MeltMask: View {
+    let length: CGFloat
+
+    var body: some View {
+        GeometryReader { geometry in
+            let height = max(geometry.size.height, 1)
+            let start = 1 - min(length, height * 0.55) / height
+            LinearGradient(
+                stops: (0...10).map { step in
+                    let t = CGFloat(step) / 10
+                    let eased = t * t * (3 - 2 * t)
+                    return Gradient.Stop(color: Color.black.opacity(Double(1 - eased)), location: start + (1 - start) * t)
+                },
+                startPoint: .top,
+                endPoint: .bottom
+            )
         }
     }
 }

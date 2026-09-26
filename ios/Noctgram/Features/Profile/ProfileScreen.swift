@@ -101,13 +101,22 @@ struct ProfileScreen: View {
                             BlockedProfileView(profile: profile)
                                 .padding(.top, topInset)
                         } else {
-                            header(profile, topInset: topInset)
-                            tabs(profile)
-                                .padding(.top, 14)
-                                .id("tabs")
+                            VStack(spacing: 0) {
+                                header(profile, topInset: topInset)
+                                tabs(profile)
+                                    .padding(.top, 14)
+                                    .id("tabs")
+                            }
+                            .padding(.bottom, 12)
+                            // A Premium background runs on under the tabs and
+                            // melts into the page instead of ending at a line.
+                            .background {
+                                if hasSurface(profile) {
+                                    ProfileSurfaceBackground(profile: profile)
+                                }
+                            }
                             content(profile)
                                 .padding(.horizontal, 12)
-                                .padding(.top, 12)
                                 .padding(.bottom, 24)
                         }
                     } else if let error = store.error {
@@ -276,8 +285,13 @@ struct ProfileScreen: View {
             )
         }
         .environment(\.onProfileSurface, premiumSurface)
-        .background(ProfileSurfaceBackground(profile: profile, active: premiumSurface))
-        .overlay(alignment: .bottom) { Rectangle().fill(Noct.border).frame(height: 0.5) }
+        // Without a Premium background the card ends at a hairline.
+        .background(premiumSurface ? Color.clear : Noct.card)
+        .overlay(alignment: .bottom) {
+            if !premiumSurface {
+                Rectangle().fill(Noct.border).frame(height: 0.5)
+            }
+        }
     }
 
     private func avatarLine(_ profile: Profile) -> some View {
