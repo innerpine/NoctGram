@@ -48,21 +48,25 @@ final class CommentReplyTests: XCTestCase {
     /// the field floats over the list, and a tap under it reaches the field.
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
         let field = app.descendants(matching: .any)["composer-field"]
-        for _ in 0..<8 {
-            let bottom = field.exists ? field.frame.minY - 24 : app.frame.height * 0.7
+        let top: CGFloat = 130
+        for _ in 0..<10 {
+            let bottom = (field.exists ? field.frame.minY : app.frame.height * 0.75) - 24
             guard element.exists else {
-                app.swipeUp(velocity: .slow)
+                drag(app, by: -200)
                 continue
             }
             let frame = element.frame
-            if frame.minY > 130 && frame.maxY < bottom { return true }
-            if frame.minY <= 130 {
-                app.swipeDown(velocity: .slow)
-            } else {
-                app.swipeUp(velocity: .slow)
-            }
+            if frame.minY >= top && frame.maxY <= bottom { return true }
+            drag(app, by: max(-200, min(200, (top + bottom) / 2 - frame.midY)))
         }
         return false
+    }
+
+    /// A slow drag in the list that stops where it ends, so it does not
+    /// coast (a swipe did not move the list while the keyboard was up).
+    private func drag(_ app: XCUIApplication, by distance: CGFloat) {
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: distance)), withVelocity: .slow, thenHoldForDuration: 0.2)
     }
 
     func testAnswerQuotesTheComment() {
