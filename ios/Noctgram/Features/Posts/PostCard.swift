@@ -94,6 +94,15 @@ struct PostCard: View {
             guard !Task.isCancelled else { return }
             await PostActions.recordView(post, session: session)
         }
+        #if DEBUG
+        .onAppear {
+            // Screenshot hooks (ios/Tests): `-noct.debugSheet comments` opens
+            // the comments of a post on its own screen.
+            if detail, UserDefaults.standard.string(forKey: "noct.debugSheet")?.hasPrefix("comments") == true {
+                showComments = true
+            }
+        }
+        #endif
         .sheet(isPresented: $showComments) {
             CommentsSheet(post: post)
                 .environmentObject(session)

@@ -111,13 +111,22 @@ async function approve(review: StoredReview, me: string, note: string) {
   } else if (kind === 'comment') {
     await assertPostVisible(contextId, actorId);
     insert = d
-      .prepare(`INSERT INTO comments(id,postId,userId,text,created)
-      SELECT ?,p.id,a.id,?,? FROM posts p JOIN users u ON u.id=p.userId,users a WHERE p.id=? AND a.id=?
+      .prepare(`INSERT INTO comments(id,postId,userId,text,replyTo,created)
+      SELECT ?,p.id,a.id,?,(SELECT rc.id FROM comments rc WHERE rc.id=? AND rc.postId=p.id),? FROM posts p JOIN users u ON u.id=p.userId,users a WHERE p.id=? AND a.id=?
       AND ${published('p')} AND ${visibleAccount('u')} AND a.deletedAt=0 AND a.onboardingComplete=1
       AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE (ar.userId=a.id OR (ar.userId IN(u.id,u.ownerId) AND ar.mode='blocked')) AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
       AND NOT EXISTS(SELECT 1 FROM user_blocks ub WHERE (ub.blocker=a.id AND ub.blocked IN(u.id,u.ownerId)) OR (ub.blocked=a.id AND ub.blocker IN(u.id,u.ownerId)))
       AND ${queueGate}`)
-      .bind(targetId, p.text, now, contextId, actorId, id, me);
+      .bind(
+        targetId,
+        p.text,
+        p.replyTo || null,
+        now,
+        contextId,
+        actorId,
+        id,
+        me,
+      );
   } else {
     insert = d
       .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,ciphertext,replyTo,created)

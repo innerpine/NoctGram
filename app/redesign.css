@@ -1377,6 +1377,73 @@ textarea::placeholder {
   line-height: 1.6;
   margin-top: 6px;
 }
+/* Answers quote the comment they answer, as chat replies do. */
+.comment-reply-quote {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 5px 10px;
+  border: 0;
+  border-left: 2px solid #c4a7e6;
+  border-radius: 4px 8px 8px 4px;
+  background: #c4a7e614;
+  color: #ffffffbf;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+}
+.comment-reply-quote strong {
+  color: #d8c2ee;
+  font-size: 12px;
+  font-weight: 600;
+}
+.comment-reply-quote span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.comment-reply-quote:disabled {
+  border-left-color: #ffffff33;
+  background: #ffffff0a;
+  cursor: default;
+}
+.comment-reply-quote:disabled strong {
+  color: #ffffff7a;
+  font-weight: 500;
+}
+.comment[data-glow] {
+  border-radius: 12px;
+  background: #c4a7e614;
+  transition: background 0.3s ease;
+}
+.comment-reply-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 7px 6px 7px 12px;
+  border-left: 2px solid #c4a7e6;
+  border-radius: 6px 12px 12px 6px;
+  background: #c4a7e614;
+  color: #d8c2ee;
+}
+.comment-reply-bar > div {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+.comment-reply-bar strong {
+  font-weight: 600;
+}
+.comment-reply-bar span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #ffffffa6;
+}
 .comments-panel .comment-form {
   align-items: flex-start;
   gap: 10px;

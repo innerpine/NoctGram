@@ -184,6 +184,9 @@ export const comments = sqliteTable(
       .notNull()
       .references(() => users.id),
     text: text().notNull(),
+    // The comment this one answers, from the same post. A deleted one leaves
+    // the id behind, so the answer can say that it was deleted.
+    replyTo: text(),
     created: integer().notNull(),
   },
   (t) => [index('comments_post').on(t.postId, t.created)],

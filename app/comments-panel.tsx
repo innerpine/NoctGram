@@ -13,6 +13,8 @@ import {
   RefreshCw,
   Flag,
   ShieldCheck,
+  Reply,
+  X,
 } from 'lucide-react';
 import { Avatar, Empty, Stamp } from './post-card';
 import { ContentDecisionForm } from './content-decision-form';
@@ -35,7 +37,10 @@ export function CommentsPanel({
     [sending, setSending] = useState(false),
     [more, setMore] = useState(false),
     [error, setError] = useState(''),
-    [deleting, setDeleting] = useState('');
+    [deleting, setDeleting] = useState(''),
+    // The comment being answered, and the one just jumped to from a quote.
+    [replying, setReplying] = useState<Comment | null>(null),
+    [glow, setGlow] = useState('');
   const [decision, setDecision] = useState<{
       comment: Comment;
       action: 'remove' | 'report';
@@ -45,6 +50,7 @@ export function CommentsPanel({
     generation = useRef(0),
     lock = useRef(false),
     end = useRef<HTMLDivElement>(null),
+    field = useRef<HTMLTextAreaElement>(null),
     cursor = useRef<Comment | null>(null);
   const load = useCallback(
     async (append = false) => {
@@ -103,10 +109,12 @@ export function CommentsPanel({
         action: 'comment',
         id: post.id,
         text,
+        ...(replying ? { replyTo: replying.id } : {}),
       });
       if ('queued' in row) {
         if (live.current) {
           setText('');
+          setReplying(null);
           setNotice(row.notice);
         }
         return;
@@ -114,6 +122,7 @@ export function CommentsPanel({
       onChanged();
       if (live.current) {
         setText('');
+        setReplying(null);
         setComments((old) =>
           old.some((c) => c.id === row.id) ? old : [...old, row],
         );
@@ -138,13 +147,31 @@ export function CommentsPanel({
     setDeleting(id);
     try {
       await request('', { action: 'deleteComment', id });
-      if (live.current) setComments((rows) => rows.filter((c) => c.id !== id));
+      if (live.current) {
+        setComments((rows) => rows.filter((c) => c.id !== id));
+        setReplying((current) => (current?.id === id ? null : current));
+      }
       onChanged();
     } catch (e) {
       if (live.current) setError((e as Error).message);
     } finally {
       if (live.current) setDeleting('');
     }
+  };
+  const reply = (comment: Comment) => {
+    setReplying(comment);
+    requestAnimationFrame(() => field.current?.focus());
+  };
+  // A quote leads to the comment it answers, if that one is loaded.
+  const jump = (id: string) => {
+    const target = document.getElementById('comment-' + id);
+    if (!target) return;
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setGlow(id);
+    setTimeout(
+      () => setGlow((current) => (current === id ? '' : current)),
+      1600,
+    );
   };
   return (
     <div className="comments-panel">
@@ -190,7 +217,12 @@ export function CommentsPanel({
           </button>
         )}
         {comments.map((c) => (
-          <article key={c.id} className="comment">
+          <article
+            key={c.id}
+            id={'comment-' + c.id}
+            className="comment"
+            data-glow={glow === c.id || undefined}
+          >
             <ProfileLink
               target={{ id: c.userId }}
               aria-label={'Профиль ' + c.name}
@@ -217,34 +249,59 @@ export function CommentsPanel({
                   </button>
                 )}
               </div>
+              {c.replyTo && (
+                <button
+                  type="button"
+                  className="comment-reply-quote"
+                  disabled={!c.replyUserId}
+                  onClick={() => jump(c.replyTo!)}
+                >
+                  <strong>
+                    {c.replyUserId ? c.replyName : 'Комментарий удалён'}
+                  </strong>
+                  {c.replyUserId && <span>{c.replyText}</span>}
+                </button>
+              )}
               <p>
                 <MentionText text={c.text} />
               </p>
-              {c.userId !== me.id && !readOnly && (
+              {!readOnly && (
                 <div className="comment-moderation-actions">
                   <button
                     className="text-button"
-                    disabled={!!decision || !!deleting || sending}
-                    onClick={() => {
-                      setNotice('');
-                      setDecision({ comment: c, action: 'report' });
-                    }}
+                    disabled={sending || !!deleting}
+                    onClick={() => reply(c)}
                   >
-                    <Flag size={12} />
-                    Пожаловаться
+                    <Reply size={12} />
+                    Ответить
                   </button>
-                  {me.canModerate && (
-                    <button
-                      className="text-button"
-                      disabled={!!decision || !!deleting || sending}
-                      onClick={() => {
-                        setNotice('');
-                        setDecision({ comment: c, action: 'remove' });
-                      }}
-                    >
-                      <ShieldCheck size={12} />
-                      Удалить как модератор
-                    </button>
+                  {c.userId !== me.id && (
+                    <>
+                      <button
+                        className="text-button"
+                        disabled={!!decision || !!deleting || sending}
+                        onClick={() => {
+                          setNotice('');
+                          setDecision({ comment: c, action: 'report' });
+                        }}
+                      >
+                        <Flag size={12} />
+                        Пожаловаться
+                      </button>
+                      {me.canModerate && (
+                        <button
+                          className="text-button"
+                          disabled={!!decision || !!deleting || sending}
+                          onClick={() => {
+                            setNotice('');
+                            setDecision({ comment: c, action: 'remove' });
+                          }}
+                        >
+                          <ShieldCheck size={12} />
+                          Удалить как модератор
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -302,6 +359,24 @@ export function CommentsPanel({
       )}
       {notice && <output className="moderation-notice">{notice}</output>}
       <EmojiPreview text={text} />
+      {replying && (
+        <div className="comment-reply-bar">
+          <Reply size={15} />
+          <div>
+            <strong>Ответ {replying.name}</strong>
+            <span>{replying.text}</span>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Отменить ответ"
+            disabled={sending}
+            onClick={() => setReplying(null)}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
       <form
         className="comment-form"
         onSubmit={(e) => {
@@ -318,6 +393,7 @@ export function CommentsPanel({
             disabled={sending || readOnly}
           />
           <textarea
+            ref={field}
             aria-label="Комментарий"
             placeholder="Добавить мысль…"
             maxLength={2000}

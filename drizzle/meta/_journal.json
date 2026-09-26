@@ -337,6 +337,13 @@
       "when": 1790185656561,
       "tag": "0049_profile_details",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1790461199364,
+      "tag": "0050_comment_replies",
+      "breakpoints": true
     }
   ]
 }

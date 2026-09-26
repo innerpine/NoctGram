@@ -87,6 +87,42 @@ def upgrade(body):
     return 200, {"collectible": collectible, "balance": R["giftCatalog"].get("balance", 0) - collection["price"]}
 
 
+def author(user_id):
+    """A commenter as the comments list names them, with their appearance."""
+    profile = {META["me"]: R["profileAlice"], META["bob"]: R["profileBob"]}.get(user_id, {})
+    keys = ("name", "avatar", "handle", "verified", "premium", "boostLevel", "profileTheme", "nameGradient",
+            "ringText", "chromeFlow", "chromeTempo", "avatarMotion", "avatarMotionType")
+    return {key: profile[key] for key in keys if key in profile}
+
+
+def answer(comment_id):
+    """The quote of an answered comment (lib/comment-replies.ts)."""
+    answered = next((c for c in R["comments"] if c["id"] == comment_id), None)
+    if not answered:
+        return {"replyTo": comment_id or None, "replyUserId": None, "replyName": None, "replyText": None}
+    return {"replyTo": answered["id"], "replyUserId": answered["userId"], "replyName": answered["name"],
+            "replyText": answered["text"][:160]}
+
+
+def comments():
+    """The captured comments and Alice's answer to Carol's question."""
+    rows = [dict(c, replyTo=None, replyUserId=None, replyName=None, replyText=None) for c in R["comments"]]
+    carol = next((c for c in R["comments"] if c["userId"] == "local_carol"), None)
+    if carol:
+        rows.append(dict(carol, **author(META["me"]), id="mock-answer", userId=META["me"],
+                         text="На крыше у Петроградской, перед самым рассветом 🌃",
+                         created=carol["created"] + 60000, **answer(carol["id"])))
+    return rows
+
+
+def new_comment(body):
+    """POST /api/social {action: 'comment'}: the row the server returns. The
+    mock keeps nothing, so every test starts from the same comments."""
+    return dict(author(META["me"]), id="mock-" + str(int(time.time() * 1000)), postId=body.get("id", ""),
+                userId=META["me"], text=str(body.get("text", "")).strip(), created=int(time.time() * 1000),
+                **answer(body.get("replyTo")))
+
+
 def with_own(reactions, emoji):
     """Reactions after the viewer picks emoji or takes theirs back (None):
     one reaction per person, as lib/message-reactions-store.ts keeps them."""
@@ -308,7 +344,9 @@ def social(q):
         # The archive holds what the app archived (ThreadSwipeTests).
         rows = [dict(row, archivedAt=1 if row["id"] in STATE["archived"] else 0) for row in R["threads"]]
         return [row for row in rows if bool(row["archivedAt"]) == (q.get("archived") == "1")]
-    if action in ("comments", "notifications"):
+    if action == "comments":
+        return [] if q.get("before") else comments()
+    if action == "notifications":
         return [] if q.get("before") else R[action]
     name = SOCIAL.get(action)
     return R[name] if name else {"error": "Не найдено"}
@@ -402,6 +440,8 @@ class Handler(BaseHTTPRequestHandler):
             body = {}
         path = urlparse(self.path).path
         if path == "/api/social" and isinstance(body, dict):
+            if body.get("action") == "comment":
+                return self.send(200, new_comment(body))
             if body.get("action") == "messageReaction":
                 STATE["reactions"][body.get("id")] = body.get("emoji")
             elif body.get("action") == "messagePin":

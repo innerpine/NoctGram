@@ -454,6 +454,11 @@ struct Comment: Identifiable, Hashable {
     var text: String
     var created: Double
     var appearance: Appearance
+    /// The comment this one answers (lib/comment-replies.ts), or "".
+    var replyTo: String
+    /// Who is answered and the start of their comment; nil when that
+    /// comment is deleted or its author is hidden from the viewer.
+    var reply: CommentReply?
 
     init(_ j: JSON) {
         id = j["id"].str
@@ -465,11 +470,19 @@ struct Comment: Identifiable, Hashable {
         text = j["text"].str
         created = j["created"].double ?? 0
         appearance = Appearance(j)
+        replyTo = j["replyTo"].str
+        reply = j["replyUserId"].string.map { CommentReply(userId: $0, name: j["replyName"].str, text: j["replyText"].str) }
     }
 
     var author: Identity {
         Identity(id: userId, name: name, avatar: avatar, handle: handle, appearance: appearance)
     }
+}
+
+struct CommentReply: Hashable {
+    var userId: String
+    var name: String
+    var text: String
 }
 
 struct ChatAttachment: Identifiable, Hashable {

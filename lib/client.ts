@@ -122,6 +122,12 @@ export type Comment = Appearance & {
   handle: string;
   text: string;
   created: number;
+  /** The comment this one answers (lib/comment-replies.ts). */
+  replyTo?: string | null;
+  /** Null when the answered comment is deleted or unavailable. */
+  replyUserId?: string | null;
+  replyName?: string | null;
+  replyText?: string | null;
 };
 export type Message = {
   reactions?: import('./message-reactions').MessageReaction[];

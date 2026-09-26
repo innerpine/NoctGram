@@ -325,52 +325,81 @@ struct PostDetailView: View {
     @StateObject private var comments = CommentsStore()
     @State private var text = ""
     @FocusState private var focused: Bool
+    /// The comment being answered, and the one a quote just led to.
+    @State private var replying: Comment?
+    @State private var glow: String?
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
-                if let post {
-                    PostCard(post: post, detail: true)
-                    Text("Комментарии")
-                        .font(.system(size: 15, weight: .semibold))
-                        .padding(.horizontal, 4)
-                    if comments.hasOlder {
-                        Button("Показать предыдущие") {
-                            Task { await comments.loadOlder(postId: postId, api: session.api) }
-                        }
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Noct.text75)
-                    }
-                    if comments.comments.isEmpty && !comments.loading {
-                        Text("Комментариев пока нет. Начни разговор.")
-                            .font(.system(size: 14))
-                            .foregroundColor(Noct.text48)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    if let post {
+                        PostCard(post: post, detail: true)
+                        Text("Комментарии")
+                            .font(.system(size: 15, weight: .semibold))
                             .padding(.horizontal, 4)
+                        if comments.hasOlder {
+                            Button("Показать предыдущие") {
+                                Task { await comments.loadOlder(postId: postId, api: session.api) }
+                            }
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Noct.text75)
+                        }
+                        if comments.comments.isEmpty && !comments.loading {
+                            Text("Комментариев пока нет. Начни разговор.")
+                                .font(.system(size: 14))
+                                .foregroundColor(Noct.text48)
+                                .padding(.horizontal, 4)
+                        }
+                        ForEach(comments.comments) { comment in
+                            CommentRow(
+                                comment: comment,
+                                highlighted: glow == comment.id,
+                                onProfile: { nav.push(.profile($0)) },
+                                onReply: session.readOnly ? nil : { reply(to: comment) },
+                                onJump: { jump(to: $0, proxy: proxy) },
+                                onDelete: {
+                                    if replying?.id == comment.id { replying = nil }
+                                    Task { await comments.delete(comment, post: post, session: session) }
+                                },
+                                onReport: { reason in Task { await comments.report(comment, reason: reason, session: session) } }
+                            )
+                            .id(comment.id)
+                            .padding(.horizontal, 4)
+                        }
+                    } else if let error {
+                        ErrorBanner(text: error) { Task { await load() } }
+                    } else {
+                        LoadingRow()
                     }
-                    ForEach(comments.comments) { comment in
-                        CommentRow(
-                            comment: comment,
-                            onProfile: { nav.push(.profile($0)) },
-                            onDelete: { Task { await comments.delete(comment, post: post, session: session) } },
-                            onReport: { reason in Task { await comments.report(comment, reason: reason, session: session) } }
-                        )
-                        .padding(.horizontal, 4)
-                    }
-                } else if let error {
-                    ErrorBanner(text: error) { Task { await load() } }
-                } else {
-                    LoadingRow()
                 }
+                .padding(12)
             }
-            .padding(12)
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Noct.background)
         .glassBottomBar {
             if let post, !session.readOnly {
-                ComposerBar(text: $text, placeholder: "Написать комментарий…", sending: comments.sending, focus: $focused, leading: nil) {
-                    Task {
-                        if await comments.send(text, post: post, session: session) { text = "" }
+                VStack(spacing: 0) {
+                    if let replying {
+                        ComposerContext(title: "Ответ \(replying.name)", text: PremiumEmoji.replace(replying.text)) {
+                            withAnimation(Noct.quick) { self.replying = nil }
+                        }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                    ComposerBar(
+                        text: $text,
+                        placeholder: replying == nil ? "Написать комментарий…" : "Ответить…",
+                        sending: comments.sending,
+                        focus: $focused,
+                        leading: nil
+                    ) {
+                        Task {
+                            if await comments.send(text, replyTo: replying, post: post, session: session) {
+                                text = ""
+                                withAnimation(Noct.quick) { replying = nil }
+                            }
+                        }
                     }
                 }
             }
@@ -389,6 +418,25 @@ struct PostDetailView: View {
             }
         }
         .task { await load() }
+    }
+
+    private func reply(to comment: Comment) {
+        withAnimation(Noct.quick) { replying = comment }
+        focused = true
+    }
+
+    /// A quote leads to the comment it answers and lights it for a moment.
+    private func jump(to id: String, proxy: ScrollViewProxy) {
+        guard comments.comments.contains(where: { $0.id == id }) else {
+            session.show("Этот комментарий выше — открой предыдущие")
+            return
+        }
+        withAnimation(Noct.motion) { proxy.scrollTo(id, anchor: .center) }
+        glow = id
+        Task {
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            if glow == id { glow = nil }
+        }
     }
 
     private func load() async {

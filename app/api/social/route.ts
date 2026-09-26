@@ -12,6 +12,7 @@ import {
 } from '@/lib/antispam-moderation';
 import { premiumGet, premiumPost } from '@/lib/premium';
 import { appearanceColumns } from '@/lib/premium-access';
+import { replyColumns, replyJoins, replyTarget } from '@/lib/comment-replies';
 import { assertMediaRead, mediaPermission } from '@/lib/media-access';
 import { callsGet, callsPost } from '@/lib/calls';
 import {
@@ -226,9 +227,10 @@ export async function GET(req: Request) {
         (
           await d
             .prepare(
-              `SELECT * FROM (SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND c.postId=? AND (c.created<? OR (c.created=? AND c.id<?)) ORDER BY c.created DESC,c.id DESC LIMIT 50) ORDER BY created,id`,
+              `SELECT * FROM (SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle,${replyColumns('rc', 'ru')} FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 ${replyJoins('c', 'rc', 'ru')} WHERE ${visibleAccount('u')} AND ${personalVisibility('u')} AND c.postId=? AND (c.created<? OR (c.created=? AND c.id<?)) ORDER BY c.created DESC,c.id DESC LIMIT 50) ORDER BY created,id`,
             )
             .bind(
+              me,
               me,
               s.get('post') || '',
               Number(s.get('before')) || Date.now() + 1,
@@ -635,28 +637,29 @@ export async function POST(req: Request) {
       } else if (action === 'comment') {
         const commentId = crypto.randomUUID();
         const text = clean(b.text, 2000, true);
+        const replyTo = await replyTarget(me, id, b.replyTo);
         const held = await reviewSpam({
           kind: 'comment',
           targetId: commentId,
           actorId: me,
           contextId: id,
-          payload: { text },
+          payload: { text, replyTo },
         });
         if (held) return Response.json(held, { status: 202 });
         await d.batch([
           d
             .prepare(
-              'INSERT INTO comments (id,postId,userId,text,created) VALUES (?,?,?,?,?)',
+              'INSERT INTO comments (id,postId,userId,text,replyTo,created) VALUES (?,?,?,?,?,?)',
             )
-            .bind(commentId, id, me, text, Date.now()),
+            .bind(commentId, id, me, text, replyTo, Date.now()),
           commentNotification(commentId),
         ]);
         return Response.json(
           await d
             .prepare(
-              `SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 WHERE c.id=?`,
+              `SELECT c.*,u.name,u.avatar,${appearanceColumns('u')},h.handle,${replyColumns('rc', 'ru')} FROM comments c JOIN users u ON u.id=c.userId LEFT JOIN handles h ON h.userId=u.id AND h.main=1 ${replyJoins('c', 'rc', 'ru')} WHERE c.id=?`,
             )
-            .bind(commentId)
+            .bind(me, commentId)
             .first(),
         );
       } else {

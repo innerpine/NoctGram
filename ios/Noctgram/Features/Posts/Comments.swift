@@ -41,13 +41,17 @@ final class CommentsStore: ObservableObject {
         }
     }
 
-    func send(_ text: String, post: Post, session: AppSession) async -> Bool {
+    /// Posts a comment, or an answer to `replyTo`, which the server keeps
+    /// under the same post (lib/comment-replies.ts).
+    func send(_ text: String, replyTo: Comment? = nil, post: Post, session: AppSession) async -> Bool {
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty, !sending else { return false }
         sending = true
         defer { sending = false }
         do {
-            let data = try await session.api.socialPost("comment", ["id": post.id, "text": value])
+            var body: [String: Any] = ["id": post.id, "text": value]
+            if let replyTo { body["replyTo"] = replyTo.id }
+            let data = try await session.api.socialPost("comment", body)
             if data["id"].string != nil, data["text"].string != nil {
                 comments.append(Comment(data))
                 var next = post
@@ -86,13 +90,23 @@ final class CommentsStore: ObservableObject {
     }
 }
 
+/// A comment: the author, the comment it answers (a quote that leads to
+/// it), the text and «Ответить». Swiping it to the left answers it, as a
+/// message in a chat.
 struct CommentRow: View {
     @EnvironmentObject private var session: AppSession
     let comment: Comment
+    /// Lit for a moment after a quote led here.
+    var highlighted = false
     let onProfile: (String) -> Void
+    /// Nil where one cannot answer (read-only).
+    var onReply: (() -> Void)?
+    var onJump: (String) -> Void = { _ in }
     let onDelete: () -> Void
     let onReport: (String) -> Void
     @State private var showReport = false
+
+    private var accent: Color { session.me?.appearance.accent ?? Noct.lilac }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -115,6 +129,11 @@ struct CommentRow: View {
                         .foregroundColor(Noct.text48)
                     Spacer(minLength: 0)
                     Menu {
+                        if let onReply {
+                            Button(action: onReply) {
+                                Label("Ответить", systemImage: "arrowshape.turn.up.left")
+                            }
+                        }
                         Button {
                             session.copy(comment.text)
                         } label: {
@@ -139,15 +158,50 @@ struct CommentRow: View {
                             .contentShape(Rectangle())
                     }
                 }
+                if !comment.replyTo.isEmpty {
+                    quote
+                        .padding(.top, 2)
+                }
                 LinkedText(text: comment.text, size: 14, color: Noct.text75, lineSpacing: 3)
+                if let onReply {
+                    Button("Ответить", action: onReply)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Noct.text48)
+                        .buttonStyle(PressableStyle())
+                        .padding(.top, 2)
+                        .accessibilityIdentifier("comment-reply-" + comment.id)
+                }
             }
         }
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(highlighted ? 0.08 : 0))
+                .padding(-8)
+        )
+        .animation(.easeOut(duration: 0.35), value: highlighted)
+        .modifier(SwipeToReply(action: onReply))
         .confirmationDialog("Пожаловаться на комментарий", isPresented: $showReport, titleVisibility: .visible) {
             ForEach(ReportReason.all, id: \.self) { reason in
                 Button(reason) { onReport(reason) }
             }
             Button("Отмена", role: .cancel) {}
         }
+    }
+
+    /// The answered comment, as a chat reply quotes a message.
+    private var quote: some View {
+        Button {
+            onJump(comment.replyTo)
+        } label: {
+            BubbleQuote(
+                name: comment.reply?.name ?? "Комментарий удалён",
+                text: comment.reply.map { PremiumEmoji.replace($0.text) } ?? "Его удалили, или он недоступен",
+                accent: comment.reply == nil ? Noct.text48 : accent
+            )
+        }
+        .buttonStyle(PressableStyle())
+        .disabled(comment.reply == nil)
+        .accessibilityLabel(comment.reply.map { "Ответ \($0.name): \($0.text)" } ?? "Ответ на удалённый комментарий")
     }
 }
 
@@ -171,6 +225,7 @@ struct ComposerBar: View {
                     .lineLimit(1...6)
                     .font(.system(size: 16))
                     .focused(focus)
+                    .accessibilityIdentifier("composer-field")
                     .padding(.horizontal, 16)
                     .padding(.vertical, 11)
                     .frame(minHeight: 44)
@@ -270,6 +325,10 @@ struct CommentsSheet: View {
     @StateObject private var store = CommentsStore()
     @State private var text = ""
     @FocusState private var focused: Bool
+    /// The comment being answered.
+    @State private var replying: Comment?
+    /// The comment a quote just led to.
+    @State private var glow: String?
 
     var body: some View {
         NavigationStack {
@@ -291,11 +350,17 @@ struct CommentsSheet: View {
                         ForEach(store.comments) { comment in
                             CommentRow(
                                 comment: comment,
+                                highlighted: glow == comment.id,
                                 onProfile: { id in
                                     dismiss()
                                     nav.push(.profile(id))
                                 },
-                                onDelete: { Task { await store.delete(comment, post: post, session: session) } },
+                                onReply: session.readOnly ? nil : { reply(to: comment) },
+                                onJump: { id in jump(to: id, proxy: proxy) },
+                                onDelete: {
+                                    if replying?.id == comment.id { replying = nil }
+                                    Task { await store.delete(comment, post: post, session: session) }
+                                },
                                 onReport: { reason in Task { await store.report(comment, reason: reason, session: session) } }
                             )
                             .id(comment.id)
@@ -311,9 +376,26 @@ struct CommentsSheet: View {
             .sheetSurface()
             .glassBottomBar {
                 if !session.readOnly {
-                    ComposerBar(text: $text, placeholder: "Написать комментарий…", sending: store.sending, focus: $focused, leading: nil) {
-                        Task {
-                            if await store.send(text, post: post, session: session) { text = "" }
+                    VStack(spacing: 0) {
+                        if let replying {
+                            ComposerContext(title: "Ответ \(replying.name)", text: PremiumEmoji.replace(replying.text)) {
+                                withAnimation(Noct.quick) { self.replying = nil }
+                            }
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+                        ComposerBar(
+                            text: $text,
+                            placeholder: replying == nil ? "Написать комментарий…" : "Ответить…",
+                            sending: store.sending,
+                            focus: $focused,
+                            leading: nil
+                        ) {
+                            Task {
+                                if await store.send(text, replyTo: replying, post: post, session: session) {
+                                    text = ""
+                                    withAnimation(Noct.quick) { replying = nil }
+                                }
+                            }
                         }
                     }
                 }
@@ -328,8 +410,41 @@ struct CommentsSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .task { await store.load(postId: post.id, api: session.api) }
+        .task {
+            await store.load(postId: post.id, api: session.api)
+            #if DEBUG
+            debugReply()
+            #endif
+        }
     }
+
+    private func reply(to comment: Comment) {
+        withAnimation(Noct.quick) { replying = comment }
+        focused = true
+    }
+
+    /// A quote leads to the comment it answers and lights it for a moment.
+    private func jump(to id: String, proxy: ScrollViewProxy) {
+        guard store.comments.contains(where: { $0.id == id }) else {
+            session.show("Этот комментарий выше — открой предыдущие")
+            return
+        }
+        withAnimation(Noct.motion) { proxy.scrollTo(id, anchor: .center) }
+        glow = id
+        Task {
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            if glow == id { glow = nil }
+        }
+    }
+
+    #if DEBUG
+    /// Screenshot hook (ios/Tests): `-noct.debugSheet comments-reply`
+    /// starts an answer to the last comment of someone else.
+    private func debugReply() {
+        guard UserDefaults.standard.string(forKey: "noct.debugSheet") == "comments-reply" else { return }
+        replying = store.comments.last { $0.userId != session.myId }
+    }
+    #endif
 }
 
 /// Noct Stars support for the author: 1–10 000 in total per post from one reader.
