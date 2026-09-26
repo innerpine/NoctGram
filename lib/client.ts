@@ -222,12 +222,12 @@ export async function request<T>(query: string, body?: unknown): Promise<T> {
     );
   return data;
 }
-export async function upload(file: File): Promise<Media> {
+export async function upload(file: File, signal?: AbortSignal): Promise<Media> {
   if (file.size > 25 * 1024 * 1024)
     throw new Error('Максимальный размер файла — 25 МБ');
   const data = new FormData();
   data.set('file', file);
-  const r = await fetch('/api/upload', { method: 'POST', body: data });
+  const r = await fetch('/api/upload', { method: 'POST', body: data, signal });
   const body = await readApiJson<Media>(r, 'Не удалось загрузить файл');
   if (!r.ok && ['ACCOUNT_BLOCKED', 'READ_ONLY'].includes(body.code || ''))
     window.dispatchEvent(new Event('noctgram:restriction'));

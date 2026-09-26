@@ -99,6 +99,8 @@ import { Avatar, Empty, PostCard, PostSkeleton } from './post-card';
 import { CommentsPanel } from './comments-panel';
 import { ContentDecisionForm } from './content-decision-form';
 import { ProfileDesign } from './profile-design';
+import { ProfileBanner } from './profile-banner';
+import { uploadPhoto } from '@/lib/profile-image';
 import { ProfileSurface } from './profile-surface';
 import { EditorPane } from './editor-pane';
 import { DisplayName, ProfileAvatar } from './profile-identity';
@@ -1488,7 +1490,8 @@ export default function Noctgram({
     );
     void latestRefresh.current();
   };
-  const saveProfile = () =>
+  // The banner saves from «Дизайн» and keeps the editor open.
+  const saveProfile = (keepOpen = false) =>
     void run(async () => {
       const r = await request<Profile>('', {
         action: 'profile',
@@ -1503,8 +1506,13 @@ export default function Noctgram({
       });
       if (r.id === me?.id) setMe(r);
       setProfile((current) => (current?.id === r.id ? r : current));
-      setModal('');
-      notify('Изменения сохранены');
+      if (keepOpen) {
+        setEditCover(r.cover);
+        notify('Баннер сохранён');
+      } else {
+        setModal('');
+        notify('Изменения сохранены');
+      }
       await latestRefresh.current();
     });
   const follow = (person: Person) => {
@@ -2313,8 +2321,8 @@ export default function Noctgram({
                   <button
                     className="cover-edit"
                     disabled={readOnly || channelRestricted}
-                    aria-label="Изменить обложку"
-                    onClick={() => edit()}
+                    aria-label="Изменить баннер"
+                    onClick={() => edit('design')}
                   >
                     <Camera size={17} />
                   </button>
@@ -3423,65 +3431,25 @@ export default function Noctgram({
                           disabled={uploading}
                           onChange={(e) => {
                             const f = e.target.files?.[0];
+                            e.target.value = '';
                             if (!f) return;
                             setUploading(true);
-                            void upload(f)
+                            void uploadPhoto(f, 1024)
                               .then((m) => setEditAvatar(m.url!))
                               .catch((e) => notify(e.message))
                               .finally(() => setUploading(false));
                           }}
                         />
                       </label>
-                      <label className="secondary">
-                        Обложка
-                        <input
-                          className="hidden"
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          disabled={uploading}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (!f) return;
-                            setUploading(true);
-                            void upload(f)
-                              .then((m) => setEditCover(m.url!))
-                              .catch((e) => notify(e.message))
-                              .finally(() => setUploading(false));
-                          }}
-                        />
-                      </label>
+                      {/* People look for the banner in «Дизайн»; it lives there now. */}
                       <button
                         type="button"
                         className="secondary"
-                        aria-pressed={editCover === LIQUID_COVER}
-                        title="Живой фон из цветов аватарки вместо своей обложки"
-                        onClick={() => setEditCover(LIQUID_COVER)}
+                        onClick={() => setEditTab('design')}
                       >
-                        Жидкое
+                        <ImageIcon size={14} /> Баннер
                       </button>
                     </div>
-                    {editCover === LIQUID_COVER && !editAvatar && (
-                      <p className="meta">
-                        «Жидкое» строится из аватарки — добавьте её, и фон
-                        появится.
-                      </p>
-                    )}
-                    {editCover && (
-                      <div className="edit-cover">
-                        {editCover === LIQUID_COVER ? (
-                          <LiquidCover src={editAvatar} />
-                        ) : (
-                          <img src={editCover} alt="Новая обложка" />
-                        )}
-                        <button
-                          type="button"
-                          aria-label="Убрать обложку"
-                          onClick={() => setEditCover('')}
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    )}
                     <label>
                       Имя
                       <input
@@ -3585,6 +3553,15 @@ export default function Noctgram({
               {editTarget && (
                 <>
                   <EditorPane active={editTab === 'design'}>
+                    <ProfileBanner
+                      cover={editCover}
+                      saved={editTarget.cover}
+                      avatar={editAvatar}
+                      disabled={readOnly || channelRestricted}
+                      saving={busy}
+                      onChange={setEditCover}
+                      onSave={() => saveProfile(true)}
+                    />
                     <ProfileDesign
                       key={editTarget.id}
                       me={editTarget}
