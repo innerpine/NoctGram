@@ -70,7 +70,8 @@ final class GiftUpgradeTests: XCTestCase {
 
         done.tap()
         expect(poll(6) { !number.exists }, "«Готово» does not close the collectible", in: app, shot: "upgrade-close")
-        let tile = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "#1234")).firstMatch
+        // «#1 234» with the app's Russian digit grouping.
+        let tile = app.descendants(matching: .any).matching(NSPredicate(format: "label MATCHES %@", ".*#1.234.*")).firstMatch
         expect(tile.waitForExistence(timeout: 6), "The grid does not show the new collectible", in: app, shot: "upgrade-grid")
     }
 }

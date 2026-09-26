@@ -460,7 +460,7 @@ struct GiftTile: View {
             }
             .overlay(alignment: .bottom) {
                 if let collectible = gift.collectible {
-                    Text("#\(collectible.number)")
+                    Text("#" + Format.count(collectible.number))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
