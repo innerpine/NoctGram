@@ -44,22 +44,45 @@ final class CommentReplyTests: XCTestCase {
         return condition()
     }
 
-    /// Scrolls the post down until the element is on screen.
+    /// Scrolls until the element sits between the bar and the comment field:
+    /// the field floats over the list, and a tap under it reaches the field.
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
-        for _ in 0..<6 {
-            if element.exists && element.isHittable { return true }
-            app.swipeUp(velocity: .slow)
+        let field = app.descendants(matching: .any)["composer-field"]
+        for _ in 0..<8 {
+            let bottom = field.exists ? field.frame.minY - 24 : app.frame.height * 0.7
+            guard element.exists else {
+                app.swipeUp(velocity: .slow)
+                continue
+            }
+            let frame = element.frame
+            if frame.minY > 130 && frame.maxY < bottom { return true }
+            if frame.minY <= 130 {
+                app.swipeDown(velocity: .slow)
+            } else {
+                app.swipeUp(velocity: .slow)
+            }
         }
-        return element.exists && element.isHittable
+        return false
     }
 
     func testAnswerQuotesTheComment() {
         let app = launch()
         let answer = app.buttons["comment-reply-" + carol]
-        expect(answer.waitForExistence(timeout: 20) || reveal(answer, in: app), "Carol's comment offers no «Ответить»", in: app, shot: "reply-button")
-        expect(reveal(answer, in: app), "«Ответить» cannot be reached", in: app, shot: "reply-reach")
-        answer.tap()
+        expect(answer.waitForExistence(timeout: 20), "Carol's comment offers no «Ответить»", in: app, shot: "reply-button")
 
+        // A swipe to the left answers, as a message in a chat; «Отменить»
+        // drops the answer.
+        let bobText = app.staticTexts["Вторая фотография — просто космос! 🔥"]
+        expect(reveal(bobText, in: app), "Bob's comment is not on screen", in: app, shot: "reply-bob")
+        let start = bobText.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -220, dy: 0)))
+        expect(app.staticTexts["Ответ Боб"].waitForExistence(timeout: 5), "A swipe to the left does not answer", in: app, shot: "reply-swipe")
+        app.buttons["Отменить"].tap()
+        expect(poll(5) { !app.staticTexts["Ответ Боб"].exists }, "«Отменить» does not drop the answer", in: app, shot: "reply-cancel")
+
+        // «Ответить» under Carol's comment, then the answer quotes her.
+        expect(reveal(answer, in: app), "«Ответить» stays under the comment field", in: app, shot: "reply-reach")
+        answer.tap()
         expect(app.staticTexts["Ответ Кэрол"].waitForExistence(timeout: 5), "«Ответить» shows no «Ответ Кэрол» over the field", in: app, shot: "reply-context")
         let field = app.descendants(matching: .any)["composer-field"]
         expect(field.waitForExistence(timeout: 5), "No comment field", in: app, shot: "reply-field")
@@ -74,14 +97,5 @@ final class CommentReplyTests: XCTestCase {
         // Alice's captured answer and the one just sent both quote Carol.
         expect(poll(5) { quotes.count >= 2 }, "The answer does not quote Carol", in: app, shot: "reply-quote")
         save("49-comment-reply")
-
-        // A swipe to the left answers too, as in a chat.
-        let bobText = app.staticTexts["Вторая фотография — просто космос! 🔥"]
-        expect(reveal(bobText, in: app) || bobText.exists, "Bob's comment is not on screen", in: app, shot: "reply-bob")
-        let start = bobText.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -220, dy: 0)))
-        expect(app.staticTexts["Ответ Боб"].waitForExistence(timeout: 5), "A swipe to the left does not answer", in: app, shot: "reply-swipe")
-        app.buttons["Отменить"].tap()
-        expect(poll(5) { !app.staticTexts["Ответ Боб"].exists }, "«Отменить» does not drop the answer", in: app, shot: "reply-cancel")
     }
 }

@@ -131,56 +131,59 @@ struct LoginView: View {
     // MARK: Email
 
     private var emailStep: some View {
-        VStack(spacing: 0) {
-            AuthBackBar(disabled: busy) { go(.welcome) }
-            ScrollView {
-                VStack(spacing: 0) {
-                    AuthIcon(symbol: "envelope.fill")
-                    AuthTitle(
-                        title: "Твоя почта",
-                        text: Text("Пришлём на неё код для входа. Если аккаунта ещё нет, создадим новый.")
-                    )
-                    HStack(spacing: 12) {
-                        Image(systemName: "at")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundColor(Noct.text48)
-                        TextField("name@example.com", text: $email)
-                            .keyboardType(.emailAddress)
-                            .textContentType(.emailAddress)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .font(.system(size: 18))
-                            .focused($focus, equals: .email)
-                            .submitLabel(.continue)
-                            .onSubmit { Task { await start() } }
-                            .accessibilityIdentifier("login-email")
-                    }
-                    .padding(.horizontal, 18)
-                    .frame(height: 56)
-                    .glassRect(18)
-                    .padding(.top, 30)
-                    if let error {
-                        AuthError(text: error)
-                    }
-                    if !emailEnabled {
-                        VStack(spacing: 12) {
-                            Text("На этом сервере вход по почте ещё не подключён.")
-                                .font(.system(size: 14))
-                                .foregroundColor(Noct.text48)
-                                .multilineTextAlignment(.center)
-                            Button {
-                                showWebLogin = true
-                            } label: {
-                                Label("Войти через сайт", systemImage: "globe")
-                            }
-                            .buttonStyle(SecondaryButtonStyle())
-                        }
-                        .padding(.top, 18)
-                    }
+        ScrollView {
+            VStack(spacing: 0) {
+                AuthIcon(symbol: "envelope.fill")
+                AuthTitle(
+                    title: "Твоя почта",
+                    text: Text("Пришлём на неё код для входа. Если аккаунта ещё нет, создадим новый.")
+                )
+                HStack(spacing: 12) {
+                    Image(systemName: "at")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundColor(Noct.text48)
+                    // A verbatim prompt: as a string key the address would
+                    // turn into a blue Markdown link.
+                    TextField("Почта", text: $email, prompt: Text(verbatim: "name@example.com"))
+                        .keyboardType(.emailAddress)
+                        .textContentType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.system(size: 18))
+                        .focused($focus, equals: .email)
+                        .submitLabel(.continue)
+                        .onSubmit { Task { await start() } }
+                        .accessibilityIdentifier("login-email")
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 18)
+                .frame(height: 56)
+                .glassRect(18)
+                .padding(.top, 30)
+                if let error {
+                    AuthError(text: error)
+                }
+                if !emailEnabled {
+                    VStack(spacing: 12) {
+                        Text("На этом сервере вход по почте ещё не подключён.")
+                            .font(.system(size: 14))
+                            .foregroundColor(Noct.text48)
+                            .multilineTextAlignment(.center)
+                        Button {
+                            showWebLogin = true
+                        } label: {
+                            Label("Войти через сайт", systemImage: "globe")
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                    }
+                    .padding(.top, 18)
+                }
             }
-            .scrollDismissesKeyboard(.interactively)
+            .padding(.horizontal, 24)
+            .padding(.top, 48)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .overlay(alignment: .topLeading) {
+            AuthBackBar(disabled: busy) { go(.welcome) }
         }
         .safeAreaInset(edge: .bottom) {
             AuthButton(title: "Продолжить", busy: busy, enabled: emailValid && emailEnabled) {
@@ -194,54 +197,55 @@ struct LoginView: View {
     // MARK: Code
 
     private var codeStep: some View {
-        VStack(spacing: 0) {
+        ScrollView {
+            VStack(spacing: 0) {
+                AuthIcon(symbol: "envelope.open.fill")
+                AuthTitle(
+                    title: "Введи код",
+                    text: Text("Отправили письмо с кодом на \(Text(email).foregroundColor(.white).fontWeight(.medium))")
+                )
+                ZStack {
+                    TextField("", text: Binding(
+                        get: { code },
+                        set: { value in
+                            code = String(value.filter(\.isNumber).prefix(6))
+                            if !code.isEmpty { error = nil }
+                            if code.count == 6 { Task { await verify() } }
+                        }
+                    ))
+                    .keyboardType(.numberPad)
+                    .textContentType(.oneTimeCode)
+                    .focused($focus, equals: .code)
+                    .foregroundColor(.clear)
+                    .tint(.clear)
+                    .accentColor(.clear)
+                    .accessibilityIdentifier("login-code")
+                    CodeCells(code: code, active: focus == .code, failed: error != nil, shakes: shakes)
+                        .allowsHitTesting(false)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { focus = .code }
+                .padding(.top, 30)
+                if let error {
+                    AuthError(text: error)
+                }
+                resend
+                    .padding(.top, 24)
+                if busy {
+                    ProgressView()
+                        .tint(.white)
+                        .padding(.top, 18)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 48)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .overlay(alignment: .topLeading) {
             AuthBackBar(disabled: busy) {
                 code = ""
                 go(.email)
             }
-            ScrollView {
-                VStack(spacing: 0) {
-                    AuthIcon(symbol: "envelope.open.fill")
-                    AuthTitle(
-                        title: "Введи код",
-                        text: Text("Отправили письмо с кодом на \(Text(email).foregroundColor(.white).fontWeight(.medium))")
-                    )
-                    ZStack {
-                        TextField("", text: Binding(
-                            get: { code },
-                            set: { value in
-                                code = String(value.filter(\.isNumber).prefix(6))
-                                if !code.isEmpty { error = nil }
-                                if code.count == 6 { Task { await verify() } }
-                            }
-                        ))
-                        .keyboardType(.numberPad)
-                        .textContentType(.oneTimeCode)
-                        .focused($focus, equals: .code)
-                        .foregroundColor(.clear)
-                        .tint(.clear)
-                        .accentColor(.clear)
-                        .accessibilityIdentifier("login-code")
-                        CodeCells(code: code, active: focus == .code, failed: error != nil, shakes: shakes)
-                            .allowsHitTesting(false)
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture { focus = .code }
-                    .padding(.top, 30)
-                    if let error {
-                        AuthError(text: error)
-                    }
-                    resend
-                        .padding(.top, 24)
-                    if busy {
-                        ProgressView()
-                            .tint(.white)
-                            .padding(.top, 18)
-                    }
-                }
-                .padding(.horizontal, 24)
-            }
-            .scrollDismissesKeyboard(.interactively)
         }
         .onAppear { focusSoon(.code) }
     }
