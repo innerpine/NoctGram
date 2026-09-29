@@ -787,9 +787,11 @@ assert.equal(
   403,
 );
 const mine = await read('alice', 'action=mine');
-assert.equal(
-  mine.body.packs.find((pack) => pack.id === cats.body.id).removed,
-  true,
+const removedPack = mine.body.packs.find((pack) => pack.id === cats.body.id);
+assert.equal(removedPack.removed, true);
+assert.ok(
+  removedPack.stickers.every((sticker) => !sticker.available && !sticker.src),
+  'The author sees a removed pack without its files',
 );
 await stickers('alice', { action: 'deletePack', id: cats.body.id });
 assert.ok(

@@ -100,9 +100,10 @@ function packInfo(
     own: pack.ownerId === me,
     installed,
     ...(pack.ownerId === me && pack.removedAt ? { removed: true } : {}),
+    // Files of a pack removed by a moderator are no longer served.
     stickers: stickers
       .filter((sticker) => sticker.packId === pack.id)
-      .map((sticker) => userInfo({ ...sticker, live: 1 })),
+      .map((sticker) => userInfo({ ...sticker, live: pack.removedAt ? 0 : 1 })),
   };
 }
 function id(value: unknown, message = 'Набор не найден') {
