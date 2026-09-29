@@ -136,6 +136,8 @@ export type Message = {
   editedAt?: number;
   forwardedName?: string;
   forwardedSender?: string | null;
+  // Voice and round video: when the recipient first played it.
+  listenedAt?: number;
   reply?: {
     id: string;
     sender: string;

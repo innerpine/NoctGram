@@ -9,10 +9,18 @@ import {
   chatFileKind,
   normalizeChatType,
   validChatMedia,
+  validRecording,
   type ChatAttachment,
+  type ChatRecordingIntent,
 } from './chat-files';
 
 export type ChatUploadTarget = { peer: string } | { room: string };
+// Voice and round video recordings keep their real media type and metadata.
+export type ChatRecording = {
+  intent: ChatRecordingIntent;
+  duration: number;
+  waveform: string;
+};
 
 function checkedFile(file: File) {
   if (!file.size || file.size > CHAT_FILE_LIMIT)
@@ -28,14 +36,22 @@ async function persist(
   file: File,
   bytes: Uint8Array,
   register: (id: string, kind: ChatAttachment['kind']) => D1PreparedStatement,
+  recording?: ChatRecording,
 ): Promise<ChatAttachment> {
   const input = normalizeChatType(file.type);
-  if (!validChatMedia(input, bytes))
+  if (recording && !validRecording(recording.intent, input, bytes))
+    throw new ApiError(
+      400,
+      recording.intent === 'voice'
+        ? 'Голосовое сообщение повреждено или записано в неподдерживаемом формате'
+        : 'Видеосообщение повреждено или записано в неподдерживаемом формате',
+    );
+  if (!recording && !validChatMedia(input, bytes))
     throw new ApiError(
       400,
       'Формат фото или видео не соответствует содержимому',
     );
-  const kind = chatFileKind(input),
+  const kind = recording ? recording.intent : chatFileKind(input),
     type = kind === 'file' ? 'application/octet-stream' : input,
     name = storedName(file) || 'Файл',
     id = crypto.randomUUID();
@@ -59,13 +75,23 @@ async function persist(
       .run();
     throw e;
   }
-  return { id, type, name, size: file.size, kind };
+  return {
+    id,
+    type,
+    name,
+    size: file.size,
+    kind,
+    ...(recording
+      ? { duration: recording.duration, waveform: recording.waveform }
+      : {}),
+  };
 }
 
 export async function storeChatUpload(
   me: string,
   peer: string,
   file: File,
+  recording?: ChatRecording,
 ): Promise<ChatAttachment> {
   await assertWritable(me);
   if (!peer || peer.length > 100 || peer === me)
@@ -79,12 +105,24 @@ export async function storeChatUpload(
   if (!access)
     throw new ApiError(403, 'Прикрепление файлов недоступно в этом диалоге');
   const bytes = new Uint8Array(await file.arrayBuffer());
-  return persist(me, file, bytes, (id, kind) =>
-    db()
-      .prepare(
-        'INSERT INTO chat_uploads(uploadId,recipient,size,kind) VALUES(?,?,?,?)',
-      )
-      .bind(id, peer, file.size, kind),
+  return persist(
+    me,
+    file,
+    bytes,
+    (id, kind) =>
+      db()
+        .prepare(
+          'INSERT INTO chat_uploads(uploadId,recipient,size,kind,duration,waveform) VALUES(?,?,?,?,?,?)',
+        )
+        .bind(
+          id,
+          peer,
+          file.size,
+          kind,
+          recording?.duration ?? 0,
+          recording?.waveform ?? '',
+        ),
+    recording,
   );
 }
 
@@ -93,6 +131,7 @@ export async function storeRoomUpload(
   me: string,
   roomId: string,
   file: File,
+  recording?: ChatRecording,
 ): Promise<ChatAttachment> {
   await assertWritable(me);
   if (!roomId || roomId.length > 100) throw new ApiError(400, 'Выберите чат');
@@ -106,12 +145,24 @@ export async function storeRoomUpload(
   if (!access)
     throw new ApiError(403, 'Прикрепление файлов недоступно в этом чате');
   const bytes = new Uint8Array(await file.arrayBuffer());
-  return persist(me, file, bytes, (id, kind) =>
-    db()
-      .prepare(
-        'INSERT INTO chat_room_uploads(uploadId,roomId,size,kind) VALUES(?,?,?,?)',
-      )
-      .bind(id, roomId, file.size, kind),
+  return persist(
+    me,
+    file,
+    bytes,
+    (id, kind) =>
+      db()
+        .prepare(
+          'INSERT INTO chat_room_uploads(uploadId,roomId,size,kind,duration,waveform) VALUES(?,?,?,?,?,?)',
+        )
+        .bind(
+          id,
+          roomId,
+          file.size,
+          kind,
+          recording?.duration ?? 0,
+          recording?.waveform ?? '',
+        ),
+    recording,
   );
 }
 

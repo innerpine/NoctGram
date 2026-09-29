@@ -736,6 +736,19 @@ export async function changeRoom(
       attachments = attachmentIds(body.attachments);
       text = string(body.text ?? '', 4000, !attachments.length);
       await assertPremiumEmoji(me, text);
+      if (
+        (attachments.length > 1 || text) &&
+        (await db()
+          .prepare(
+            `SELECT 1 FROM chat_room_uploads WHERE kind IN ('voice','round') AND uploadId IN(SELECT value FROM json_each(?)) LIMIT 1`,
+          )
+          .bind(JSON.stringify(attachments))
+          .first())
+      )
+        throw new ApiError(
+          400,
+          'Голосовые и видеосообщения отправляются отдельно, без подписи',
+        );
       replyTo = body.replyTo == null ? null : id(body.replyTo);
     }
     if (

@@ -48,7 +48,7 @@ const { outputFiles } = await build({
         build.onResolve(
           {
             filter:
-              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/popover|\.\/chat-emoji-picker|\.\/chat-text-editor|\.\/chat-emoji-text)$/,
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/popover|\.\/chat-emoji-picker|\.\/chat-text-editor|\.\/chat-emoji-text|\.\/chat-recorder)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
@@ -64,6 +64,8 @@ const { outputFiles } = await build({
                     ? 'export const ChatTextEditor="ChatTextEditor";'
                     : path.includes('chat-emoji-text')
                       ? 'export const ChatEmojiText="ChatEmojiText";'
+                      : path.includes('chat-recorder')
+                        ? 'export const ChatRecorder="ChatRecorder";'
                       : path.includes('chat-emoji-picker')
                         ? 'export default "Picker";'
                         : 'export const File="File", LoaderCircle="LoaderCircle", Paperclip="Paperclip", RotateCcw="RotateCcw", Send="Send", Video="Video", X="X", Reply="Reply", Smile="Smile";',

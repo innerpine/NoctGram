@@ -35,6 +35,7 @@ export const ChatMessage = memo(function ChatMessage({
   onRetry,
   onReact,
   reactionPending = false,
+  onListened,
 }: {
   message: Message;
   me: Person | null;
@@ -53,6 +54,7 @@ export const ChatMessage = memo(function ChatMessage({
   onRetry?: (id: string) => void;
   onReact: (message: Message, emoji: ReactionEmoji | null) => Promise<void>;
   reactionPending?: boolean;
+  onListened?: (message: Message) => void;
 }) {
   const own = message.sender === me?.id;
   const reactions = (
@@ -73,7 +75,8 @@ export const ChatMessage = memo(function ChatMessage({
     onAction,
     unconfirmed: !!delivery,
   };
-  const { emojiCount, visualMedia, mediaOnly } = messageLayout(message);
+  const { emojiCount, visualMedia, mediaOnly, round, voice } =
+    messageLayout(message);
   const metadata = (
     <span className="message-time">
       <time dateTime={new Date(message.created).toISOString()}>
@@ -149,7 +152,9 @@ export const ChatMessage = memo(function ChatMessage({
             (own ? 'self' : 'other') +
             (emojiCount ? ' chat-emoji-only' : '') +
             (visualMedia ? ' chat-media-message' : '') +
-            (mediaOnly ? ' chat-media-only' : '')
+            (mediaOnly ? ' chat-media-only' : '') +
+            (round ? ' chat-round-message' : '') +
+            (voice ? ' chat-voice-message' : '')
           }
           data-emoji-count={emojiCount || undefined}
           data-delivery={delivery?.status}
@@ -163,6 +168,9 @@ export const ChatMessage = memo(function ChatMessage({
               files={message.attachments}
               flush={visualMedia}
               metadata={mediaOnly ? metadata : undefined}
+              own={own}
+              listened={!!message.listenedAt || !!delivery}
+              onListened={own ? undefined : () => onListened?.(message)}
             />
           )}
           {!!message.text.trim() && (

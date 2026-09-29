@@ -30,12 +30,16 @@ export function messageLayout(message: LayoutInput) {
     message.attachments.every(
       (file) => file.kind === 'image' || file.kind === 'video',
     );
+  const round =
+    message.attachments?.length === 1 && message.attachments[0].kind === 'round';
+  const voice =
+    message.attachments?.length === 1 && message.attachments[0].kind === 'voice';
   const mediaOnly =
-    visualMedia &&
+    (visualMedia || round) &&
     !message.text.trim() &&
     !message.reply &&
     !message.forwardedName;
-  return { emojiCount, visualMedia, mediaOnly };
+  return { emojiCount, visualMedia, mediaOnly, round, voice };
 }
 export function forwardedHeader(
   name: string | undefined,

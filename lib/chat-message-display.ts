@@ -11,7 +11,11 @@ export function messageSummary(
           ? 'Фото'
           : file.kind === 'video'
             ? 'Видео'
-            : file.name,
+            : file.kind === 'voice'
+              ? 'Голосовое сообщение'
+              : file.kind === 'round'
+                ? 'Видеосообщение'
+                : file.name,
       )
       .join(', ') ||
     (message.gift ? 'Подарок' : 'Сообщение')

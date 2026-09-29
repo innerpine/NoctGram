@@ -2,7 +2,11 @@ import { appearanceColumns } from '@/lib/premium-access';
 import { assertPremiumEmoji } from './premium-emoji-access';
 import { db, clean, ApiError } from './server';
 import { assertReadable, visibleAccount } from './account-access';
-import { CHAT_ATTACHMENT_LIMIT, type ChatAttachment } from './chat-files';
+import {
+  CHAT_ATTACHMENT_LIMIT,
+  attachmentJsonSql,
+  type ChatAttachment,
+} from './chat-files';
 import { messageVisible, messagePair } from './chat-access';
 import { readPresencePrivacy, savePresencePrivacy } from './presence-privacy';
 
@@ -33,6 +37,25 @@ export async function assertCanInteract(me: string, target: string) {
   if (denied)
     throw new ApiError(403, 'Действие недоступно из-за настроек приватности');
 }
+// Voice and round video messages are sent alone, without a caption.
+export async function assertRecordingAlone(
+  table: 'chat_uploads' | 'chat_room_uploads',
+  attachments: string[],
+  text: string,
+) {
+  if (!attachments.length || (attachments.length === 1 && !text.trim())) return;
+  const recording = await db()
+    .prepare(
+      `SELECT 1 FROM ${table} WHERE kind IN ('voice','round') AND uploadId IN(SELECT value FROM json_each(?)) LIMIT 1`,
+    )
+    .bind(JSON.stringify(attachments))
+    .first();
+  if (recording)
+    throw new ApiError(
+      400,
+      'Голосовые и видеосообщения отправляются отдельно, без подписи',
+    );
+}
 export async function sendPrivateMessage(
   me: string,
   recipient: string,
@@ -60,6 +83,7 @@ export async function sendPrivateMessage(
     throw new ApiError(400, 'Напиши сообщение или прикрепи файл');
   if (typeof key !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(key))
     throw new ApiError(400, 'Некорректный запрос отправки');
+  await assertRecordingAlone('chat_uploads', attachments, text);
   const id = `message:${me}:${key}`,
     ids = JSON.stringify(attachments);
   const existing = await db()
@@ -91,7 +115,7 @@ export async function sendPrivateMessage(
   const results = await db().batch([
     db()
       .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,replyTo)
-    SELECT ?,s.id,r.id,?,(SELECT json_group_array(json_object('id',up.id,'name',up.name,'type',up.type,'size',cu.size,'kind',cu.kind))
+    SELECT ?,s.id,r.id,?,(SELECT json_group_array(json(${attachmentJsonSql('up', 'cu')}))
       FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_uploads cu ON cu.uploadId=up.id),?,? FROM users s,users r
     WHERE s.id=? AND r.id=? AND s.id<>r.id AND r.kind='person'
     AND ${visibleAccount('s')} AND ${visibleAccount('r')}

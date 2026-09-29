@@ -23,6 +23,7 @@ import { GiveawayCard } from './giveaway-card';
 import { ChatEmojiText } from './chat-emoji-text';
 import { ChatMessageFiles } from './chat-message-files';
 import { forwardedHeader, messageLayout, replyQuote } from './message-body';
+import { locallyListened, markLocallyListened } from '@/lib/media-playback';
 import { Avatar } from './post-card';
 
 const time = (date: number) =>
@@ -72,7 +73,7 @@ export const RoomMessageRow = memo(function RoomMessageRow({
   const group = roomKind === 'group';
   const giveawayEvent = !!message.giveawayId && !deleted;
   const attachments = deleted ? [] : (message.attachments ?? []);
-  const { emojiCount, visualMedia, mediaOnly } = messageLayout({
+  const { emojiCount, visualMedia, mediaOnly, round, voice } = messageLayout({
     text: deleted ? '' : content,
     attachments,
     reply: message.reply,
@@ -121,7 +122,9 @@ export const RoomMessageRow = memo(function RoomMessageRow({
               (deleted ? ' deleted' : '') +
               (emojiCount ? ' room-emoji-only' : '') +
               (visualMedia ? ' room-media-message' : '') +
-              (mediaOnly ? ' room-media-only' : '')
+              (mediaOnly ? ' room-media-only' : '') +
+              (round ? ' room-round-message' : '') +
+              (voice ? ' room-voice-message' : '')
         }
         data-emoji-count={emojiCount || undefined}
       >
@@ -140,6 +143,9 @@ export const RoomMessageRow = memo(function RoomMessageRow({
             files={attachments}
             flush={visualMedia}
             metadata={mediaOnly ? stamp : undefined}
+            own={self}
+            listened={self || !!delivery || locallyListened(message.id)}
+            onListened={() => markLocallyListened(message.id)}
           />
         )}
         {giveawayEvent ? (

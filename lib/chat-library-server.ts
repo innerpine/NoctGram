@@ -15,7 +15,7 @@ const scope = `WITH visible AS (
   SELECT m.* FROM messages m WHERE ${messagePair('m', '?', '?')} AND ${messageVisible('m', '?')}
 ), attachments AS (
   SELECT m.id AS messageId,m.sender,m.created,CAST(j.key AS INTEGER) AS part,j.value AS file,
-    CASE json_extract(j.value,'$.kind') WHEN 'image' THEN 'photos' WHEN 'video' THEN 'videos'
+    CASE json_extract(j.value,'$.kind') WHEN 'image' THEN 'photos' WHEN 'video' THEN 'videos' WHEN 'round' THEN 'videos'
       ELSE CASE WHEN json_extract(j.value,'$.type') LIKE 'audio/%' THEN 'audio' ELSE 'files' END END AS category
   FROM visible m,json_each(m.media) j
   WHERE NOT EXISTS(SELECT 1 FROM moderated_uploads u WHERE u.uploadId=json_extract(j.value,'$.id'))

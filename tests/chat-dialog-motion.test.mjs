@@ -55,7 +55,7 @@ const compiled = await build({
         build.onResolve(
           {
             filter:
-              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog|\.\/profile-identity|\.\/chat-text-editor|\.\/chat-emoji-text|\.\/chat-video-player)$/,
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog|\.\/profile-identity|\.\/chat-text-editor|\.\/chat-emoji-text|\.\/chat-video-player|\.\/voice-message|\.\/round-video-message)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
@@ -73,6 +73,10 @@ const compiled = await build({
                       ? 'export const ChatEmojiText="ChatEmojiText";'
                       : path === './chat-video-player'
                         ? 'export const ChatVideoPlayer="ChatVideoPlayer";'
+                        : path === './voice-message'
+                          ? 'export const VoiceMessage="VoiceMessage";'
+                          : path === './round-video-message'
+                            ? 'export const RoundVideoMessage="RoundVideoMessage";'
                         : path === './profile-identity'
                           ? 'export const Avatar="Avatar";'
                           : 'export const Dialog="Dialog", DialogContent="DialogContent", DialogDescription="DialogDescription", DialogTitle="DialogTitle";',

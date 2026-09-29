@@ -39,6 +39,8 @@ import {
 import { ChatTextEditor, type ChatTextEditorHandle } from './chat-text-editor';
 import { ChatEmojiText } from './chat-emoji-text';
 import type { ChatDraft } from '@/lib/chat-outbox';
+import { ChatRecorder } from './chat-recorder';
+import type { RecordingResult } from '@/lib/media-recorder';
 
 const ChatEmojiPicker = lazy(() => import('./chat-emoji-picker'));
 
@@ -78,6 +80,12 @@ export function ChatComposer({
   const input = useRef<HTMLInputElement>(null);
   const editor = useRef<ChatTextEditorHandle>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  // A finished recording is uploaded, then handed to the outbox like a file.
+  const [recorded, setRecorded] = useState<{
+    result: RecordingResult;
+    error?: string;
+  } | null>(null);
   const alive = useRef(true);
   const controllers = useRef(new Map<string, AbortController>());
   const locked = useRef(false);
@@ -169,6 +177,37 @@ export function ChatComposer({
       if (!alive.current) break;
       if (current.current.some((file) => file.id === item.id))
         await uploadFile(item);
+    }
+  };
+  const sendRecording = async (result: RecordingResult) => {
+    setRecorded({ result });
+    setError('');
+    try {
+      const form = new FormData();
+      form.set('file', result.file);
+      if (roomId) form.set('room', roomId);
+      else form.set('peer', peerId || '');
+      form.set('intent', result.kind);
+      form.set('duration', String(result.duration));
+      if (result.kind === 'voice') form.set('waveform', result.waveform);
+      const attachment = await chatRequest<ChatAttachment>('/api/chat-upload', {
+        method: 'POST',
+        body: form,
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!alive.current) {
+        void discardChatFile(attachment.id);
+        return;
+      }
+      setRecorded(null);
+      onSend({ text: '', attachments: [attachment], reply: reply ?? undefined });
+      onCancelReply?.();
+    } catch (e) {
+      if (alive.current)
+        setRecorded({
+          result,
+          error: e instanceof Error ? e.message : 'Не удалось отправить запись',
+        });
     }
   };
   const remove = (item: DraftFile) => {
@@ -304,6 +343,34 @@ export function ChatComposer({
           </small>
         </div>
       )}
+      {recorded && (
+        <div
+          className={'chat-recording-upload' + (recorded.error ? ' failed' : '')}
+          role={recorded.error ? 'alert' : 'status'}
+        >
+          {recorded.error ? <X size={16} /> : <LoaderCircle className="spin" size={16} />}
+          <span>
+            {recorded.error ||
+              (recorded.result.kind === 'voice'
+                ? 'Отправляем голосовое сообщение…'
+                : 'Отправляем видеосообщение…')}
+          </span>
+          {recorded.error && (
+            <button
+              type="button"
+              disabled={frozen}
+              onClick={() => void sendRecording(recorded.result)}
+            >
+              <RotateCcw size={15} /> Повторить
+            </button>
+          )}
+          {recorded.error && (
+            <button type="button" onClick={() => setRecorded(null)}>
+              Удалить
+            </button>
+          )}
+        </div>
+      )}
       {error && (
         <p className="chat-send-error" role="alert">
           {error}
@@ -311,7 +378,7 @@ export function ChatComposer({
       )}
       <EmojiPreview text={text} />
       <form
-        className="message-composer"
+        className={'message-composer' + (recording ? ' recording' : '')}
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -394,18 +461,28 @@ export function ChatComposer({
             </Suspense>
           </PopoverContent>
         </Popover>
-        <button
-          type="submit"
-          className="send-button"
-          aria-label="Отправить сообщение"
-          disabled={
-            disabled ||
-            files.some((file) => !file.attachment) ||
-            (!text.trim() && !files.length)
-          }
-        >
-          <Send size={21} fill="currentColor" strokeWidth={1.5} />
-        </button>
+        {!text.trim() && !files.length && !recorded ? (
+          <ChatRecorder
+            disabled={frozen}
+            onRecorded={(result) => void sendRecording(result)}
+            onError={setError}
+            onActiveChange={setRecording}
+          />
+        ) : (
+          <button
+            type="submit"
+            className="send-button"
+            aria-label="Отправить сообщение"
+            disabled={
+              disabled ||
+              !!recorded ||
+              files.some((file) => !file.attachment) ||
+              (!text.trim() && !files.length)
+            }
+          >
+            <Send size={21} fill="currentColor" strokeWidth={1.5} />
+          </button>
+        )}
       </form>
     </div>
   );

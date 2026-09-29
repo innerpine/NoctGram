@@ -1,0 +1,536 @@
+/* Voice messages, round videos and the Telegram-style recorder. */
+.chat-compose-area .message-composer {
+  position: relative;
+}
+.message-composer.recording
+  > :not(.chat-record-button):not(.chat-recording-bar):not(
+    .chat-recording-lock
+  ) {
+  visibility: hidden;
+}
+.chat-record-button {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  margin: 1px 1px 1px 0;
+  border: 0;
+  border-radius: 50%;
+  background: #8774e1;
+  color: #fff;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 150ms;
+}
+.chat-record-button:hover:not(:disabled) {
+  background: #9785ee;
+}
+.chat-record-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.chat-record-button::before {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #8774e1;
+  opacity: 0;
+  content: '';
+  transform: scale(1);
+  transition:
+    transform 90ms linear,
+    opacity 150ms;
+  pointer-events: none;
+  z-index: -1;
+}
+.chat-record-button.active:is(.starting, .recording) {
+  transform: scale(1.5);
+}
+.chat-record-button.active:is(.starting, .recording)::before {
+  opacity: 0.32;
+  transform: scale(calc(1 + var(--level, 0) * 0.55));
+}
+.chat-record-button.active:is(.locked, .preview) {
+  background: #8774e1;
+}
+.chat-record-button svg {
+  transition: transform 180ms;
+}
+.chat-record-button.round-mode:not(.active) svg {
+  transform: rotate(-8deg);
+}
+.chat-recording-bar {
+  position: absolute;
+  inset: 0 50px 0 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 14px;
+  border-radius: 27px;
+  background: #222224;
+  color: #f1edf6;
+  font-size: 15px;
+  animation: chat-recording-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes chat-recording-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+.chat-recording-dot {
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: chat-recording-blink 1.1s ease-in-out infinite;
+}
+@keyframes chat-recording-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+.chat-recording-time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+.chat-recording-wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  min-width: 0;
+  overflow: hidden;
+}
+.chat-recording-wave > i {
+  flex: 0 0 2px;
+  width: 2px;
+  min-height: 4px;
+  border-radius: 1px;
+  background: #ffffff5c;
+  transition: height 80ms linear;
+}
+.chat-recording-wave.live > i {
+  background: #b6a8f2;
+}
+.chat-recording-wave > i.played {
+  background: #b6a8f2;
+}
+.chat-recording-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  color: #ffffff8a;
+  font-size: 14px;
+  white-space: nowrap;
+  transform: translateX(var(--record-shift, 0));
+}
+.chat-recording-trash,
+.chat-recording-stop,
+.chat-recording-play {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #ffffffc0;
+  cursor: pointer;
+}
+.chat-recording-trash:hover {
+  background: #ef44441f;
+  color: #ff9a9a;
+}
+.chat-recording-stop {
+  margin-left: auto;
+  color: #ef4444;
+}
+.chat-recording-stop:hover {
+  background: #ef444419;
+}
+.chat-recording-play {
+  background: #8774e1;
+  color: #fff;
+}
+.chat-recording-preview {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.chat-recording-preview .chat-recording-time {
+  margin-left: auto;
+  color: #ffffffb0;
+  font-size: 14px;
+}
+.chat-recording-lock {
+  position: absolute;
+  right: 5px;
+  bottom: calc(100% + 14px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 34px;
+  padding: 9px 0 7px;
+  border: 1px solid #ffffff14;
+  border-radius: 17px;
+  background: #1c1c1e;
+  color: #ffffffc0;
+  box-shadow: 0 8px 22px #0006;
+  transform: translateY(var(--lock-shift, 0));
+  animation: chat-recording-lock-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+@keyframes chat-recording-lock-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.chat-recording-lock svg:last-child {
+  animation: chat-recording-nudge 1.2s ease-in-out infinite;
+}
+@keyframes chat-recording-nudge {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+.chat-recording-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 16px 0;
+  color: #d9d2e3;
+  font-size: 13px;
+}
+.chat-recording-upload.failed {
+  color: #ffc5bb;
+}
+.chat-recording-upload button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid #ffffff1f;
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Round video recorder overlay. */
+.round-recorder {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding-bottom: 110px;
+  /* The composer stays visible: only the area around the circle is dimmed. */
+  background: radial-gradient(
+    circle at 50% 44%,
+    #000000b3 0,
+    #0000007a 34%,
+    transparent 62%
+  );
+  pointer-events: none;
+  animation: round-recorder-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes round-recorder-in {
+  from {
+    opacity: 0;
+  }
+}
+.round-recorder-stage {
+  position: relative;
+  width: min(360px, 78vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #111;
+  box-shadow: 0 24px 70px #000a;
+  animation: round-recorder-grow 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes round-recorder-grow {
+  from {
+    transform: scale(0.7);
+  }
+}
+.round-recorder-stage video {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  pointer-events: auto;
+}
+.round-recorder-stage video.mirrored {
+  transform: scaleX(-1);
+}
+.round-recorder-ring {
+  position: absolute;
+  inset: -6px;
+  width: calc(100% + 12px);
+  height: calc(100% + 12px);
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+.round-recorder-ring circle {
+  fill: none;
+  stroke: #ef4444;
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 100ms linear;
+}
+.round-recorder-flip {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff1f;
+  color: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* Voice message player. */
+.voice-message {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 2px 0 4px;
+}
+.voice-play {
+  display: grid;
+  flex: 0 0 40px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: #8774e1;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 150ms;
+}
+.voice-play:active {
+  transform: scale(0.94);
+}
+.voice-play svg {
+  margin-left: 2px;
+}
+.voice-message.playing .voice-play svg {
+  margin-left: 0;
+}
+.voice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.voice-waveform {
+  display: block;
+  max-width: 100%;
+  cursor: pointer;
+  touch-action: none;
+}
+.voice-waveform:focus-visible {
+  outline: 2px solid #b6a8f2;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.voice-waveform rect {
+  fill: #ffffff4d;
+  transition: fill 120ms;
+}
+.voice-waveform rect.played {
+  fill: #c9bdff;
+}
+.voice-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
+  color: #ffffff9c;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.voice-unlistened {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #b6a8f2;
+}
+.voice-rate {
+  padding: 1px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff1c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.voice-meta :is(.message-time, .room-message-time) {
+  margin: 0 0 0 auto;
+}
+.voice-message-fallback {
+  color: inherit;
+  text-decoration: none;
+}
+.voice-message-fallback small {
+  display: block;
+  color: #ffffff8f;
+  font-size: 12px;
+}
+.chat-message-files:has(.voice-message) {
+  margin-bottom: 2px;
+}
+
+/* Round video messages render without a bubble. */
+.chat-message-row > .bubble.chat-round-message,
+.room-message > .room-bubble.room-round-message {
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+.chat-round-message .chat-message-files,
+.room-round-message .chat-message-files {
+  margin: 0;
+  overflow: visible;
+}
+.round-video {
+  position: relative;
+  display: block;
+  width: 280px;
+  height: 280px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #141414;
+  cursor: pointer;
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.round-video.playing {
+  transform: scale(1.05);
+}
+.round-video video {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.round-video-ring {
+  position: absolute;
+  inset: -5px;
+  width: calc(100% + 10px);
+  height: calc(100% + 10px);
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+.round-video-ring circle {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  opacity: 0;
+  transition:
+    stroke-dashoffset 250ms linear,
+    opacity 200ms;
+}
+.round-video:is(.playing, .paused) .round-video-ring circle {
+  opacity: 0.9;
+}
+.round-video-info {
+  position: absolute;
+  bottom: 14px;
+  left: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 11px;
+  background: #0000008c;
+  color: #fff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.round-video :is(.message-time, .room-message-time) {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  margin: 0;
+  padding: 2px 7px;
+  border-radius: 11px;
+  background: #0000008c;
+  color: #fff;
+}
+.round-video-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #ffffffb0;
+  font-size: 13px;
+}
+.round-video:focus-visible {
+  outline: 2px solid #b6a8f2;
+  outline-offset: 4px;
+}
+@media (max-width: 500px) {
+  .round-video {
+    width: 240px;
+    height: 240px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-recording-dot,
+  .chat-recording-lock svg:last-child {
+    animation: none;
+  }
+  .chat-record-button,
+  .round-video,
+  .round-recorder,
+  .round-recorder-stage,
+  .chat-recording-bar {
+    animation: none;
+    transition: none;
+  }
+}
+/* The lock hint sits above the composer, outside its scroll box. */
+.chat-compose-area:has(.message-composer.recording) {
+  overflow: visible;
+}
+@media (max-width: 500px) {
+  .chat-recording-bar.recording .chat-recording-wave {
+    display: none;
+  }
+}

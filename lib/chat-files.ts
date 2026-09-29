@@ -61,3 +61,48 @@ export function attachmentJsonSql(upload: string, chatUpload: string) {
   return `json_patch(json_object('id',${upload}.id,'name',${upload}.name,'type',${upload}.type,'size',${chatUpload}.size,'kind',${chatUpload}.kind),
     CASE WHEN ${chatUpload}.kind IN ('voice','round') THEN json_object('duration',${chatUpload}.duration,'waveform',${chatUpload}.waveform) ELSE '{}' END)`;
 }
+export type ChatRecordingIntent = 'voice' | 'round';
+export const VOICE_MAX_MS = 60 * 60 * 1000;
+export const ROUND_MAX_MS = 61 * 1000;
+export const VOICE_TYPES = ['audio/ogg', 'audio/webm', 'audio/mp4', 'audio/mpeg'];
+export const ROUND_TYPES = ['video/mp4', 'video/webm'];
+// Up to 100 five-bit samples: 0-9 then a-v, as produced by lib/voice-waveform.
+export const WAVEFORM_PATTERN = /^[0-9a-v]{0,100}$/;
+// Recorder output is checked against its container signature, never trusted by name.
+export function validRecording(
+  intent: ChatRecordingIntent,
+  input: string,
+  bytes: Uint8Array,
+) {
+  const type = normalizeChatType(input);
+  if (!(intent === 'voice' ? VOICE_TYPES : ROUND_TYPES).includes(type))
+    return false;
+  if (bytes.length < 12) return false;
+  const ascii = (start: number, end: number) =>
+    String.fromCharCode(...bytes.slice(start, end));
+  if (type.endsWith('/webm'))
+    return (
+      bytes[0] === 26 && bytes[1] === 69 && bytes[2] === 223 && bytes[3] === 163
+    );
+  if (type === 'audio/ogg') return ascii(0, 4) === 'OggS';
+  if (type === 'audio/mpeg')
+    return ascii(0, 3) === 'ID3' || (bytes[0] === 255 && (bytes[1] & 224) === 224);
+  return ascii(4, 8) === 'ftyp';
+}
+export function recordingMetadata(
+  intent: ChatRecordingIntent,
+  duration: unknown,
+  waveform: unknown,
+) {
+  const ms = Number(duration);
+  if (
+    !Number.isSafeInteger(ms) ||
+    ms < 1 ||
+    ms > (intent === 'voice' ? VOICE_MAX_MS : ROUND_MAX_MS)
+  )
+    return null;
+  const wave =
+    intent === 'voice' && typeof waveform === 'string' ? waveform : '';
+  if (!WAVEFORM_PATTERN.test(wave)) return null;
+  return { duration: ms, waveform: wave };
+}

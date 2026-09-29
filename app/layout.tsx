@@ -50,6 +50,7 @@ import './staff-panel.css';
 import './antispam.css';
 import './channel-boosts.css';
 import './market.css';
+import './voice-messages.css';
 import './viewport.css';
 import { MusicProvider } from './music-provider';
 import { APP_HISTORY_BOOTSTRAP } from '@/lib/app-history-bootstrap';

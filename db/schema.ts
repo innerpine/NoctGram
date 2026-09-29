@@ -233,6 +233,8 @@ export const messages = sqliteTable(
     deletedAt: integer().notNull().default(0),
     created: integer().notNull(),
     read: integer().notNull().default(0),
+    // When the recipient first played a voice or round video message.
+    listenedAt: integer().notNull().default(0),
   },
   (t) => [
     index('messages_recipient').on(t.recipient, t.created),

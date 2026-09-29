@@ -376,6 +376,21 @@ export function ChatConversation({
       reactHandler.current(message, emoji),
     [],
   );
+  const onListened = useCallback(
+    (message: Message) => {
+      void chatRequest('/api/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'messageListened',
+          peer: peer.id,
+          id: message.id,
+        }),
+        signal: AbortSignal.timeout(15000),
+      }).catch(() => {});
+    },
+    [peer.id],
+  );
   const finished = () => {
     if (operation?.type === 'delete') {
       removal.current?.remove(operation.messages);
@@ -467,6 +482,7 @@ export function ChatConversation({
             }
             onRetry={onRetry}
             onReact={onReact}
+            onListened={onListened}
             reactionPending={reactionPending.has(message.id)}
             initial={initialMessages.has(message.id)}
             me={me}

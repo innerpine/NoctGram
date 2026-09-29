@@ -9,6 +9,7 @@ import {
   saveMessageReaction,
 } from './message-reactions-store';
 import { parseReactions } from './message-reactions';
+import { messageSummarySql } from './message-summary-sql';
 
 export async function readUnreadMessageCount(me: string): Promise<number> {
   // The navigation badge only displays up to 99+, without loading every peer's
@@ -61,12 +62,11 @@ export async function readConversation(
       UNION
       SELECT a.copyId,src.id,src.sender,src.forwardSourceId,src.forwardedName
       FROM attribution a JOIN messages src ON src.id=a.forwardSourceId
-    ) SELECT m.id,m.sender,m.recipient,m.text,m.media,m.created,m.read,m.editedAt,m.forwardedName,p.created AS pinnedAt,
+    ) SELECT m.id,m.sender,m.recipient,m.text,m.media,m.created,m.read,m.editedAt,m.forwardedName,m.listenedAt,p.created AS pinnedAt,
       ${reactionSummarySql('message_reactions', 'm.id', '(SELECT me FROM scope)')} AS reactionData,
       (SELECT a.sender FROM attribution a WHERE a.copyId=m.id AND a.forwardSourceId IS NULL AND a.forwardedName='' LIMIT 1) AS forwardedSender,
       m.replyTo,rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
-      CASE WHEN rp.text<>'' THEN substr(rp.text,1,240) WHEN json_array_length(rp.media)>0 THEN
-        CASE json_extract(rp.media,'$[0].kind') WHEN 'image' THEN 'Фото' WHEN 'video' THEN 'Видео' ELSE json_extract(rp.media,'$[0].name') END ELSE 'Сообщение' END AS replyText,
+      ${messageSummarySql('rp', { textLimit: 240 })} AS replyText,
       g.id AS receiptId,g.giftId AS giftType,g.message AS giftMessage,t.amount AS giftPrice,
       gc.family AS collectibleFamily,gc.number AS collectibleNumber,gc.attributes AS collectibleAttributes,
       gc.keepOriginal AS collectibleKeepOriginal,gc.created AS collectibleCreated,
