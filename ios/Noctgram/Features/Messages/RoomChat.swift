@@ -482,7 +482,10 @@ struct RoomChatView: View {
             recorder.cancel()
             VoicePlayback.shared.stop()
         }
-        .task { await StickerStore.shared.load(api: session.api, me: session.myId ?? "") }
+        .task {
+            await StickerStore.shared.load(api: session.api, me: session.myId ?? "")
+            StickerStore.shared.retryMissing()
+        }
         .task {
             while !Task.isCancelled {
                 await store.load(api: session.api)

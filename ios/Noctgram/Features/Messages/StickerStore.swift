@@ -73,6 +73,7 @@ final class StickerStore: ObservableObject {
     }
 
     private func reload(api: APIClient) async {
+        failed = []
         async let panelRequest = try? api.get("/api/stickers", ["action": "panel"])
         async let builtinRequest = try? api.get("/api/stickers", ["action": "builtin"])
         let (panel, listed) = await (panelRequest, builtinRequest)
@@ -123,6 +124,13 @@ final class StickerStore: ObservableObject {
         return nil
     }
 
+    /// Opening a chat asks again for stickers that failed while offline.
+    func retryMissing() {
+        guard !failed.isEmpty else { return }
+        failed = []
+        revision += 1
+    }
+
     /// True once the server was asked and gave nothing usable.
     func isMissing(_ ref: String) -> Bool {
         failed.contains(ref)
@@ -155,7 +163,12 @@ final class StickerStore: ObservableObject {
         guard let api, !refs.isEmpty else { return }
         for start in stride(from: 0, to: refs.count, by: 60) {
             let chunk = Array(refs[start..<min(start + 60, refs.count)])
-            guard let data = try? await api.get("/api/stickers", ["action": "resolve", "refs": chunk.joined(separator: ",")]) else { continue }
+            guard let data = try? await api.get("/api/stickers", ["action": "resolve", "refs": chunk.joined(separator: ",")]) else {
+                // Offline: not asked again until the panel reloads, so a
+                // chat without network does not ask in a loop.
+                failed.formUnion(chunk)
+                continue
+            }
             let stickers = data["stickers"].array.map { Sticker($0) }
             for sticker in stickers { remember(sticker) }
             let answered = Set(stickers.map(\.ref))

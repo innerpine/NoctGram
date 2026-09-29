@@ -566,6 +566,7 @@ struct ChatView: View {
             await store.loadMeta(api: session.api)
             await GiftCatalog.shared.load(api: session.api)
             await StickerStore.shared.load(api: session.api, me: session.myId ?? "")
+            StickerStore.shared.retryMissing()
         }
         .task {
             while !Task.isCancelled {
