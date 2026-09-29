@@ -113,8 +113,7 @@
 .room-message-context {
   user-select: text;
 }
-.chat-media-message > .message-reactions,
-.room-bubble.room-media-message > .message-reactions {
+.chat-media-message > .message-reactions {
   margin: 7px 9px;
 }
 .room-giveaway-content > .message-reactions,

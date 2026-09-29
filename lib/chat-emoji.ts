@@ -14,11 +14,20 @@ const normalized = (value: string) =>
 const artwork = new Map(names.map((name) => [normalized(name), name]));
 const segmenter = new Intl.Segmenter('und', { granularity: 'grapheme' });
 export function chatEmojiParts(text: string) {
-  const parts: { text: string; unified?: string; premium?: PremiumEmoji }[] =
-    [];
+  const parts: {
+    text: string;
+    unified?: string;
+    premium?: PremiumEmoji;
+    // The sticker id of a custom emoji from a pack made by a person.
+    custom?: string;
+  }[] = [];
   for (const part of emojiParts(text)) {
     if (part.emoji) {
       parts.push({ text: part.text, premium: part.emoji });
+      continue;
+    }
+    if (part.custom) {
+      parts.push({ text: part.text, custom: part.custom });
       continue;
     }
     for (const { segment } of segmenter.segment(part.text)) {
@@ -30,19 +39,23 @@ export function chatEmojiParts(text: string) {
       // Explicit text presentation (VS15) stays text; a joined emoji is one image.
       const unified = artwork.get(normalized(code));
       const last = parts.at(-1);
-      if (!unified && last && !last.unified && !last.premium)
+      if (!unified && last && !last.unified && !last.premium && !last.custom)
         last.text += segment;
       else parts.push({ text: segment, ...(unified ? { unified } : {}) });
     }
   }
   return parts;
 }
+// A message of only emoji is shown large: Unicode emoji and premium or
+// custom emoji tokens count alike.
 export function largeEmojiCount(text: string) {
   const parts = chatEmojiParts(text);
-  const count = parts.filter((part) => part.unified || part.premium).length;
+  const emoji = (part: (typeof parts)[number]) =>
+    !!(part.unified || part.premium || part.custom);
+  const count = parts.filter(emoji).length;
   return count > 0 &&
     count <= 6 &&
-    parts.every((part) => part.unified || part.premium || !part.text.trim())
+    parts.every((part) => emoji(part) || !part.text.trim())
     ? count
     : 0;
 }

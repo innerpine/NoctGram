@@ -36,6 +36,8 @@ const stubs = {
     'export async function cleanSpamActivity(){globalThis.__giveawayRoutes.calls.push(["antispam"]);}',
   '@/lib/upload-storage':
     'export async function cleanUploads(){globalThis.__giveawayRoutes.calls.push(["uploads"]);return {deleted:4};}',
+  '@/lib/message-search':
+    'export async function backfillSearchText(){globalThis.__giveawayRoutes.calls.push(["search"]);return 5;}',
 };
 async function route(file) {
   const compiled = await build({
@@ -108,6 +110,7 @@ const mutations = (s) =>
       'push',
       'calls',
       'uploads',
+      'search',
       'access-cleanup',
       'antispam',
     ].includes(name),
@@ -235,6 +238,7 @@ await test('ordinary authorized jobs still settle prizes, calls, push and upload
     giveaways: { completed: 2, failed: 0 },
     sent: 3,
     uploads: { deleted: 4 },
+    searchIndexed: 5,
   });
   assert.deepEqual(s.calls, [
     ['online'],
@@ -243,6 +247,7 @@ await test('ordinary authorized jobs still settle prizes, calls, push and upload
     ['antispam'],
     ['push'],
     ['uploads'],
+    ['search'],
     ['access-cleanup'],
   ]);
 });

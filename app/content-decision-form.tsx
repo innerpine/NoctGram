@@ -10,7 +10,7 @@ export function ContentDecisionForm({
   onCancel,
 }: {
   id: string;
-  type: 'post' | 'comment' | 'message' | 'story';
+  type: 'post' | 'comment' | 'message' | 'story' | 'sticker_pack';
   action: 'remove' | 'report';
   text: string;
   onDone: () => void;
@@ -68,7 +68,9 @@ export function ContentDecisionForm({
             ? 'Пост, его комментарии и вложения станут недоступны.'
             : type === 'story'
               ? 'История и её вложение станут недоступны.'
-              : 'Комментарий будет удалён из обсуждения.'}{' '}
+              : type === 'sticker_pack'
+                ? 'Набор исчезнет из панелей, его стикеры и эмодзи перестанут показываться.'
+                : 'Комментарий будет удалён из обсуждения.'}{' '}
           Решение и причина сохранятся в истории. Восстановление не
           предусмотрено.
         </p>

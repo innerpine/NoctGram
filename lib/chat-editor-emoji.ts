@@ -6,6 +6,15 @@ import {
   type SerializedTextNode,
 } from 'lexical';
 import { appleEmojiUrl, chatEmojiParts } from './chat-emoji';
+import type { PremiumEmoji } from './premium-emoji';
+import { posterFor } from './sticker-catalog';
+
+// Catalog emoji draw their poster or picture; a short video stays a token.
+function premiumArtwork(emoji: PremiumEmoji) {
+  if (!emoji.asset) return '/assets/emoji/' + emoji.id + '.preview.webp';
+  if (emoji.format === 'webm') return '';
+  return emoji.format === 'webp' ? emoji.asset : posterFor(emoji.asset);
+}
 
 export class ChatEmojiNode extends TextNode {
   static getType() {
@@ -23,11 +32,13 @@ export class ChatEmojiNode extends TextNode {
   createDOM(config: EditorConfig) {
     const dom = super.createDOM(config);
     const part = chatEmojiParts(this.__text)[0];
-    if (!part?.unified && !part?.premium) return dom;
+    const url = part?.premium
+      ? premiumArtwork(part.premium)
+      : part?.unified
+        ? appleEmojiUrl(part.unified)
+        : '';
+    if (!url) return dom;
     dom.classList.add('chat-editor-emoji');
-    const url = part.premium
-      ? '/assets/emoji/' + part.premium.id + '.preview.webp'
-      : appleEmojiUrl(part.unified!);
     dom.style.backgroundImage = `url("${url}")`;
     if (part.premium) dom.setAttribute('aria-label', part.premium.fallback);
     return dom;

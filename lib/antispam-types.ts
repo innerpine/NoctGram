@@ -8,6 +8,11 @@ export type SpamPayload = {
   adult?: number;
   publishAt?: number;
   replyTo?: string | null;
+  quote?: string;
+  // Forum topic id of a held group message ('' or absent for «Общее»).
+  topic?: string;
+  // A held sticker message.
+  sticker?: string;
 };
 export type SpamSubmission = {
   kind: SpamKind;

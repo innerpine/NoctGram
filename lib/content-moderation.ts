@@ -6,9 +6,14 @@ import {
   moderatorWriteAllowed,
 } from './account-access';
 
-type TargetType = 'post' | 'comment' | 'story';
+type TargetType = 'post' | 'comment' | 'story' | 'sticker_pack';
 function targetType(value: unknown): TargetType {
-  if (value !== 'post' && value !== 'comment' && value !== 'story')
+  if (
+    value !== 'post' &&
+    value !== 'comment' &&
+    value !== 'story' &&
+    value !== 'sticker_pack'
+  )
     throw new ApiError(400, 'Выберите пост, комментарий или историю');
   return value;
 }
@@ -24,7 +29,9 @@ async function content(type: TargetType, id: string) {
         ? 'SELECT p.*,u.ownerId FROM posts p JOIN users u ON u.id=p.userId WHERE p.id=?'
         : type === 'story'
           ? 'SELECT s.* FROM stories s WHERE s.id=? AND s.deletedAt=0'
-          : 'SELECT c.* FROM comments c WHERE c.id=?',
+          : type === 'sticker_pack'
+            ? 'SELECT sp.id,sp.ownerId AS userId,sp.title AS text,sp.shortName,sp.type FROM sticker_packs sp WHERE sp.id=? AND sp.removedAt=0'
+            : 'SELECT c.* FROM comments c WHERE c.id=?',
     )
     .bind(id)
     .first<{
@@ -64,6 +71,7 @@ export async function contentModerationGet(
     CASE WHEN r.targetType='post' THEN EXISTS(SELECT 1 FROM posts p WHERE p.id=r.targetId)
       WHEN r.targetType='story' THEN EXISTS(SELECT 1 FROM stories s WHERE s.id=r.targetId AND s.deletedAt=0 AND s.expiresAt>strftime('%s','now')*1000)
       WHEN r.targetType='message' THEN EXISTS(SELECT 1 FROM messages m WHERE m.id=r.targetId)
+      WHEN r.targetType='sticker_pack' THEN EXISTS(SELECT 1 FROM sticker_packs sp WHERE sp.id=r.targetId AND sp.removedAt=0)
       ELSE EXISTS(SELECT 1 FROM comments c WHERE c.id=r.targetId) END AS available
     FROM content_reports r JOIN users u ON u.id=r.authorId
     LEFT JOIN handles h ON h.userId=u.id AND h.main=1
@@ -157,10 +165,21 @@ export async function contentModerationPost(
   const row = await content(type, id);
   if (!row) throw new ApiError(409, 'Контент уже удалён. Обновите список.');
   const table =
-    type === 'post' ? 'posts' : type === 'story' ? 'stories' : 'comments';
+    type === 'post'
+      ? 'posts'
+      : type === 'story'
+        ? 'stories'
+        : type === 'sticker_pack'
+          ? 'sticker_packs'
+          : 'comments';
   const eventId = crypto.randomUUID(),
     now = Date.now(),
-    postId = type === 'post' ? id : type === 'story' ? '' : row.postId!;
+    postId =
+      type === 'post'
+        ? id
+        : type === 'story' || type === 'sticker_pack'
+          ? ''
+          : row.postId!;
   const statements = [
     d
       .prepare(`INSERT OR IGNORE INTO content_removals
@@ -198,6 +217,25 @@ export async function contentModerationPost(
         )
         .bind(eventId, id, eventId),
     );
+  // A removed pack keeps its files as evidence; they are no longer served.
+  if (type === 'sticker_pack')
+    statements.push(
+      d
+        .prepare(
+          `INSERT OR IGNORE INTO moderated_uploads(uploadId,removalId) SELECT st.uploadId,? FROM stickers st WHERE st.packId=? AND EXISTS(SELECT 1 FROM content_removals WHERE id=?)`,
+        )
+        .bind(eventId, id, eventId),
+      d
+        .prepare(
+          `DELETE FROM faved_stickers WHERE stickerRef IN(SELECT 'u:'||st.id FROM stickers st WHERE st.packId=?) AND EXISTS(SELECT 1 FROM content_removals WHERE id=?)`,
+        )
+        .bind(id, eventId),
+      d
+        .prepare(
+          `DELETE FROM user_sticker_packs WHERE packRef='u:'||? AND EXISTS(SELECT 1 FROM content_removals WHERE id=?)`,
+        )
+        .bind(id, eventId),
+    );
   statements.push(
     d
       .prepare(`UPDATE content_reports SET status='closed',reviewNote=?,reviewedBy=?,updated=?
@@ -206,11 +244,17 @@ export async function contentModerationPost(
       .bind(reason, me, now, id, eventId),
   );
   statements.push(
-    d
-      .prepare(
-        `DELETE FROM ${table} WHERE id=? AND EXISTS(SELECT 1 FROM content_removals WHERE id=?)`,
-      )
-      .bind(id, eventId),
+    type === 'sticker_pack'
+      ? d
+          .prepare(
+            `UPDATE sticker_packs SET removedAt=?,removalId=? WHERE id=? AND removedAt=0 AND EXISTS(SELECT 1 FROM content_removals WHERE id=?)`,
+          )
+          .bind(now, eventId, id, eventId)
+      : d
+          .prepare(
+            `DELETE FROM ${table} WHERE id=? AND EXISTS(SELECT 1 FROM content_removals WHERE id=?)`,
+          )
+          .bind(id, eventId),
   );
   const result = await d.batch(statements);
   if (!result.at(-1)?.meta.changes)

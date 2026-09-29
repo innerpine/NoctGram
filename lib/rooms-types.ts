@@ -1,4 +1,5 @@
 import type { SecretPublicKey } from './secret-format';
+import type { ChatAttachment } from './chat-files';
 
 export type RoomKind = 'group' | 'secret';
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -13,7 +14,6 @@ export type RoomMember = {
   joinedAt: number;
 };
 export type RoomMessage = {
-  attachments?: import('./chat-files').ChatAttachment[];
   reactions?: import('./message-reactions').MessageReaction[];
   giveawayId?: string | null;
   id: string;
@@ -24,11 +24,28 @@ export type RoomMessage = {
   text: string;
   ciphertext: string | null;
   replyTo: string | null;
-  replyText?: string | null;
-  replyName?: string | null;
-  replyUnavailable?: boolean;
   created: number;
   deletedAt: number;
+  attachments?: ChatAttachment[];
+  reply?: RoomMessageReply;
+  forwardedName?: string;
+  forwardedFrom?: string | null;
+  postShare?: { id: string };
+  // A sticker message: 'b:<pack>:<slug>' or 'u:<sticker id>'.
+  sticker?: string;
+  // Forum topic id; absent for «Общее».
+  topicId?: string;
+  // The thread this reply belongs to, and how many replies a message has.
+  threadRootId?: string;
+  replies?: number;
+};
+export type RoomMessageReply = {
+  id: string;
+  sender: string;
+  name: string;
+  text: string;
+  unavailable: boolean;
+  quote?: string;
 };
 export type RoomPreview = {
   id: string;
@@ -49,6 +66,8 @@ export type RoomSummary = Omit<RoomPreview, 'joined'> & {
   role: RoomRole;
   archivedAt: number;
   muted: boolean;
+  // Groups with topics; unread then counts topics with new messages.
+  forum: boolean;
   unread: number;
   lastMessage: {
     id: string;
@@ -62,6 +81,12 @@ export type RoomDetail = RoomSummary & {
   members: RoomMember[];
   messages: RoomMessage[];
   nextCursor: string | null;
-  pageCursor?: string | null;
   canSend: boolean;
+  topics?: import('./room-topic-shared').RoomTopic[];
+  // The topic the messages belong to ('general' or an id), when filtered.
+  topic?: string;
+  // The first message of a thread, when reading its replies.
+  threadRoot?: RoomMessage;
+  // Set when the history was opened around this message.
+  around?: string;
 };

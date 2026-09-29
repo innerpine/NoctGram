@@ -16,9 +16,8 @@ import {
   published,
 } from './channel-access';
 import { mediaPermission } from './media-access';
-import { canSend } from './room-access';
 import { availableCommentParent } from './comment-replies';
-import { groupSenderVisible } from './antispam-access';
+import { roomMessageStatements } from './rooms';
 import { spamSettings } from './antispam';
 import type { SpamReview, SpamPayload } from './antispam-types';
 
@@ -76,7 +75,8 @@ async function approve(review: StoredReview, me: string, note: string) {
     await d.prepare(`SELECT id FROM ${table} WHERE id=?`).bind(targetId).first()
   )
     throw new ApiError(409, 'Публикация уже существует. Обновите очередь.');
-  let insert;
+  let insert: D1PreparedStatement,
+    bindUploads: D1PreparedStatement | null = null;
   const now = Date.now();
   if (kind === 'post') {
     if (!(await allowed(contextId, actorId)))
@@ -135,33 +135,24 @@ async function approve(review: StoredReview, me: string, note: string) {
       );
   } else {
     const media = JSON.parse(p.media || '[]') as { id: string }[];
-    const ids = JSON.stringify(media.map((file) => file.id));
-    insert = d
-      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,ciphertext,replyTo,created,media)
-      SELECT ?,r.id,u.id,?,NULL,?,MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0)),
-      (SELECT json_group_array(json_object('id',up.id,'name',up.name,'type',up.type,'size',f.size,'kind',f.kind))
-        FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN room_uploads f ON f.uploadId=up.id)
-      FROM chat_rooms r,users u WHERE r.id=? AND u.id=? AND r.kind='group' AND ${canSend('r', 'u.id')}
-      AND NOT EXISTS(SELECT 1 FROM json_each(?) j LEFT JOIN uploads up ON up.id=j.value
-        LEFT JOIN room_uploads f ON f.uploadId=up.id AND f.roomId=r.id
-        WHERE up.id IS NULL OR f.uploadId IS NULL OR up.userId<>u.id OR up.state<>'ready' OR (f.messageId IS NOT NULL AND f.messageId<>?)
-        OR EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id))
-      AND (? IS NULL OR EXISTS(SELECT 1 FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=r.id AND rp.deletedAt=0 AND ${groupSenderVisible('rp')})) AND ${queueGate}`)
-      .bind(
-        targetId,
-        p.text,
-        p.replyTo || null,
+    [insert, bindUploads] = roomMessageStatements(
+      {
+        id: targetId,
+        roomId: contextId,
+        sender: actorId,
+        kind: 'group',
+        text: p.text,
+        ciphertext: null,
+        replyTo: p.replyTo || null,
+        quote: p.quote || '',
+        topicId: p.topic || '',
+        attachments: media.map((file) => file.id),
+        stickerId: p.sticker || null,
         now,
-        ids,
-        contextId,
-        actorId,
-        ids,
-        targetId,
-        p.replyTo || null,
-        p.replyTo || null,
-        id,
-        me,
-      );
+      },
+      queueGate,
+      [id, me],
+    );
   }
   const authorColumn =
     kind === 'post' ? 'publisherId' : kind === 'comment' ? 'userId' : 'sender';
@@ -184,6 +175,7 @@ async function approve(review: StoredReview, me: string, note: string) {
             .bind(targetId),
         ]
       : []),
+    ...(bindUploads ? [bindUploads] : []),
   ]);
   if (!results[0].meta.changes || !results[1].meta.changes)
     throw new ApiError(409, 'Отправка или права изменились. Обновите очередь.');

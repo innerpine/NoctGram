@@ -1,5 +1,8 @@
-const clockSql = "strftime('%s','now')*1000";
-// Arguments to these predicates are internal SQL expressions, never user input.
+import { groupSenderVisible } from './antispam-access';
+
+// SQL predicates for group and secret rooms. Arguments are internal SQL
+// expressions and aliases, never user input.
+export const clockSql = "strftime('%s','now')*1000";
 export const readable = (
   u: string,
 ) => `${u}.kind='person' AND ${u}.deletedAt=0 AND ${u}.onboardingComplete=1
@@ -37,3 +40,9 @@ export const canSend = (
 ) => `${access(r, actor, true)} AND (${r}.kind='group' OR
   ((SELECT COUNT(*) FROM chat_room_members km WHERE km.roomId=${r}.id AND km.status='active' AND km.publicKey<>'')=2
   AND NOT EXISTS(SELECT 1 FROM chat_room_members pm WHERE pm.roomId=${r}.id AND pm.userId<>${actor} AND NOT (${accepts(actor, 'pm.userId')}))))`;
+// A readable, undeleted message of an ordinary group the actor currently belongs to.
+export const groupMessageReadable = (
+  msg: string,
+  actor: string,
+) => `${msg}.deletedAt=0 AND ${msg}.ciphertext IS NULL AND ${groupSenderVisible(msg)}
+  AND EXISTS(SELECT 1 FROM chat_rooms gr WHERE gr.id=${msg}.roomId AND gr.kind='group' AND ${access('gr', actor)})`;

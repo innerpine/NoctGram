@@ -1,7 +1,7 @@
 import { db } from './storage';
 import type { Message } from './client';
 import { ApiError } from './api-error';
-import { messageAllowed } from './privacy';
+import { directMessageAllowed } from './privacy';
 import { visibleAccount } from './account-access';
 import { messageVisible, messagePair, messageWritable } from './chat-access';
 import {
@@ -9,6 +9,7 @@ import {
   saveMessageReaction,
 } from './message-reactions-store';
 import { parseReactions } from './message-reactions';
+import { messageSummarySql } from './message-summary-sql';
 
 export async function readUnreadMessageCount(me: string): Promise<number> {
   // The navigation badge only displays up to 99+, without loading every peer's
@@ -50,23 +51,27 @@ export async function readConversation(
       .bind(me, peer, me),
   ]);
   const rows = await db()
-    .prepare(`WITH RECURSIVE scope AS (SELECT ? AS me,? AS peer), visible AS (
+    .prepare(`WITH RECURSIVE scope AS (SELECT ? AS me,? AS peer,? AS focus), visible AS (
       SELECT m.* FROM messages m,scope s WHERE ${messagePair('m', 's.me', 's.peer')} AND ${messageVisible('m', 's.me')}
-    ), recent AS (SELECT * FROM visible ORDER BY created DESC,id DESC LIMIT 300), chosen AS (
+    ), recent AS (SELECT * FROM visible ORDER BY created DESC,id DESC LIMIT 300),
+    target AS (SELECT created,id FROM visible WHERE id=(SELECT focus FROM scope)),
+    -- A message found by search or a reply jump arrives with its context.
+    earlier AS (SELECT v.* FROM visible v,target t WHERE v.created<t.created OR (v.created=t.created AND v.id<t.id) ORDER BY v.created DESC,v.id DESC LIMIT 40),
+    later AS (SELECT v.* FROM visible v,target t WHERE v.created>t.created OR (v.created=t.created AND v.id>=t.id) ORDER BY v.created,v.id LIMIT 41),
+    chosen AS (
       SELECT * FROM recent UNION SELECT m.* FROM visible m JOIN message_pins p ON p.messageId=m.id
-      UNION SELECT * FROM visible WHERE id=?
+      UNION SELECT * FROM earlier UNION SELECT * FROM later
     ), attribution(copyId,id,sender,forwardSourceId,forwardedName) AS (
       SELECT m.id,src.id,src.sender,src.forwardSourceId,src.forwardedName
       FROM chosen m JOIN messages src ON src.id=m.forwardSourceId WHERE m.forwardedName<>''
       UNION
       SELECT a.copyId,src.id,src.sender,src.forwardSourceId,src.forwardedName
       FROM attribution a JOIN messages src ON src.id=a.forwardSourceId
-    ) SELECT m.id,m.sender,m.recipient,m.text,m.media,m.created,m.read,m.editedAt,m.forwardedName,p.created AS pinnedAt,
+    ) SELECT m.id,m.sender,m.recipient,m.text,m.media,m.created,m.read,m.editedAt,m.forwardedName,m.listenedAt,p.created AS pinnedAt,
       ${reactionSummarySql('message_reactions', 'm.id', '(SELECT me FROM scope)')} AS reactionData,
-      (SELECT a.sender FROM attribution a WHERE a.copyId=m.id AND a.forwardSourceId IS NULL AND a.forwardedName='' LIMIT 1) AS forwardedSender,
-      m.replyTo,rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
-      CASE WHEN rp.text<>'' THEN substr(rp.text,1,240) WHEN json_array_length(rp.media)>0 THEN
-        CASE json_extract(rp.media,'$[0].kind') WHEN 'image' THEN 'Фото' WHEN 'video' THEN 'Видео' ELSE json_extract(rp.media,'$[0].name') END ELSE 'Сообщение' END AS replyText,
+      COALESCE(m.forwardedFrom,(SELECT a.sender FROM attribution a WHERE a.copyId=m.id AND a.forwardSourceId IS NULL AND a.forwardedName='' LIMIT 1)) AS forwardedSender,
+      m.replyTo,m.replyQuote,m.postShareId,m.stickerId,rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
+      ${messageSummarySql('rp', { textLimit: 240 })} AS replyText,
       g.id AS receiptId,g.giftId AS giftType,g.message AS giftMessage,t.amount AS giftPrice,
       gc.family AS collectibleFamily,gc.number AS collectibleNumber,gc.attributes AS collectibleAttributes,
       gc.keepOriginal AS collectibleKeepOriginal,gc.created AS collectibleCreated,
@@ -97,6 +102,9 @@ export async function readConversation(
         collectibleKeepOriginal: number;
         collectibleCreated: number;
         replyTo: string | null;
+        replyQuote: string;
+        postShareId: string | null;
+        stickerId: string | null;
         replyId: string | null;
         replySender: string | null;
         replyName: string | null;
@@ -119,6 +127,9 @@ export async function readConversation(
       media,
       reactionData,
       replyTo,
+      replyQuote,
+      postShareId,
+      stickerId,
       replyId,
       replySender,
       replyName,
@@ -136,9 +147,13 @@ export async function readConversation(
               name: replyName || '',
               text: replyId ? replyText || 'Сообщение' : 'Сообщение недоступно',
               unavailable: !replyId,
+              // A quote is shown only while the quoted message is available.
+              ...(replyQuote && replyId ? { quote: replyQuote } : {}),
             },
           }
         : {}),
+      ...(postShareId ? { postShare: { id: postShareId } } : {}),
+      ...(stickerId ? { sticker: stickerId } : {}),
       ...(receiptId && giftType && giftPrice !== null
         ? {
             gift: {
@@ -176,13 +191,12 @@ export async function reactToMessage(
     id.length > 250 ||
     typeof peer !== 'string' ||
     !peer ||
-    peer.length > 100 ||
-    peer === me
+    peer.length > 100
   )
     throw new ApiError(400, 'Выбери сообщение в диалоге');
   const gate = `EXISTS(SELECT 1 FROM messages m,users s,users r WHERE m.id=? AND s.id=? AND r.id=?
     AND ${messagePair('m', 's.id', 'r.id')} AND ${messageVisible('m', 's.id')}
-    AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageWritable('s.id')} AND ${messageAllowed})`;
+    AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageWritable('s.id')} AND ${directMessageAllowed})`;
   return saveMessageReaction('message_reactions', id, me, emoji, gate, [
     id,
     me,
@@ -197,7 +211,6 @@ export async function pinMessage(me: string, body: Record<string, unknown>) {
     id.length > 250 ||
     typeof peer !== 'string' ||
     peer.length > 100 ||
-    peer === me ||
     typeof value !== 'boolean'
   )
     throw new ApiError(400, 'Выбери сообщение в диалоге');
@@ -205,7 +218,7 @@ export async function pinMessage(me: string, body: Record<string, unknown>) {
   const access = `EXISTS(SELECT 1 FROM messages m,users s,users r WHERE m.id=? AND s.id=? AND r.id=?
     AND ((m.sender=s.id AND m.recipient=r.id) OR (m.sender=r.id AND m.recipient=s.id))
     AND ${messageVisible('m', 's.id')}
-    AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageAllowed}
+    AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${directMessageAllowed}
     AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=s.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000)))`;
   const allowed = await db()
     .prepare(`SELECT 1 WHERE ${access}`)

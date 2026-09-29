@@ -1,4 +1,25 @@
-export const premiumEmoji = [
+import { catalogEmoji, catalogEmojiPacks } from './premium-emoji-catalog';
+
+// Premium emoji go into text as :noct_<name>: tokens: the original NoctGram
+// set and the emoji packs of the built-in catalog (the Telegram Web set shares
+// its Lottie files with the built-in sticker packs). Emoji from packs made by
+// people are :ce_<sticker id>: tokens, resolved through the sticker API.
+export type PremiumEmoji = {
+  id: string;
+  name: string;
+  fallback: string;
+  pack: string;
+  // Catalog emoji: an asset outside /assets/emoji, without a static preview.
+  asset?: string;
+  format?: 'lottie' | 'webp' | 'webm';
+};
+export const premiumEmojiPacks: readonly { id: string; title: string }[] = [
+  { id: 'RestrictedEmoji', title: 'RestrictedEmoji' },
+  { id: 'CreepyEmoji', title: 'CreepyEmoji' },
+  { id: 'NewsEmoji', title: 'NewsEmoji' },
+  ...catalogEmojiPacks,
+];
+const original: PremiumEmoji[] = [
   {
     id: '5372954454653933911',
     name: 'smile',
@@ -53,18 +74,31 @@ export const premiumEmoji = [
     fallback: '🌛',
     pack: 'NewsEmoji',
   },
-] as const;
-export type PremiumEmoji = (typeof premiumEmoji)[number];
+];
+export const premiumEmoji: readonly PremiumEmoji[] = [
+  ...original,
+  ...catalogEmoji,
+];
 export const emojiToken = (emoji: PremiumEmoji) => `:noct_${emoji.name}:`;
+const CUSTOM = /^:ce_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):$/;
+// Stands in for a custom emoji where only plain text fits.
+export const CUSTOM_EMOJI_FALLBACK = '✨';
 export function emojiParts(text: string) {
-  return text.split(/(:noct_[a-z0-9_]+:)/g).map((text) => ({
-    text,
-    emoji: premiumEmoji.find((e) => emojiToken(e) === text),
-  }));
+  return text
+    .split(/(:noct_[a-z0-9_]+:|:ce_[0-9a-f-]{36}:)/g)
+    .map((text) => ({
+      text,
+      emoji: premiumEmoji.find((e) => emojiToken(e) === text),
+      // The sticker id of a custom emoji from a pack made by a person.
+      custom: CUSTOM.exec(text)?.[1],
+    }));
 }
 export function emojiFallback(text: string) {
   return emojiParts(text)
-    .map((p) => p.emoji?.fallback || p.text)
+    .map(
+      (p) => p.emoji?.fallback || (p.custom ? CUSTOM_EMOJI_FALLBACK : p.text),
+    )
     .join('');
 }
-export const hasPremiumEmoji = (text: string) => /:noct_[a-z0-9_]+:/.test(text);
+export const hasPremiumEmoji = (text: string) =>
+  /:noct_[a-z0-9_]+:|:ce_[0-9a-f-]{36}:/.test(text);

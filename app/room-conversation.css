@@ -699,3 +699,12 @@
     opacity: 0.65;
   }
 }
+
+/* Group bubbles use the direct-chat media, sticker and voice styles; only the
+   sender name above an edge-to-edge photo needs its own inset. */
+.room-message-context .bubble.chat-media-message > .room-sender {
+  margin: 8px 12px 6px;
+}
+.room-workspace > .chat-compose-area {
+  flex: 0 0 auto;
+}

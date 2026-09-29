@@ -243,8 +243,9 @@ await test('empty history and invalid input are handled', async () => {
     items: [],
     next: null,
   });
+  // «Избранное» (the chat with yourself) has its own library.
+  assert.equal((await readChatLibrary('alice', 'alice')).messages, 0);
   for (const [peer, kind, before] of [
-    ['alice', '', ''],
     ['missing', '', ''],
     ['bob', 'invalid', ''],
     ['bob', 'photos', 'invalid'],

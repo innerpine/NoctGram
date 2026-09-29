@@ -23,6 +23,8 @@ export type AppRoute = {
   handle?: string;
   peerId?: string;
   roomId?: string;
+  // Forum topic inside roomId: 'general' or a topic id.
+  topic?: string;
   group?: string;
   invite?: string;
   profileTab?: string;
@@ -54,7 +56,12 @@ export function normalizeAppRoute(input: AppRoute): AppRoute {
         : 'posts',
     };
   if (page === 'messages') {
-    if (input.roomId) return { page, roomId: text(input.roomId) };
+    if (input.roomId)
+      return {
+        page,
+        roomId: text(input.roomId),
+        ...(input.topic ? { topic: text(input.topic) } : {}),
+      };
     if (input.group)
       return {
         page,
@@ -105,6 +112,7 @@ export function appRouteFromURL(href: string, owner: string): AppRoute {
     return normalizeAppRoute({
       page: 'messages',
       roomId: params.get('room') || '',
+      topic: params.get('topic') || '',
       group: params.get('group') || '',
       invite: params.get('invite') || '',
     });
@@ -141,8 +149,10 @@ export function appRouteHref(input: AppRoute) {
     else params.set('page', 'profile');
     if (route.profileTab !== 'posts') params.set('tab', route.profileTab!);
   } else if (route.page === 'messages') {
-    if (route.roomId) params.set('room', route.roomId);
-    else if (route.group) params.set('group', route.group);
+    if (route.roomId) {
+      params.set('room', route.roomId);
+      if (route.topic) params.set('topic', route.topic);
+    } else if (route.group) params.set('group', route.group);
     else if (route.invite) params.set('invite', route.invite);
     else if (route.peerId) params.set('chat', route.peerId);
     else params.set('page', 'messages');
@@ -222,7 +232,7 @@ export function createAppHistory(
     const href = new URL(appRouteHref(route), host.location.origin);
     if (keepExtras) {
       const current = new URL(host.location.href);
-      for (const key of ['post', 'provider', 'result']) {
+      for (const key of ['post', 'provider', 'result', 'stickers']) {
         const value = current.searchParams.get(key);
         if (value) href.searchParams.set(key, value);
       }

@@ -144,13 +144,21 @@ export type Message = {
   editedAt?: number;
   forwardedName?: string;
   forwardedSender?: string | null;
+  // Voice and round video: when the recipient first played it.
+  listenedAt?: number;
   reply?: {
     id: string;
     sender: string;
     name: string;
     text: string;
     unavailable: boolean;
+    // A fragment of the replied message that the reply quotes.
+    quote?: string;
   };
+  // A feed post shared into the chat; the card loads it for the viewer.
+  postShare?: { id: string };
+  // A sticker message: 'b:<pack>:<slug>' or 'u:<sticker id>'.
+  sticker?: string;
   gift?: {
     id: string;
     giftId: string;

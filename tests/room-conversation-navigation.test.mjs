@@ -55,6 +55,16 @@ globalThis.__roomNavigation = {
     );
   },
   roomAction: async () => ({ ok: true }),
+  // Group sends go through the shared outbox; this history has none pending.
+  useSyncExternalStore: (_subscribe, _snapshot, server) => server(),
+  roomOutbox: {
+    subscribe: () => () => {},
+    getSnapshot: () => [],
+    acknowledge() {},
+  },
+  emptyRoomOutbox: [],
+  mergeRoomOutgoing: (messages) => messages,
+  takeChatFocus: () => '',
   watchChatTail: () => () => {},
   revealChat: () => () => {},
   createChatNavigator(list, interrupt) {
@@ -88,27 +98,26 @@ for (const [name, value] of Object.entries({
 }
 const names = {
   'lucide-react':
-    'ArrowLeft Check ChevronDown KeyRound LoaderCircle LockKeyhole MoreHorizontal Reply Send Settings ShieldCheck Trash2 Users X',
+    'ArrowLeft ChevronDown KeyRound LoaderCircle LockKeyhole MoreHorizontal Search Settings ShieldCheck Users',
   '@/components/ui/dialog':
     'Dialog DialogContent DialogDescription DialogTitle',
   '@/components/ui/dropdown-menu':
-    'DropdownMenu DropdownMenuContent DropdownMenuItem DropdownMenuTrigger',
-  './premium-emoji': 'EmojiPicker EmojiPreview',
-  './profile-link': 'MentionText',
-  './giveaway-card': 'GiveawayCard',
+    'DropdownMenu DropdownMenuContent DropdownMenuTrigger',
   './giveaway-create': 'GiveawayCreateButton',
   './room-list': 'RoomAvatar',
+  './room-topics': 'RoomTopicList',
+  './topic-icon': 'TopicIcon',
+  './chat-search': 'ChatSearchBar',
+  './room-message': 'RoomMessageRow repliesLabel',
   './room-management': 'RoomManagement',
-  './post-card': 'Avatar',
+  './forward-dialog': 'ChatForwardDialog',
   './chat-notifications': 'ChatNotificationsItem',
-  './chat-reveal': 'ChatReveal',
   './chat-composer': 'ChatComposer',
-  './chat-emoji-text': 'ChatEmojiText',
-  './chat-message-files': 'ChatMessageFiles',
-  './music-link-card': 'MusicLinkCard',
-  './message-reactions': 'MessageReactions',
-  './room-message-menu': 'RoomMessageContext',
   './message-context-menu': 'chatHistoryContextMenu',
+  '@/lib/room-topic-shared': 'GENERAL_TOPIC',
+  '@/lib/chat-message-display': 'messageSummary',
+  '@/lib/forward-client': 'forwardNotice',
+  '@/lib/app-notice': 'appNotice',
   '@/lib/secret-crypto': 'decryptText encryptText ensureKey prepareSession',
 };
 const { outputFiles } = await build({
@@ -131,26 +140,28 @@ const { outputFiles } = await build({
           contents:
             path === '@/lib/chat-themes'
               ? 'export const chatTheme=()=>({style:{}});'
-              : path === '@/lib/chat-emoji'
-                ? 'export const largeEmojiCount=()=>0;'
-                : path === 'react'
-                  ? 'export const {useState,useRef,useEffect,useLayoutEffect,useCallback}=globalThis.__roomNavigation;'
-                  : path === 'react/jsx-runtime'
-                    ? 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx,Fragment="Fragment";'
-                    : path === '@/lib/rooms-client'
-                      ? 'export const {roomRequest,roomAction}=globalThis.__roomNavigation;'
-                      : path === '@/lib/chat-navigation'
-                        ? 'export const {createChatNavigator}=globalThis.__roomNavigation;'
-                        : path === '@/lib/chat-viewport'
-                          ? 'export const {watchChatTail,revealChat}=globalThis.__roomNavigation;'
-                          : (names[path] || '')
-                              .split(' ')
-                              .filter(Boolean)
-                              .map(
-                                (name) =>
-                                  `export const ${name}=${JSON.stringify(name)};`,
-                              )
-                              .join('\n'),
+              : path === '@/lib/room-outbox'
+                ? 'export const {roomOutbox,emptyRoomOutbox,mergeRoomOutgoing}=globalThis.__roomNavigation;'
+                : path === '@/lib/chat-focus'
+                  ? 'export const CHAT_FOCUS_EVENT="chat-focus";export const requestChatFocus=()=>{};export const {takeChatFocus}=globalThis.__roomNavigation;'
+                  : path === 'react'
+                    ? 'export const {useState,useRef,useEffect,useLayoutEffect,useCallback,useSyncExternalStore}=globalThis.__roomNavigation;'
+                    : path === 'react/jsx-runtime'
+                      ? 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx,Fragment="Fragment";'
+                      : path === '@/lib/rooms-client'
+                        ? 'export const {roomRequest,roomAction}=globalThis.__roomNavigation;'
+                        : path === '@/lib/chat-navigation'
+                          ? 'export const {createChatNavigator}=globalThis.__roomNavigation;'
+                          : path === '@/lib/chat-viewport'
+                            ? 'export const {watchChatTail,revealChat}=globalThis.__roomNavigation;'
+                            : (names[path] || '')
+                                .split(' ')
+                                .filter(Boolean)
+                                .map(
+                                  (name) =>
+                                    `export const ${name}=${JSON.stringify(name)};`,
+                                )
+                                .join('\n'),
         }));
       },
     },
@@ -178,7 +189,17 @@ const msg = (id, replyTo = null) => ({
   text: id,
   created: Number(id.replace(/\D/g, '')) || 1,
   replyTo,
-  replyText: 'old message',
+  ...(replyTo
+    ? {
+        reply: {
+          id: replyTo,
+          sender: 'bob',
+          name: 'Bob',
+          text: 'old message',
+          unavailable: false,
+        },
+      }
+    : {}),
   deletedAt: 0,
 });
 const detail = (messages) => ({
@@ -217,6 +238,11 @@ function mount() {
       for (const node of walk(view.tree)) {
         if (node.props?.id)
           view.elements.set(node.props.id, { id: node.props.id });
+        // Bubbles live inside RoomMessageRow, keyed by the message id.
+        if (node.type === 'RoomMessageRow') {
+          const id = 'room-message-' + node.props.message.id;
+          view.elements.set(id, { id });
+        }
         if (node.props?.className?.includes('room-message-list'))
           node.props.ref.current = view.list;
       }
@@ -232,10 +258,20 @@ function mount() {
   view.render();
   return view;
 }
-const quote = (view) =>
-  walk(view.render()).find(
-    (node) => node.props?.className === 'chat-reply-quote',
+// The reply quote inside a row (app/message-body.tsx) jumps with onJump and is
+// disabled when the quoted message is unavailable.
+const quote = (view) => {
+  const row = walk(view.render()).find(
+    (node) => node.type === 'RoomMessageRow' && node.props.message.reply,
   );
+  return {
+    type: 'button',
+    props: {
+      disabled: row.props.message.reply.unavailable,
+      onClick: () => row.props.onJump(row.props.message.reply.id),
+    },
+  };
+};
 try {
   const view = mount();
   requests
@@ -256,7 +292,7 @@ try {
   assert.equal(requests.at(-1).query.before, undefined);
   requests.at(-1).resolve({
     ...detail([msg('message4'), msg('message5'), msg('message6')]),
-    pageCursor: 'anchor',
+    around: 'message5',
   });
   await flush();
   older.render();
@@ -300,11 +336,14 @@ try {
   );
 
   const deleted = mount();
-  requests
-    .at(-1)
-    .resolve(
-      detail([{ ...msg('message200', 'message5'), replyUnavailable: true }]),
-    );
+  requests.at(-1).resolve(
+    detail([
+      {
+        ...msg('message200', 'message5'),
+        reply: { ...msg('message200', 'message5').reply, unavailable: true },
+      },
+    ]),
+  );
   await flush();
   assert.equal(quote(deleted).props.disabled, true);
   console.log(

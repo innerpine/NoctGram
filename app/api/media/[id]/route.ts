@@ -14,16 +14,18 @@ export async function GET(
       assertReadable(me),
       db()
         .prepare(
-          `SELECT up.userId,up.name,up.type,u.onboardingComplete,u.deletedAt,COALESCE(c.kind,rf.kind) AS kind,
+          `SELECT up.userId,up.name,up.type,u.onboardingComplete,u.deletedAt,COALESCE(c.kind,rc.kind) AS kind,
+        EXISTS(SELECT 1 FROM stickers st WHERE st.uploadId=up.id) AS sticker,
         (SELECT onboardingComplete FROM users WHERE id=?) AS viewerComplete,
         EXISTS(SELECT 1 FROM users av WHERE av.avatar='/api/media/'||up.id AND ${visibleAccount('av')}) AS avatar
-        FROM uploads up JOIN users u ON u.id=up.userId LEFT JOIN chat_uploads c ON c.uploadId=up.id LEFT JOIN room_uploads rf ON rf.uploadId=up.id WHERE up.id=? AND up.state='ready'`,
+        FROM uploads up JOIN users u ON u.id=up.userId LEFT JOIN chat_uploads c ON c.uploadId=up.id LEFT JOIN chat_room_uploads rc ON rc.uploadId=up.id WHERE up.id=? AND up.state='ready'`,
         )
         .bind(me, id)
         .first<{
           userId: string;
           name: string;
           kind: string | null;
+          sticker: number;
           onboardingComplete: number;
           deletedAt: number;
           viewerComplete: number;
@@ -70,7 +72,12 @@ export async function GET(
         headers.set('Content-Type', 'application/octet-stream');
     }
     headers.set('X-Content-Type-Options', 'nosniff');
-    headers.set('Cache-Control', 'private, no-store');
+    // Sticker files never change; a short private cache keeps panels fast
+    // while a moderator's removal still takes effect within the hour.
+    headers.set(
+      'Cache-Control',
+      upload.sticker ? 'private, max-age=3600' : 'private, no-store',
+    );
     headers.set('Accept-Ranges', 'bytes');
     headers.set('ETag', object.httpEtag);
     if (size) {

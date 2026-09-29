@@ -1,4 +1,3 @@
-import { CHAT_ATTACHMENT_LIMIT, type ChatAttachment } from './chat-files';
 import { assertSpamIdentity, reviewSpam } from './antispam';
 import { groupSenderVisible } from './antispam-access';
 import { assertPremiumEmoji } from './premium-emoji-access';
@@ -8,32 +7,55 @@ import {
   saveMessageReaction,
 } from './message-reactions-store';
 import { parseReactions } from './message-reactions';
+import { messageSummarySql } from './message-summary-sql';
+import { replyQuoteValue } from './reply-quote';
+import { stickerForMessage } from './sticker-send';
+import { normalizeSearch } from './search-text';
+import {
+  CHAT_ATTACHMENT_LIMIT,
+  attachmentJsonSql,
+  type ChatAttachment,
+} from './chat-files';
 import { COMMUNITY_ROOM_ID } from './community-group';
 import { ApiError } from './api-error';
 import {
   validateSecretPublicKey,
   validateSecretEnvelope,
 } from './secret-format';
+import {
+  access,
+  accepts,
+  canSend,
+  readable,
+  unblocked,
+  visibleRoom,
+  writable,
+} from './room-access';
 import type {
   RoomDetail,
+  RoomKind,
   RoomMember,
   RoomMessage,
   RoomPreview,
   RoomRole,
   RoomSummary,
 } from './rooms-types';
+import {
+  closeTopic,
+  createTopic,
+  deleteTopic,
+  forumUnreadSql,
+  markTopicRead,
+  readTopics,
+  setForum,
+  topicKey,
+  topicName,
+  updateTopic,
+} from './room-topics';
 
 const PAGE_SIZE = 100;
 const LIMIT = 200;
-import {
-  readable,
-  writable,
-  unblocked,
-  accepts,
-  visibleRoom,
-  access,
-  canSend,
-} from './room-access';
+export { canSend };
 const memberCount = (r: string) =>
   `(SELECT COUNT(*) FROM chat_room_members countm WHERE countm.roomId=${r}.id AND countm.status='active')`;
 // The shared community admits every registered person. Ordinary groups retain
@@ -48,7 +70,10 @@ const summaryColumns = (actor: string) => `r.id,r.kind,r.ownerId,
   CASE WHEN r.kind='secret' THEN COALESCE((SELECT peer.name FROM chat_room_members pm JOIN users peer ON peer.id=pm.userId WHERE pm.roomId=r.id AND pm.userId<>${actor} AND pm.status='active' LIMIT 1),'Секретный чат') ELSE r.name END AS name,
   r.description,
   CASE WHEN r.kind='secret' THEN COALESCE((SELECT peer.avatar FROM chat_room_members pm JOIN users peer ON peer.id=pm.userId WHERE pm.roomId=r.id AND pm.userId<>${actor} AND pm.status='active' LIMIT 1),'') ELSE r.avatar END AS avatar,
-  r.visibility,r.username,r.created,r.updatedAt`;
+  r.visibility,r.username,r.created,r.updatedAt,(r.kind='group' AND r.forum=1) AS forum`;
+// Unread messages for a member (alias m); a forum counts unread topics.
+const unreadSql = `CASE WHEN r.kind='group' AND r.forum=1 THEN ${forumUnreadSql('r', 'm')} ELSE
+    (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('unreadm')})) END`;
 
 async function keyedRoomId(actor: string, key: string) {
   const bytes = new Uint8Array(
@@ -109,6 +134,97 @@ function uuid(value: unknown) {
     throw new ApiError(400, 'Некорректный ключ сообщения');
   return result;
 }
+function attachmentIds(value: unknown) {
+  if (value === undefined) return [];
+  if (
+    !Array.isArray(value) ||
+    value.length > CHAT_ATTACHMENT_LIMIT ||
+    value.some(
+      (item) => typeof item !== 'string' || !item || item.length > 100,
+    ) ||
+    new Set(value).size !== value.length
+  )
+    throw new ApiError(400, 'Можно прикрепить до 10 разных файлов');
+  return value as string[];
+}
+const sameIds = (media: string, ids: string[]) =>
+  JSON.stringify(
+    (JSON.parse(media) as ChatAttachment[]).map((file) => file.id),
+  ) === JSON.stringify(ids);
+export type RoomMessageInput = {
+  id: string;
+  roomId: string;
+  sender: string;
+  kind: 'group' | 'secret';
+  text: string;
+  ciphertext: string | null;
+  replyTo: string | null;
+  quote?: string;
+  // Forum topic ('' is «Общее»); a reply joins its parent's thread.
+  topicId?: string;
+  attachments: string[];
+  // A sticker message, checked by lib/sticker-send.ts.
+  stickerId?: string | null;
+  now: number;
+};
+// The single write path for new room messages: sending, moderator approval and
+// forwarding. Attachments must be the sender's own ready drafts for this room;
+// the second statement binds them to the message in the same batch.
+export function roomMessageStatements(
+  message: RoomMessageInput,
+  gate = '',
+  gateBindings: (string | number | null)[] = [],
+) {
+  const ids = JSON.stringify(message.attachments);
+  return [
+    db()
+      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,searchText,ciphertext,replyTo,replyQuote,stickerId,media,created,topicId,threadRootId)
+      SELECT ?,r.id,u.id,?,?,?,?,?,?,
+        (SELECT json_group_array(json(${attachmentJsonSql('up', 'cu')}))
+          FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_room_uploads cu ON cu.uploadId=up.id),
+        MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0)),
+        ?,(SELECT COALESCE(tp.threadRootId,tp.id) FROM chat_room_messages tp WHERE tp.id=? AND tp.roomId=r.id)
+      FROM chat_rooms r,users u WHERE r.id=? AND u.id=? AND ${canSend('r', 'u.id')}
+      AND r.kind=? AND (? IS NULL OR EXISTS(SELECT 1 FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=r.id AND rp.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('rp')})
+        AND (?='' OR instr(rp.text,?)>0) AND (r.forum=0 OR rp.topicId=?)))
+      AND (?='' OR (r.forum=1 AND EXISTS(SELECT 1 FROM chat_room_topics t WHERE t.id=? AND t.roomId=r.id AND t.deletedAt=0
+        AND (t.closedAt=0 OR t.createdBy=u.id OR EXISTS(SELECT 1 FROM chat_room_members tm WHERE tm.roomId=r.id AND tm.userId=u.id AND tm.status='active' AND tm.role IN ('owner','admin'))))))
+      AND NOT EXISTS(SELECT 1 FROM json_each(?) j WHERE NOT EXISTS(
+        SELECT 1 FROM uploads up JOIN chat_room_uploads cu ON cu.uploadId=up.id WHERE up.id=j.value AND up.userId=u.id
+          AND up.state='ready' AND cu.roomId=r.id AND cu.messageId IS NULL AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)))
+      ${gate ? 'AND ' + gate : ''}
+      ON CONFLICT(id) DO NOTHING`)
+      .bind(
+        message.id,
+        message.text,
+        normalizeSearch(message.text),
+        message.ciphertext,
+        message.replyTo,
+        message.quote ?? '',
+        message.stickerId ?? null,
+        ids,
+        message.now,
+        message.topicId ?? '',
+        message.replyTo,
+        message.roomId,
+        message.sender,
+        message.kind,
+        message.replyTo,
+        message.replyTo,
+        message.quote ?? '',
+        message.quote ?? '',
+        message.topicId ?? '',
+        message.topicId ?? '',
+        message.topicId ?? '',
+        ids,
+        ...gateBindings,
+      ),
+    db()
+      .prepare(`UPDATE chat_room_uploads SET messageId=? WHERE messageId IS NULL AND uploadId IN(
+      SELECT json_extract(j.value,'$.id') FROM chat_room_messages m,json_each(m.media) j WHERE m.id=? AND m.sender=?)`)
+      .bind(message.id, message.id, message.sender),
+  ];
+}
 function changed(result: { meta: { changes?: number } }) {
   if (!result.meta.changes)
     throw new ApiError(
@@ -148,7 +264,7 @@ function preview(row: RoomPreview & { joined: number | boolean }): RoomPreview {
 async function roomRow(me: string, roomId: string): Promise<RoomSummary> {
   const row = await db()
     .prepare(`SELECT ${summaryColumns('m.userId')},m.role,m.archivedAt,m.muted,${memberCount('r')} AS memberCount,
-    (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('unreadm')})) AS unread
+    ${unreadSql} AS unread
     FROM chat_rooms r JOIN chat_room_members m ON m.roomId=r.id AND m.userId=? WHERE r.id=? AND ${access('r', 'm.userId')}`)
     .bind(me, roomId)
     .first<RoomSummary>();
@@ -156,6 +272,7 @@ async function roomRow(me: string, roomId: string): Promise<RoomSummary> {
   return {
     ...row,
     muted: !!row.muted,
+    forum: !!row.forum,
     label: row.kind === 'group' ? 'Группа' : 'Секретный чат',
     lastMessage: null,
   };
@@ -189,8 +306,8 @@ export async function listRooms(
   await actorAllowed(me);
   const result = await db()
     .prepare(`SELECT ${summaryColumns('m.userId')},m.role,m.archivedAt,m.muted,${memberCount('r')} AS memberCount,
-    (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('unreadm')})) AS unread,
-    (SELECT json_object('id',lastm.id,'text',CASE WHEN r.kind='secret' THEN '' WHEN lastm.text<>'' THEN lastm.text WHEN json_array_length(lastm.media)>0 THEN 'Вложение' ELSE '' END,'created',lastm.created,'sender',lastm.sender)
+    ${unreadSql} AS unread,
+    (SELECT json_object('id',lastm.id,'text',CASE WHEN r.kind='secret' THEN '' ELSE ${messageSummarySql('lastm', { empty: '' })} END,'created',lastm.created,'sender',lastm.sender)
     FROM chat_room_messages lastm WHERE lastm.roomId=r.id AND lastm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('lastm')}) ORDER BY lastm.created DESC,lastm.id DESC LIMIT 1) AS lastMessage
     FROM chat_rooms r JOIN chat_room_members m ON m.roomId=r.id WHERE m.userId=? AND (m.archivedAt>0)=? AND ${access('r', 'm.userId')}
     ORDER BY MAX(r.updatedAt,COALESCE((SELECT MAX(created) FROM chat_room_messages latest WHERE latest.roomId=r.id AND (r.kind='secret' OR ${groupSenderVisible('latest')})),0)) DESC,r.id LIMIT 100`)
@@ -200,6 +317,7 @@ export async function listRooms(
     rooms: result.results.map((r) => ({
       ...r,
       muted: !!r.muted,
+      forum: !!r.forum,
       label: r.kind === 'group' ? 'Группа' : 'Секретный чат',
       lastMessage: r.lastMessage ? JSON.parse(r.lastMessage) : null,
     })),
@@ -269,34 +387,102 @@ export async function resolveRoomInvite(
   if (!row) throw new ApiError(404, 'Приглашение отозвано или недоступно');
   return { room: preview(row) };
 }
+type MessageRow = RoomMessage & {
+  reactionData: string;
+  media: string;
+  forwardedName: string;
+  forwardedFrom: string | null;
+  replyQuote: string;
+  postShareId: string | null;
+  stickerId: string | null;
+  topicId: string;
+  threadRootId: string | null;
+  replyCount: number;
+  replyId: string | null;
+  replySender: string | null;
+  replyName: string | null;
+  replyText: string | null;
+};
+// One message SELECT for the history, a topic, a thread and its root.
+const messageSelect = (
+  where: string,
+) => `SELECT msg.id,msg.roomId,msg.sender,u.name AS senderName,u.avatar AS senderAvatar,msg.text,msg.ciphertext,msg.replyTo,msg.created,msg.deletedAt,msg.giveawayId,
+    CASE WHEN msg.deletedAt=0 THEN msg.media ELSE '[]' END AS media,
+    CASE WHEN msg.deletedAt=0 THEN msg.forwardedName ELSE '' END AS forwardedName,msg.forwardedFrom,
+    CASE WHEN msg.deletedAt=0 THEN msg.replyQuote ELSE '' END AS replyQuote,
+    CASE WHEN msg.deletedAt=0 THEN msg.postShareId END AS postShareId,
+    CASE WHEN msg.deletedAt=0 THEN msg.stickerId END AS stickerId,
+    msg.topicId,msg.threadRootId,
+    CASE WHEN r.kind='group' THEN (SELECT COUNT(*) FROM chat_room_messages tm WHERE tm.roomId=msg.roomId AND tm.threadRootId=msg.id AND tm.deletedAt=0 AND ${groupSenderVisible('tm')}) ELSE 0 END AS replyCount,
+    rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
+    CASE WHEN rp.id IS NULL THEN NULL ELSE ${messageSummarySql('rp', { textLimit: 240 })} END AS replyText,
+    CASE WHEN r.kind='group' AND msg.deletedAt=0 AND msg.ciphertext IS NULL
+      THEN ${reactionSummarySql('chat_room_message_reactions', 'msg.id', ':viewer')} ELSE '[]' END AS reactionData
+    FROM chat_room_messages msg JOIN users u ON u.id=msg.sender JOIN chat_rooms r ON r.id=msg.roomId
+    LEFT JOIN chat_room_messages rp ON rp.id=msg.replyTo AND rp.roomId=msg.roomId AND rp.deletedAt=0 AND rp.ciphertext IS NULL AND ${groupSenderVisible('rp')}
+    LEFT JOIN users ru ON ru.id=rp.sender
+    WHERE msg.roomId=? AND ${access('r', ':viewer')} AND (r.kind='secret' OR ${groupSenderVisible('msg')}) ${where}`;
+function messageView(kind: RoomKind) {
+  return ({
+    reactionData,
+    media,
+    forwardedName,
+    forwardedFrom,
+    replyQuote,
+    postShareId,
+    stickerId,
+    topicId,
+    threadRootId,
+    replyCount,
+    replyId,
+    replySender,
+    replyName,
+    replyText,
+    ...message
+  }: MessageRow): RoomMessage => ({
+    ...message,
+    attachments: JSON.parse(media) as ChatAttachment[],
+    ...(forwardedName ? { forwardedName, forwardedFrom } : {}),
+    ...(postShareId ? { postShare: { id: postShareId } } : {}),
+    ...(stickerId ? { sticker: stickerId } : {}),
+    ...(topicId ? { topicId } : {}),
+    ...(threadRootId ? { threadRootId } : {}),
+    ...(replyCount ? { replies: replyCount } : {}),
+    ...(message.replyTo && kind === 'group'
+      ? {
+          reply: {
+            id: message.replyTo,
+            sender: replySender || '',
+            name: replyName || '',
+            text: replyId ? replyText || 'Сообщение' : 'Сообщение недоступно',
+            unavailable: !replyId,
+            ...(replyQuote && replyId ? { quote: replyQuote } : {}),
+          },
+        }
+      : {}),
+    ...(kind === 'group' ? { reactions: parseReactions(reactionData) } : {}),
+  });
+}
+export type RoomReadOptions = {
+  // 'general' or a topic id: only that forum topic.
+  topic?: string | null;
+  // A thread root: its replies, with the root itself as threadRoot.
+  thread?: string | null;
+  // 'topics': a forum's topic list without messages.
+  view?: string | null;
+  // A message to open with its context, e.g. a search result.
+  around?: string | null;
+};
+const AROUND_BEFORE = 60,
+  AROUND_AFTER = 40;
 export async function readRoom(
   me: string,
   roomId: string,
   before?: string | null,
-  around?: string | null,
+  options: RoomReadOptions = {},
 ): Promise<RoomDetail> {
   const row = await roomRow(me, id(roomId));
   let cursor: { created: number; id: string } | null = null;
-  if (around) {
-    if (before) throw new ApiError(400, 'Выбери страницу или сообщение');
-    const target = await viewerQuery(
-      `SELECT msg.created,msg.id FROM chat_room_messages msg JOIN chat_rooms r ON r.id=msg.roomId
-       WHERE msg.id=? AND msg.roomId=? AND msg.deletedAt=0 AND ${access('r', ':viewer')} AND (r.kind='secret' OR ${groupSenderVisible('msg')})`,
-      me,
-    )
-      .bind(id(around), roomId)
-      .first<{ created: number; id: string }>();
-    if (!target) throw new ApiError(404, 'Сообщение больше недоступно');
-    // A bounded window around the target; never download every older page.
-    cursor = await viewerQuery(
-      `SELECT msg.created,msg.id FROM chat_room_messages msg JOIN chat_rooms r ON r.id=msg.roomId
-       WHERE msg.roomId=? AND (msg.created>? OR (msg.created=? AND msg.id>?)) AND ${access('r', ':viewer')} AND (r.kind='secret' OR ${groupSenderVisible('msg')})
-       ORDER BY msg.created,msg.id LIMIT 1 OFFSET 49`,
-      me,
-    )
-      .bind(roomId, target.created, target.created, target.id)
-      .first();
-  }
   if (before) {
     try {
       const value = JSON.parse(atob(string(before, 500)));
@@ -312,6 +498,12 @@ export async function readRoom(
       throw new ApiError(400, 'Некорректная страница истории');
     }
   }
+  const group = row.kind === 'group';
+  const forum = group && !!row.forum;
+  const thread = group && options.thread ? id(options.thread) : null;
+  const topic = forum && !thread ? topicKey(options.topic) : null;
+  const around = group && options.around && !thread ? id(options.around) : null;
+  const listOnly = forum && options.view === 'topics' && !thread && !around;
   const members = await viewerQuery(
     `SELECT m.userId,u.name,u.avatar,COALESCE((SELECT h.handle FROM handles h WHERE h.userId=u.id AND h.main=1),'') AS handle,
     m.role,m.status,m.publicKey,m.joinedAt FROM chat_room_members m JOIN users u ON u.id=m.userId JOIN chat_rooms r ON r.id=m.roomId
@@ -322,31 +514,75 @@ export async function readRoom(
   )
     .bind(roomId)
     .all<Omit<RoomMember, 'publicKey'> & { publicKey: string }>();
-  const messages = await viewerQuery(
-    `SELECT msg.id,msg.roomId,msg.sender,u.name AS senderName,u.avatar AS senderAvatar,msg.text,msg.media,msg.ciphertext,msg.replyTo,msg.created,msg.deletedAt,msg.giveawayId,
-    CASE WHEN rp.text<>'' THEN substr(rp.text,1,160) WHEN json_array_length(rp.media)>0 THEN 'Вложение' ELSE rp.text END AS replyText,ru.name AS replyName,(msg.replyTo IS NOT NULL AND rp.id IS NULL) AS replyUnavailable,
-    CASE WHEN r.kind='group' AND msg.deletedAt=0 AND msg.ciphertext IS NULL
-      THEN ${reactionSummarySql('chat_room_message_reactions', 'msg.id', ':viewer')} ELSE '[]' END AS reactionData
-    FROM chat_room_messages msg JOIN users u ON u.id=msg.sender JOIN chat_rooms r ON r.id=msg.roomId
-    LEFT JOIN chat_room_messages rp ON rp.id=msg.replyTo AND rp.roomId=msg.roomId AND rp.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('rp')})
-    LEFT JOIN users ru ON ru.id=rp.sender
-    WHERE msg.roomId=? AND ${access('r', ':viewer')} AND (r.kind='secret' OR ${groupSenderVisible('msg')}) ${cursor ? 'AND (msg.created<? OR (msg.created=? AND msg.id<?))' : ''}
-    ORDER BY msg.created DESC,msg.id DESC LIMIT ${PAGE_SIZE + 1}`,
-    me,
-  )
-    .bind(
-      roomId,
-      ...(cursor ? [cursor.created, cursor.created, cursor.id] : []),
-    )
-    .all<RoomMessage & { reactionData: string; media: string }>();
+  const filter = thread
+    ? 'AND msg.threadRootId=?'
+    : topic !== null
+      ? 'AND msg.topicId=?'
+      : '';
+  const filterArgs = thread ? [thread] : topic !== null ? [topic] : [];
+  if (around && before)
+    throw new ApiError(400, 'Выбери страницу или сообщение');
+  // Only a message the viewer could read opens with its context.
+  const target = around
+    ? await db()
+        .prepare(
+          `SELECT msg.created FROM chat_room_messages msg WHERE msg.id=? AND msg.roomId=? AND msg.deletedAt=0 AND ${groupSenderVisible('msg')}`,
+        )
+        .bind(around, roomId)
+        .first<{ created: number }>()
+    : null;
+  if (around && !target) throw new ApiError(404, 'Сообщение недоступно');
+  const messages = listOnly
+    ? { results: [] as MessageRow[] }
+    : await viewerQuery(
+        `${messageSelect(
+          `${filter} ${
+            target
+              ? 'AND (msg.created<? OR (msg.created=? AND msg.id<=?))'
+              : cursor
+                ? 'AND (msg.created<? OR (msg.created=? AND msg.id<?))'
+                : ''
+          }`,
+        )}
+        ORDER BY msg.created DESC,msg.id DESC LIMIT ${(target ? AROUND_BEFORE : PAGE_SIZE) + 1}`,
+        me,
+      )
+        .bind(
+          roomId,
+          ...filterArgs,
+          ...(target
+            ? [target.created, target.created, around!]
+            : cursor
+              ? [cursor.created, cursor.created, cursor.id]
+              : []),
+        )
+        .all<MessageRow>();
+  // Messages after the one being opened, oldest first.
+  const later = target
+    ? await viewerQuery(
+        `${messageSelect(`${filter} AND (msg.created>? OR (msg.created=? AND msg.id>?))`)}
+        ORDER BY msg.created,msg.id LIMIT ${AROUND_AFTER}`,
+        me,
+      )
+        .bind(roomId, ...filterArgs, target.created, target.created, around!)
+        .all<MessageRow>()
+    : null;
+  const root = thread
+    ? await viewerQuery(messageSelect('AND msg.id=?'), me)
+        .bind(roomId, thread)
+        .first<MessageRow>()
+    : null;
+  if (thread && !root) throw new ApiError(404, 'Ветка недоступна');
   const permission = await viewerQuery(
     `SELECT 1 FROM chat_rooms r WHERE r.id=? AND ${canSend('r', ':viewer')}`,
     me,
   )
     .bind(roomId)
     .first();
-  const page = messages.results.slice(0, PAGE_SIZE);
+  const size = target ? AROUND_BEFORE : PAGE_SIZE;
+  const page = messages.results.slice(0, size);
   const oldest = page.at(-1);
+  const view = messageView(row.kind);
   return {
     ...row,
     me,
@@ -354,21 +590,16 @@ export async function readRoom(
       ...m,
       publicKey: m.publicKey ? JSON.parse(m.publicKey) : null,
     })),
-    messages: page.reverse().map(({ reactionData, media, ...message }) => ({
-      ...message,
-      attachments:
-        !message.deletedAt && row.kind === 'group' ? JSON.parse(media) : [],
-      replyUnavailable: !!message.replyUnavailable,
-      ...(row.kind === 'group'
-        ? { reactions: parseReactions(reactionData) }
-        : {}),
-    })),
-    pageCursor: cursor ? btoa(JSON.stringify(cursor)) : null,
+    messages: [...page.reverse(), ...(later?.results || [])].map(view),
     canSend: !!permission,
     nextCursor:
-      messages.results.length > PAGE_SIZE && oldest
+      messages.results.length > size && oldest
         ? btoa(JSON.stringify({ created: oldest.created, id: oldest.id }))
         : null,
+    ...(target ? { around: around! } : {}),
+    ...(forum ? { topics: await readTopics(me, roomId) } : {}),
+    ...(topic !== null ? { topic: topicName(topic) } : {}),
+    ...(root ? { threadRoot: view(root) } : {}),
   };
 }
 
@@ -381,14 +612,14 @@ async function avatarValue(me: string, input: unknown) {
   if (
     !(await db()
       .prepare(`SELECT 1 FROM uploads u WHERE u.id=? AND u.userId=? AND u.type IN ('image/jpeg','image/png','image/webp','image/gif') AND u.state='ready'
-    AND NOT EXISTS(SELECT 1 FROM room_uploads f WHERE f.uploadId=u.id) AND NOT EXISTS(SELECT 1 FROM chat_uploads c WHERE c.uploadId=u.id) AND NOT EXISTS(SELECT 1 FROM moderated_uploads m WHERE m.uploadId=u.id)`)
+    AND NOT EXISTS(SELECT 1 FROM chat_uploads c WHERE c.uploadId=u.id) AND NOT EXISTS(SELECT 1 FROM chat_room_uploads rc WHERE rc.uploadId=u.id) AND NOT EXISTS(SELECT 1 FROM moderated_uploads m WHERE m.uploadId=u.id)`)
       .bind(uploadId, me)
       .first())
   )
     throw new ApiError(400, 'Изображение недоступно');
   return avatar;
 }
-const avatarGuard = `(?='' OR EXISTS(SELECT 1 FROM uploads av WHERE '/api/media/'||av.id=? AND av.userId=? AND av.state='ready' AND av.type IN ('image/jpeg','image/png','image/webp','image/gif') AND NOT EXISTS(SELECT 1 FROM room_uploads f WHERE f.uploadId=av.id) AND NOT EXISTS(SELECT 1 FROM chat_uploads ca WHERE ca.uploadId=av.id) AND NOT EXISTS(SELECT 1 FROM moderated_uploads ma WHERE ma.uploadId=av.id)))`;
+const avatarGuard = `(?='' OR EXISTS(SELECT 1 FROM uploads av WHERE '/api/media/'||av.id=? AND av.userId=? AND av.state='ready' AND av.type IN ('image/jpeg','image/png','image/webp','image/gif') AND NOT EXISTS(SELECT 1 FROM chat_uploads ca WHERE ca.uploadId=av.id) AND NOT EXISTS(SELECT 1 FROM chat_room_uploads cra WHERE cra.uploadId=av.id) AND NOT EXISTS(SELECT 1 FROM moderated_uploads ma WHERE ma.uploadId=av.id)))`;
 
 export async function changeRoom(
   me: string,
@@ -606,12 +837,40 @@ export async function changeRoom(
   if (action === 'read') {
     if (body.through === undefined) return { ok: true };
     const through = id(body.through);
+    // Forums keep a read position per topic.
+    const topic = row.forum ? topicKey(body.topic) : null;
+    if (topic !== null) {
+      await markTopicRead(me, roomId, topic, through);
+      return { ok: true };
+    }
     await db()
       .prepare(`UPDATE chat_room_members SET lastReadAt=(SELECT created FROM chat_room_messages WHERE id=? AND roomId=chat_room_members.roomId),lastReadId=?
       WHERE roomId=? AND userId=? AND EXISTS(SELECT 1 FROM chat_rooms r WHERE r.id=chat_room_members.roomId AND ${access('r', 'chat_room_members.userId')})
       AND EXISTS(SELECT 1 FROM chat_room_messages seen WHERE seen.id=? AND seen.roomId=chat_room_members.roomId AND (seen.created>lastReadAt OR (seen.created=lastReadAt AND seen.id>lastReadId)))`)
       .bind(through, through, roomId, me, through)
       .run();
+    return { ok: true };
+  }
+  if (action === 'forum') {
+    if (row.kind !== 'group')
+      throw new ApiError(400, 'Темы доступны только в группах');
+    await setForum(me, roomId, body.enabled, now);
+    return readRoom(me, roomId, null, { view: 'topics' });
+  }
+  if (action === 'topicCreate') {
+    if (!row.forum) throw new ApiError(400, 'Сначала включите темы в группе');
+    return createTopic(me, roomId, body, now);
+  }
+  if (action === 'topicUpdate') {
+    await updateTopic(me, roomId, body, now);
+    return { ok: true };
+  }
+  if (action === 'topicClose' || action === 'topicReopen') {
+    await closeTopic(me, roomId, body, action === 'topicClose', now);
+    return { ok: true };
+  }
+  if (action === 'topicDelete') {
+    await deleteTopic(me, roomId, body, now);
     return { ok: true };
   }
   if (action === 'acceptSecret') {
@@ -638,16 +897,22 @@ export async function changeRoom(
   }
   if (action === 'send') {
     const key = uuid(body.key ?? body.messageId);
-    let attachments: string[] = [];
     let text = '',
       ciphertext: string | null = null,
-      replyTo: string | null = null;
+      replyTo: string | null = null,
+      quote = '',
+      topicId = '',
+      sticker: string | null = null,
+      attachments: string[] = [];
     if (row.kind === 'secret') {
       if (
         'text' in body ||
         'media' in body ||
         'attachments' in body ||
-        'replyTo' in body
+        'replyTo' in body ||
+        'quote' in body ||
+        'topic' in body ||
+        'sticker' in body
       )
         throw new ApiError(
           400,
@@ -669,23 +934,31 @@ export async function changeRoom(
       }
     } else {
       if ('ciphertext' in body || 'media' in body)
-        throw new ApiError(400, 'Некорректное сообщение');
-      const incoming = body.attachments ?? [];
-      if (
-        !Array.isArray(incoming) ||
-        incoming.length > CHAT_ATTACHMENT_LIMIT ||
-        incoming.some(
-          (value) => typeof value !== 'string' || !value || value.length > 100,
-        ) ||
-        new Set(incoming).size !== incoming.length
-      )
-        throw new ApiError(400, 'Можно прикрепить до 10 разных файлов');
-      attachments = incoming;
-      text = string(body.text ?? '', 4000, false);
-      if (!text && !attachments.length)
-        throw new ApiError(400, 'Напиши сообщение или прикрепи файл');
+        throw new ApiError(400, 'Некорректное сообщение группы');
+      attachments = attachmentIds(body.attachments);
+      sticker = await stickerForMessage(body.sticker);
+      text = string(body.text ?? '', 4000, !attachments.length && !sticker);
+      if (sticker && (text || attachments.length))
+        throw new ApiError(400, 'Стикер отправляется отдельным сообщением');
       await assertPremiumEmoji(me, text);
+      if (
+        (attachments.length > 1 || text) &&
+        (await db()
+          .prepare(
+            `SELECT 1 FROM chat_room_uploads WHERE kind IN ('voice','round') AND uploadId IN(SELECT value FROM json_each(?)) LIMIT 1`,
+          )
+          .bind(JSON.stringify(attachments))
+          .first())
+      )
+        throw new ApiError(
+          400,
+          'Голосовые и видеосообщения отправляются отдельно, без подписи',
+        );
       replyTo = body.replyTo == null ? null : id(body.replyTo);
+      quote = replyQuoteValue(body.quote, replyTo);
+      topicId = topicKey(body.topic) ?? '';
+      if (topicId && !row.forum)
+        throw new ApiError(400, 'В этой группе не включены темы');
     }
     const ids = JSON.stringify(attachments);
     if (
@@ -695,27 +968,52 @@ export async function changeRoom(
         .bind(key)
         .first())
     ) {
-      if (
-        replyTo &&
-        !(await db()
-          .prepare(
-            `SELECT rp.id FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=? AND rp.deletedAt=0 AND ${groupSenderVisible('rp')}`,
-          )
-          .bind(replyTo, roomId)
-          .first())
-      )
+      const replied = replyTo
+        ? await db()
+            .prepare(
+              `SELECT rp.text,rp.topicId FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=? AND rp.deletedAt=0 AND ${groupSenderVisible('rp')}`,
+            )
+            .bind(replyTo, roomId)
+            .first<{ text: string; topicId: string }>()
+        : null;
+      if (replyTo && !replied)
         throw new ApiError(404, 'Сообщение для ответа недоступно');
+      // Held messages must reference files that approval can still attach.
       if (attachments.length) {
         const files = await db()
           .prepare(`SELECT COUNT(*) AS count FROM json_each(?) j JOIN uploads up ON up.id=j.value
-            JOIN room_uploads f ON f.uploadId=up.id WHERE up.userId=? AND up.state='ready' AND f.roomId=?
-            AND (f.messageId IS NULL OR f.messageId=?) AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)`)
-          .bind(ids, me, roomId, key)
+            JOIN chat_room_uploads cu ON cu.uploadId=up.id WHERE up.userId=? AND up.state='ready' AND cu.roomId=?
+            AND cu.messageId IS NULL AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)`)
+          .bind(ids, me, roomId)
           .first<{ count: number }>();
         if (Number(files?.count) !== attachments.length)
           throw new ApiError(
             403,
             'Вложение больше недоступно. Прикрепите файл заново.',
+          );
+      }
+      if (quote && !replied?.text.includes(quote))
+        throw new ApiError(
+          409,
+          'Цитируемый текст изменился. Выделите его заново',
+        );
+      if (row.forum && replied && replied.topicId !== topicId)
+        throw new ApiError(
+          400,
+          'Ответ отправляется в тему исходного сообщения',
+        );
+      if (topicId) {
+        const topic = await db()
+          .prepare(
+            'SELECT closedAt,createdBy FROM chat_room_topics WHERE id=? AND roomId=? AND deletedAt=0',
+          )
+          .bind(topicId, roomId)
+          .first<{ closedAt: number; createdBy: string }>();
+        if (!topic) throw new ApiError(404, 'Тема удалена или недоступна');
+        if (topic.closedAt && topic.createdBy !== me && row.role === 'member')
+          throw new ApiError(
+            403,
+            'Тема закрыта: писать в неё могут только администраторы',
           );
       }
       const held = await reviewSpam({
@@ -726,61 +1024,67 @@ export async function changeRoom(
         payload: {
           text,
           replyTo,
-          media: JSON.stringify(attachments.map((id) => ({ id }))),
+          ...(quote ? { quote } : {}),
+          ...(topicId ? { topic: topicId } : {}),
+          ...(sticker ? { sticker } : {}),
+          ...(attachments.length
+            ? {
+                media: JSON.stringify(
+                  attachments.map((file) => ({ id: file })),
+                ),
+              }
+            : {}),
         },
       });
       if (held) return held;
     }
-    const result = await db()
-      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,ciphertext,replyTo,created,media)
-      SELECT ?,r.id,u.id,?,?,?,MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0)),
-      (SELECT json_group_array(json_object('id',up.id,'name',up.name,'type',up.type,'size',f.size,'kind',f.kind))
-        FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN room_uploads f ON f.uploadId=up.id)
-      FROM chat_rooms r,users u WHERE r.id=? AND u.id=? AND ${canSend('r', 'u.id')}
-      AND r.kind=? AND (? IS NULL OR EXISTS(SELECT 1 FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=r.id AND rp.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('rp')})))
-      AND NOT EXISTS(SELECT 1 FROM json_each(?) j WHERE NOT EXISTS(SELECT 1 FROM uploads up JOIN room_uploads f ON f.uploadId=up.id
-        WHERE up.id=j.value AND up.userId=u.id AND up.state='ready' AND f.roomId=r.id AND (f.messageId IS NULL OR f.messageId=?)
-        AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)))
-      ON CONFLICT(id) DO NOTHING`)
-      .bind(
-        key,
+    const [result] = await db().batch(
+      roomMessageStatements({
+        id: key,
+        roomId,
+        sender: me,
+        kind: row.kind,
         text,
         ciphertext,
         replyTo,
+        quote,
+        topicId,
+        attachments,
+        stickerId: sticker,
         now,
-        ids,
-        roomId,
-        me,
-        row.kind,
-        replyTo,
-        replyTo,
-        ids,
-        key,
-      )
-      .run();
+      }),
+    );
     if (!result.meta.changes) {
       const saved = await db()
         .prepare(
           `SELECT msg.* FROM chat_room_messages msg JOIN chat_rooms r ON r.id=msg.roomId WHERE msg.id=? AND msg.sender=? AND ${canSend('r', 'msg.sender')}`,
         )
         .bind(key, me)
-        .first<RoomMessage & { media: string }>();
+        .first<
+          RoomMessage & {
+            media: string;
+            replyQuote: string;
+            topicId: string;
+            stickerId: string | null;
+          }
+        >();
       if (
         !saved ||
         saved.roomId !== roomId ||
         saved.text !== text ||
         saved.ciphertext !== ciphertext ||
         saved.replyTo !== replyTo ||
-        JSON.stringify(
-          (JSON.parse(saved.media) as ChatAttachment[]).map((file) => file.id),
-        ) !== ids ||
+        saved.replyQuote !== quote ||
+        saved.topicId !== topicId ||
+        saved.stickerId !== sticker ||
+        !sameIds(saved.media, attachments) ||
         saved.deletedAt
       )
         throw new ApiError(
           saved ? 409 : 403,
           saved
             ? 'Этот ключ уже использован для другого сообщения'
-            : 'Отправка недоступна. Проверьте участников и настройки приватности',
+            : 'Отправка недоступна. Проверьте участников, вложения и настройки приватности',
         );
     }
     return { id: key };
@@ -789,7 +1093,7 @@ export async function changeRoom(
     const messageId = id(body.messageId);
     const result = await db().batch([
       db()
-        .prepare(`UPDATE chat_room_messages SET text='',media='[]',ciphertext=NULL,deletedAt=? WHERE id=? AND roomId=?
+        .prepare(`UPDATE chat_room_messages SET text='',media='[]',searchText='',ciphertext=NULL,deletedAt=? WHERE id=? AND roomId=?
       AND EXISTS(SELECT 1 FROM chat_rooms r JOIN chat_room_members a ON a.roomId=r.id AND a.userId=? WHERE r.id=chat_room_messages.roomId
       AND ${access('r', 'a.userId', true)} AND (chat_room_messages.sender=a.userId OR (r.kind='group' AND a.role IN ('owner','admin'))))`)
         .bind(now, messageId, roomId, me),
@@ -977,7 +1281,7 @@ export function groupRoomExportSections(
     ],
     [
       'groupMessages',
-      `SELECT msg.id,msg.roomId,msg.sender,msg.text,msg.replyTo,msg.created FROM chat_room_messages msg
+      `SELECT msg.id,msg.roomId,msg.sender,msg.text,msg.replyTo,msg.replyQuote,msg.forwardedName,msg.forwardedFrom,msg.postShareId,msg.topicId,msg.threadRootId,msg.media,msg.created FROM chat_room_messages msg
       JOIN chat_rooms r ON r.id=msg.roomId JOIN chat_room_members m ON m.roomId=r.id
       WHERE m.userId=? AND r.kind='group' AND msg.ciphertext IS NULL AND msg.deletedAt=0 AND ${groupSenderVisible('msg')}
       AND ${access('r', 'm.userId')} AND msg.id>? ORDER BY msg.id LIMIT 100`,

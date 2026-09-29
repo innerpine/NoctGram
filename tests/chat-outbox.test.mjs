@@ -151,6 +151,34 @@ assert.ok(
 assert.equal(largeEmojiCount(':noct_fire: 😀 :noct_heart:'), 3);
 assert.equal(largeEmojiCount(':noct_fire:'.repeat(7)), 0);
 assert.equal(largeEmojiCount('Текст :noct_fire:'), 0);
+// Custom emoji from people's packs are their own parts, drawn by CustomEmoji.
+const custom = ':ce_0f0e4c8a-1b2c-4d3e-8f90-123456789abc:';
+assert.deepEqual(
+  chatEmojiParts('Hi ' + custom).map((part) => part.custom || part.text),
+  ['Hi ', '0f0e4c8a-1b2c-4d3e-8f90-123456789abc'],
+);
+assert.equal(largeEmojiCount(custom + ' 😀'), 2);
+// A sticker message carries only its sticker reference.
+const stickerCalls = [];
+const stickerOutbox = createChatOutbox(
+  (body) => new Promise((resolve) => stickerCalls.push({ body, resolve })),
+);
+stickerOutbox.enqueue('alice', 'carol', {
+  text: '',
+  attachments: [],
+  sticker: 'b:utya:birthday',
+});
+assert.equal(stickerCalls[0].body.sticker, 'b:utya:birthday');
+assert.equal(stickerOutbox.getSnapshot()[0].message.sticker, 'b:utya:birthday');
+stickerOutbox.enqueue('alice', 'dave', {
+  text: 'Без стикера',
+  attachments: [],
+});
+assert.equal(
+  'sticker' in stickerCalls[1].body,
+  false,
+  'Old request shape unchanged',
+);
 const mixed = 'Привет @alice 👨‍👩‍👧‍👦 ❤️\nhttps://soundcloud.com/a/b';
 assert.equal(
   chatEmojiParts(mixed)

@@ -5,9 +5,14 @@ import type { ReactionEmoji } from '@/lib/message-reactions';
 import { Check, CheckCheck, Clock3, RotateCcw } from 'lucide-react';
 import type { Message, Person } from '@/lib/client';
 import { ChatGift } from './chat-gift';
-import { ProfileLink } from './profile-link';
 import { ChatEmojiText } from './chat-emoji-text';
-import { largeEmojiCount } from '@/lib/chat-emoji';
+import {
+  forwardedHeader,
+  messageLayout,
+  replyQuote,
+  sharedPost,
+  stickerContent,
+} from './message-body';
 import type { OutgoingMessage } from '@/lib/chat-outbox';
 import { Avatar } from './profile-identity';
 import { MusicLinkCard } from './music-link-card';
@@ -36,13 +41,14 @@ export const ChatMessage = memo(function ChatMessage({
   onRetry,
   onReact,
   reactionPending = false,
+  onListened,
 }: {
   message: Message;
   me: Person | null;
   peer: Person;
   onProfile: (id: string) => void;
   onAvatar: (id: string) => void;
-  onAction: (action: ChatAction, message: Message) => void;
+  onAction: (action: ChatAction, message: Message, quote?: string) => void;
   disabled: boolean;
   canSend: boolean;
   selected: boolean;
@@ -54,8 +60,11 @@ export const ChatMessage = memo(function ChatMessage({
   onRetry?: (id: string) => void;
   onReact: (message: Message, emoji: ReactionEmoji | null) => Promise<void>;
   reactionPending?: boolean;
+  onListened?: (message: Message) => void;
 }) {
   const own = message.sender === me?.id;
+  // «Избранное»: no second participant, so no read receipts or unheard dots.
+  const saved = peer.id === me?.id;
   const reactions = (
     <MessageReactions
       reactions={message.reactions}
@@ -76,20 +85,8 @@ export const ChatMessage = memo(function ChatMessage({
     reactionPending,
     unconfirmed: !!delivery,
   };
-  const emojiCount =
-    !message.attachments?.length && !message.reply && !message.forwardedName
-      ? largeEmojiCount(message.text)
-      : 0;
-  const visualMedia =
-    !!message.attachments?.length &&
-    message.attachments.every(
-      (file) => file.kind === 'image' || file.kind === 'video',
-    );
-  const mediaOnly =
-    visualMedia &&
-    !message.text.trim() &&
-    !message.reply &&
-    !message.forwardedName;
+  const { emojiCount, visualMedia, mediaOnly, round, voice, sticker } =
+    messageLayout(message);
   const metadata = (
     <span className="message-time">
       <time dateTime={new Date(message.created).toISOString()}>
@@ -101,7 +98,7 @@ export const ChatMessage = memo(function ChatMessage({
           ·
         </span>
       )}
-      {own && (
+      {own && (!saved || (delivery && delivery.status !== 'sent')) && (
         <span
           aria-label={
             delivery?.status === 'sending'
@@ -165,55 +162,32 @@ export const ChatMessage = memo(function ChatMessage({
             (own ? 'self' : 'other') +
             (emojiCount ? ' chat-emoji-only' : '') +
             (visualMedia ? ' chat-media-message' : '') +
-            (mediaOnly ? ' chat-media-only' : '')
+            (mediaOnly ? ' chat-media-only' : '') +
+            (round ? ' chat-round-message' : '') +
+            (voice ? ' chat-voice-message' : '') +
+            (sticker ? ' chat-sticker-message' : '')
           }
           data-emoji-count={emojiCount || undefined}
           data-delivery={delivery?.status}
           id={'chat-message-' + message.id}
           tabIndex={-1}
         >
-          {!!message.forwardedName && (
-            <div className="chat-forwarded">
-              <span>Переслано от</span>
-              <strong>
-                {message.forwardedSender ? (
-                  <ProfileLink target={{ id: message.forwardedSender }}>
-                    {message.forwardedName}
-                  </ProfileLink>
-                ) : (
-                  message.forwardedName
-                )}
-              </strong>
-            </div>
-          )}
-          {message.reply && (
-            <button
-              type="button"
-              className="chat-reply-quote"
-              disabled={message.reply.unavailable}
-              onClick={() => onJump(message.reply!.id)}
-            >
-              <strong>
-                {message.reply.unavailable
-                  ? 'Ответ на сообщение'
-                  : message.reply.sender === me?.id
-                    ? 'Вы'
-                    : message.reply.name}
-              </strong>
-              <span>
-                <ChatEmojiText text={message.reply.text} />
-              </span>
-            </button>
-          )}
+          {forwardedHeader(message.forwardedName, message.forwardedSender)}
+          {replyQuote(message.reply, me?.id, onJump)}
           {!!message.attachments?.length && (
             <ChatMessageFiles
               files={message.attachments}
               flush={visualMedia}
               metadata={mediaOnly ? metadata : undefined}
+              own={own}
+              listened={!!message.listenedAt || !!delivery || saved}
+              onListened={own ? undefined : () => onListened?.(message)}
             />
           )}
+          {sharedPost(message.postShare, me?.id)}
+          {stickerContent(message.sticker)}
           {!!message.text.trim() && (
-            <p>
+            <p className="chat-message-text">
               <ChatEmojiText text={message.text} large={!!emojiCount} />
             </p>
           )}

@@ -1,3 +1,4 @@
+import { claimMediaPlayback } from './media-playback';
 export function readVideoState(video: HTMLVideoElement) {
   const duration = Number.isFinite(video.duration)
     ? Math.max(0, video.duration)
@@ -30,11 +31,9 @@ export function seekVideo(video: HTMLVideoElement, position: number) {
     return;
   video.currentTime = Math.max(0, Math.min(video.duration, position));
 }
-const activeVideos = new WeakMap<Document, HTMLVideoElement>();
+// Videos share one playback slot with voice messages and round videos.
 export function claimVideoPlayback(video: HTMLVideoElement) {
-  const previous = activeVideos.get(video.ownerDocument);
-  if (previous && previous !== video) previous.pause();
-  activeVideos.set(video.ownerDocument, video);
+  claimMediaPlayback(video);
 }
 export type VideoPlayback = {
   position: number;

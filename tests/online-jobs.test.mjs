@@ -36,6 +36,8 @@ const { outputFiles } = await build({
               'export async function cleanSpamActivity(){globalThis.__onlineJobs.calls.push("antispam");}',
             '@/lib/upload-storage':
               'export async function cleanUploads(){globalThis.__onlineJobs.calls.push("uploads"); return 0;}',
+            '@/lib/message-search':
+              'export async function backfillSearchText(){globalThis.__onlineJobs.calls.push("search"); return 0;}',
           }[path],
         }));
       },
@@ -66,6 +68,7 @@ await test('full job records online and preserves existing maintenance', async (
   assert.deepEqual(await (await POST(request())).json(), {
     delivered: 0,
     uploads: 0,
+    searchIndexed: 0,
     giveaways: { completed: 0, failed: 0 },
   });
   assert.deepEqual(calls, [
@@ -75,6 +78,7 @@ await test('full job records online and preserves existing maintenance', async (
     'antispam',
     'push',
     'uploads',
+    'search',
     'access-cleanup',
   ]);
 });
@@ -90,6 +94,7 @@ await test('access cleanup failure does not prevent existing maintenance', async
       'antispam',
       'push',
       'uploads',
+      'search',
       'access-cleanup',
     ]);
   } finally {

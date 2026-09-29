@@ -101,7 +101,8 @@ const compiled = await build({
           namespace: 'fixture-settings',
         }));
         build.onLoad({ filter: /.*/, namespace: 'fixture-settings' }, () => ({
-          contents: "export const setting=()=> '1'; export const tokenHash=async value=>value;",
+          contents:
+            "export const setting=()=> '1'; export const tokenHash=async value=>value;",
         }));
         build.onResolve({ filter: /^\.\/(storage|server)$/ }, () => ({
           path: 'storage',
@@ -836,50 +837,53 @@ for (let i = 0; i < 230; i++)
   );
 const recent = await api.readRoom('bob', navigationRoom.id);
 assert.equal(recent.messages.length, 100);
-assert.equal(recent.messages.at(-1).replyText, 'Message 5');
-assert.equal(recent.messages.at(-1).replyUnavailable, false);
-const centered = await api.readRoom(
-  'bob',
-  navigationRoom.id,
-  null,
-  'navigation-080',
-);
+assert.equal(recent.messages.at(-1).reply.text, 'Message 5');
+assert.equal(recent.messages.at(-1).reply.unavailable, false);
+const centered = await api.readRoom('bob', navigationRoom.id, null, {
+  around: 'navigation-080',
+});
+// A bounded window: 60 messages up to the target and 40 after it.
 assert.equal(centered.messages.length, 100);
-assert.ok(centered.messages.some((m) => m.id === 'navigation-080'));
+assert.equal(centered.around, 'navigation-080');
+assert.equal(centered.messages[59].id, 'navigation-080');
 assert.ok(centered.nextCursor);
-assert.ok(centered.pageCursor);
-assert.deepEqual(
-  (
-    await api.readRoom('bob', navigationRoom.id, centered.pageCursor)
-  ).messages.map((m) => m.id),
-  centered.messages.map((m) => m.id),
-);
 assert.equal(
-  (await api.readRoom('bob', navigationRoom.id, null, 'navigation-229'))
-    .pageCursor,
-  null,
+  (
+    await api.readRoom('bob', navigationRoom.id, null, {
+      around: 'navigation-229',
+    })
+  ).messages.at(-1).id,
+  'navigation-229',
 );
 await deny(
-  api.readRoom('carol', navigationRoom.id, null, 'navigation-080'),
+  api.readRoom('carol', navigationRoom.id, null, { around: 'navigation-080' }),
   404,
 );
-await deny(api.readRoom('alice', survivor.id, null, 'navigation-080'), 404);
 await deny(
-  api.readRoom('bob', navigationRoom.id, centered.pageCursor, 'navigation-080'),
+  api.readRoom('alice', survivor.id, null, { around: 'navigation-080' }),
+  404,
+);
+await deny(
+  api.readRoom('bob', navigationRoom.id, centered.nextCursor, {
+    around: 'navigation-080',
+  }),
   400,
 );
 sqlite
   .prepare("UPDATE chat_room_messages SET deletedAt=1,text='' WHERE id=?")
   .run('navigation-005');
-await deny(api.readRoom('bob', navigationRoom.id, null, 'navigation-005'), 404);
+await deny(
+  api.readRoom('bob', navigationRoom.id, null, { around: 'navigation-005' }),
+  404,
+);
 assert.equal(
-  (await api.readRoom('bob', navigationRoom.id)).messages.at(-1)
-    .replyUnavailable,
+  (await api.readRoom('bob', navigationRoom.id)).messages.at(-1).reply
+    .unavailable,
   true,
 );
 assert.equal(
-  (await api.readRoom('bob', navigationRoom.id)).messages.at(-1).replyText,
-  null,
+  (await api.readRoom('bob', navigationRoom.id)).messages.at(-1).reply.text,
+  'Сообщение недоступно',
 );
 // Muting belongs to one member, persists, and never acknowledges unread history.
 const memberBefore = sqlite
@@ -970,14 +974,11 @@ const photo = () =>
     'photo.png',
     { type: 'image/png' },
   );
-await deny(
-  uploadsApi.storeChatUpload('files_outside', '', photo(), fileRoom.id),
-);
-const file = await uploadsApi.storeChatUpload(
+await deny(uploadsApi.storeRoomUpload('files_outside', fileRoom.id, photo()));
+const file = await uploadsApi.storeRoomUpload(
   'files_owner',
-  '',
-  photo(),
   fileRoom.id,
+  photo(),
 );
 await mediaApi.assertMediaRead(file.id, 'files_owner', 'files_owner');
 await deny(
@@ -1008,7 +1009,7 @@ const fileMessage = await send('files_owner', fileRoom.id, '', {
 });
 assert.equal(
   sqlite
-    .prepare('SELECT messageId FROM room_uploads WHERE uploadId=?')
+    .prepare('SELECT messageId FROM chat_room_uploads WHERE uploadId=?')
     .get(file.id).messageId,
   fileMessage.id,
 );
@@ -1071,11 +1072,10 @@ await deny(
   mediaApi.assertMediaRead(file.id, 'files_owner', 'files_owner'),
   404,
 );
-const garbage = await uploadsApi.storeChatUpload(
+const garbage = await uploadsApi.storeRoomUpload(
   'files_owner',
-  '',
-  photo(),
   fileRoom.id,
+  photo(),
 );
 sqlite
   .prepare("UPDATE uploads SET state='deleting' WHERE id=?")
@@ -1083,11 +1083,10 @@ sqlite
 await deny(
   send('files_owner', fileRoom.id, 'garbage', { attachments: [garbage.id] }),
 );
-const raced = await uploadsApi.storeChatUpload(
+const raced = await uploadsApi.storeRoomUpload(
   'files_owner',
-  '',
-  photo(),
   fileRoom.id,
+  photo(),
 );
 beforeWrite = () =>
   sqlite
@@ -1100,7 +1099,7 @@ await deny(
 );
 assert.equal(
   sqlite
-    .prepare('SELECT messageId FROM room_uploads WHERE uploadId=?')
+    .prepare('SELECT messageId FROM chat_room_uploads WHERE uploadId=?')
     .get(raced.id).messageId,
   null,
 );

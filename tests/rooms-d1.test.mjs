@@ -80,7 +80,10 @@ void test(
             }));
             build.onLoad(
               { filter: /.*/, namespace: 'fixture-settings' },
-              () => ({ contents: "export const setting=()=> '1'; export const tokenHash=async value=>value;" }),
+              () => ({
+                contents:
+                  "export const setting=()=> '1'; export const tokenHash=async value=>value;",
+              }),
             );
             build.onResolve({ filter: /^\.\/storage$/ }, () => ({
               path: 'storage',
@@ -195,9 +198,11 @@ void test(
       text: 'Reply',
       replyTo: message.id,
     });
-    const focused = await api.readRoom('initial-0', full.id, null, message.id);
+    const focused = await api.readRoom('initial-0', full.id, null, {
+      around: message.id,
+    });
     assert.equal(focused.messages[0].id, message.id);
-    assert.equal(focused.messages[1].replyText, 'A real D1 group message');
+    assert.equal(focused.messages[1].reply.text, 'A real D1 group message');
     await api.saveRoomNotifications('initial-0', {
       actor: 'initial-0',
       id: full.id,

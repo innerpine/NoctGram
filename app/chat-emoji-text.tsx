@@ -3,6 +3,7 @@ import { memo } from 'react';
 import { chatEmojiParts } from '@/lib/chat-emoji';
 import { MentionText } from './profile-link';
 import { AppleEmoji, PremiumEmoji } from './premium-emoji';
+import { CustomEmoji } from './sticker-view';
 
 export const ChatEmojiText = memo(function ChatEmojiText({
   text,
@@ -21,6 +22,8 @@ export const ChatEmojiText = memo(function ChatEmojiText({
             key={index + ':' + part.premium.id}
             emoji={part.premium}
           />
+        ) : part.custom ? (
+          <CustomEmoji key={index + ':' + part.custom} id={part.custom} />
         ) : part.unified ? (
           <AppleEmoji
             key={index + ':' + part.unified}

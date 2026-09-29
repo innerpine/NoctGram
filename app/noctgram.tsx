@@ -119,6 +119,16 @@ import { StarsIcon, NoctLogo } from './stars-icon';
 import { SendGiftButton, ProfileGifts } from './gifts';
 import { ChatThemeMenu } from './chat-theme-menu';
 
+import { ChatForwardDialog } from './forward-dialog';
+import { StickerPackHost } from './sticker-pack-dialog';
+import { SAVED_MESSAGES, SavedMessagesAvatar } from './saved-messages';
+import { forwardNotice } from '@/lib/forward-client';
+import { APP_NOTICE_EVENT } from '@/lib/app-notice';
+import { ChatFolderBar } from './chat-folders';
+import { ChatListSearch } from './chat-search';
+import { folderIncludes, type ChatFolder } from '@/lib/chat-folders-filter';
+import { requestChatFocus } from '@/lib/chat-focus';
+import type { SearchHit } from '@/lib/message-search';
 import {
   chatTheme,
   DEFAULT_CHAT_THEME,
@@ -377,8 +387,12 @@ export default function Noctgram({
     me?.restriction?.mode === 'blocked' ? '' : me?.id || '',
     page === 'messages',
   );
-  const openRoom = useCallback((id: string) => {
-    void appHistory.current?.navigate({ page: 'messages', roomId: id });
+  const openRoom = useCallback((id: string, topic?: string) => {
+    void appHistory.current?.navigate({
+      page: 'messages',
+      roomId: id,
+      ...(topic ? { topic } : {}),
+    });
   }, []);
   const resolveRoomLink = useCallback((id: string) => {
     void appHistory.current?.navigate(
@@ -396,7 +410,9 @@ export default function Noctgram({
   const chatSwipe = useRef<ReturnType<typeof createChatSwipeBack> | null>(null);
   const closeChat = useRef(() => {});
   closeChat.current = roomTarget
-    ? backFromRoom
+    ? roomTarget.roomId && roomTarget.topic
+      ? () => openRoom(roomTarget.roomId!)
+      : backFromRoom
     : () => {
         appHistory.current?.cancelPending();
         setPeer(null);
@@ -484,6 +500,9 @@ export default function Noctgram({
   const chatSnapshots = useRef(createChatSnapshots());
   chatSnapshots.current.reset(accountBlocked ? '' : me?.id || '');
   const [openingChat, setOpeningChat] = useState('');
+  const [sharedPost, setSharedPost] = useState<Post | null>(null);
+  const [chatFolderTab, setChatFolderTab] = useState<ChatFolder | null>(null);
+  const [searchPeer, setSearchPeer] = useState('');
   const chatPreparation = useRef(0),
     preparedMessageLoad = useRef('');
   const audioCalls = useAudioCalls(me?.id, readOnly || accountBlocked);
@@ -914,6 +933,36 @@ export default function Noctgram({
       active = false;
     };
   }, [myId, notify]);
+  // Shared post cards in chats open the post; nested views raise toasts.
+  useEffect(() => {
+    if (!myId) return;
+    let active = true;
+    const openPost = (event: Event) => {
+      const id = (event as CustomEvent<{ id?: string }>).detail?.id;
+      if (!id) return;
+      request<Post>('?action=post&id=' + encodeURIComponent(id))
+        .then((p) => {
+          if (active) {
+            setCommentPost(p);
+            setModal('comments');
+          }
+        })
+        .catch((e) => {
+          if (active) notify(e.message);
+        });
+    };
+    const showNotice = (event: Event) => {
+      const text = (event as CustomEvent<{ text?: string }>).detail?.text;
+      if (text) notify(text);
+    };
+    window.addEventListener('noctgram:open-post', openPost);
+    window.addEventListener(APP_NOTICE_EVENT, showNotice);
+    return () => {
+      active = false;
+      window.removeEventListener('noctgram:open-post', openPost);
+      window.removeEventListener(APP_NOTICE_EVENT, showNotice);
+    };
+  }, [myId, notify]);
   const refreshPost = async (id: string) => {
     try {
       const updated = await request<Post>(
@@ -1313,6 +1362,9 @@ export default function Noctgram({
               (destination.roomId || destination.group || destination.invite)
               ? {
                   ...(destination.roomId ? { roomId: destination.roomId } : {}),
+                  ...(destination.roomId && destination.topic
+                    ? { topic: destination.topic }
+                    : {}),
                   ...(destination.group ? { group: destination.group } : {}),
                   ...(destination.invite ? { invite: destination.invite } : {}),
                 }
@@ -2089,6 +2141,9 @@ export default function Noctgram({
           setModalOpen(true);
         }
       },
+      onShare: (post: Post) => {
+        if (cardActions.current.writable()) setSharedPost(post);
+      },
     }),
     [],
   );
@@ -2154,6 +2209,87 @@ export default function Noctgram({
   );
   const archiveDone = async () => {
     await Promise.all([loadThreads(), roomList.refresh()]);
+  };
+  // Chats as folders and search see them; built inline for every dialog.
+  const folderChats = dialogs.map((d) =>
+    d.type === 'room'
+      ? {
+          key: 'room:' + d.room.id,
+          kind:
+            d.room.kind === 'secret' ? ('secret' as const) : ('group' as const),
+          unread: d.room.unread,
+          archived: !!d.room.archivedAt,
+          name: d.room.name || 'Секретный чат',
+        }
+      : {
+          key: 'person:' + d.person.id,
+          kind: 'person' as const,
+          unread: d.person.unread || 0,
+          archived: !!d.person.archivedAt,
+          name: d.person.id === myId ? SAVED_MESSAGES : d.person.name,
+        },
+  );
+  const shownDialogs = chatFolderTab
+    ? dialogs.filter((_, index) =>
+        folderIncludes(chatFolderTab, folderChats[index]),
+      )
+    : visibleDialogs;
+  const searchChats = [
+    ...(me
+      ? [
+          {
+            key: 'saved',
+            name: SAVED_MESSAGES,
+            subtitle: 'Заметки и пересланное',
+            avatar: '',
+            saved: true,
+            open: () => openChat(me),
+          },
+        ]
+      : []),
+    ...dialogs
+      .filter((d) => d.type === 'room' || d.person.id !== myId)
+      .map((d) =>
+        d.type === 'room'
+          ? {
+              key: 'room:' + d.room.id,
+              name: d.room.name || 'Секретный чат',
+              subtitle:
+                d.room.kind === 'secret'
+                  ? 'Секретный чат'
+                  : `${d.room.memberCount} участников`,
+              avatar: d.room.avatar,
+              open: () => openRoom(d.room.id),
+            }
+          : {
+              key: 'person:' + d.person.id,
+              name: d.person.name,
+              subtitle: d.person.handle ? '@' + d.person.handle : '',
+              avatar: d.person.avatar,
+              open: () => openChat(d.person),
+            },
+      ),
+  ];
+  const openSearchHit = (hit: SearchHit) => {
+    if (hit.kind === 'dm') {
+      requestChatFocus('dm:' + hit.chatId, hit.id);
+      const person =
+        hit.chatId === myId
+          ? me
+          : threads.find((thread) => thread.id === hit.chatId);
+      openChat(
+        person ||
+          ({
+            id: hit.chatId,
+            name: hit.chatName,
+            avatar: hit.chatAvatar,
+            handle: '',
+          } as Person),
+      );
+    } else {
+      requestChatFocus('room:' + hit.chatId, hit.id);
+      openRoom(hit.chatId, hit.forum ? hit.topicId || 'general' : undefined);
+    }
   };
   const online = !!profile?.lastSeen && Date.now() - profile.lastSeen < 120000;
   // The bar highlights the current section; someone else's profile keeps the
@@ -3117,6 +3253,17 @@ export default function Noctgram({
                 />
                 <button
                   className="icon-button"
+                  aria-label={SAVED_MESSAGES}
+                  title={SAVED_MESSAGES}
+                  disabled={!me}
+                  onClick={() => {
+                    if (me) openChat(me);
+                  }}
+                >
+                  <Bookmark size={16} />
+                </button>
+                <button
+                  className="icon-button"
                   aria-label="Новый диалог"
                   onClick={() => {
                     setPeopleQuery('');
@@ -3126,23 +3273,40 @@ export default function Noctgram({
                   <Pencil size={16} />
                 </button>
               </div>
-              <ArchiveFolderButton
-                archived={chatFolder === 'archive'}
-                count={archivedDialogs.length}
-                unread={archivedDialogs.reduce(
-                  (n, d) =>
-                    n +
-                    (d.type === 'room'
-                      ? d.room.muted
-                        ? 0
-                        : d.room.unread
-                      : d.person.unread || 0),
-                  0,
-                )}
-                onClick={() =>
-                  setChatFolder(chatFolder === 'archive' ? 'active' : 'archive')
-                }
+              <ChatListSearch
+                meId={myId || ''}
+                chats={searchChats}
+                onOpenHit={openSearchHit}
               />
+              {!!myId && (
+                <ChatFolderBar
+                  owner={myId}
+                  chats={folderChats}
+                  active={chatFolderTab?.id || ''}
+                  onSelect={setChatFolderTab}
+                />
+              )}
+              {!chatFolderTab && (
+                <ArchiveFolderButton
+                  archived={chatFolder === 'archive'}
+                  count={archivedDialogs.length}
+                  unread={archivedDialogs.reduce(
+                    (n, d) =>
+                      n +
+                      (d.type === 'room'
+                        ? d.room.muted
+                          ? 0
+                          : d.room.unread
+                        : d.person.unread || 0),
+                    0,
+                  )}
+                  onClick={() =>
+                    setChatFolder(
+                      chatFolder === 'archive' ? 'active' : 'archive',
+                    )
+                  }
+                />
+              )}
               {roomList.error && (
                 <div className="room-error" role="alert">
                   {roomList.error}
@@ -3154,7 +3318,7 @@ export default function Noctgram({
                   </button>
                 </div>
               )}
-              {visibleDialogs.map((dialog) => {
+              {shownDialogs.map((dialog) => {
                 if (dialog.type === 'room')
                   return (
                     <ArchiveRow
@@ -3173,6 +3337,7 @@ export default function Noctgram({
                     </ArchiveRow>
                   );
                 const t = dialog.person;
+                const saved = t.id === myId;
                 return (
                   <ArchiveRow
                     key={myId + ':' + t.id}
@@ -3187,14 +3352,22 @@ export default function Noctgram({
                       className={
                         'thread-row ' + (peer?.id === t.id ? 'active' : '')
                       }
-                      aria-label={'Открыть диалог с ' + t.name}
+                      aria-label={
+                        saved
+                          ? 'Открыть ' + SAVED_MESSAGES
+                          : 'Открыть диалог с ' + t.name
+                      }
                       aria-busy={openingChat === t.id}
                       onClick={() => openChat(t)}
                     >
-                      <Avatar person={t} size={38} />
+                      {saved ? (
+                        <SavedMessagesAvatar size={38} />
+                      ) : (
+                        <Avatar person={t} size={38} />
+                      )}
                       <span className="thread-copy">
                         <strong>
-                          <DisplayName person={t} />
+                          {saved ? SAVED_MESSAGES : <DisplayName person={t} />}
                         </strong>
                         <small>
                           <ChatEmojiText
@@ -3215,12 +3388,14 @@ export default function Noctgram({
                   </ArchiveRow>
                 );
               })}
-              {!visibleDialogs.length && (
+              {!shownDialogs.length && (
                 <Empty>
                   <p>
-                    {chatFolder === 'archive'
-                      ? 'Здесь появятся диалоги, которые ты перенесёшь в архив.'
-                      : 'Найди человека по юзернейму и начни разговор.'}
+                    {chatFolderTab
+                      ? 'В этой папке пока нет чатов. Измените её настройки правой кнопкой по вкладке.'
+                      : chatFolder === 'archive'
+                        ? 'Здесь появятся диалоги, которые ты перенесёшь в архив.'
+                        : 'Найди человека по юзернейму и начни разговор.'}
                   </p>
                   <button
                     className="secondary"
@@ -3255,6 +3430,7 @@ export default function Noctgram({
                   disabled={readOnly || accountBlocked}
                   onOpen={resolveRoomLink}
                   onBack={exitChat}
+                  onOpenTopic={openRoom}
                   onProfile={(id) => void openProfile(id)}
                   onRoomsChanged={roomList.refresh}
                 />
@@ -3268,106 +3444,136 @@ export default function Noctgram({
                     >
                       <ArrowLeft size={18} />
                     </button>
-                    <ChatPeerProfile
-                      key={'peer-profile:' + me.id + ':' + peer.id}
-                      peer={peer}
-                      viewerId={me.id}
-                      lastSeen={
-                        (
-                          threads.find((thread) => thread.id === peer.id) ||
-                          peer
-                        ).lastSeen
-                      }
-                    />
-                    <button
-                      className="icon-button call-button"
-                      aria-label="Аудиозвонок"
-                      title="Аудиозвонок"
-                      disabled={
-                        readOnly || audioCalls.active || !messageAccess?.allowed
-                      }
-                      onClick={() => void audioCalls.start(peer)}
-                    >
-                      <Phone size={18} />
-                    </button>
-                    {me && peer.id !== me.id && (
-                      <SendGiftButton
-                        key={'chat-gift:' + me.id + ':' + peer.id}
-                        recipient={peer}
-                        senderId={me.id}
-                        disabled={busy || readOnly || !messageAccess?.allowed}
+                    {peer.id === me.id ? (
+                      <div className="chat-saved-heading">
+                        <SavedMessagesAvatar size={36} />
+                        <span>
+                          <strong>{SAVED_MESSAGES}</strong>
+                          <small>Заметки и пересланное — только для вас</small>
+                        </span>
+                      </div>
+                    ) : (
+                      <ChatPeerProfile
+                        key={'peer-profile:' + me.id + ':' + peer.id}
+                        peer={peer}
+                        viewerId={me.id}
+                        lastSeen={
+                          (
+                            threads.find((thread) => thread.id === peer.id) ||
+                            peer
+                          ).lastSeen
+                        }
                       />
                     )}
                     <button
-                      className="chat-block icon-button"
-                      disabled={busy || !messageAccess}
-                      aria-label={
-                        messageAccess?.blockedByMe
-                          ? 'Разблокировать собеседника'
-                          : 'Заблокировать собеседника'
-                      }
-                      title={
-                        messageAccess?.blockedByMe
-                          ? 'Разблокировать собеседника'
-                          : 'Заблокировать собеседника'
-                      }
+                      className="icon-button chat-search-toggle"
+                      aria-label="Поиск по чату"
+                      title="Поиск по чату"
+                      aria-pressed={searchPeer === peer.id}
                       onClick={() =>
-                        void run(async () => {
-                          await request('', {
-                            action: 'blockUser',
-                            id: peer.id,
-                            value: !messageAccess?.blockedByMe,
-                          });
-                          chatSnapshots.current.remove(peer.id);
-                          await loadMessages();
-                          setPrivacyVersion((v) => v + 1);
-                          notify(
-                            messageAccess?.blockedByMe
-                              ? 'Собеседник разблокирован'
-                              : 'Собеседник добавлен в чёрный список',
-                          );
-                        }, 'block:' + peer.id)
+                        setSearchPeer(searchPeer === peer.id ? '' : peer.id)
                       }
                     >
-                      <Ban size={17} />
+                      <Search size={18} />
                     </button>
-                    <ChatThemeMenu
-                      key={'chat-theme:' + myId + ':' + peer.id}
-                      owner={myId || ''}
-                      peer={peer.id}
-                      value={currentChatTheme}
-                      canShare={!readOnly && !!messageAccess?.allowed}
-                      onRefresh={() => {
-                        void Promise.all([loadThreads(), loadMessages()]).catch(
-                          (e) => notify(e.message),
-                        );
-                      }}
-                      onSave={async (scope, theme) => {
-                        const saved = await request<ChatThemeState>('', {
-                          action: 'chatTheme',
-                          peer: peer.id,
-                          scope,
-                          theme,
-                        });
-                        if (activePeer.current === peer.id) {
-                          chatSnapshots.current.updateTheme(peer.id, saved);
-                          setChatAppearance((previous) => {
-                            if (
-                              previous &&
-                              previous.viewer === myId &&
-                              previous.peer === peer.id &&
-                              previous.value.revision > saved.revision
-                            )
-                              return previous;
-                            return {
-                              viewer: myId || '',
+                    {peer.id !== me.id && (
+                      <>
+                        <button
+                          className="icon-button call-button"
+                          aria-label="Аудиозвонок"
+                          title="Аудиозвонок"
+                          disabled={
+                            readOnly ||
+                            audioCalls.active ||
+                            !messageAccess?.allowed
+                          }
+                          onClick={() => void audioCalls.start(peer)}
+                        >
+                          <Phone size={18} />
+                        </button>
+                        {me && peer.id !== me.id && (
+                          <SendGiftButton
+                            key={'chat-gift:' + me.id + ':' + peer.id}
+                            recipient={peer}
+                            senderId={me.id}
+                            disabled={
+                              busy || readOnly || !messageAccess?.allowed
+                            }
+                          />
+                        )}
+                        <button
+                          className="chat-block icon-button"
+                          disabled={busy || !messageAccess}
+                          aria-label={
+                            messageAccess?.blockedByMe
+                              ? 'Разблокировать собеседника'
+                              : 'Заблокировать собеседника'
+                          }
+                          title={
+                            messageAccess?.blockedByMe
+                              ? 'Разблокировать собеседника'
+                              : 'Заблокировать собеседника'
+                          }
+                          onClick={() =>
+                            void run(async () => {
+                              await request('', {
+                                action: 'blockUser',
+                                id: peer.id,
+                                value: !messageAccess?.blockedByMe,
+                              });
+                              chatSnapshots.current.remove(peer.id);
+                              await loadMessages();
+                              setPrivacyVersion((v) => v + 1);
+                              notify(
+                                messageAccess?.blockedByMe
+                                  ? 'Собеседник разблокирован'
+                                  : 'Собеседник добавлен в чёрный список',
+                              );
+                            }, 'block:' + peer.id)
+                          }
+                        >
+                          <Ban size={17} />
+                        </button>
+                        <ChatThemeMenu
+                          key={'chat-theme:' + myId + ':' + peer.id}
+                          owner={myId || ''}
+                          peer={peer.id}
+                          value={currentChatTheme}
+                          canShare={!readOnly && !!messageAccess?.allowed}
+                          onRefresh={() => {
+                            void Promise.all([
+                              loadThreads(),
+                              loadMessages(),
+                            ]).catch((e) => notify(e.message));
+                          }}
+                          onSave={async (scope, theme) => {
+                            const saved = await request<ChatThemeState>('', {
+                              action: 'chatTheme',
                               peer: peer.id,
-                              value: saved,
-                            };
-                          });
-                        }
-                      }}
-                    />
+                              scope,
+                              theme,
+                            });
+                            if (activePeer.current === peer.id) {
+                              chatSnapshots.current.updateTheme(peer.id, saved);
+                              setChatAppearance((previous) => {
+                                if (
+                                  previous &&
+                                  previous.viewer === myId &&
+                                  previous.peer === peer.id &&
+                                  previous.value.revision > saved.revision
+                                )
+                                  return previous;
+                                return {
+                                  viewer: myId || '',
+                                  peer: peer.id,
+                                  value: saved,
+                                };
+                              });
+                            }
+                          }}
+                        />
+                      </>
+                    )}
                   </div>
                   <ChatConversation
                     key={'conversation:' + myId + ':' + peer.id}
@@ -3377,6 +3583,8 @@ export default function Noctgram({
                     peer={peer}
                     threads={threads}
                     disabled={busy || !!readOnly}
+                    searchOpen={searchPeer === peer.id}
+                    onCloseSearch={() => setSearchPeer('')}
                     canSend={!!messageAccess?.allowed}
                     privacyNote={
                       messageAccess?.allowed
@@ -3524,6 +3732,29 @@ export default function Noctgram({
             <p>Меньше шума. Больше своего.</p>
           </div>
         </aside>
+      )}
+      <StickerPackHost meId={me?.id} />
+      {sharedPost && me && (
+        <ChatForwardDialog
+          key={'share:' + me.id + ':' + sharedPost.id}
+          me={me}
+          source={{ post: { postId: sharedPost.id } }}
+          preview={
+            sharedPost.name +
+            ': ' +
+            (sharedPost.text.slice(0, 200) ||
+              (sharedPost.media.length ? 'медиа' : 'публикация'))
+          }
+          threads={threads}
+          rooms={roomList.rooms}
+          fetchTargets
+          onClose={() => setSharedPost(null)}
+          onDone={(result, chosen) => {
+            notify(forwardNotice(result, chosen));
+            void loadThreads().catch(() => {});
+            void roomList.refresh();
+          }}
+        />
       )}
       <CreateGroupDialog
         key={'create-group:' + (me?.id || '')}

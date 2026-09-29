@@ -414,6 +414,48 @@
       "when": 1790186835138,
       "tag": "0058_profile_details",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1790655085375,
+      "tag": "0059_chat_media_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "6",
+      "when": 1790656417787,
+      "tag": "0060_voice_round",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "6",
+      "when": 1790657792301,
+      "tag": "0061_forward_saved_quotes",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "6",
+      "when": 1790660736536,
+      "tag": "0062_threads_topics",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "6",
+      "when": 1790662268979,
+      "tag": "0063_search_folders",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "6",
+      "when": 1790664274637,
+      "tag": "0064_stickers",
+      "breakpoints": true
     }
   ]
 }

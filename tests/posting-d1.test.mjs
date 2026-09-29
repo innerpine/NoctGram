@@ -31,18 +31,22 @@ const modules = new Map();
 const allowed = new Set([
   'lib/media-access.ts',
   'lib/room-access.ts',
+  'lib/antispam-access.ts',
   'lib/chat-access.ts',
   'lib/chat-files.ts',
   'lib/premium-access.ts',
   'lib/presence-privacy.ts',
   'lib/premium-predicate.ts',
   'lib/premium-emoji.ts',
+  'lib/premium-emoji-catalog.ts',
   'lib/premium-emoji-access.ts',
   'lib/boost-access.ts',
   'lib/boost-rules.ts',
   'lib/channel-access.ts',
   'lib/account-access.ts',
   'lib/privacy.ts',
+  'lib/reply-quote.ts',
+  'lib/search-text.ts',
   'lib/api-error.ts',
 ]);
 function load(file) {
@@ -381,7 +385,7 @@ void test(
           Date.now(),
         );
         await run(
-          "INSERT INTO room_uploads(uploadId,roomId,size,kind) VALUES(?,?,4,'image')",
+          "INSERT INTO chat_room_uploads(uploadId,roomId,size,kind) VALUES(?,?,4,'image')",
           fileId,
           room.id,
         );

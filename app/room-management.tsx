@@ -438,6 +438,26 @@ export function RoomManagement({
               </button>
             </form>
           )}
+          {tab === 'info' && manage && room.kind === 'group' && (
+            <div className="room-forum-toggle">
+              <span>
+                <strong>Темы</strong>
+                <small>
+                  Разделите группу на темы, как форум. Сообщения до включения
+                  останутся в «Общем».
+                </small>
+              </span>
+              <input
+                type="checkbox"
+                aria-label="Темы в группе"
+                checked={!!room.forum}
+                disabled={busy || disabled}
+                onChange={(event) =>
+                  void perform('forum', { enabled: event.target.checked })
+                }
+              />
+            </div>
+          )}
           {tab === 'link' && (
             <div className="room-invite-section">
               {room.visibility === 'public' ? (

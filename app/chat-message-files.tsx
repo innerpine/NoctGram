@@ -5,15 +5,24 @@ import { Download, File as FileIcon } from 'lucide-react';
 import { chatFileSize, type ChatAttachment } from '@/lib/chat-files';
 import { ChatVideoPlayer } from './chat-video-player';
 import { PhotoViewer } from './photo-viewer';
+import { VoiceMessage } from './voice-message';
+import { RoundVideoMessage } from './round-video-message';
 
 export function ChatMessageFiles({
   files,
   flush = false,
   metadata,
+  own = false,
+  listened = true,
+  onListened,
 }: {
   files: ChatAttachment[];
   flush?: boolean;
   metadata?: ReactNode;
+  own?: boolean;
+  // Voice and round video: whether the recipient already played it.
+  listened?: boolean;
+  onListened?: () => void;
 }) {
   const [photo, setPhoto] = useState<ChatAttachment | null>(null);
   const [open, setOpen] = useState(false);
@@ -46,6 +55,30 @@ export function ChatMessageFiles({
                 </button>
                 {stamp}
               </div>
+            );
+          if (file.kind === 'voice')
+            return (
+              <VoiceMessage
+                key={file.id}
+                file={file}
+                src={url}
+                own={own}
+                listened={listened}
+                onListened={onListened}
+                metadata={stamp}
+              />
+            );
+          if (file.kind === 'round')
+            return (
+              <RoundVideoMessage
+                key={file.id}
+                file={file}
+                src={url}
+                own={own}
+                listened={listened}
+                onListened={onListened}
+                metadata={stamp}
+              />
             );
           if (file.kind === 'video')
             return (

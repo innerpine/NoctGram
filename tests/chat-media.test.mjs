@@ -25,7 +25,7 @@ const { outputFiles } = await build({
         build.onResolve(
           {
             filter:
-              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog|\.\/chat-video-player|\.\/photo-viewer)$/,
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/dialog|\.\/chat-video-player|\.\/photo-viewer|\.\/voice-message|\.\/round-video-message)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
@@ -35,7 +35,7 @@ const { outputFiles } = await build({
               ? 'export const useState=globalThis.__mediaState;'
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
-                : 'export const Download="Download", File="File", ChatVideoPlayer="ChatVideoPlayer", PhotoViewer="PhotoViewer";',
+                : 'export const Download="Download", File="File", ChatVideoPlayer="ChatVideoPlayer", PhotoViewer="PhotoViewer", VoiceMessage="VoiceMessage", RoundVideoMessage="RoundVideoMessage";',
         }));
       },
     },

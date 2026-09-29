@@ -44,12 +44,14 @@ export function openMessageContextMenu(
   );
 }
 
-export function MessageContextTrigger(
-  props: Omit<
-    ComponentProps<typeof ContextMenuTrigger>,
-    'onKeyDown' | 'onContextMenu' | 'onTouchStart'
-  >,
-) {
+// onContextMenu runs first, e.g. to capture a selected quote.
+export function MessageContextTrigger({
+  onContextMenu,
+  ...props
+}: Omit<
+  ComponentProps<typeof ContextMenuTrigger>,
+  'onKeyDown' | 'onTouchStart'
+>) {
   return (
     <ContextMenuTrigger
       {...props}
@@ -71,6 +73,7 @@ export function MessageContextTrigger(
         openMessageContextMenu(surface);
       }}
       onContextMenu={(event) => {
+        onContextMenu?.(event);
         if (preserveContextTarget(event.target, event.currentTarget)) {
           event.preventBaseUIHandler();
           if (event.currentTarget.contains(event.target as Node))

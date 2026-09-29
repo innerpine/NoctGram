@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   Bell,
   BellOff,
+  Check,
+  FolderInput,
   MoreHorizontal,
 } from 'lucide-react';
 import {
@@ -13,6 +15,9 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
 import { request } from '@/lib/client';
 import { roomAction } from '@/lib/rooms-client';
@@ -21,6 +26,7 @@ import {
   ChatNotificationsItem,
   useChatNotifications,
 } from './chat-notifications';
+import { addChatToFolder, useChatFolders } from '@/lib/chat-folders-store';
 
 export function ArchiveRow({
   owner,
@@ -56,6 +62,8 @@ export function ArchiveRow({
     { owner, peer: id, kind, onChanged: onDone },
     revealed,
   );
+  const { folders } = useChatFolders(owner);
+  const folderKey = (kind === 'room' ? 'room:' : 'person:') + id;
   const move = async () => {
     if (locked.current) return;
     locked.current = true;
@@ -151,6 +159,38 @@ export function ArchiveRow({
             {archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}{' '}
             {archived ? 'Вернуть из архива' : 'В архив'}
           </DropdownMenuItem>
+          {folders.length > 0 && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <FolderInput size={16} /> Добавить в папку
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="room-menu">
+                {folders.map((folder) => {
+                  const inside = folder.includePeers.includes(folderKey);
+                  return (
+                    <DropdownMenuItem
+                      key={folder.id}
+                      disabled={inside}
+                      onClick={() =>
+                        void addChatToFolder(owner, folder, folderKey).catch(
+                          (e) =>
+                            alive.current &&
+                            setError(
+                              e instanceof Error
+                                ? e.message
+                                : 'Не удалось добавить в папку',
+                            ),
+                        )
+                      }
+                    >
+                      {folder.emoji || '📁'} {folder.title}
+                      {inside && <Check size={14} />}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       {(error || sound.error) && (

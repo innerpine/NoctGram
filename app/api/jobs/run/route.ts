@@ -7,6 +7,7 @@ import { cleanSpamActivity } from '@/lib/antispam';
 import { settleDueGiveaways } from '@/lib/giveaways';
 import { cleanAccessHistory } from '@/lib/access-security';
 import { db } from '@/lib/storage';
+import { backfillSearchText } from '@/lib/message-search';
 export async function POST(req: Request) {
   const secret = setting('NOCT_JOBS_SECRET'),
     supplied = req.headers.get('authorization') || '';
@@ -26,7 +27,11 @@ export async function POST(req: Request) {
     await expireCalls();
     await cleanSpamActivity();
     const push = await flushPush();
-    maintenance = { ...push, uploads: await cleanUploads() };
+    maintenance = {
+      ...push,
+      uploads: await cleanUploads(),
+      searchIndexed: await backfillSearchText(),
+    };
     await cleanAccessHistory(db());
   }
   if (snapshot.status === 'rejected') throw snapshot.reason;

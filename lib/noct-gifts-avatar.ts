@@ -22,7 +22,7 @@ export async function noctGiftsAvatar(body: Record<string, unknown>) {
     WHERE up.id=? AND up.userId=u.id AND up.state='ready'
       AND NOT EXISTS(SELECT 1 FROM moderated_uploads m WHERE m.uploadId=up.id)
       AND NOT EXISTS(SELECT 1 FROM chat_uploads c WHERE c.uploadId=up.id)
-      AND NOT EXISTS(SELECT 1 FROM room_uploads r WHERE r.uploadId=up.id)`)
+      AND NOT EXISTS(SELECT 1 FROM chat_room_uploads r WHERE r.uploadId=up.id)`)
     .bind(me.id, id)
     .first<{ type: string }>();
   if (!upload || !/^image\/(?:png|jpeg|webp|gif|avif)$/.test(upload.type))

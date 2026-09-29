@@ -1,9 +1,18 @@
 'use client';
 import { useRef, useState, type ReactNode } from 'react';
-import { Copy, MoreHorizontal, Reply, Trash2 } from 'lucide-react';
+import {
+  Copy,
+  Forward,
+  MessageCircle,
+  MoreHorizontal,
+  Quote,
+  Reply,
+  Trash2,
+} from 'lucide-react';
 import { ContextMenu, ContextMenuItem } from '@/components/ui/context-menu';
 import type { RoomMessage, RoomKind, RoomRole } from '@/lib/rooms-types';
 import type { ReactionEmoji } from '@/lib/message-reactions';
+import { selectionQuote } from '@/lib/message-selection';
 import { useMessageReplyGesture } from './use-message-reply-gesture';
 import {
   MessageContextTrigger,
@@ -22,8 +31,13 @@ export function RoomMessageContext({
   canSend,
   pending,
   reactionPending,
+  unconfirmed = false,
+  canReply = true,
   onReact,
   onReply,
+  onQuote,
+  onThread,
+  onForward,
   onRemove,
   onCopy,
   initial = true,
@@ -38,23 +52,33 @@ export function RoomMessageContext({
   canSend: boolean;
   pending: boolean;
   reactionPending: boolean;
+  // An optimistic message the server has not confirmed yet.
+  unconfirmed?: boolean;
+  // False in a closed forum topic: reactions and deletion still work.
+  canReply?: boolean;
   onReact: (message: RoomMessage, emoji: ReactionEmoji | null) => Promise<void>;
   onReply: (message: RoomMessage) => void;
+  // A text fragment selected when the menu opens becomes a quote reply.
+  onQuote?: (message: RoomMessage, quote: string) => void;
+  onThread?: (message: RoomMessage) => void;
+  onForward?: (message: RoomMessage) => void;
   onRemove: (message: RoomMessage) => void;
   onCopy: () => void;
   initial?: boolean;
 }) {
   const [enter] = useState(() => !initial);
+  const [quote, setQuote] = useState('');
   const trigger = useRef<HTMLDivElement>(null);
   const deleted = !!message.deletedAt;
+  const closed = deleted || unconfirmed;
   const readonly = disabled || !canSend || pending;
-  const canQuickReply = kind === 'group' && !readonly && !deleted;
+  const canQuickReply = kind === 'group' && canReply && !readonly && !closed;
   const replyGesture = useMessageReplyGesture(canQuickReply, () =>
     onReply(message),
   );
   return (
     <ContextMenu
-      disabled={deleted}
+      disabled={closed}
       onOpenChange={(open) => {
         if (open) replyGesture.cancel();
       }}
@@ -68,6 +92,16 @@ export function RoomMessageContext({
         }
         data-room-message-id={message.id}
         data-chat-initial={!enter || undefined}
+        onContextMenu={(event) =>
+          setQuote(
+            canQuickReply && onQuote
+              ? selectionQuote(
+                  event.currentTarget.querySelector('.chat-message-text'),
+                  message.text,
+                )
+              : '',
+          )
+        }
         onPointerDown={replyGesture.onPointerDown}
         onPointerMove={replyGesture.onPointerMove}
         onPointerUp={replyGesture.onPointerUp}
@@ -77,7 +111,7 @@ export function RoomMessageContext({
         onDoubleClick={replyGesture.onDoubleClick}
       >
         {children}
-        {!deleted && (
+        {!closed && (
           <button
             type="button"
             className="room-message-more icon-button"
@@ -102,23 +136,53 @@ export function RoomMessageContext({
       </MessageContextTrigger>
       <MessageContextContent
         reactions={message.reactions}
-        disabled={readonly || deleted}
+        disabled={readonly || closed}
         pending={reactionPending}
         onReact={
-          kind === 'group' && !deleted
+          kind === 'group' && !closed
             ? (emoji) => onReact(message, emoji)
             : undefined
         }
       >
         {kind === 'group' && (
           <ContextMenuItem
-            disabled={readonly || deleted}
+            disabled={!canQuickReply}
             onClick={() => {
-              if (!readonly && !deleted) onReply(message);
+              if (canQuickReply) onReply(message);
             }}
           >
             <Reply />
             Ответить
+          </ContextMenuItem>
+        )}
+        {kind === 'group' && !!quote && onQuote && (
+          <ContextMenuItem
+            disabled={!canQuickReply}
+            onClick={() => {
+              if (canQuickReply) onQuote(message, quote);
+            }}
+          >
+            <Quote />
+            Ответить с цитатой
+          </ContextMenuItem>
+        )}
+        {kind === 'group' &&
+          onThread &&
+          (!!message.replies || !!message.threadRootId) && (
+            <ContextMenuItem onClick={() => onThread(message)}>
+              <MessageCircle />
+              Открыть ветку
+            </ContextMenuItem>
+          )}
+        {kind === 'group' && onForward && !message.giveawayId && (
+          <ContextMenuItem
+            disabled={closed}
+            onClick={() => {
+              if (!closed) onForward(message);
+            }}
+          >
+            <Forward />
+            Переслать
           </ContextMenuItem>
         )}
         {kind === 'group' && !!message.text && (
@@ -135,9 +199,9 @@ export function RoomMessageContext({
         {(own || (role !== 'member' && kind === 'group')) && (
           <ContextMenuItem
             variant="destructive"
-            disabled={readonly || deleted}
+            disabled={readonly || closed}
             onClick={() => {
-              if (!readonly && !deleted) onRemove(message);
+              if (!readonly && !closed) onRemove(message);
             }}
           >
             <Trash2 />

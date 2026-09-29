@@ -268,11 +268,26 @@ export const messages = sqliteTable(
     deletedAt: integer().notNull().default(0),
     created: integer().notNull(),
     read: integer().notNull().default(0),
+    // When the recipient first played a voice or round video message.
+    listenedAt: integer().notNull().default(0),
+    // Original author of a forwarded message or shared post (any surface).
+    forwardedFrom: text(),
+    // The quoted fragment of the replied message, if the reply quotes one.
+    replyQuote: text().notNull().default(''),
+    // A feed post shared into the chat; rendered live for each viewer.
+    postShareId: text(),
+    // Lower-cased text for search (D1 folds only ASCII); NULL until indexed.
+    searchText: text(),
+    // A sticker: 'b:<pack>:<slug>' (built-in) or 'u:<sticker id>'.
+    stickerId: text(),
   },
   (t) => [
     index('messages_recipient').on(t.recipient, t.created),
     index('messages_sender').on(t.sender, t.created),
     uniqueIndex('messages_gift_receipt').on(t.giftReceiptId),
+    index('messages_search_pending')
+      .on(t.id)
+      .where(sql`${t.searchText} IS NULL`),
   ],
 );
 export const messageReactions = sqliteTable(
@@ -338,6 +353,8 @@ export const chatUploads = sqliteTable('chat_uploads', {
   size: integer().notNull(),
   kind: text().notNull(),
   messageId: text().references(() => messages.id),
+  duration: integer().notNull().default(0),
+  waveform: text().notNull().default(''),
 });
 export const messagePins = sqliteTable(
   'message_pins',
@@ -1323,6 +1340,8 @@ export const chatRooms = sqliteTable(
     created: integer().notNull(),
     updatedAt: integer().notNull(),
     deletedAt: integer().notNull().default(0),
+    // Groups with topics: messages live in «Общее» or in a named topic.
+    forum: integer().notNull().default(0),
   },
   (t) => [
     uniqueIndex('chat_rooms_username').on(t.username),
@@ -1394,14 +1413,210 @@ export const chatRoomMessages = sqliteTable(
     giveawayId: text().references(() => giveaways.id),
     created: integer().notNull(),
     deletedAt: integer().notNull().default(0),
+    forwardedName: text().notNull().default(''),
+    forwardedFrom: text(),
+    replyQuote: text().notNull().default(''),
+    postShareId: text(),
+    // Forum topic of the message; '' is «Общее».
+    topicId: text().notNull().default(''),
+    // The first message of the reply thread this message belongs to.
+    threadRootId: text(),
+    // Lower-cased text for search; NULL until indexed, '' when encrypted.
+    searchText: text(),
+    stickerId: text(),
   },
   (t) => [
     index('chat_room_messages_room').on(t.roomId, t.created, t.id),
+    index('chat_room_messages_topic').on(t.roomId, t.topicId, t.created, t.id),
+    index('chat_room_messages_thread').on(
+      t.roomId,
+      t.threadRootId,
+      t.created,
+      t.id,
+    ),
+    index('chat_room_messages_search_pending')
+      .on(t.id)
+      .where(sql`${t.searchText} IS NULL`),
     uniqueIndex('chat_room_messages_giveaway').on(t.giveawayId),
     check(
       'chat_room_message_payload',
       sql`${t.ciphertext} IS NULL OR (${t.text} = '' AND ${t.replyTo} IS NULL)`,
     ),
+  ],
+);
+// Sticker and custom emoji packs made by users; built-in packs live in
+// lib/sticker-catalog.json.
+export const stickerPacks = sqliteTable(
+  'sticker_packs',
+  {
+    id: text().primaryKey(),
+    ownerId: text()
+      .notNull()
+      .references(() => users.id),
+    type: text().notNull().default('stickers'),
+    shortName: text().notNull(),
+    title: text().notNull(),
+    stickerCount: integer().notNull().default(0),
+    created: integer().notNull(),
+    updated: integer().notNull(),
+    deletedAt: integer().notNull().default(0),
+    removedAt: integer().notNull().default(0),
+    removalId: text(),
+  },
+  (t) => [
+    uniqueIndex('sticker_packs_short_name').on(t.shortName),
+    index('sticker_packs_owner').on(t.ownerId, t.deletedAt),
+    check('sticker_packs_type', sql`${t.type} IN ('stickers','emoji')`),
+  ],
+);
+export const stickers = sqliteTable(
+  'stickers',
+  {
+    id: text().primaryKey(),
+    packId: text()
+      .notNull()
+      .references(() => stickerPacks.id, { onDelete: 'cascade' }),
+    position: integer().notNull().default(0),
+    emoji: text().notNull(),
+    format: text().notNull(),
+    uploadId: text()
+      .notNull()
+      .references(() => uploads.id),
+    width: integer().notNull(),
+    height: integer().notNull(),
+    created: integer().notNull(),
+    deletedAt: integer().notNull().default(0),
+  },
+  (t) => [
+    index('stickers_pack').on(t.packId, t.deletedAt, t.position),
+    uniqueIndex('stickers_upload').on(t.uploadId),
+    check('stickers_format', sql`${t.format} IN ('webp','png','tgs')`),
+  ],
+);
+// Packs a person added to their sticker panel: 'u:<pack id>'.
+export const userStickerPacks = sqliteTable(
+  'user_sticker_packs',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    packRef: text().notNull(),
+    position: integer().notNull().default(0),
+    installedAt: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.packRef] })],
+);
+export const favedStickers = sqliteTable(
+  'faved_stickers',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    stickerRef: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.stickerRef] })],
+);
+// Chat folders: tabs above the chat list, like Telegram's folders.
+export const chatFolders = sqliteTable(
+  'chat_folders',
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    title: text().notNull(),
+    emoji: text().notNull().default(''),
+    position: integer().notNull().default(0),
+    includePersonal: integer().notNull().default(0),
+    includeGroups: integer().notNull().default(0),
+    includeSecret: integer().notNull().default(0),
+    excludeRead: integer().notNull().default(0),
+    excludeArchived: integer().notNull().default(0),
+    // JSON arrays of 'person:<id>' and 'room:<id>'.
+    includePeers: text().notNull().default('[]'),
+    excludePeers: text().notNull().default('[]'),
+    created: integer().notNull(),
+    updated: integer().notNull(),
+  },
+  (t) => [index('chat_folders_user').on(t.userId, t.position)],
+);
+export const chatRoomTopics = sqliteTable(
+  'chat_room_topics',
+  {
+    id: text().primaryKey(),
+    roomId: text()
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    title: text().notNull(),
+    // One of the six Telegram topic colours (0-5).
+    color: integer().notNull().default(0),
+    emoji: text().notNull().default(''),
+    createdBy: text()
+      .notNull()
+      .references(() => users.id),
+    created: integer().notNull(),
+    updatedAt: integer().notNull(),
+    closedAt: integer().notNull().default(0),
+    deletedAt: integer().notNull().default(0),
+  },
+  (t) => [
+    index('chat_room_topics_room').on(t.roomId, t.deletedAt, t.updatedAt),
+    check('chat_room_topics_color', sql`${t.color} BETWEEN 0 AND 5`),
+  ],
+);
+// Per-topic read position of a member ('' is «Общее»).
+export const chatRoomTopicReads = sqliteTable(
+  'chat_room_topic_reads',
+  {
+    roomId: text()
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    topicId: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    lastReadAt: integer().notNull().default(0),
+    lastReadId: text().notNull().default(''),
+  },
+  (t) => [primaryKey({ columns: [t.roomId, t.topicId, t.userId] })],
+);
+// Group attachments are drafted for one room, then bound to their first message.
+export const chatRoomUploads = sqliteTable(
+  'chat_room_uploads',
+  {
+    uploadId: text()
+      .primaryKey()
+      .references(() => uploads.id, { onDelete: 'cascade' }),
+    roomId: text()
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    size: integer().notNull(),
+    kind: text().notNull(),
+    duration: integer().notNull().default(0),
+    waveform: text().notNull().default(''),
+    messageId: text().references(() => chatRoomMessages.id, {
+      onDelete: 'set null',
+    }),
+  },
+  (t) => [index('chat_room_uploads_room').on(t.roomId, t.messageId)],
+);
+// Every chat message that shows an upload, maintained by triggers. Access to a
+// forwarded file follows any live copy the viewer can read, in DMs or groups.
+export const chatMediaRefs = sqliteTable(
+  'chat_media_refs',
+  {
+    uploadId: text()
+      .notNull()
+      .references(() => uploads.id, { onDelete: 'cascade' }),
+    surface: text().notNull(),
+    messageId: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.uploadId, t.surface, t.messageId] }),
+    index('chat_media_refs_message').on(t.surface, t.messageId),
+    check('chat_media_refs_surface', sql`${t.surface} IN ('dm','room')`),
   ],
 );
 export const giveaways = sqliteTable(
@@ -1596,24 +1811,6 @@ export const paymentSupport = sqliteTable('payment_support', {
   created: integer().notNull(),
 });
 
-export const roomUploads = sqliteTable(
-  'room_uploads',
-  {
-    uploadId: text()
-      .primaryKey()
-      .references(() => uploads.id, { onDelete: 'cascade' }),
-    roomId: text()
-      .notNull()
-      .references(() => chatRooms.id, { onDelete: 'cascade' }),
-    messageId: text().references(() => chatRoomMessages.id, {
-      onDelete: 'cascade',
-    }),
-    size: integer().notNull(),
-    kind: text().notNull(),
-  },
-  (t) => [index('room_uploads_message').on(t.messageId)],
-);
-
 export const accessObservations = sqliteTable(
   'access_observations',
   {
@@ -1728,7 +1925,10 @@ export const marketListings = sqliteTable(
     index('market_catalog').on(t.kind, t.status, t.price),
     index('market_history').on(t.kind, t.assetId, t.closed),
     index('market_seller').on(t.sellerId, t.status),
-    check('market_listings_kind', sql`${t.kind} IN ('number','username','gift')`),
+    check(
+      'market_listings_kind',
+      sql`${t.kind} IN ('number','username','gift')`,
+    ),
     check(
       'market_listings_status',
       sql`${t.status} IN ('active','sold','cancelled')`,

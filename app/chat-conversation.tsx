@@ -15,6 +15,9 @@ import { withOwnReaction, type ReactionEmoji } from '@/lib/message-reactions';
 import { createLatestRequests } from '@/lib/optimistic';
 import { chatOutbox, emptyOutbox, mergeOutgoing } from '@/lib/chat-outbox';
 import { messageSummary } from '@/lib/chat-message-display';
+import { forwardNotice } from '@/lib/forward-client';
+import { CHAT_FOCUS_EVENT, takeChatFocus } from '@/lib/chat-focus';
+import { ChatSearchBar } from './chat-search';
 import { createChatNavigator } from '@/lib/chat-navigation';
 import { revealChat, watchChatTail } from '@/lib/chat-viewport';
 import { createChatDragSelection } from '@/lib/chat-drag-selection';
@@ -47,6 +50,8 @@ export function ChatConversation({
   onProfile,
   onReport,
   notify,
+  searchOpen = false,
+  onCloseSearch,
 }: {
   messages: Message[];
   ready: boolean;
@@ -63,6 +68,8 @@ export function ChatConversation({
   onProfile: (id: string) => void;
   onReport: (message: Message) => void;
   notify: (text: string) => void;
+  searchOpen?: boolean;
+  onCloseSearch?: () => void;
 }) {
   const outbox = useSyncExternalStore(
     chatOutbox.subscribe,
@@ -113,7 +120,9 @@ export function ChatConversation({
     setProfileId(id);
     setProfileOpen(true);
   }, []);
+  const saved = peer.id === me.id;
   const [reply, setReply] = useState<Message | null>(null),
+    [quote, setQuote] = useState(''),
     [selected, setSelected] = useState<string[]>([]),
     [working, setWorking] = useState(false);
   const [operation, setOperation] = useState<{
@@ -239,6 +248,16 @@ export function ChatConversation({
         }
       });
   }, []);
+  // A search result chosen elsewhere opens here with its context.
+  useEffect(() => {
+    const take = () => {
+      const id = takeChatFocus('dm:' + peer.id);
+      if (id) onJump(id);
+    };
+    take();
+    window.addEventListener(CHAT_FOCUS_EVENT, take);
+    return () => window.removeEventListener(CHAT_FOCUS_EVENT, take);
+  }, [peer.id, onJump]);
   const last = history.at(-1);
   useLayoutEffect(() => {
     const previous = previousNewest.current;
@@ -268,10 +287,10 @@ export function ChatConversation({
   const selectedMessages = messages.filter((message) =>
     selected.includes(message.id),
   );
-  const action = useRef<(action: ChatAction, message: Message) => void>(
-    () => {},
-  );
-  action.current = (kind, message) => {
+  const action = useRef<
+    (action: ChatAction, message: Message, quote?: string) => void
+  >(() => {});
+  action.current = (kind, message, fragment = '') => {
     if (removal.current?.has(message.id)) return;
     if (kind === 'copy') {
       void navigator.clipboard
@@ -303,9 +322,10 @@ export function ChatConversation({
         !messages.some((item) => item.id === message.id))
     )
       return;
-    if (kind === 'reply') {
+    if (kind === 'reply' || kind === 'quote') {
       if (canSend) {
         setReply(message);
+        setQuote(kind === 'quote' ? fragment : '');
         setReplyFocus((version) => version + 1);
         setSelected([]);
       }
@@ -340,7 +360,8 @@ export function ChatConversation({
       setOperation({ type: kind, messages: [message] });
   };
   const onAction = useCallback(
-    (kind: ChatAction, message: Message) => action.current(kind, message),
+    (kind: ChatAction, message: Message, quote?: string) =>
+      action.current(kind, message, quote),
     [],
   );
   const onPin = useCallback(
@@ -401,6 +422,21 @@ export function ChatConversation({
       reactHandler.current(message, emoji),
     [],
   );
+  const onListened = useCallback(
+    (message: Message) => {
+      void chatRequest('/api/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'messageListened',
+          peer: peer.id,
+          id: message.id,
+        }),
+        signal: AbortSignal.timeout(15000),
+      }).catch(() => {});
+    },
+    [peer.id],
+  );
   const finished = () => {
     if (operation?.type === 'delete') {
       removal.current?.remove(operation.messages);
@@ -411,16 +447,20 @@ export function ChatConversation({
         setReply(null);
       setSelected([]);
     }
-    if (operation?.type === 'forward') {
-      setSelected([]);
-      notify('Сообщения пересланы');
-    }
     void onRefresh().catch((error) => notify(error.message));
   };
   const readonly = disabled || working;
   const visibleMessages = removal.current?.visible(history) ?? history;
   return (
     <div className="chat-conversation">
+      {searchOpen && (
+        <ChatSearchBar
+          meId={me.id}
+          scope={{ peer: peer.id }}
+          onJump={(hit) => onJump(hit.id)}
+          onClose={() => onCloseSearch?.()}
+        />
+      )}
       <ChatPins
         messages={messages}
         disabled={readonly || !canSend}
@@ -467,9 +507,19 @@ export function ChatConversation({
         onContextMenu={chatHistoryContextMenu}
       >
         <div className="chat-history-content" ref={content}>
-          {ready && !visibleMessages.length && (
-            <p className="chat-empty-history">Сообщений пока нет.</p>
-          )}
+          {ready &&
+            !visibleMessages.length &&
+            (saved ? (
+              <div className="chat-empty-history saved-empty">
+                <strong>Избранное</strong>
+                <p>
+                  Пересылайте сюда сообщения и публикации, чтобы сохранить их.
+                  Заметки, файлы и голосовые тоже можно отправлять себе.
+                </p>
+              </div>
+            ) : (
+              <p className="chat-empty-history">Сообщений пока нет.</p>
+            ))}
           {visibleMessages.map((message) => (
             <ChatMessage
               key={message.id}
@@ -491,6 +541,7 @@ export function ChatConversation({
               }
               onRetry={onRetry}
               onReact={onReact}
+              onListened={onListened}
               initial={!!initialMessages?.has(message.id)}
               me={me}
               peer={peer}
@@ -517,6 +568,7 @@ export function ChatConversation({
       />
       <ChatComposer
         premium={!!me.premium}
+        meId={me.id}
         peerId={peer.id}
         replyFocus={replyFocus}
         text={text}
@@ -530,10 +582,14 @@ export function ChatConversation({
                 name: reply.sender === me.id ? 'Вы' : peer.name,
                 text: messageSummary(reply),
                 unavailable: false,
+                ...(quote ? { quote } : {}),
               }
             : null
         }
-        onCancelReply={() => setReply(null)}
+        onCancelReply={() => {
+          setReply(null);
+          setQuote('');
+        }}
         onSend={(draft) => {
           followTail.current = true;
           chatOutbox.enqueue(me.id, peer.id, draft);
@@ -543,6 +599,7 @@ export function ChatConversation({
         <ChatDeleteDialog
           messages={operation.messages}
           peer={peer}
+          saved={saved}
           onClose={() => setOperation(null)}
           onDone={finished}
         />
@@ -561,8 +618,13 @@ export function ChatConversation({
           me={me}
           peer={peer}
           threads={threads}
+          fetchTargets
           onClose={() => setOperation(null)}
-          onDone={finished}
+          onDone={(result, chosen) => {
+            setSelected([]);
+            notify(forwardNotice(result, chosen));
+            void onRefresh().catch((error) => notify(error.message));
+          }}
         />
       )}
     </div>

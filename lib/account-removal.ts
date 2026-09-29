@@ -64,6 +64,33 @@ export async function deleteAccount(
         `DELETE FROM direct_chat_archives WHERE (userId=? OR peerId=?) AND ${gate}`,
       )
       .bind(me, me, ...args),
+    // Own sticker packs leave every panel with the account. A pack removed by
+    // a moderator stays as evidence, hidden with its owner.
+    d
+      .prepare(
+        `DELETE FROM faved_stickers WHERE stickerRef IN(SELECT 'u:'||st.id FROM stickers st JOIN sticker_packs sp ON sp.id=st.packId WHERE sp.ownerId=?) AND ${gate}`,
+      )
+      .bind(me, ...args),
+    d
+      .prepare(
+        `DELETE FROM user_sticker_packs WHERE packRef IN(SELECT 'u:'||id FROM sticker_packs WHERE ownerId=?) AND ${gate}`,
+      )
+      .bind(me, ...args),
+    d
+      .prepare(
+        `DELETE FROM stickers WHERE packId IN(SELECT id FROM sticker_packs WHERE ownerId=? AND removedAt=0) AND ${gate}`,
+      )
+      .bind(me, ...args),
+    d
+      .prepare(
+        `DELETE FROM sticker_packs WHERE ownerId=? AND removedAt=0 AND ${gate}`,
+      )
+      .bind(me, ...args),
+    d
+      .prepare(
+        `UPDATE sticker_packs SET deletedAt=? WHERE ownerId=? AND deletedAt=0 AND ${gate}`,
+      )
+      .bind(now, me, ...args),
     // Secret room deletion cascades all ciphertext, both public keys and room
     // membership. Owned groups have no other live members after the gate above.
     d
@@ -152,6 +179,10 @@ export async function deleteAccount(
   for (const table of [
     'message_reactions',
     'chat_room_message_reactions',
+    'chat_room_topic_reads',
+    'chat_folders',
+    'user_sticker_packs',
+    'faved_stickers',
     'likes',
     'bookmarks',
     'votes',

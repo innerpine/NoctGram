@@ -31,7 +31,12 @@ export async function GET(req: Request) {
         me,
         params.get('id') || '',
         params.get('before'),
-        params.get('around'),
+        {
+          topic: params.get('topic'),
+          thread: params.get('thread'),
+          view: params.get('view'),
+          around: params.get('around'),
+        },
       );
     else if (action === 'notifications')
       result = await readRoomNotifications(me, params.get('id') || '');

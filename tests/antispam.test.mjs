@@ -455,7 +455,7 @@ await test('antispam persistence, permission races and ordinary-group integratio
         .run(file, Date.now());
       sql
         .prepare(
-          "INSERT INTO room_uploads(uploadId,roomId,size,kind) VALUES(?,?,4,'image')",
+          "INSERT INTO chat_room_uploads(uploadId,roomId,size,kind) VALUES(?,?,4,'image')",
         )
         .run(file, room.id);
       const pending = await send(room, 'unixgram.com', {
@@ -483,7 +483,7 @@ await test('antispam persistence, permission races and ordinary-group integratio
       assert.equal(message.attachments[0].id, file);
       assert.equal(
         sql
-          .prepare('SELECT messageId FROM room_uploads WHERE uploadId=?')
+          .prepare('SELECT messageId FROM chat_room_uploads WHERE uploadId=?')
           .get(file).messageId,
         key,
       );
@@ -508,7 +508,7 @@ await test('antispam persistence, permission races and ordinary-group integratio
         .run(file, Date.now());
       sql
         .prepare(
-          "INSERT INTO room_uploads(uploadId,roomId,size,kind) VALUES(?,?,4,'image')",
+          "INSERT INTO chat_room_uploads(uploadId,roomId,size,kind) VALUES(?,?,4,'image')",
         )
         .run(file, room.id);
       const pending = await send(room, 'unixgram.com', { attachments: [file] });
