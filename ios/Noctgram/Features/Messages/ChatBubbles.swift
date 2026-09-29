@@ -292,6 +292,16 @@ enum MessageStatus {
         case .read: return "checkmark.circle.fill"
         }
     }
+
+    /// What VoiceOver says for the tick (the symbol alone reads «Выбрано»).
+    var spoken: String {
+        switch self {
+        case .pending: return "Отправляется"
+        case .failed: return "Не отправлено"
+        case .sent: return "Отправлено"
+        case .read: return "Прочитано"
+        }
+    }
 }
 
 /// «изм. 23:02 ✓», drawn at the end of the last line or over a photo.
@@ -322,6 +332,7 @@ struct BubbleTime: View {
             if let status {
                 Image(systemName: status.symbol)
                     .foregroundColor(status == .failed ? Noct.red : (status == .read ? .white : color))
+                    .accessibilityLabel(status.spoken)
             }
         }
         .font(.system(size: 11))

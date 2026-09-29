@@ -335,7 +335,7 @@ private struct StickersPage: View {
                                 }
                                 .padding(.horizontal, 8)
                             }
-                            .id(section.id)
+                            .id(PanelAnchor.section(section.id))
                         }
                         if list.isEmpty {
                             Text(store.loaded ? (term.isEmpty ? "Стикеров пока нет" : "Стикеров с «\(query)» не нашлось") : "Загружаем стикеры…")
@@ -390,7 +390,7 @@ private struct StickersPage: View {
     private func jump(_ id: String, _ proxy: ScrollViewProxy) {
         Haptics.tap()
         current = id
-        withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .top) }
+        withAnimation(Noct.quick) { proxy.scrollTo(PanelAnchor.section(id), anchor: .top) }
     }
 
     private func cell(_ sticker: Sticker) -> some View {
@@ -421,6 +421,13 @@ private struct StickersPage: View {
             }
         }
     }
+}
+
+/// Where a tab of the pack bar scrolls to. The tabs themselves carry the
+/// pack and category ids (ForEach identity), and a scroll proxy takes the
+/// first scroll view with a matching id, so the sections are named apart.
+private enum PanelAnchor {
+    static func section(_ id: String) -> String { "section:" + id }
 }
 
 /// Stickers grow a little under the finger.
@@ -469,7 +476,7 @@ private struct EmojiPage: View {
                                     PanelHeader(title: "Недавние")
                                     grid(recent)
                                 }
-                                .id("recent")
+                                .id(PanelAnchor.section("recent"))
                             }
                             ForEach(store.emojiPacks) { pack in
                                 VStack(alignment: .leading, spacing: 0) {
@@ -483,14 +490,14 @@ private struct EmojiPage: View {
                                     }
                                     premiumGrid(pack)
                                 }
-                                .id(pack.ref)
+                                .id(PanelAnchor.section(pack.ref))
                             }
                             ForEach(catalog) { category in
                                 VStack(alignment: .leading, spacing: 0) {
                                     PanelHeader(title: category.title)
                                     grid(category.emoji.map { $0.0 })
                                 }
-                                .id(category.id)
+                                .id(PanelAnchor.section(category.id))
                             }
                         }
                     }
@@ -542,7 +549,7 @@ private struct EmojiPage: View {
     private func jump(_ id: String, _ proxy: ScrollViewProxy) {
         Haptics.tap()
         current = id
-        withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .top) }
+        withAnimation(Noct.quick) { proxy.scrollTo(PanelAnchor.section(id), anchor: .top) }
     }
 
     private func grid(_ emoji: [String]) -> some View {
