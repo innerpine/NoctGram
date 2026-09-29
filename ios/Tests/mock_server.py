@@ -478,6 +478,40 @@ def rooms_list(archived):
     ]}
 
 
+def chat_search(q):
+    """GET /api/chat-search?scope=all: messages of the mock's chats whose
+    text holds the query (lib/message-search.ts)."""
+    term = q.get("q", "").strip().lower()
+    if not term:
+        return 400, {"error": "Запрос — от 1 до 100 символов"}
+    names = {META["bob"]: ("Боб", R["profileBob"]["avatar"]), "local_carol": ("Кэрол", ""), META["me"]: ("Алиса Ночная", R["profileAlice"]["avatar"])}
+    items = []
+    for peer, messages in ((META["bob"], dialogue()), ("local_carol", media_dialogue()), (META["me"], saved())):
+        for message in messages:
+            if term in message["text"].lower():
+                sender = names.get(message["sender"], ("Алиса Ночная", ""))[0]
+                items.append({"kind": "dm", "id": message["id"], "chatId": peer, "chatName": names[peer][0], "chatAvatar": names[peer][1],
+                              "sender": message["sender"], "senderName": sender, "text": message["text"], "created": message["created"]})
+    for message in room()["messages"]:
+        if term in message["text"].lower():
+            items.append({"kind": "room", "id": message["id"], "chatId": ROOM, "chatName": "Ночные прогулки", "chatAvatar": "",
+                          "forum": False, "sender": message["sender"], "senderName": message["senderName"], "text": message["text"],
+                          "created": message["created"]})
+    if q.get("scope") == "chat":
+        chat = q.get("peer") or q.get("room")
+        items = [item for item in items if item["chatId"] == chat]
+    items.sort(key=lambda item: -item["created"])
+    return 200, {"items": items[:30], "next": None, "total": len(items)}
+
+
+FOLDERS = {"folders": [
+    {"id": "folder-people", "title": "Личные", "emoji": "💬", "position": 0, "includePersonal": True, "includeGroups": False,
+     "includeSecret": False, "excludeRead": False, "excludeArchived": True, "includePeers": [], "excludePeers": []},
+    {"id": "folder-groups", "title": "Группы", "emoji": "👥", "position": 1, "includePersonal": False, "includeGroups": True,
+     "includeSecret": False, "excludeRead": False, "excludeArchived": True, "includePeers": [], "excludePeers": []},
+], "limit": 10}
+
+
 def person(key, **extra):
     """A profile fixture as the team's lists give people (sample data only)."""
     profile = R[key]
@@ -655,6 +689,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, body)
         if url.path == "/api/stickers":
             return self.send(*stickers(q))
+        if url.path == "/api/chat-search":
+            return self.send(*chat_search(q))
+        if url.path == "/api/chat-folders":
+            return self.send(200, FOLDERS)
         if url.path == "/api/rooms":
             if q.get("action") == "room":
                 if q.get("id") == "room_media":

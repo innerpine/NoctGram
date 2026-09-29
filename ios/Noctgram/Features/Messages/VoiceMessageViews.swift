@@ -226,7 +226,9 @@ final class RoundPlayback: ObservableObject {
         timeToken = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 20), queue: .main) { [weak self] time in
             let seconds = time.seconds
             Task { @MainActor in
-                guard let self, seconds.isFinite else { return }
+                // The silent loop shows the whole length; only playback
+                // with sound moves the ring.
+                guard let self, self.withSound, seconds.isFinite else { return }
                 self.time = seconds
             }
         }

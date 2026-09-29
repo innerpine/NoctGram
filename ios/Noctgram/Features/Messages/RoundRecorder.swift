@@ -45,8 +45,9 @@ final class RoundRecorder: NSObject, ObservableObject {
         return await VoiceRecorder.permission()
     }
 
-    /// Turns the camera on for the preview.
-    func prepare() throws {
+    /// Turns the camera on for the preview; returns once it runs, so a
+    /// recording can start.
+    func prepare() async throws {
         guard !running else { return }
         let audio = AVAudioSession.sharedInstance()
         try audio.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .allowBluetooth])
@@ -62,9 +63,14 @@ final class RoundRecorder: NSObject, ObservableObject {
         output.maxRecordedDuration = CMTime(seconds: Self.limit, preferredTimescale: 600)
         orient()
         session.commitConfiguration()
-        running = true
         let captured = session
-        queue.async { captured.startRunning() }
+        await withCheckedContinuation { continuation in
+            queue.async {
+                captured.startRunning()
+                continuation.resume()
+            }
+        }
+        running = true
     }
 
     private func attachCamera(position: AVCaptureDevice.Position) throws {
@@ -130,11 +136,14 @@ final class RoundRecorder: NSObject, ObservableObject {
         if let completed {
             raw = completed
             self.completed = nil
-        } else {
+        } else if output.isRecording {
             raw = await withCheckedContinuation { continuation in
                 finished = continuation
                 output.stopRecording()
             }
+        } else {
+            // The recording never started (or failed on its own).
+            raw = nil
         }
         stopTicker()
         shutdown()
@@ -182,6 +191,8 @@ final class RoundRecorder: NSObject, ObservableObject {
             completed = url
             stopTicker()
             reachedLimit = true
+        } else {
+            try? FileManager.default.removeItem(at: file)
         }
     }
 

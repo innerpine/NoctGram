@@ -50,7 +50,7 @@ final class VoicePlayback: ObservableObject {
         current = id
         time = 0
         duration = known
-        timeToken = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 30), queue: .main) { [weak self] time in
+        timeToken = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 15), queue: .main) { [weak self] time in
             let seconds = time.seconds
             Task { @MainActor in
                 guard let self, self.current == id else { return }

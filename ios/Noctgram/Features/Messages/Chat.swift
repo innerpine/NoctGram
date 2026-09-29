@@ -22,15 +22,21 @@ final class ChatStore: ObservableObject {
     private var pending: [ChatMessage] = []
     /// Recordings this device already reported as listened.
     private var listened: Set<String> = []
+    /// A found message the dialogue opens on: the server adds the messages
+    /// around it to the newest ones (lib/chat-messages.ts).
+    let focus: String?
 
-    init(peer: Person) {
+    init(peer: Person, focus: String? = nil) {
         self.peer = peer
+        self.focus = focus
     }
 
     /// Opening the dialogue marks incoming messages read on the server.
     func load(api: APIClient) async {
         do {
-            let data = try await api.social("messages", ["peer": peer.id, "includeTheme": "1"])
+            var query: [String: String?] = ["peer": peer.id, "includeTheme": "1"]
+            if let focus { query["focus"] = focus }
+            let data = try await api.social("messages", query)
             // With includeTheme the server wraps the list: {messages, theme}.
             let list = data["messages"].isNull ? data : data["messages"]
             var server = list.array.map { ChatMessage($0) }
@@ -97,15 +103,18 @@ final class ChatStore: ObservableObject {
         }
     }
 
-    func send(_ text: String, reply: ChatMessage?, session: AppSession) async {
+    /// `quote` is a fragment of the answered message (lib/reply-quote.ts).
+    func send(_ text: String, reply: ChatMessage?, quote: String? = nil, session: AppSession) async {
         guard let me = session.myId else { return }
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let files = attachments
         guard !value.isEmpty || !files.isEmpty else { return }
         let key = UUID().uuidString.lowercased()
-        let local = ChatMessage(localId: "message:\(me):\(key)", sender: me, recipient: peer.id, text: value, attachments: files, reply: preview(reply, me: me))
+        var answered = preview(reply, me: me)
+        if let quote, reply != nil { answered?.quote = quote }
+        let local = ChatMessage(localId: "message:\(me):\(key)", sender: me, recipient: peer.id, text: value, attachments: files, reply: answered)
         attachments = []
-        await deliver(local, body: [:], key: key, reply: reply, session: session)
+        await deliver(local, body: quote != nil && reply != nil ? ["quote": quote ?? ""] : [:], key: key, reply: reply, session: session)
     }
 
     /// A sticker goes alone, without text or files (lib/sticker-send.ts).
@@ -286,6 +295,9 @@ struct ChatView: View {
     @State private var reporting: ChatMessage?
     @State private var deleting: ChatMessage?
     @State private var forwarding: ChatMessage?
+    @State private var quoting: ChatMessage?
+    /// The fragment of the answered message the reply quotes.
+    @State private var quote = ""
     @State private var openPack: StickerPanel.PackRequest?
     @State private var atEnd = true
     @State private var window = ChatWindow()
@@ -294,9 +306,18 @@ struct ChatView: View {
     @EnvironmentObject private var focus: MessageFocus
     @FocusState private var focused: Bool
 
-    init(peer: Person) {
+    /// A found message to open the dialogue on.
+    let target: String?
+    @State private var focusDone = false
+    @State private var glow: String?
+    @State private var searchingChat = false
+    /// A found message of this chat to scroll to.
+    @State private var jumpTo: String?
+
+    init(peer: Person, focus: String? = nil) {
         self.peer = peer
-        _store = StateObject(wrappedValue: ChatStore(peer: peer))
+        target = focus
+        _store = StateObject(wrappedValue: ChatStore(peer: peer, focus: focus))
     }
 
     private var isSaved: Bool { peer.id == session.myId }
@@ -319,18 +340,47 @@ struct ChatView: View {
             .modifier(ChatEndTracker(atEnd: $atEnd))
             .modifier(ChatFollowsEnd(proxy: proxy, last: store.messages.last?.id, atEnd: atEnd, bar: (replyTo ?? editing)?.id, messages: store.messages))
             .background(ChatBackdrop(palette: store.palette))
-            .simultaneousGesture(TapGesture().onEnded { if panel { withAnimation(Noct.quick) { panel = false } } })
+            // A tap in the chat puts the panel away; only while it is open,
+            // so the list's own gestures are untouched otherwise.
+            .simultaneousGesture(TapGesture().onEnded { withAnimation(Noct.quick) { panel = false } }, including: panel ? .all : .subviews)
             .onChange(of: store.messages.last?.id) { id in
-                guard let id else { return }
+                guard let id, target == nil || focusDone else { return }
                 withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .bottom) }
             }
             .onChange(of: store.loaded) { _ in
                 window.hidden = window.start(store.messages.count)
-                if let id = store.messages.last?.id { proxy.scrollTo(id, anchor: .bottom) }
+                if let target, let index = store.messages.firstIndex(where: { $0.id == target }) {
+                    // Draw from a few messages before the found one and
+                    // stay on it, lit for a moment.
+                    window.hidden = min(window.hidden ?? 0, max(0, index - 5))
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        proxy.scrollTo(target, anchor: .center)
+                        withAnimation(.easeOut(duration: 0.3)) { glow = target }
+                        focusDone = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                            withAnimation(.easeOut(duration: 0.6)) { glow = nil }
+                        }
+                    }
+                } else {
+                    focusDone = true
+                    if let id = store.messages.last?.id { proxy.scrollTo(id, anchor: .bottom) }
+                }
             }
             .onChange(of: panel) { _ in
                 if atEnd, let id = store.messages.last?.id {
                     DispatchQueue.main.async { withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .bottom) } }
+                }
+            }
+            .onChange(of: jumpTo) { id in
+                guard let id, let index = store.messages.firstIndex(where: { $0.id == id }) else { return }
+                window.hidden = min(window.start(store.messages.count), max(0, index - 5))
+                DispatchQueue.main.async {
+                    withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .center) }
+                    withAnimation(.easeOut(duration: 0.3)) { glow = id }
+                    jumpTo = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                        withAnimation(.easeOut(duration: 0.6)) { if glow == id { glow = nil } }
+                    }
                 }
             }
         }
@@ -370,25 +420,34 @@ struct ChatView: View {
                 .buttonStyle(PressableStyle())
             }
             ToolbarItem(placement: .navigationBarTrailing) {
-                if isSaved {
-                    SavedAvatar(size: 36)
-                } else {
-                    Menu {
+                Menu {
+                    if !isSaved {
                         Button {
                             nav.push(.profile(peer.id))
                         } label: {
                             Label("Профиль", systemImage: "person")
                         }
+                    }
+                    Button {
+                        searchingChat = true
+                    } label: {
+                        Label("Поиск", systemImage: "magnifyingglass")
+                    }
+                    if !isSaved {
                         Button(role: store.blockedByMe ? nil : .destructive) {
                             Task { await store.setBlocked(!store.blockedByMe, session: session) }
                         } label: {
                             Label(store.blockedByMe ? "Разблокировать" : "Заблокировать", systemImage: "hand.raised")
                         }
-                    } label: {
+                    }
+                } label: {
+                    if isSaved {
+                        SavedAvatar(size: 36)
+                    } else {
                         AvatarView(person: title, size: 36, ring: false)
                     }
-                    .accessibilityLabel("Меню чата")
                 }
+                .accessibilityLabel("Меню чата")
             }
         }
         .sheet(item: $forwarding) { message in
@@ -398,6 +457,22 @@ struct ChatView: View {
         .sheet(item: $openPack) { request in
             StickerPackSheet(name: request.name, send: canWrite ? stickerSender : nil)
                 .environmentObject(session)
+        }
+        .sheet(isPresented: $searchingChat) {
+            ChatSearchSheet(scope: ["peer": peer.id]) { id in
+                if store.messages.contains(where: { $0.id == id }) {
+                    jumpTo = id
+                } else {
+                    nav.push(.chatMessage(peer, id))
+                }
+            }
+            .environmentObject(session)
+        }
+        .sheet(item: $quoting) { message in
+            QuoteSheet(name: senderName(message), text: message.text) { fragment in
+                reply(to: message)
+                quote = fragment
+            }
         }
         .confirmationDialog("Пожаловаться на сообщение", isPresented: Binding(get: { reporting != nil }, set: { if !$0 { reporting = nil } }), titleVisibility: .visible) {
             ForEach(ReportReason.all, id: \.self) { reason in
@@ -532,6 +607,14 @@ struct ChatView: View {
             }
             bubble(message, joins: joins)
                 .padding(.top, joins ? 2 : 8)
+                .background {
+                    if glow == message.id {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(store.palette.accent.opacity(0.16))
+                            .padding(.horizontal, -8)
+                            .allowsHitTesting(false)
+                    }
+                }
                 .id(message.id)
                 .modifier(ChatEndRow(isLast: message.id == store.messages.last?.id, atEnd: $atEnd))
         }
@@ -590,6 +673,7 @@ struct ChatView: View {
     private func reply(to message: ChatMessage) {
         replyTo = message
         editing = nil
+        quote = ""
         if !panel { focused = true }
     }
 
@@ -630,6 +714,9 @@ struct ChatView: View {
         var list: [MessageAction] = []
         if canWrite {
             list.append(MessageAction(title: "Ответить", icon: "arrowshape.turn.up.left") { reply(to: message) })
+            if !message.text.isEmpty && message.gift == nil {
+                list.append(MessageAction(title: "Цитировать", icon: "text.quote") { quoting = message })
+            }
         }
         if !message.text.isEmpty {
             list.append(MessageAction(title: "Скопировать", icon: "doc.on.doc") { session.copy(message.text) })
@@ -683,11 +770,12 @@ struct ChatView: View {
                 if let context = replyTo ?? editing {
                     ComposerContext(
                         title: editing != nil ? "Редактирование" : (context.sender == session.myId ? "Ответ себе" : "Ответ \(title.name)"),
-                        text: PremiumEmoji.replace(context.summary)
+                        text: PremiumEmoji.replace(quote.isEmpty || editing != nil ? context.summary : "«\(quote)»")
                     ) {
                         if editing != nil { text = "" }
                         replyTo = nil
                         editing = nil
+                        quote = ""
                     }
                 }
                 if !store.attachments.isEmpty || store.uploading > 0 {
@@ -712,9 +800,11 @@ struct ChatView: View {
                         Task { await store.edit(message, text: value, session: session) }
                     } else {
                         let reply = replyTo
+                        let fragment = quote.isEmpty ? nil : quote
                         replyTo = nil
+                        quote = ""
                         text = ""
-                        Task { await store.send(value, reply: reply, session: session) }
+                        Task { await store.send(value, reply: reply, quote: fragment, session: session) }
                     }
                 }
                 if panel {

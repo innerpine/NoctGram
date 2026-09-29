@@ -34,6 +34,73 @@ struct RoomSummary: Identifiable, Hashable {
     }
 }
 
+/// A chat folder made on the site (lib/chat-folders-filter.ts): chosen chat
+/// types or chats, minus excluded ones, and optionally without read or
+/// archived chats. The app shows them as tabs over the list.
+struct ChatFolder: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let emoji: String
+    let includePersonal: Bool
+    let includeGroups: Bool
+    let includeSecret: Bool
+    let excludeRead: Bool
+    let excludeArchived: Bool
+    let includePeers: [String]
+    let excludePeers: [String]
+
+    init(_ j: JSON) {
+        id = j["id"].str
+        title = j["title"].str
+        emoji = j["emoji"].str
+        includePersonal = j["includePersonal"].bool
+        includeGroups = j["includeGroups"].bool
+        includeSecret = j["includeSecret"].bool
+        excludeRead = j["excludeRead"].bool
+        excludeArchived = j["excludeArchived"].bool
+        includePeers = j["includePeers"].array.compactMap(\.string)
+        excludePeers = j["excludePeers"].array.compactMap(\.string)
+    }
+
+    func includes(_ item: ThreadItem) -> Bool {
+        if excludePeers.contains(item.folderKey) { return false }
+        let typed: Bool
+        switch item {
+        case .direct: typed = includePersonal
+        case .room(let room): typed = room.isSecret ? includeSecret : includeGroups
+        }
+        if !typed && !includePeers.contains(item.folderKey) { return false }
+        if excludeRead && item.unread == 0 { return false }
+        if excludeArchived && item.archived { return false }
+        return true
+    }
+}
+
+/// A message found by /api/chat-search (lib/message-search.ts).
+struct MessageHit: Identifiable, Hashable {
+    let kind: String
+    let id: String
+    let chatId: String
+    let chatName: String
+    let chatAvatar: String
+    let senderName: String
+    let text: String
+    let created: Double
+
+    init(_ j: JSON) {
+        kind = j["kind"].str
+        id = j["id"].str
+        chatId = j["chatId"].str
+        chatName = j["chatName"].str
+        chatAvatar = j["chatAvatar"].str
+        senderName = j["senderName"].str
+        text = j["text"].str
+        created = j["created"].double ?? 0
+    }
+
+    var isRoom: Bool { kind == "room" }
+}
+
 /// One row of the merged list: a direct dialogue or a group.
 enum ThreadItem: Identifiable, Hashable {
     case direct(Person)
@@ -58,6 +125,28 @@ enum ThreadItem: Identifiable, Hashable {
         if case .room(let room) = self { return !room.isSecret }
         return false
     }
+
+    /// «person:<id>» or «room:<id>», as folders name chats.
+    var folderKey: String {
+        switch self {
+        case .direct(let person): return "person:" + person.id
+        case .room(let room): return "room:" + room.id
+        }
+    }
+
+    var unread: Int {
+        switch self {
+        case .direct(let person): return person.unread
+        case .room(let room): return room.unread
+        }
+    }
+
+    var archived: Bool {
+        switch self {
+        case .direct(let person): return person.archivedAt > 0
+        case .room(let room): return room.archivedAt > 0
+        }
+    }
 }
 
 @MainActor
@@ -66,22 +155,35 @@ final class ThreadsStore: ObservableObject {
     @Published var loading = false
     @Published var loaded = false
     @Published var error: String?
+    @Published var folders: [ChatFolder] = []
 
-    func load(api: APIClient, archived: Bool) async {
+    /// A folder takes chats from the archive too, unless it leaves them out.
+    func load(api: APIClient, archived: Bool, folder: ChatFolder? = nil) async {
         loading = true
         defer { loading = false }
         do {
-            let threads = try await api.social("threads", ["archived": archived ? "1" : "0"])
-            var merged = threads.array.map { ThreadItem.direct(Person($0)) }
-            if let rooms = try? await api.get("/api/rooms", ["action": "list", "archived": archived ? "1" : "0"]) {
-                merged += rooms["rooms"].array.map { ThreadItem.room(RoomSummary($0)) }
+            let states = folder != nil && !archived ? ["0", "1"] : [archived ? "1" : "0"]
+            var merged: [ThreadItem] = []
+            for state in states {
+                let threads = try await api.social("threads", ["archived": state])
+                merged += threads.array.map { ThreadItem.direct(Person($0)) }
+                if let rooms = try? await api.get("/api/rooms", ["action": "list", "archived": state]) {
+                    merged += rooms["rooms"].array.map { ThreadItem.room(RoomSummary($0)) }
+                }
             }
+            if let folder { merged = merged.filter(folder.includes) }
             items = merged.sorted { $0.time > $1.time }
             error = nil
         } catch {
             if let message = error.userMessage { self.error = message }
         }
         loaded = true
+    }
+
+    func loadFolders(api: APIClient) async {
+        guard let data = try? await api.get("/api/chat-folders") else { return }
+        let list = data["folders"].array.map { ChatFolder($0) }
+        if list != folders { folders = list }
     }
 
     /// Takes a row out at once; the next load brings it back if the server
@@ -114,33 +216,30 @@ struct ThreadsView: View {
     @EnvironmentObject private var nav: Navigator
     @StateObject private var store = ThreadsStore()
     @State private var archived = "chats"
+    /// The folder tab; empty for all chats.
+    @State private var folder = ""
+    @State private var query = ""
+    @State private var hits: [MessageHit] = []
+    @State private var searching = false
     @State private var showNew = false
     /// The row slid open to its actions.
     @State private var openRow: String?
     @State private var deleting: ThreadItem?
 
+    private var term: String { query.trimmingCharacters(in: .whitespaces) }
+
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 0) {
-                NoctSegments(options: [SegmentOption("chats", "Чаты"), SegmentOption("archive", "Архив")], selection: $archived)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                ForEach(store.items) { item in
-                    row(item)
-                }
-                if store.loading && store.items.isEmpty {
-                    LoadingRow()
-                } else if store.loaded && store.items.isEmpty {
-                    if let error = store.error {
-                        ErrorBanner(text: error) { Task { await reload() } }
-                    } else {
-                        EmptyState(icon: "bubble.left.and.bubble.right", text: archived == "chats" ? "Сообщений пока нет. Напиши кому-нибудь первым." : "Архив пуст.")
-                    }
-                }
+            if term.isEmpty {
+                list
+            } else {
+                results
             }
         }
         .background(Noct.background)
         .refreshable { await reload() }
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Поиск по чатам и сообщениям")
+        .task(id: term) { await search() }
         .navigationTitle("Сообщения")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -173,6 +272,10 @@ struct ThreadsView: View {
             openRow = nil
             Task { await reload() }
         }
+        .onChange(of: folder) { _ in
+            openRow = nil
+            Task { await reload() }
+        }
         .confirmationDialog(deleteTitle, isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
             if let item = deleting {
                 switch item {
@@ -193,14 +296,153 @@ struct ThreadsView: View {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 10_000_000_000)
                 guard !Task.isCancelled else { return }
-                await store.load(api: session.api, archived: archived == "archive")
+                await store.load(api: session.api, archived: archived == "archive", folder: currentFolder)
             }
         }
     }
 
+    private var list: some View {
+        LazyVStack(spacing: 0) {
+            NoctSegments(options: [SegmentOption("chats", "Чаты"), SegmentOption("archive", "Архив")], selection: $archived)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+            if archived == "chats" && !store.folders.isEmpty {
+                folderTabs
+            }
+            ForEach(store.items) { item in
+                row(item)
+            }
+            if store.loading && store.items.isEmpty {
+                LoadingRow()
+            } else if store.loaded && store.items.isEmpty {
+                if let error = store.error {
+                    ErrorBanner(text: error) { Task { await reload() } }
+                } else {
+                    EmptyState(icon: "bubble.left.and.bubble.right", text: archived == "chats" ? "Сообщений пока нет. Напиши кому-нибудь первым." : "Архив пуст.")
+                }
+            }
+        }
+    }
+
+    /// Search as in Telegram: chats by name, then messages in every chat
+    /// (/api/chat-search, scope=all); a found message opens its chat on it.
+    private var results: some View {
+        let lower = term.lowercased()
+        let chats = store.items.filter { item in
+            switch item {
+            case .direct(let person):
+                return person.name.lowercased().contains(lower) || person.handle.lowercased().contains(lower)
+                    || (person.id == session.myId && "избранное".contains(lower))
+            case .room(let room):
+                return room.name.lowercased().contains(lower)
+            }
+        }
+        return LazyVStack(alignment: .leading, spacing: 0) {
+            if !chats.isEmpty {
+                sectionTitle("Чаты")
+                ForEach(chats) { item in
+                    rowContent(item)
+                }
+            }
+            sectionTitle("Сообщения")
+            ForEach(hits) { hit in
+                Button {
+                    open(hit)
+                } label: {
+                    hitRow(hit)
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityIdentifier("hit-" + hit.id)
+            }
+            if hits.isEmpty {
+                Text(searching ? "Ищем…" : "Сообщений не нашлось")
+                    .font(.system(size: 14))
+                    .foregroundColor(Noct.text48)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+            }
+        }
+    }
+
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundColor(Noct.text48)
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
+    }
+
+    private func hitRow(_ hit: MessageHit) -> some View {
+        let saved = !hit.isRoom && hit.chatId == session.myId
+        return ThreadRow(
+            identity: Identity(id: hit.chatId, name: saved ? "Избранное" : hit.chatName, avatar: hit.chatAvatar, handle: ""),
+            title: saved ? "Избранное" : hit.chatName,
+            text: (hit.isRoom && !hit.senderName.isEmpty ? hit.senderName + ": " : "") + PremiumEmoji.replace(hit.text),
+            time: hit.created,
+            unread: 0,
+            online: false,
+            saved: saved
+        )
+    }
+
+    private func open(_ hit: MessageHit) {
+        if hit.isRoom {
+            nav.push(.roomMessage(id: hit.chatId, title: hit.chatName, message: hit.id))
+        } else {
+            nav.push(.chatMessage(Person(identity: Identity(id: hit.chatId, name: hit.chatName, avatar: hit.chatAvatar, handle: "")), hit.id))
+        }
+    }
+
+    private func search() async {
+        guard !term.isEmpty else {
+            hits = []
+            return
+        }
+        searching = true
+        defer { searching = false }
+        try? await Task.sleep(nanoseconds: 350_000_000)
+        guard !Task.isCancelled else { return }
+        let data = try? await session.api.get("/api/chat-search", ["scope": "all", "q": term])
+        guard !Task.isCancelled else { return }
+        hits = data?["items"].array.map { MessageHit($0) } ?? []
+    }
+
+    private var currentFolder: ChatFolder? {
+        archived == "chats" ? store.folders.first { $0.id == folder } : nil
+    }
+
     private func reload() async {
-        await store.load(api: session.api, archived: archived == "archive")
+        await store.load(api: session.api, archived: archived == "archive", folder: currentFolder)
         await session.refreshCounters()
+        await store.loadFolders(api: session.api)
+        if !folder.isEmpty && !store.folders.contains(where: { $0.id == folder }) { folder = "" }
+    }
+
+    /// Folders from the site as tabs, as in Telegram: «Все» and each folder.
+    private var folderTabs: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                folderChip("", "Все")
+                ForEach(store.folders) { item in
+                    folderChip(item.id, (item.emoji.isEmpty ? "" : item.emoji + " ") + item.title)
+                }
+            }
+            .padding(.horizontal, 12)
+        }
+        .padding(.bottom, 6)
+    }
+
+    private func folderChip(_ id: String, _ title: String) -> some View {
+        Button {
+            guard folder != id else { return }
+            Haptics.tap()
+            folder = id
+        } label: {
+            Text(title).lineLimit(1)
+        }
+        .buttonStyle(ChipButtonStyle(selected: folder == id))
+        .accessibilityIdentifier("folder-" + (id.isEmpty ? "all" : id))
     }
 
     private func row(_ item: ThreadItem) -> some View {

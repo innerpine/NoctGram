@@ -49,9 +49,12 @@ final class RoomStore: ObservableObject {
     @Published var uploading = 0
     private var pending: [ChatMessage] = []
     private var lastRead = ""
+    /// A found message the group opens on (action=room&around=).
+    let around: String?
 
-    init(roomId: String) {
+    init(roomId: String, around: String? = nil) {
         self.roomId = roomId
+        self.around = around
     }
 
     var isSecret: Bool { kind == "secret" }
@@ -60,6 +63,7 @@ final class RoomStore: ObservableObject {
         do {
             var query: [String: String?] = ["action": "room", "id": roomId]
             if let topic { query["topic"] = topic }
+            if let around { query["around"] = around }
             let data = try await api.get("/api/rooms", query)
             name = data["name"].str
             kind = data["kind"].string ?? "group"
@@ -138,14 +142,15 @@ final class RoomStore: ObservableObject {
         }
     }
 
-    func send(_ text: String, reply: ChatMessage?, session: AppSession) async {
+    func send(_ text: String, reply: ChatMessage?, quote: String? = nil, session: AppSession) async {
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let files = attachments
         guard !value.isEmpty || !files.isEmpty else { return }
         let key = UUID().uuidString.lowercased()
-        guard let message = local(key, text: value, attachments: files, reply: reply, sticker: "", session: session) else { return }
+        guard var message = local(key, text: value, attachments: files, reply: reply, sticker: "", session: session) else { return }
+        if let quote, reply != nil { message.reply?.quote = quote }
         attachments = []
-        await deliver(message, extra: [:], reply: reply, session: session)
+        await deliver(message, extra: quote != nil && reply != nil ? ["quote": quote ?? ""] : [:], reply: reply, session: session)
     }
 
     func sendSticker(_ sticker: Sticker, reply: ChatMessage?, session: AppSession) async {
@@ -268,6 +273,8 @@ struct RoomChatView: View {
     @State private var window = ChatWindow()
     @State private var picked: [PhotosPickerItem] = []
     @State private var forwarding: ChatMessage?
+    @State private var quoting: ChatMessage?
+    @State private var quote = ""
     @State private var openPack: StickerPanel.PackRequest?
     @State private var panel = false
     @State private var keyboard: CGFloat = 0
@@ -275,10 +282,18 @@ struct RoomChatView: View {
     @EnvironmentObject private var focus: MessageFocus
     @FocusState private var focused: Bool
 
-    init(roomId: String, title: String) {
+    /// A found message to open the group on.
+    let target: String?
+    @State private var focusDone = false
+    @State private var glow: String?
+    @State private var searchingChat = false
+    @State private var jumpTo: String?
+
+    init(roomId: String, title: String, focus: String? = nil) {
         self.roomId = roomId
         self.title = title
-        _store = StateObject(wrappedValue: RoomStore(roomId: roomId))
+        target = focus
+        _store = StateObject(wrappedValue: RoomStore(roomId: roomId, around: focus))
     }
 
     var body: some View {
@@ -306,6 +321,14 @@ struct RoomChatView: View {
                             let joinsNext = index + 1 < store.messages.count && Self.joins(message, store.messages[index + 1])
                             roomBubble(message, joinsPrevious: joinsPrevious, joinsNext: joinsNext)
                                 .padding(.top, joinsPrevious ? 2 : 8)
+                                .background {
+                                    if glow == message.id {
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .fill(Noct.lilac.opacity(0.16))
+                                            .padding(.horizontal, -10)
+                                            .allowsHitTesting(false)
+                                    }
+                                }
                                 .id(message.id)
                                 .modifier(ChatEndRow(isLast: message.id == store.messages.last?.id, atEnd: $atEnd))
                         }
@@ -318,13 +341,40 @@ struct RoomChatView: View {
             .modifier(ChatEndTracker(atEnd: $atEnd))
             .modifier(ChatFollowsEnd(proxy: proxy, last: store.messages.last?.id, atEnd: atEnd, bar: replyTo?.id, messages: store.messages))
             .background(ChatBackdrop(palette: .noct))
-            .simultaneousGesture(TapGesture().onEnded { if panel { withAnimation(Noct.quick) { panel = false } } })
+            // A tap in the chat puts the panel away; only while it is open,
+            // so the list's own gestures are untouched otherwise.
+            .simultaneousGesture(TapGesture().onEnded { withAnimation(Noct.quick) { panel = false } }, including: panel ? .all : .subviews)
             .onChange(of: store.messages.last?.id) { id in
-                guard let id else { return }
+                guard let id, target == nil || focusDone else { return }
                 withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .bottom) }
+            }
+            .onChange(of: jumpTo) { id in
+                guard let id, let index = store.messages.firstIndex(where: { $0.id == id }) else { return }
+                window.hidden = min(window.start(store.messages.count), max(0, index - 5))
+                DispatchQueue.main.async {
+                    withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .center) }
+                    withAnimation(.easeOut(duration: 0.3)) { glow = id }
+                    jumpTo = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                        withAnimation(.easeOut(duration: 0.6)) { if glow == id { glow = nil } }
+                    }
+                }
             }
             .onChange(of: store.loaded) { _ in
                 window.hidden = window.start(store.messages.count)
+                guard let target, let index = store.messages.firstIndex(where: { $0.id == target }) else {
+                    focusDone = true
+                    return
+                }
+                window.hidden = min(window.hidden ?? 0, max(0, index - 5))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    proxy.scrollTo(target, anchor: .center)
+                    withAnimation(.easeOut(duration: 0.3)) { glow = target }
+                    focusDone = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                        withAnimation(.easeOut(duration: 0.6)) { glow = nil }
+                    }
+                }
             }
         }
         .overlay {
@@ -351,6 +401,16 @@ struct RoomChatView: View {
                             .font(.system(size: 11))
                             .foregroundColor(Noct.text48)
                     }
+                }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if !store.isSecret {
+                    Button {
+                        searchingChat = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                    }
+                    .accessibilityLabel("Поиск в группе")
                 }
             }
             if store.forum && !store.topics.isEmpty {
@@ -385,6 +445,22 @@ struct RoomChatView: View {
         .sheet(item: $openPack) { request in
             StickerPackSheet(name: request.name, send: canWrite ? stickerSender : nil)
                 .environmentObject(session)
+        }
+        .sheet(isPresented: $searchingChat) {
+            ChatSearchSheet(scope: store.topic.map { ["room": roomId, "topic": $0] } ?? ["room": roomId]) { id in
+                if store.messages.contains(where: { $0.id == id }) {
+                    jumpTo = id
+                } else {
+                    nav.push(.roomMessage(id: roomId, title: store.name, message: id))
+                }
+            }
+            .environmentObject(session)
+        }
+        .sheet(item: $quoting) { message in
+            QuoteSheet(name: message.senderName, text: message.text) { fragment in
+                replyAction(message)()
+                quote = fragment
+            }
         }
         .onChange(of: picked) { items in
             guard !items.isEmpty else { return }
@@ -470,6 +546,7 @@ struct RoomChatView: View {
     private func replyAction(_ message: ChatMessage) -> () -> Void {
         {
             replyTo = message
+            quote = ""
             if !panel { focused = true }
         }
     }
@@ -552,6 +629,9 @@ struct RoomChatView: View {
         var actions: [MessageAction] = []
         if canWrite {
             actions.append(MessageAction(title: "Ответить", icon: "arrowshape.turn.up.left", run: replyAction(message)))
+            if !message.text.isEmpty && !message.deleted {
+                actions.append(MessageAction(title: "Цитировать", icon: "text.quote") { quoting = message })
+            }
         }
         if !message.text.isEmpty {
             actions.append(MessageAction(title: "Скопировать", icon: "doc.on.doc") { session.copy(message.text) })
@@ -587,8 +667,9 @@ struct RoomChatView: View {
         if canWrite {
             VStack(spacing: 0) {
                 if let reply = replyTo {
-                    ComposerContext(title: "Ответ \(reply.senderName)", text: PremiumEmoji.replace(reply.summary)) {
+                    ComposerContext(title: "Ответ \(reply.senderName)", text: PremiumEmoji.replace(quote.isEmpty ? reply.summary : "«\(quote)»")) {
                         replyTo = nil
+                        quote = ""
                     }
                 }
                 if !store.attachments.isEmpty || store.uploading > 0 {
@@ -643,9 +724,11 @@ struct RoomChatView: View {
                 ) {
                     let value = text
                     let reply = replyTo
+                    let fragment = quote.isEmpty ? nil : quote
                     text = ""
                     replyTo = nil
-                    Task { await store.send(value, reply: reply, session: session) }
+                    quote = ""
+                    Task { await store.send(value, reply: reply, quote: fragment, session: session) }
                 }
                 if panel {
                     StickerPanel(text: $text, height: panelHeight) { sticker in send(sticker) }

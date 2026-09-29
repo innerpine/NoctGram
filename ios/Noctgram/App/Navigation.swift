@@ -22,6 +22,9 @@ enum Route: Hashable {
     case post(String)
     case chat(Person)
     case room(id: String, title: String)
+    /// A found message: the chat opens on it (message search).
+    case chatMessage(Person, String)
+    case roomMessage(id: String, title: String, message: String)
     case connections(profileId: String, kind: ConnectionKind)
     case saved
     case tag(String)
@@ -142,6 +145,10 @@ struct RouteView: View {
             ChatView(peer: person)
         case .room(let id, let title):
             RoomChatView(roomId: id, title: title)
+        case .chatMessage(let person, let message):
+            ChatView(peer: person, focus: message)
+        case .roomMessage(let id, let title, let message):
+            RoomChatView(roomId: id, title: title, focus: message)
         case .connections(let profileId, let kind):
             ConnectionsView(profileId: profileId, kind: kind)
         case .saved:

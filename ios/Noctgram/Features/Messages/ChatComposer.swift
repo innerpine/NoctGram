@@ -117,7 +117,13 @@ final class MessageRecorder: ObservableObject {
             if kind == .voice {
                 try voice.start()
             } else {
-                try round.prepare()
+                try await round.prepare()
+                // The finger may have let go while the camera turned on.
+                guard !released else {
+                    round.cancel()
+                    phase = .idle
+                    return
+                }
                 round.start()
                 watchLimit()
             }

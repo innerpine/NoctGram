@@ -143,6 +143,43 @@ final class ChatMediaTests: XCTestCase {
         }
     }
 
+    /// Search over every chat finds a message and opens its chat on it.
+    func testSearchOpensTheFoundMessage() {
+        let app = launch("screen:none")
+        let field = app.searchFields.firstMatch
+        expect(field.waitForExistence(timeout: 30), "No search field over the chats", in: app, shot: "56-search")
+        field.tap()
+        field.typeText("гулять")
+        let hit = element("hit-message:local_alice:media-6", in: app)
+        expect(hit.waitForExistence(timeout: 15), "The message is not found", in: app, shot: "56-search")
+        save("56-search")
+        hit.tap()
+        let bubble = element("message-message:local_alice:media-6", in: app)
+        expect(bubble.waitForExistence(timeout: 20), "The found message does not open", in: app, shot: "57-search-open")
+        expect(poll(5) { bubble.isHittable }, "The chat does not show the found message", in: app, shot: "57-search-open")
+    }
+
+    /// «Цитировать» takes a fragment into the reply.
+    func testQuoteAnswersAFragment() {
+        let app = launch()
+        let bubble = element("message-message:local_alice:media-6", in: app)
+        expect(bubble.waitForExistence(timeout: 30), "No text message", in: app, shot: "58-quote")
+        bubble.press(forDuration: 0.8)
+        let quote = app.buttons["Цитировать"]
+        expect(quote.waitForExistence(timeout: 5), "No «Цитировать» in the menu", in: app, shot: "58-quote")
+        quote.tap()
+        let text = element("quote-text", in: app)
+        expect(text.waitForExistence(timeout: 10), "The quote sheet does not open", in: app, shot: "58-quote")
+        // A double tap selects a word.
+        text.doubleTap()
+        let confirm = app.buttons["quote-confirm"]
+        expect(poll(5) { confirm.isEnabled }, "Selecting a word does not allow quoting", in: app, shot: "58-quote")
+        confirm.tap()
+        let context = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "«")).firstMatch
+        expect(context.waitForExistence(timeout: 5), "The quote is not over the field", in: app, shot: "58-quote")
+        save("58-quote")
+    }
+
     func testForwardToSaved() {
         let app = launch()
         let bubble = element("message-message:local_carol:media-5", in: app)
