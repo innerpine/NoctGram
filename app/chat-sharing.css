@@ -211,3 +211,21 @@ button.shared-post:focus-visible {
     width: 100%;
   }
 }
+/* Forum groups: the topic a forwarded message goes to. */
+.chat-forward-topic {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #b9b1c4;
+}
+.chat-forward-topic select {
+  padding: 8px 10px;
+  border: 1px solid #ffffff1a;
+  border-radius: 10px;
+  color: #fff;
+  background: #ffffff0a;
+  font-size: 14px;
+}
+.chat-forward-topic small {
+  color: #f0a3a8;
+}

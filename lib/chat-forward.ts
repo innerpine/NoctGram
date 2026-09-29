@@ -24,7 +24,8 @@ export type ForwardSource =
   | { post: { postId: string } };
 export type ForwardTarget =
   | { dm: { peer: string } }
-  | { room: { roomId: string } };
+  // A forum topic id; without one a forum group receives into «Общее».
+  | { room: { roomId: string; topicId?: string } };
 export type ForwardResult =
   | { target: ForwardTarget; ok: true; ids: string[] }
   | { target: ForwardTarget; ok: false; error: string };
@@ -103,9 +104,20 @@ export function parseForwardTargets(input: unknown): ForwardTarget[] {
     const dm = object(target?.dm),
       room = object(target?.room);
     if (!dm === !room) throw new ApiError(400, 'Выберите чат для пересылки');
+    const topic =
+      room?.topicId === undefined ||
+      room.topicId === '' ||
+      room.topicId === 'general'
+        ? ''
+        : value(room.topicId, 100);
     const parsed: ForwardTarget = dm
       ? { dm: { peer: value(dm.peer, 100) } }
-      : { room: { roomId: value(room!.roomId, 100) } };
+      : {
+          room: {
+            roomId: value(room!.roomId, 100),
+            ...(topic ? { topicId: topic } : {}),
+          },
+        };
     const key =
       'dm' in parsed ? 'dm:' + parsed.dm.peer : 'room:' + parsed.room.roomId;
     if (seen.has(key)) throw new ApiError(400, 'Чат выбран дважды');
@@ -243,28 +255,36 @@ function directStatements(
       .bind(idList),
   ];
 }
+// A forum topic must exist and be open, unless the sender created it or
+// runs the group, as for ordinary messages.
 function roomStatement(
   me: string,
-  roomId: string,
+  target: { roomId: string; topicId?: string },
   rows: Row[],
   gate: Gate,
   now: number,
 ) {
+  const topic = target.topicId ?? '';
   return db()
-    .prepare(`INSERT INTO chat_room_messages(id,text,searchText,media,roomId,sender,ciphertext,replyTo,created,forwardedName,forwardedFrom,postShareId,stickerId)
+    .prepare(`INSERT INTO chat_room_messages(id,text,searchText,media,roomId,sender,ciphertext,replyTo,created,forwardedName,forwardedFrom,postShareId,stickerId,topicId)
     SELECT ${copyColumns},r.id,s.id,NULL,NULL,
       MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0))+CAST(j.key AS INTEGER),
-      ${column('forwardedName')},${column('forwardedFrom')},${column('postShareId')},${column('stickerId')}
+      ${column('forwardedName')},${column('forwardedFrom')},${column('postShareId')},${column('stickerId')},?
     FROM json_each(?) j,chat_rooms r,users s
     WHERE r.id=? AND s.id=? AND r.kind='group' AND ${canSend('r', 's.id')}
+    AND (?='' OR (r.forum=1 AND EXISTS(SELECT 1 FROM chat_room_topics t WHERE t.id=? AND t.roomId=r.id AND t.deletedAt=0
+      AND (t.closedAt=0 OR t.createdBy=s.id OR EXISTS(SELECT 1 FROM chat_room_members tm WHERE tm.roomId=r.id AND tm.userId=s.id AND tm.status='active' AND tm.role IN ('owner','admin'))))))
     AND ${noModeratedMedia} ${gate.sql}
     AND NOT EXISTS(SELECT 1 FROM chat_room_messages WHERE id IN (SELECT value FROM json_each(?)))
     ON CONFLICT(id) DO NOTHING`)
     .bind(
       now,
+      topic,
       JSON.stringify(rows),
-      roomId,
+      target.roomId,
       me,
+      topic,
+      topic,
       ...gate.bindings,
       JSON.stringify(rows.map((row) => row.id)),
     );
@@ -354,7 +374,7 @@ export async function forwardToChats(
       const [inserted] = await db().batch(
         'dm' in target
           ? directStatements(me, target.dm.peer, rows, gate, now)
-          : [roomStatement(me, target.room.roomId, rows, gate, now)],
+          : [roomStatement(me, target.room, rows, gate, now)],
       );
       if (
         inserted.meta.changes === rows.length ||

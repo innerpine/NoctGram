@@ -9,7 +9,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { Message, Person } from '@/lib/client';
-import type { RoomSummary } from '@/lib/rooms-types';
+import type { RoomDetail, RoomSummary } from '@/lib/rooms-types';
+import { GENERAL_TOPIC, type RoomTopic } from '@/lib/room-topic-shared';
+import { roomRequest } from '@/lib/rooms-client';
 import { chatRequest } from '@/lib/chat-client';
 import { messageSummary } from '@/lib/chat-message-display';
 import {
@@ -104,7 +106,11 @@ export function ChatForwardDialog({
     } | null>(null),
     [chosen, setChosen] = useState<ForwardChoice[]>([]),
     [comment, setComment] = useState(''),
-    [limit, setLimit] = useState(false);
+    [limit, setLimit] = useState(false),
+    // Open topics of chosen forum groups, loaded when a forum is picked.
+    [topics, setTopics] = useState<
+      Record<string, RoomTopic[] | 'loading' | 'error'>
+    >({});
   const mutation = useDialogMutation<ForwardResponse>(
     (result) => onDone(result, chosen),
     onClose,
@@ -187,8 +193,40 @@ export function ChatForwardDialog({
     ...recent,
     ...extra,
   ];
+  const loadTopics = (roomId: string) => {
+    if (topics[roomId]) return;
+    setTopics((current) => ({ ...current, [roomId]: 'loading' }));
+    void roomRequest<RoomDetail>({
+      actor: me.id,
+      action: 'room',
+      id: roomId,
+      view: 'topics',
+    })
+      .then((detail) =>
+        setTopics((current) => ({
+          ...current,
+          // «Общее» is the first option already.
+          [roomId]: (detail.topics ?? []).filter(
+            (topic) => !topic.closedAt && topic.id !== GENERAL_TOPIC,
+          ),
+        })),
+      )
+      .catch(() => setTopics((current) => ({ ...current, [roomId]: 'error' })));
+  };
+  const chooseTopic = (key: string, roomId: string, topicId: string) =>
+    setChosen(
+      chosen.map((item) =>
+        item.key === key
+          ? {
+              ...item,
+              target: { room: { roomId, ...(topicId ? { topicId } : {}) } },
+            }
+          : item,
+      ),
+    );
   const toggle = (option: Option) => {
     const active = chosen.some((item) => item.key === option.key);
+    if (!active && option.room?.forum) loadTopics(option.room.id);
     setLimit(!active && chosen.length >= FORWARD_TARGET_LIMIT);
     if (active) setChosen(chosen.filter((item) => item.key !== option.key));
     else if (chosen.length < FORWARD_TARGET_LIMIT)
@@ -285,6 +323,35 @@ export function ChatForwardDialog({
             <strong>{chosen.map((item) => item.name).join(', ')}</strong>
           </p>
         )}
+        {chosen.map((item) => {
+          if (!('room' in item.target)) return null;
+          const { roomId, topicId = '' } = item.target.room;
+          if (!groups.get(roomId)?.forum) return null;
+          const list = topics[roomId];
+          return (
+            <label key={item.key} className="chat-forward-topic">
+              <span>Тема в «{item.name}»</span>
+              <select
+                value={topicId}
+                disabled={mutation.frozen || !Array.isArray(list)}
+                onChange={(event) =>
+                  chooseTopic(item.key, roomId, event.target.value)
+                }
+              >
+                <option value="">Общее</option>
+                {Array.isArray(list) &&
+                  list.map((topic) => (
+                    <option key={topic.id} value={topic.id}>
+                      {(topic.emoji ? topic.emoji + ' ' : '') + topic.title}
+                    </option>
+                  ))}
+              </select>
+              {list === 'error' && (
+                <small>Темы не загрузились — сообщение попадёт в «Общее»</small>
+              )}
+            </label>
+          );
+        })}
         {chosen.length > 0 && (
           <textarea
             className="chat-forward-comment"

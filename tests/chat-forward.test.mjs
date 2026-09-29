@@ -910,3 +910,87 @@ assert.equal(
   ).status,
   403,
 );
+
+// Forum groups: a forwarded message goes to the chosen open topic.
+const forumGroup = await api.changeRoom('alice', {
+  action: 'create',
+  kind: 'group',
+  name: 'Форум',
+  memberIds: ['bob'],
+});
+await api.changeRoom('alice', { action: 'forum', id: forumGroup.id, enabled: true });
+const movies = await api.changeRoom('alice', {
+  action: 'topicCreate',
+  id: forumGroup.id,
+  title: 'Кино',
+});
+const closed = await api.changeRoom('alice', {
+  action: 'topicCreate',
+  id: forumGroup.id,
+  title: 'Архив',
+});
+await api.changeRoom('alice', {
+  action: 'topicClose',
+  id: forumGroup.id,
+  topicId: closed.id,
+});
+const topicForward = await forward('bob', {
+  key: key(),
+  source: { post: { postId: 'post-1' } },
+  targets: [
+    { room: { roomId: forumGroup.id, topicId: movies.id } },
+    { dm: { peer: 'bob' } },
+  ],
+});
+assert.equal(topicForward.status, 200);
+const [inTopic] = topicForward.body.results[0].ids;
+assert.equal(
+  sql.prepare('SELECT topicId FROM chat_room_messages WHERE id=?').get(inTopic)
+    .topicId,
+  movies.id,
+);
+const general = await forward('bob', {
+  key: key(),
+  source: { post: { postId: 'post-1' } },
+  targets: [{ room: { roomId: forumGroup.id, topicId: 'general' } }],
+});
+assert.equal(
+  sql
+    .prepare('SELECT topicId FROM chat_room_messages WHERE id=?')
+    .get(general.body.results[0].ids[0]).topicId,
+  '',
+  '«Общее» is the empty topic',
+);
+assert.equal(
+  (
+    await forward('bob', {
+      key: key(),
+      source: { post: { postId: 'post-1' } },
+      targets: [{ room: { roomId: forumGroup.id, topicId: closed.id } }],
+    })
+  ).status,
+  403,
+  'A member cannot forward into a closed topic',
+);
+assert.equal(
+  (
+    await forward('alice', {
+      key: key(),
+      source: { post: { postId: 'post-1' } },
+      targets: [{ room: { roomId: forumGroup.id, topicId: closed.id } }],
+    })
+  ).status,
+  200,
+  'The owner still can',
+);
+assert.equal(
+  (
+    await forward('bob', {
+      key: key(),
+      source: { post: { postId: 'post-1' } },
+      targets: [{ room: { roomId: group.id, topicId: movies.id } }],
+    })
+  ).status,
+  403,
+  'A topic of another group is refused',
+);
