@@ -116,7 +116,7 @@ final class ChatGestureTests: XCTestCase {
         expect(reacted, "The reaction does not show under the message", in: app, shot: "24-reacted")
         // The bubble grew by a row of reactions; the newest message stays
         // above the input.
-        expectNewest(in: app, above: app.buttons["Отправить"].firstMatch, shot: "24-reacted")
+        expectNewest(in: app, above: element("composer-field", in: app), shot: "24-reacted")
         save("24-reacted")
         // A tap on the reaction under the message takes it back.
         element(messageId, in: app).coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 1))

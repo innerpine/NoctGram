@@ -17,6 +17,7 @@ struct PostCard: View {
     @State private var showReport = false
     @State private var showSupport = false
     @State private var likeBump = false
+    @State private var sendToChat = false
 
     private var mine: Bool { post.isMine(session.myId) }
     private var canManage: Bool { mine || post.canManagePosts }
@@ -108,6 +109,10 @@ struct PostCard: View {
                 .environmentObject(session)
                 .environmentObject(nav)
         }
+        .sheet(isPresented: $sendToChat) {
+            ForwardSheet(source: .post(post.id))
+                .environmentObject(session)
+        }
         .sheet(isPresented: $showSupport) {
             SupportSheet(post: post)
                 .environmentObject(session)
@@ -177,6 +182,13 @@ struct PostCard: View {
                 session.copy(PostActions.link(post, session: session).absoluteString, message: "Ссылка скопирована")
             } label: {
                 Label("Скопировать ссылку", systemImage: "link")
+            }
+            if !session.readOnly {
+                Button {
+                    sendToChat = true
+                } label: {
+                    Label("Отправить в чат", systemImage: "paperplane")
+                }
             }
             ShareLink(item: PostActions.link(post, session: session)) {
                 Label("Поделиться", systemImage: "square.and.arrow.up")

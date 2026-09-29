@@ -490,7 +490,12 @@ struct ChatAttachment: Identifiable, Hashable {
     var name: String
     var type: String
     var size: Int
+    /// image, video, file, voice or round (lib/chat-files.ts).
     var kind: String
+    /// Seconds of a voice or round message (the server keeps milliseconds).
+    var duration: Double
+    /// Voice loudness, 0–31 per sample (lib/voice-waveform.ts).
+    var waveform: [Int]
 
     init(_ j: JSON) {
         id = j["id"].str
@@ -498,11 +503,19 @@ struct ChatAttachment: Identifiable, Hashable {
         type = j["type"].str
         size = j["size"].int ?? 0
         kind = j["kind"].string ?? (j["type"].str.hasPrefix("image/") ? "image" : j["type"].str.hasPrefix("video/") ? "video" : "file")
+        duration = (j["duration"].double ?? 0) / 1000
+        waveform = Waveform.decode(j["waveform"].str)
     }
 
     var path: String { "/api/media/" + id }
     var isImage: Bool { kind == "image" }
     var isVideo: Bool { kind == "video" }
+    var isVoice: Bool { kind == "voice" }
+    var isRound: Bool { kind == "round" }
+    /// A photo or video shown in the media grid.
+    var isMedia: Bool { isImage || isVideo }
+    /// A document, not media and not a recording.
+    var isFile: Bool { !isMedia && !isVoice && !isRound }
 }
 
 struct Reaction: Hashable {
@@ -536,6 +549,24 @@ struct ReplyPreview: Hashable {
     var name: String
     var text: String
     var unavailable: Bool
+    /// The fragment of the answered message the reply quotes, or "".
+    var quote: String = ""
+
+    init(id: String, sender: String, name: String, text: String, unavailable: Bool, quote: String = "") {
+        self.id = id
+        self.sender = sender
+        self.name = name
+        self.text = text
+        self.unavailable = unavailable
+        self.quote = quote
+    }
+
+    /// nil when there is no reply object.
+    init?(_ j: JSON) {
+        guard j.object != nil else { return nil }
+        self.init(id: j["id"].str, sender: j["sender"].str, name: j["name"].str,
+                  text: j["text"].str, unavailable: j["unavailable"].bool, quote: j["quote"].str)
+    }
 }
 
 struct ChatGift: Hashable {
@@ -557,9 +588,30 @@ struct ChatMessage: Identifiable, Hashable {
     var editedAt: Double
     var pinnedAt: Double
     var forwardedName: String
+    /// Who wrote a forwarded message first, when they can be opened.
+    var forwardedSender: String = ""
     var reply: ReplyPreview?
     var gift: ChatGift?
     var reactions: [Reaction]
+    /// When the recipient first played a voice or round message (0: not yet).
+    var listenedAt: Double = 0
+    /// A sticker message: «b:<pack>:<slug>» or «u:<id>» (lib/sticker-types.ts).
+    var sticker: String = ""
+    /// A feed post shared into the chat.
+    var postShare: String = ""
+    /// A group message deleted for everyone.
+    var deleted = false
+    /// The author above a group message (empty in dialogues).
+    var senderName: String = ""
+    var senderAvatar: String = ""
+    var senderAppearance = Appearance()
+    /// Groups: the forum topic (empty for «Общее»), the thread a reply
+    /// belongs to and how many replies a message has.
+    var topicId: String = ""
+    var threadRootId: String = ""
+    var replies: Int = 0
+    /// Groups: an end-to-end encrypted message of a secret chat.
+    var encrypted = false
     /// Local optimistic state while the message is being sent.
     var pending = false
     var failed = false
@@ -575,10 +627,11 @@ struct ChatMessage: Identifiable, Hashable {
         editedAt = j["editedAt"].double ?? 0
         pinnedAt = j["pinnedAt"].double ?? 0
         forwardedName = j["forwardedName"].str
-        let reply = j["reply"]
-        self.reply = reply.object == nil ? nil : ReplyPreview(
-            id: reply["id"].str, sender: reply["sender"].str, name: reply["name"].str,
-            text: reply["text"].str, unavailable: reply["unavailable"].bool)
+        forwardedSender = j["forwardedSender"].str
+        listenedAt = j["listenedAt"].double ?? 0
+        sticker = j["sticker"].str
+        postShare = j["postShare"]["id"].str
+        reply = ReplyPreview(j["reply"])
         let gift = j["gift"]
         self.gift = gift.object == nil ? nil : ChatGift(
             id: gift["id"].str, giftId: gift["giftId"].str, price: gift["price"].int ?? 0,
@@ -588,7 +641,41 @@ struct ChatMessage: Identifiable, Hashable {
         }
     }
 
-    init(localId: String, sender: String, recipient: String, text: String, attachments: [ChatAttachment], reply: ReplyPreview?) {
+    /// A group message (lib/rooms.ts messageView); `recipient` is the room.
+    init(room j: JSON) {
+        id = j["id"].str
+        sender = j["sender"].str
+        recipient = j["roomId"].str
+        text = j["text"].str
+        created = j["created"].double ?? 0
+        read = false
+        attachments = j["attachments"].nestedJSON.array.map(ChatAttachment.init)
+        editedAt = 0
+        pinnedAt = 0
+        forwardedName = j["forwardedName"].str
+        forwardedSender = j["forwardedFrom"].str
+        reply = ReplyPreview(j["reply"])
+        gift = nil
+        reactions = j["reactions"].array.map {
+            Reaction(emoji: $0["emoji"].str, count: $0["count"].int ?? 0, own: $0["own"].bool)
+        }
+        sticker = j["sticker"].str
+        postShare = j["postShare"]["id"].str
+        deleted = (j["deletedAt"].double ?? 0) > 0
+        senderName = j["senderName"].str
+        senderAvatar = j["senderAvatar"].str
+        senderAppearance = Appearance(j["senderAppearance"])
+        topicId = j["topicId"].str
+        threadRootId = j["threadRootId"].str
+        replies = j["replies"].int ?? 0
+        encrypted = !j["ciphertext"].isNull
+        // An older server answers with the id only.
+        if reply == nil, let replyTo = j["replyTo"].string, !replyTo.isEmpty {
+            reply = ReplyPreview(id: replyTo, sender: "", name: "", text: "", unavailable: false)
+        }
+    }
+
+    init(localId: String, sender: String, recipient: String, text: String, attachments: [ChatAttachment], reply: ReplyPreview?, sticker: String = "") {
         id = localId
         self.sender = sender
         self.recipient = recipient
@@ -602,7 +689,23 @@ struct ChatMessage: Identifiable, Hashable {
         self.reply = reply
         gift = nil
         reactions = []
+        self.sticker = sticker
         pending = true
+    }
+
+    var voice: ChatAttachment? { attachments.first(where: \.isVoice) }
+    var round: ChatAttachment? { attachments.first(where: \.isRound) }
+
+    /// What a list or a quote says for it (lib/message-summary-sql.ts).
+    var summary: String {
+        if !text.isEmpty { return text }
+        if !sticker.isEmpty { return "Стикер" }
+        if voice != nil { return "Голосовое сообщение" }
+        if round != nil { return "Видеосообщение" }
+        if gift != nil { return "Подарок" }
+        if !postShare.isEmpty { return "Публикация" }
+        if let first = attachments.first { return first.isImage ? "Фото" : (first.isVideo ? "Видео" : first.name) }
+        return "Вложение"
     }
 }
 

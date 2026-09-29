@@ -20,6 +20,8 @@ final class ChatStore: ObservableObject {
     @Published var palette = ChatPalette.noct
 
     private var pending: [ChatMessage] = []
+    /// Recordings this device already reported as listened.
+    private var listened: Set<String> = []
 
     init(peer: Person) {
         self.peer = peer
@@ -31,7 +33,10 @@ final class ChatStore: ObservableObject {
             let data = try await api.social("messages", ["peer": peer.id, "includeTheme": "1"])
             // With includeTheme the server wraps the list: {messages, theme}.
             let list = data["messages"].isNull ? data : data["messages"]
-            let server = list.array.map { ChatMessage($0) }
+            var server = list.array.map { ChatMessage($0) }
+            for index in server.indices where listened.contains(server[index].id) && server[index].listenedAt == 0 {
+                server[index].listenedAt = Format.nowMs
+            }
             let theme = data["theme"]
             if !theme.isNull {
                 let id = theme["personal"].string ?? theme["shared"].string ?? "noct"
@@ -58,26 +63,26 @@ final class ChatStore: ObservableObject {
         }
     }
 
-    func send(_ text: String, reply: ChatMessage?, session: AppSession) async {
-        guard let me = session.myId else { return }
-        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let files = attachments
-        guard !value.isEmpty || !files.isEmpty else { return }
-        let key = UUID().uuidString.lowercased()
-        let preview = reply.map {
-            ReplyPreview(id: $0.id, sender: $0.sender, name: $0.sender == me ? "Вы" : peer.name, text: $0.text.isEmpty ? "Вложение" : $0.text, unavailable: false)
+    private func preview(_ reply: ChatMessage?, me: String) -> ReplyPreview? {
+        reply.map {
+            ReplyPreview(id: $0.id, sender: $0.sender, name: $0.sender == me ? "Вы" : peer.name, text: $0.summary, unavailable: false)
         }
-        var local = ChatMessage(localId: "message:\(me):\(key)", sender: me, recipient: peer.id, text: value, attachments: files, reply: preview)
+    }
+
+    /// Shows the message at once and sends it with a key, so a retry never
+    /// doubles it (lib/chat-outbox.ts).
+    private func deliver(_ local: ChatMessage, body extra: [String: Any], key: String, reply: ChatMessage?, session: AppSession) async {
+        var local = local
         pending.append(local)
         messages.append(local)
-        attachments = []
         var body: [String: Any] = [
             "id": peer.id,
-            "text": value,
-            "attachments": files.map(\.id),
             "key": key,
-            "expectedSender": me,
+            "text": local.text,
+            "attachments": local.attachments.map(\.id),
+            "expectedSender": local.sender,
         ]
+        body.merge(extra) { _, new in new }
         if let reply { body["replyTo"] = reply.id }
         do {
             _ = try await session.api.socialPost("message", body)
@@ -90,6 +95,84 @@ final class ChatStore: ObservableObject {
             pending.removeAll { $0.id == local.id }
             session.report(error)
         }
+    }
+
+    func send(_ text: String, reply: ChatMessage?, session: AppSession) async {
+        guard let me = session.myId else { return }
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let files = attachments
+        guard !value.isEmpty || !files.isEmpty else { return }
+        let key = UUID().uuidString.lowercased()
+        let local = ChatMessage(localId: "message:\(me):\(key)", sender: me, recipient: peer.id, text: value, attachments: files, reply: preview(reply, me: me))
+        attachments = []
+        await deliver(local, body: [:], key: key, reply: reply, session: session)
+    }
+
+    /// A sticker goes alone, without text or files (lib/sticker-send.ts).
+    func sendSticker(_ sticker: Sticker, reply: ChatMessage?, session: AppSession) async {
+        guard let me = session.myId else { return }
+        let key = UUID().uuidString.lowercased()
+        let local = ChatMessage(localId: "message:\(me):\(key)", sender: me, recipient: peer.id, text: "", attachments: [], reply: preview(reply, me: me), sticker: sticker.ref)
+        await deliver(local, body: ["sticker": sticker.ref], key: key, reply: reply, session: session)
+    }
+
+    /// Uploads a voice or round recording with its length and waveform,
+    /// then sends it alone (app/api/chat-upload, VOICE_MESSAGES.md).
+    func sendRecording(_ file: URL, round: Bool, duration: Double, waveform: [Int], reply: ChatMessage?, session: AppSession) async {
+        guard let me = session.myId else { return }
+        defer { try? FileManager.default.removeItem(at: file) }
+        let key = UUID().uuidString.lowercased()
+        let milliseconds = max(1, Int((duration * 1000).rounded()))
+        var fields = [
+            "peer": peer.id,
+            "intent": round ? "round" : "voice",
+            "duration": String(round ? min(milliseconds, 61000) : milliseconds),
+        ]
+        if !round { fields["waveform"] = Waveform.encode(waveform) }
+        let placeholder = ChatAttachment(JSON.object([
+            "id": .string("local-" + key), "name": .string(""), "type": .string(round ? "video/mp4" : "audio/mp4"),
+            "size": .number(0), "kind": .string(round ? "round" : "voice"),
+            "duration": .number(Double(milliseconds)), "waveform": .string(Waveform.encode(waveform)),
+        ]))
+        var local = ChatMessage(localId: "message:\(me):\(key)", sender: me, recipient: peer.id, text: "", attachments: [placeholder], reply: preview(reply, me: me))
+        local.listenedAt = Format.nowMs
+        pending.append(local)
+        messages.append(local)
+        do {
+            guard let data = try? Data(contentsOf: file) else { throw MediaEncoder.Failure(errorDescription: "Запись не сохранилась.") }
+            let stamp = Self.stamp()
+            let result = try await session.api.upload(
+                "/api/chat-upload",
+                data: data,
+                filename: round ? "video-message-\(stamp).mp4" : "voice-\(stamp).m4a",
+                mimeType: round ? "video/mp4" : "audio/mp4",
+                fields: fields
+            )
+            let uploaded = ChatAttachment(result)
+            pending.removeAll { $0.id == local.id }
+            messages.removeAll { $0.id == local.id }
+            local.attachments = [uploaded]
+            await deliver(local, body: [:], key: key, reply: reply, session: session)
+        } catch {
+            pending.removeAll { $0.id == local.id }
+            messages.removeAll { $0.id == local.id }
+            session.report(error)
+        }
+    }
+
+    private static func stamp() -> String {
+        let format = DateFormatter()
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.dateFormat = "yyyyMMdd'T'HHmmss"
+        return format.string(from: Date())
+    }
+
+    /// The first play of an incoming recording tells its sender.
+    func markListened(_ message: ChatMessage, session: AppSession) {
+        guard message.sender != session.myId, message.listenedAt == 0, !listened.contains(message.id) else { return }
+        listened.insert(message.id)
+        if let index = messages.firstIndex(where: { $0.id == message.id }) { messages[index].listenedAt = Format.nowMs }
+        Task { _ = try? await session.api.socialPost("messageListened", ["peer": message.sender, "id": message.id]) }
     }
 
     func upload(_ item: PhotosPickerItem, session: AppSession) async {
@@ -144,21 +227,6 @@ final class ChatStore: ObservableObject {
         }
     }
 
-    func forward(_ message: ChatMessage, to person: Person, session: AppSession) async {
-        do {
-            _ = try await session.api.socialPost("messageForward", [
-                "ids": [message.id],
-                "peer": peer.id,
-                "recipient": person.id,
-                "key": UUID().uuidString.lowercased(),
-            ])
-            Haptics.success()
-            session.show("Переслано: \(person.name)")
-        } catch {
-            session.report(error)
-        }
-    }
-
     func delete(_ message: ChatMessage, everyone: Bool, session: AppSession) async {
         do {
             _ = try await session.api.socialPost("messageDelete", ["ids": [message.id], "peer": peer.id, "everyone": everyone])
@@ -203,12 +271,14 @@ final class ChatStore: ObservableObject {
     }
 }
 
-/// A direct dialogue (app/chat-conversation.tsx): polling every 3 s while open.
+/// A direct dialogue (app/chat-conversation.tsx): polling every 3 s while
+/// open. The dialogue with oneself is «Избранное»: notes and forwards.
 struct ChatView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var nav: Navigator
     let peer: Person
     @StateObject private var store: ChatStore
+    @StateObject private var recorder = MessageRecorder()
     @State private var text = ""
     @State private var replyTo: ChatMessage?
     @State private var editing: ChatMessage?
@@ -216,8 +286,11 @@ struct ChatView: View {
     @State private var reporting: ChatMessage?
     @State private var deleting: ChatMessage?
     @State private var forwarding: ChatMessage?
+    @State private var openPack: StickerPanel.PackRequest?
     @State private var atEnd = true
     @State private var window = ChatWindow()
+    @State private var panel = false
+    @State private var keyboard: CGFloat = 0
     @EnvironmentObject private var focus: MessageFocus
     @FocusState private var focused: Bool
 
@@ -226,8 +299,10 @@ struct ChatView: View {
         _store = StateObject(wrappedValue: ChatStore(peer: peer))
     }
 
+    private var isSaved: Bool { peer.id == session.myId }
     private var title: Identity { store.profile?.identity ?? peer.identity }
     private var presence: String? {
+        if isSaved { return "Заметки и пересланное — только для вас" }
         guard let seen = store.profile?.lastSeen, seen > 0 else { return nil }
         return Format.presence(seen)
     }
@@ -244,6 +319,7 @@ struct ChatView: View {
             .modifier(ChatEndTracker(atEnd: $atEnd))
             .modifier(ChatFollowsEnd(proxy: proxy, last: store.messages.last?.id, atEnd: atEnd, bar: (replyTo ?? editing)?.id, messages: store.messages))
             .background(ChatBackdrop(palette: store.palette))
+            .simultaneousGesture(TapGesture().onEnded { if panel { withAnimation(Noct.quick) { panel = false } } })
             .onChange(of: store.messages.last?.id) { id in
                 guard let id else { return }
                 withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .bottom) }
@@ -251,6 +327,16 @@ struct ChatView: View {
             .onChange(of: store.loaded) { _ in
                 window.hidden = window.start(store.messages.count)
                 if let id = store.messages.last?.id { proxy.scrollTo(id, anchor: .bottom) }
+            }
+            .onChange(of: panel) { _ in
+                if atEnd, let id = store.messages.last?.id {
+                    DispatchQueue.main.async { withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .bottom) } }
+                }
+            }
+        }
+        .overlay {
+            if recorder.mode == .round && recorder.active {
+                RoundCaptureOverlay(recorder: recorder, round: recorder.round, accent: store.palette.accent)
             }
         }
         .glassBottomBar { bottom }
@@ -261,14 +347,18 @@ struct ChatView: View {
             // avatar on the right opens the chat menu.
             ToolbarItem(placement: .principal) {
                 Button {
-                    nav.push(.profile(peer.id))
+                    if !isSaved { nav.push(.profile(peer.id)) }
                 } label: {
                     VStack(spacing: 1) {
-                        DisplayName(person: title, size: 16)
+                        if isSaved {
+                            Text("Избранное").font(.system(size: 16, weight: .semibold))
+                        } else {
+                            DisplayName(person: title, size: 16)
+                        }
                         if let presence {
                             Text(presence)
                                 .font(.system(size: 12))
-                                .foregroundColor(Format.isOnline(store.profile?.lastSeen ?? 0) ? Noct.green : Noct.text48)
+                                .foregroundColor(!isSaved && Format.isOnline(store.profile?.lastSeen ?? 0) ? Noct.green : Noct.text48)
                                 .lineLimit(1)
                         }
                     }
@@ -280,28 +370,34 @@ struct ChatView: View {
                 .buttonStyle(PressableStyle())
             }
             ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button {
-                        nav.push(.profile(peer.id))
+                if isSaved {
+                    SavedAvatar(size: 36)
+                } else {
+                    Menu {
+                        Button {
+                            nav.push(.profile(peer.id))
+                        } label: {
+                            Label("Профиль", systemImage: "person")
+                        }
+                        Button(role: store.blockedByMe ? nil : .destructive) {
+                            Task { await store.setBlocked(!store.blockedByMe, session: session) }
+                        } label: {
+                            Label(store.blockedByMe ? "Разблокировать" : "Заблокировать", systemImage: "hand.raised")
+                        }
                     } label: {
-                        Label("Профиль", systemImage: "person")
+                        AvatarView(person: title, size: 36, ring: false)
                     }
-                    Button(role: store.blockedByMe ? nil : .destructive) {
-                        Task { await store.setBlocked(!store.blockedByMe, session: session) }
-                    } label: {
-                        Label(store.blockedByMe ? "Разблокировать" : "Заблокировать", systemImage: "hand.raised")
-                    }
-                } label: {
-                    AvatarView(person: title, size: 36, ring: false)
+                    .accessibilityLabel("Меню чата")
                 }
-                .accessibilityLabel("Меню чата")
             }
         }
         .sheet(item: $forwarding) { message in
-            ForwardSheet { person in
-                Task { await store.forward(message, to: person, session: session) }
-            }
-            .environmentObject(session)
+            ForwardSheet(source: .dm(peer: peer.id, ids: [message.id]))
+                .environmentObject(session)
+        }
+        .sheet(item: $openPack) { request in
+            StickerPackSheet(name: request.name, send: canWrite ? stickerSender : nil)
+                .environmentObject(session)
         }
         .confirmationDialog("Пожаловаться на сообщение", isPresented: Binding(get: { reporting != nil }, set: { if !$0 { reporting = nil } }), titleVisibility: .visible) {
             ForEach(ReportReason.all, id: \.self) { reason in
@@ -313,13 +409,19 @@ struct ChatView: View {
         }
         .confirmationDialog("Удалить сообщение?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
             if let message = deleting {
-                if message.sender == session.myId {
-                    Button("Удалить у всех", role: .destructive) {
+                if isSaved {
+                    Button("Удалить", role: .destructive) {
                         Task { await store.delete(message, everyone: true, session: session) }
                     }
-                }
-                Button("Удалить у меня", role: .destructive) {
-                    Task { await store.delete(message, everyone: false, session: session) }
+                } else {
+                    if message.sender == session.myId {
+                        Button("Удалить у всех", role: .destructive) {
+                            Task { await store.delete(message, everyone: true, session: session) }
+                        }
+                    }
+                    Button("Удалить у меня", role: .destructive) {
+                        Task { await store.delete(message, everyone: false, session: session) }
+                    }
                 }
             }
             Button("Отмена", role: .cancel) {}
@@ -331,9 +433,23 @@ struct ChatView: View {
                 Task { await store.upload(item, session: session) }
             }
         }
+        .onChange(of: focused) { value in
+            if value && panel { panel = false }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { note in
+            if let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                keyboard = max(0, frame.height - ScreenInsets.current.bottom)
+            }
+        }
+        .onAppear(perform: wireRecorder)
+        .onDisappear {
+            recorder.cancel()
+            VoicePlayback.shared.stop()
+        }
         .task {
             await store.loadMeta(api: session.api)
             await GiftCatalog.shared.load(api: session.api)
+            await StickerStore.shared.load(api: session.api, me: session.myId ?? "")
         }
         .task {
             while !Task.isCancelled {
@@ -343,9 +459,44 @@ struct ChatView: View {
         }
         .onDisappear { Task { await session.refreshCounters() } }
         #if DEBUG
-        .task(id: store.loaded) { if store.loaded { await ChatProbe.run() } }
+        .task(id: store.loaded) {
+            guard store.loaded else { return }
+            debugOpen()
+            await ChatProbe.run()
+        }
         #endif
     }
+
+    /// Recordings go out as the next message, answering what is answered.
+    private func wireRecorder() {
+        recorder.report = { session.show($0) }
+        recorder.sendVoice = { recording in
+            let reply = replyTo
+            replyTo = nil
+            Task { await store.sendRecording(recording.url, round: false, duration: recording.duration, waveform: recording.waveform, reply: reply, session: session) }
+        }
+        recorder.sendRound = { recording in
+            let reply = replyTo
+            replyTo = nil
+            Task { await store.sendRecording(recording.url, round: true, duration: recording.duration, waveform: [], reply: reply, session: session) }
+        }
+    }
+
+    #if DEBUG
+    /// Screenshot hooks (ios/Tests): `-noct.debugSheet stickers` or `emoji`
+    /// opens the panel, `forward` the forward sheet for the last message.
+    private func debugOpen() {
+        switch UserDefaults.standard.string(forKey: "noct.debugSheet") {
+        case "stickers", "emoji":
+            UserDefaults.standard.set(UserDefaults.standard.string(forKey: "noct.debugSheet") == "emoji" ? "emoji" : "stickers", forKey: "noct.panelTab")
+            panel = true
+        case "forward":
+            forwarding = store.messages.last
+        default:
+            break
+        }
+    }
+    #endif
 
     /// The newest messages with a day line before the first of each day.
     @ViewBuilder private func rows(_ proxy: ScrollViewProxy) -> some View {
@@ -353,7 +504,11 @@ struct ChatView: View {
         if !store.loaded {
             LoadingRow()
         } else if store.messages.isEmpty {
-            EmptyState(icon: "hand.wave", text: store.error ?? "Сообщений пока нет. Напиши первым.")
+            if isSaved {
+                EmptyState(icon: "bookmark", text: store.error ?? "Сохраняйте сюда заметки, ссылки и пересланные сообщения — их видите только вы.")
+            } else {
+                EmptyState(icon: "hand.wave", text: store.error ?? "Сообщений пока нет. Напиши первым.")
+            }
         }
         if start > 0 {
             EarlierMessagesButton { showEarlier(from: start, proxy: proxy) }
@@ -375,25 +530,43 @@ struct ChatView: View {
                     .padding(.top, 10)
                     .padding(.bottom, 2)
             }
-            MessageBubble(
-                message: message,
-                mine: message.sender == session.myId,
-                peer: title,
-                palette: store.palette,
-                joinsPrevious: joins,
-                openMedia: { items, position in
-                    MediaPresenter.shared.show(MediaViewerState(items: items, index: position, title: senderName(message), date: message.created) {
-                        deleting = message
-                    })
-                },
-                onFocus: { frame in present(message, frame: frame, joinsPrevious: joins) },
-                onReply: canWrite ? replyAction(message) : nil,
-                onReact: canWrite ? reactAction(message) : nil
-            )
-            .padding(.top, joins ? 2 : 8)
-            .id(message.id)
-            .modifier(ChatEndRow(isLast: message.id == store.messages.last?.id, atEnd: $atEnd))
+            bubble(message, joins: joins)
+                .padding(.top, joins ? 2 : 8)
+                .id(message.id)
+                .modifier(ChatEndRow(isLast: message.id == store.messages.last?.id, atEnd: $atEnd))
         }
+    }
+
+    private func bubble(_ message: ChatMessage, joins: Bool, standalone: Bool = false) -> MessageBubble {
+        MessageBubble(
+            message: message,
+            mine: message.sender == session.myId,
+            peer: title,
+            palette: store.palette,
+            joinsPrevious: joins,
+            openMedia: { items, position in
+                MediaPresenter.shared.show(MediaViewerState(items: items, index: position, title: senderName(message), date: message.created) {
+                    deleting = message
+                })
+            },
+            standalone: standalone,
+            readReceipts: !isSaved,
+            unheard: unheard(message),
+            onListen: { store.markListened(message, session: session) },
+            onFocus: { frame in present(message, frame: frame, joinsPrevious: joins) },
+            onReply: canWrite ? replyAction(message) : nil,
+            onReact: canWrite ? reactAction(message) : nil,
+            onOpenProfile: { nav.push(.profile($0)) },
+            onOpenPost: { nav.push(.post($0)) },
+            onOpenPack: { openPack = StickerPanel.PackRequest(name: $0.packName) }
+        )
+    }
+
+    /// Nobody played the recording yet: the recipient sees a dot until
+    /// they play it, the sender until the recipient does. Not in «Избранное».
+    private func unheard(_ message: ChatMessage) -> Bool {
+        guard !isSaved, message.voice != nil || message.round != nil, !message.pending else { return false }
+        return message.listenedAt == 0
     }
 
     /// Draws earlier messages above, staying on the one that was first.
@@ -412,12 +585,12 @@ struct ChatView: View {
         previous.sender == message.sender && message.created - previous.created < 10 * 60 * 1000
     }
 
-    private var canWrite: Bool { !session.readOnly && store.allowed && !store.blockedByMe }
+    private var canWrite: Bool { !session.readOnly && (isSaved || (store.allowed && !store.blockedByMe)) }
 
     private func reply(to message: ChatMessage) {
         replyTo = message
         editing = nil
-        focused = true
+        if !panel { focused = true }
     }
 
     private func replyAction(_ message: ChatMessage) -> () -> Void {
@@ -428,24 +601,23 @@ struct ChatView: View {
         { emoji in Task { await store.react(message, emoji: emoji, session: session) } }
     }
 
+    private var stickerSender: (Sticker) -> Void {
+        { sticker in send(sticker) }
+    }
+
+    private func send(_ sticker: Sticker) {
+        let reply = replyTo
+        replyTo = nil
+        Task { await store.sendSticker(sticker, reply: reply, session: session) }
+    }
+
     /// Lifts a held message over the blurred screen, as in Telegram.
     private func present(_ message: ChatMessage, frame: CGRect, joinsPrevious: Bool) {
         let mine = message.sender == session.myId
         focus.present(MessageFocus.Item(
             frame: frame,
             mine: mine,
-            bubble: AnyView(
-                MessageBubble(
-                    message: message,
-                    mine: mine,
-                    peer: title,
-                    palette: store.palette,
-                    joinsPrevious: joinsPrevious,
-                    openMedia: { _, _ in },
-                    standalone: true
-                )
-                .environmentObject(session)
-            ),
+            bubble: AnyView(bubble(message, joins: joinsPrevious, standalone: true).environmentObject(session)),
             reactions: canWrite ? messageReactions : [],
             chosen: message.reactions.first(where: \.own)?.emoji,
             actions: actions(for: message),
@@ -462,12 +634,21 @@ struct ChatView: View {
         if !message.text.isEmpty {
             list.append(MessageAction(title: "Скопировать", icon: "doc.on.doc") { session.copy(message.text) })
         }
-        if mine && canWrite && message.gift == nil && message.forwardedName.isEmpty {
+        let plain = message.gift == nil && message.forwardedName.isEmpty && message.sticker.isEmpty
+            && message.voice == nil && message.round == nil && message.postShare.isEmpty
+        if mine && canWrite && plain {
             list.append(MessageAction(title: "Изменить", icon: "pencil") {
                 editing = message
                 replyTo = nil
                 text = message.text
+                panel = false
                 focused = true
+            })
+        }
+        if let sticker = StickerStore.shared.sticker(message.sticker), sticker.available, !session.readOnly {
+            let favorite = StickerStore.shared.isFavorite(sticker.ref)
+            list.append(MessageAction(title: favorite ? "Убрать из избранного" : "В избранные стикеры", icon: favorite ? "bookmark.slash" : "bookmark") {
+                Task { await StickerStore.shared.setFavorite(sticker, !favorite, session: session) }
             })
         }
         if !session.readOnly {
@@ -475,21 +656,25 @@ struct ChatView: View {
             list.append(MessageAction(title: pinned ? "Открепить" : "Закрепить", icon: pinned ? "pin.slash" : "pin") {
                 Task { await store.pin(message, value: !pinned, session: session) }
             })
-            list.append(MessageAction(title: "Переслать", icon: "arrowshape.turn.up.right") { forwarding = message })
+            if message.gift == nil {
+                list.append(MessageAction(title: "Переслать", icon: "arrowshape.turn.up.right") { forwarding = message })
+            }
         }
         list.append(MessageAction(title: "Удалить", icon: "trash", destructive: true) { deleting = message })
-        if !mine {
+        if !mine && !isSaved {
             list.append(MessageAction(title: "Пожаловаться", icon: "flag", destructive: true) { reporting = message })
         }
         return list
     }
 
+    private var panelHeight: CGFloat { max(keyboard > 0 ? keyboard : 290, 260) }
+
     @ViewBuilder private var bottom: some View {
-        if store.blockedByMe {
+        if store.blockedByMe && !isSaved {
             ComposerNotice(text: "Ты заблокировал(а) этого пользователя.", action: "Разблокировать") {
                 Task { await store.setBlocked(false, session: session) }
             }
-        } else if !store.allowed && store.loaded {
+        } else if !store.allowed && store.loaded && !isSaved {
             ComposerNotice(text: "Пользователь ограничил входящие сообщения.")
         } else if session.readOnly {
             ComposerNotice(text: "В режиме только для чтения отправка недоступна.")
@@ -498,7 +683,7 @@ struct ChatView: View {
                 if let context = replyTo ?? editing {
                     ComposerContext(
                         title: editing != nil ? "Редактирование" : (context.sender == session.myId ? "Ответ себе" : "Ответ \(title.name)"),
-                        text: context.text.isEmpty ? "Вложение" : context.text
+                        text: PremiumEmoji.replace(context.summary)
                     ) {
                         if editing != nil { text = "" }
                         replyTo = nil
@@ -506,49 +691,19 @@ struct ChatView: View {
                     }
                 }
                 if !store.attachments.isEmpty || store.uploading > 0 {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(store.attachments) { file in
-                                ZStack(alignment: .topTrailing) {
-                                    Group {
-                                        if file.isImage {
-                                            RemoteImage(url: session.api.mediaURL(file.path), maxPixel: 200)
-                                        } else {
-                                            ZStack {
-                                                Noct.coverFill
-                                                Image(systemName: file.isVideo ? "video" : "doc").foregroundColor(Noct.text60)
-                                            }
-                                        }
-                                    }
-                                    .frame(width: 64, height: 64)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                    Button {
-                                        store.attachments.removeAll { $0.id == file.id }
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundStyle(.white, .black.opacity(0.7))
-                                    }
-                                    .padding(3)
-                                }
-                            }
-                            if store.uploading > 0 {
-                                ProgressView()
-                                    .tint(.white)
-                                    .frame(width: 64, height: 64)
-                                    .glassRect(12)
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.top, 8)
-                    }
+                    attachmentsRow
                 }
-                ComposerBar(
+                if EmojiTokens.contains(text) {
+                    TokenPreview(text: text)
+                }
+                ChatComposer(
                     text: $text,
-                    placeholder: "Сообщение",
-                    sending: false,
                     focus: $focused,
-                    leading: editing == nil ? AnyView(attachButton) : nil,
-                    accent: store.palette.accent
+                    accent: store.palette.accent,
+                    attach: editing == nil ? AnyView(attachButton) : nil,
+                    panel: $panel,
+                    recorder: editing == nil ? recorder : nil,
+                    hasAttachments: !store.attachments.isEmpty
                 ) {
                     let value = text
                     if let message = editing {
@@ -562,7 +717,50 @@ struct ChatView: View {
                         Task { await store.send(value, reply: reply, session: session) }
                     }
                 }
+                if panel {
+                    StickerPanel(text: $text, height: panelHeight) { sticker in send(sticker) }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
+            .animation(Noct.quick, value: panel)
+        }
+    }
+
+    private var attachmentsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(store.attachments) { file in
+                    ZStack(alignment: .topTrailing) {
+                        Group {
+                            if file.isImage {
+                                RemoteImage(url: session.api.mediaURL(file.path), maxPixel: 200)
+                            } else {
+                                ZStack {
+                                    Noct.coverFill
+                                    Image(systemName: file.isVideo ? "video" : "doc").foregroundColor(Noct.text60)
+                                }
+                            }
+                        }
+                        .frame(width: 64, height: 64)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        Button {
+                            store.attachments.removeAll { $0.id == file.id }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.white, .black.opacity(0.7))
+                        }
+                        .padding(3)
+                    }
+                }
+                if store.uploading > 0 {
+                    ProgressView()
+                        .tint(.white)
+                        .frame(width: 64, height: 64)
+                        .glassRect(12)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
         }
     }
 
@@ -579,289 +777,26 @@ struct ChatView: View {
     }
 }
 
-/// A message as in Telegram, in the web's colours: the bubble hugs its
-/// text, the time sits at the end of the last line and photos run edge to
-/// edge with the time on glass.
-struct MessageBubble: View {
+/// How the draft looks with its premium emoji, over the field (the field
+/// itself holds the tokens, as on the web).
+struct TokenPreview: View {
     @EnvironmentObject private var session: AppSession
-    let message: ChatMessage
-    let mine: Bool
-    /// The other person of the dialogue.
-    let peer: Identity
-    let palette: ChatPalette
-    /// The previous message is from the same sender a moment earlier.
-    let joinsPrevious: Bool
-    let openMedia: ([MediaItem], Int) -> Void
-    /// Only the bubble, drawn in the held-message overlay.
-    var standalone = false
-    /// Holding lifts the bubble with reactions and actions (MessageFocus).
-    var onFocus: ((CGRect) -> Void)?
-    /// Swiping left answers the message.
-    var onReply: (() -> Void)?
-    /// A tap on a reaction puts it (an emoji) or takes the viewer's back (nil).
-    var onReact: ((String?) -> Void)?
-    @State private var ratio: CGFloat?
-
-    private let maxMedia: CGFloat = 270
-
-    private var shape: BubbleShape { .message(mine: mine, joinsPrevious: joinsPrevious) }
-    private var media: [MediaItem] {
-        message.attachments.filter { $0.isImage || $0.isVideo }.map {
-            MediaItem(JSON.object(["id": .string($0.id), "type": .string($0.type), "name": .string($0.name), "size": .number(Double($0.size))]))
-        }
-    }
-    private var files: [ChatAttachment] { message.attachments.filter { !$0.isImage && !$0.isVideo } }
-    private var reactions: [Reaction] { ChatProbe.has("nochips") ? [] : message.reactions }
-    private var hasText: Bool { !message.text.isEmpty && message.gift == nil }
-    private var status: MessageStatus? {
-        guard mine else { return nil }
-        if message.failed { return .failed }
-        if message.pending { return .pending }
-        return message.read ? .read : .sent
-    }
-    /// Nothing around the text or media: no quote, forward, files, gift or reactions.
-    private var bare: Bool {
-        message.reply == nil && message.forwardedName.isEmpty && files.isEmpty && message.gift == nil && reactions.isEmpty
-    }
-    private var emojiOnly: Bool { hasText && media.isEmpty && bare && Emoji.isOnly(message.text, limit: 3) }
-    private var mediaOnly: Bool { !media.isEmpty && !hasText && bare }
-    private var mediaSize: CGSize { ChatMedia.size(count: media.count, ratio: ratio ?? cachedRatio, maxWidth: maxMedia) }
-
-    /// A photo already in memory gives its shape at once, without a jump.
-    private var cachedRatio: CGFloat? {
-        guard media.count == 1, let item = media.first, !item.isVideo,
-              let url = session.api.mediaURL(item.path),
-              let image = ImagePipeline.shared.cached(url, maxPixel: 900), image.size.height > 0 else { return nil }
-        return image.size.width / image.size.height
-    }
-
-    /// A dialogue has two people, so every reaction has a face: the other
-    /// person's and the viewer's own.
-    private func reactors(_ reaction: Reaction) -> [Identity]? {
-        var people: [Identity] = []
-        if reaction.count - (reaction.own ? 1 : 0) == 1 { people.append(peer) }
-        if reaction.own, let me = session.me?.identity { people.append(me) }
-        return people.count == reaction.count ? people : nil
-    }
-
-    /// What VoiceOver says: forward and reply, the text or what is attached,
-    /// the reactions and the time.
-    private var spoken: String {
-        var parts: [String] = []
-        if !message.forwardedName.isEmpty { parts.append("Переслано от \(message.forwardedName)") }
-        if let reply = message.reply {
-            parts.append("Ответ на «\(reply.unavailable ? "удалённое сообщение" : (reply.text.isEmpty ? "вложение" : reply.text))»")
-        }
-        if let gift = message.gift {
-            parts.append(GiftCatalog.shared.name(for: gift.giftId).map { "Подарок «\($0)»" } ?? "Подарок")
-            if !gift.message.isEmpty { parts.append(gift.message) }
-        } else if hasText {
-            parts.append(message.text)
-        }
-        let videos = media.filter(\.isVideo).count, photos = media.count - videos
-        if photos > 0 { parts.append(photos == 1 ? "Фото" : "Фото: \(photos)") }
-        if videos > 0 { parts.append(videos == 1 ? "Видео" : "Видео: \(videos)") }
-        parts += files.map { "Файл \($0.name)" }
-        parts += SpokenBubble.reactions(reactions)
-        parts.append(Format.clock(message.created))
-        return parts.joined(separator: ", ")
-    }
-
-    private func time(onMedia: Bool = false) -> BubbleTime {
-        BubbleTime(created: message.created, edited: message.editedAt > 0, status: status, onMedia: onMedia, mine: mine, pinned: message.pinnedAt > 0)
-    }
+    @ObservedObject private var images = EmojiImages.shared
+    @ObservedObject private var stickers = StickerStore.shared
+    let text: String
 
     var body: some View {
-        let _ = ChatProbe.count("bubble body")
-        if standalone {
-            content
-                .opacity(message.pending ? 0.7 : 1)
-                .task(id: media.first?.path) { await measure() }
-        } else {
-            HStack(spacing: 0) {
-                if mine { Spacer(minLength: 52) }
-                content
-                    .opacity(message.pending ? 0.7 : 1)
-                    .modifier(SpokenBubble(label: spoken))
-                    .accessibilityIdentifier("message-" + message.id)
-                    .accessibilityAction(named: "Ответить") { onReply?() }
-                    .modifier(HoldToFocus(action: message.pending || ChatProbe.has("nohold") ? nil : onFocus))
-                if !mine { Spacer(minLength: 52) }
-            }
-            .modifier(SwipeToReply(action: message.pending || ChatProbe.has("noswipe") ? nil : onReply))
-            #if DEBUG
-            .onAppear { ChatProbe.count("appear " + ChatProbe.short(message.id)) }
-            .onDisappear { ChatProbe.count("disappear " + ChatProbe.short(message.id)) }
-            #endif
-            .task(id: media.first?.path) { await measure() }
-        }
-    }
-
-    @ViewBuilder private var content: some View {
-        if emojiOnly {
-            VStack(alignment: mine ? .trailing : .leading, spacing: 2) {
-                Text(message.text).font(.system(size: 46))
-                time(onMedia: true)
-            }
-        } else if mediaOnly {
-            ChatMedia(items: media, size: mediaSize) { openMedia(media, $0) }
-                .clipShape(shape)
-                .overlay(alignment: .bottomTrailing) {
-                    time(onMedia: true).padding(7)
-                }
-        } else {
-            bubble
-        }
-    }
-
-    #if DEBUG
-    /// The «plainstack» probe stacks the parts without BubbleStack.
-    private var column: AnyLayout {
-        ChatProbe.has("plainstack") ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(BubbleStack())
-    }
-    #else
-    private var column: BubbleStack { BubbleStack() }
-    #endif
-
-    private var bubble: some View {
-        column {
-            if !message.forwardedName.isEmpty || message.reply != nil {
-                VStack(alignment: .leading, spacing: 6) {
-                    if !message.forwardedName.isEmpty {
-                        Text("Переслано от \(message.forwardedName)")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(palette.accent)
-                            .lineLimit(1)
-                    }
-                    if let reply = message.reply {
-                        BubbleQuote(
-                            name: reply.sender == session.myId ? "Вы" : (reply.name.isEmpty ? peer.name : reply.name),
-                            text: reply.unavailable ? "Сообщение удалено" : PremiumEmoji.replace(reply.text.isEmpty ? "Вложение" : reply.text),
-                            accent: palette.accent
-                        )
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.top, 8)
-                .padding(.bottom, media.isEmpty ? 0 : 8)
-            }
-            if !media.isEmpty {
-                ChatMedia(items: media, size: mediaSize) { openMedia(media, $0) }
-            }
-            if let gift = message.gift {
-                giftCard(gift)
-                    .padding(.horizontal, 10)
-                    .padding(.top, 10)
-            }
-            ForEach(files) { file in
-                fileRow(file)
-                    .padding(.horizontal, 10)
-                    .padding(.top, 8)
-            }
-            footer
-        }
-        .frame(width: media.isEmpty ? nil : mediaSize.width)
-        .background(shape.fill(mine ? palette.outgoing : palette.incoming))
-        .clipShape(shape)
-        .overlay(shape.stroke(Color.white.opacity(0.06), lineWidth: 1))
-    }
-
-    @ViewBuilder private var footer: some View {
-        if hasText && reactions.isEmpty {
-            InlineTimeText(text: message.text, time: time(), accent: palette.accent)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-        } else if hasText {
-            VStack(alignment: .leading, spacing: 6) {
-                InlineTimeText(text: message.text, accent: palette.accent)
-                HStack(alignment: .bottom, spacing: 8) {
-                    BubbleReactions(reactions: reactions, accent: palette.accent, reactors: reactors, toggle: onReact)
-                    Spacer(minLength: 4)
-                    time()
-                }
-            }
+        let _ = (images.revision, stickers.revision)
+        EmojiText.text(text, fontSize: 15, session: session)
+            .font(.system(size: 15))
+            .foregroundColor(Noct.text75)
+            .lineLimit(2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .glassRect(18)
             .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-        } else if !reactions.isEmpty {
-            HStack(alignment: .bottom, spacing: 8) {
-                BubbleReactions(reactions: reactions, accent: palette.accent, reactors: reactors, toggle: onReact)
-                Spacer(minLength: 4)
-                time()
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-        } else {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-                time()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-        }
-    }
-
-    private func fileRow(_ file: ChatAttachment) -> some View {
-        Group {
-            if let url = session.api.mediaURL(file.path + "?download=1") {
-                Link(destination: url) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "doc.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(Color.black.opacity(0.8))
-                            .frame(width: 40, height: 40)
-                            .background(Circle().fill(palette.accent))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(file.name).font(.system(size: 15, weight: .medium)).lineLimit(1)
-                            Text(Format.fileSize(file.size)).font(.system(size: 12)).foregroundColor(Noct.text48)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .foregroundColor(.white)
-                }
-            }
-        }
-    }
-
-    private func giftCard(_ gift: ChatGift) -> some View {
-        VStack(spacing: 6) {
-            giftArt(gift)
-                .frame(width: 150, height: 150)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            Text(GiftCatalog.shared.name(for: gift.giftId).map { "Подарок «\($0)»" } ?? "Подарок")
-                .font(.system(size: 15, weight: .semibold))
-            HStack(spacing: 4) {
-                Image("StarsIcon").resizable().scaledToFit().frame(width: 14, height: 14)
-                Text("\(gift.price)").font(.system(size: 13, weight: .semibold)).foregroundColor(Noct.gold)
-            }
-            if !gift.message.isEmpty {
-                Text(PremiumEmoji.replace(gift.message))
-                    .font(.system(size: 14))
-                    .foregroundColor(Noct.text75)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    @ViewBuilder private func giftArt(_ gift: ChatGift) -> some View {
-        let path = gift.collectible.map { "/assets/gifts/\($0.modelAsset).webp" } ?? "/assets/gifts/\(gift.giftId).webp"
-        if ChatProbe.has("nogift") {
-            // Probe: the picture alone, no gift player.
-            RemoteImage(url: session.api.mediaURL(path), maxPixel: 360, contentMode: .fit, placeholder: .clear)
-        } else {
-            GiftArt(path: path, collectible: gift.collectible, animated: !ChatProbe.has("stillgift"), featured: true)
-        }
-    }
-
-    private func measure() async {
-        guard ratio == nil, media.count == 1, let item = media.first, let url = session.api.mediaURL(item.path) else { return }
-        let image = item.isVideo
-            ? await VideoThumbnails.shared.thumbnail(for: url)
-            : await ImagePipeline.shared.image(for: url, maxPixel: 900)
-        guard let image, image.size.height > 0 else { return }
-        ratio = image.size.width / image.size.height
-        #if DEBUG
-        ChatProbe.count("ratio " + ChatProbe.short(message.id))
-        #endif
+            .padding(.top, 6)
+            .accessibilityLabel("Предпросмотр: " + PremiumEmoji.replace(text))
     }
 }

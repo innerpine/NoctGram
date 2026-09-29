@@ -222,7 +222,13 @@ enum PlaybackAudio {
         guard !PictureInPictureKeeper.active else { return }
         let session = AVAudioSession.sharedInstance()
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
-        try? session.setCategory(.soloAmbient)
+        idle()
+    }
+
+    /// Silent loops of round videos mix with other apps instead of
+    /// stopping their music.
+    static func idle() {
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
     }
 }
 

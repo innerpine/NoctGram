@@ -9,6 +9,7 @@ struct NoctgramApp: App {
 
     init() {
         BarAppearance.apply()
+        PlaybackAudio.idle()
     }
 
     var body: some Scene {

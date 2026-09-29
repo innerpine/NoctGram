@@ -202,6 +202,14 @@ jobs:
           sleep 6; xcrun simctl io "$UDID" screenshot shots/21d-gift-collectible.png >/dev/null
           # A group: Bob has Premium, his name and star take his palette.
           shot 22-group 8765 -noct.debugTab messages -noct.debugRoute room:room_night_walks
+          # Stickers, premium emoji, voice and round messages, a forward and a
+          # shared post; the sticker and emoji panel; forwarding; «Избранное».
+          WAIT=12 shot 60-chat-media 8765 -noct.debugTab messages -noct.debugRoute chat:local_carol
+          WAIT=12 shot 61-sticker-panel 8765 -noct.debugTab messages -noct.debugRoute chat:local_carol -noct.debugSheet stickers
+          WAIT=12 shot 62-emoji-panel 8765 -noct.debugTab messages -noct.debugRoute chat:local_carol -noct.debugSheet emoji
+          shot 63-forward-sheet 8765 -noct.debugTab messages -noct.debugRoute chat:local_carol -noct.debugSheet forward
+          shot 64-saved 8765 -noct.debugTab messages -noct.debugRoute "chat:$ME"
+          WAIT=12 shot 65-group-media 8765 -noct.debugTab messages -noct.debugRoute room:room_media
           # The team's cabinet, which the mock viewer may open.
           shot 42-team 8765 -noct.debugTab profile -noct.debugRoute team:cabinet
           shot 43-team-reports 8765 -noct.debugTab profile -noct.debugRoute team:reports

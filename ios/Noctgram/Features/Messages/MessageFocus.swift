@@ -358,66 +358,6 @@ private struct ReplyPan: UIGestureRecognizerRepresentable {
     }
 }
 
-/// Where to forward a message: recent dialogues, or anyone found by name.
-struct ForwardSheet: View {
-    @EnvironmentObject private var session: AppSession
-    @Environment(\.dismiss) private var dismiss
-    let send: (Person) -> Void
-    @State private var query = ""
-    @State private var recent: [Person] = []
-    @State private var found: [Person] = []
-
-    private var term: String { query.trimmingCharacters(in: .whitespaces) }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                ForEach(term.isEmpty ? recent : found) { person in
-                    Button {
-                        send(person)
-                        dismiss()
-                    } label: {
-                        PersonRow(person: person.identity)
-                    }
-                    .listRowBackground(Noct.sheetRow)
-                }
-                if (term.isEmpty ? recent : found).isEmpty {
-                    Text(term.isEmpty ? "Начни вводить имя или юзернейм" : "Никого не нашли")
-                        .font(.system(size: 14))
-                        .foregroundColor(Noct.text48)
-                        .listRowBackground(Noct.sheetRow)
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .sheetSurface()
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Кому переслать")
-            .navigationTitle("Переслать")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Отмена") { dismiss() }
-                }
-            }
-            .task {
-                if let data = try? await session.api.social("threads") {
-                    recent = data.array.map { Person($0) }.filter { $0.id != "noctgram" }
-                }
-                if recent.isEmpty { recent = session.people }
-            }
-            .task(id: term) {
-                guard !term.isEmpty else { return }
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                guard !Task.isCancelled else { return }
-                if let data = try? await session.api.social("people", ["q": term]) {
-                    found = data.array.map { Person($0) }.filter { $0.id != session.myId }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-    }
-}
-
 enum ScreenInsets {
     /// Safe area of the key window (the focus overlay ignores it).
     static var current: UIEdgeInsets {

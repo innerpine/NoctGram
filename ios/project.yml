@@ -55,7 +55,8 @@ targets:
           - audio
         ITSAppUsesNonExemptEncryption: false
         NSPhotoLibraryUsageDescription: Noctgram открывает фото и видео, которые ты выбираешь для публикаций, аватара, обложки и сообщений.
-        NSCameraUsageDescription: Noctgram использует камеру, чтобы снять фото для публикации или сообщения.
+        NSCameraUsageDescription: Noctgram использует камеру, чтобы снять фото для публикации или сообщения и записать видеосообщение в кружке.
+        NSMicrophoneUsageDescription: Noctgram использует микрофон, чтобы записать голосовое сообщение или звук видеосообщения.
         NSPhotoLibraryAddUsageDescription: Noctgram сохраняет выбранные фото в твою медиатеку.
         # A self-hosted or local development server may use plain http.
         NSAppTransportSecurity:

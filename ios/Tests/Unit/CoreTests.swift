@@ -232,8 +232,83 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(account.status.title, "Заблокирован")
         XCTAssertEqual(account.current, "Сейчас: блокировка, бессрочно. Спам")
         XCTAssertTrue(account.canRestrict)
-        let message = RoomMessage(try json(#"{"id":"m","sender":"b","senderName":"Боб","senderAppearance":{"premium":1,"profileTheme":"aurora"}}"#))
+        let message = ChatMessage(room: try json(#"{"id":"m","sender":"b","senderName":"Боб","senderAppearance":{"premium":1,"profileTheme":"aurora"}}"#))
         XCTAssertTrue(message.senderAppearance.premium)
         XCTAssertEqual(message.senderAppearance.theme, .aurora)
+    }
+
+    /// Waveforms as lib/voice-waveform.ts stores them: one base32 character
+    /// per 0–31 sample, loud outliers capped at 1.8× the mean.
+    func testWaveformsReadAsTheSite() {
+        XCTAssertEqual(Waveform.decode("0v80"), [0, 31, 8, 0])
+        XCTAssertEqual(Waveform.encode([0, 31, 8, 40, -2]), "0v8v0")
+        XCTAssertEqual(Waveform.decode("0v8?w"), [0, 31, 8])
+        let wave = Waveform.fromPeaks([0, 1000, 2000, 30000], count: 4)
+        // The cap is max(1.8 × mean, 2500) = 14 850: the outlier is 31.
+        XCTAssertEqual(wave, [0, 2, 4, 31])
+        XCTAssertEqual(Waveform.resample([1, 5, 2, 9], bars: 2), [5, 9])
+        XCTAssertEqual(Waveform.barCount(duration: 1), 24)
+        XCTAssertEqual(Waveform.barCount(duration: 60), 56)
+        XCTAssertEqual(Waveform.clock(67.4), "1:07")
+        XCTAssertEqual(Waveform.clock(7.46, tenths: true), "0:07,4")
+    }
+
+    /// Premium and custom emoji tokens (lib/premium-emoji.ts) and the large
+    /// emoji rule (lib/chat-emoji.ts): one to six emoji, tokens count as one.
+    func testEmojiTokensReadAsTheSite() {
+        let custom = ":ce_3f0c2a9e-8d7b-4c1a-9e2f-5b6d7c8e9f01:"
+        XCTAssertEqual(EmojiTokens.parts("Горит :noct_fire:!"), [.text("Горит "), .token(":noct_fire:"), .text("!")])
+        XCTAssertEqual(EmojiTokens.parts(":noct_unknown_thing: x"), [.text(":noct_unknown_thing: x")])
+        XCTAssertEqual(EmojiTokens.customId(custom), "3f0c2a9e-8d7b-4c1a-9e2f-5b6d7c8e9f01")
+        XCTAssertEqual(EmojiTokens.fallback("А :noct_star_gold: и \(custom)"), "А ⭐ и ✨")
+        XCTAssertTrue(EmojiTokens.contains("x :noct_duck:"))
+        XCTAssertFalse(EmojiTokens.contains("просто текст"))
+        XCTAssertEqual(EmojiTokens.largeCount(":noct_fire::noct_moon: 🔥"), 3)
+        XCTAssertEqual(EmojiTokens.largeCount("🔥🔥🔥🔥🔥🔥🔥"), 0)
+        XCTAssertEqual(EmojiTokens.largeCount("ок 🔥"), 0)
+        XCTAssertEqual(EmojiTokens.largeCount("❤️"), 1)
+    }
+
+    /// Stickers resolve to their pictures the way the site finds them.
+    func testStickersReadAsTheSite() throws {
+        func json(_ text: String) throws -> JSON { try XCTUnwrap(JSON.parse(Data(text.utf8))) }
+        let built = Sticker(try json(#"{"ref":"b:utya:birthday","packRef":"b:utya","emoji":"🎂","format":"lottie","src":"/assets/stickers/tgs/UtyanBirthday.json","w":512,"h":512,"available":true}"#))
+        XCTAssertTrue(built.animated)
+        XCTAssertEqual(built.poster, "/assets/stickers/posters/UtyanBirthday.webp")
+        XCTAssertEqual(built.packName, "utya")
+        let upload = Sticker(try json(#"{"ref":"u:1","packRef":"u:7a1b","emoji":"😺","format":"tgs","src":"/api/media/5d6e","available":true}"#))
+        XCTAssertTrue(upload.animated)
+        XCTAssertNil(upload.poster)
+        XCTAssertEqual(upload.packName, "u:7a1b")
+        let still = Sticker(try json(#"{"ref":"u:2","format":"webp","src":"/api/media/9","available":true}"#))
+        XCTAssertFalse(still.animated)
+        XCTAssertEqual(still.poster, "/api/media/9")
+        let gone = Sticker(try json(#"{"ref":"u:3","emoji":"🐱","format":"webp","src":"","available":true}"#))
+        XCTAssertFalse(gone.available)
+        XCTAssertEqual(EmojiTokens.legacySticker(EmojiTokens.legacy[6]).poster, "/assets/emoji/5424972470023104089.preview.webp")
+    }
+
+    /// Voice, round, sticker, quote and shared post fields of a message.
+    func testChatMessagesCarryTheNewKinds() throws {
+        func json(_ text: String) throws -> JSON { try XCTUnwrap(JSON.parse(Data(text.utf8))) }
+        let voice = ChatMessage(try json(#"{"id":"message:b:k","sender":"b","recipient":"a","text":"","created":1,"read":0,"listenedAt":0,"forwardedName":"Кэрол","forwardedSender":"c","attachments":[{"id":"v","name":"voice.m4a","type":"audio/mp4","size":9,"kind":"voice","duration":4200,"waveform":"0v8"}],"reply":{"id":"x","sender":"a","name":"Алиса","text":"Встречаемся в восемь","unavailable":false,"quote":"в восемь"}}"#))
+        XCTAssertEqual(voice.voice?.duration, 4.2)
+        XCTAssertEqual(voice.voice?.waveform, [0, 31, 8])
+        XCTAssertEqual(voice.summary, "Голосовое сообщение")
+        XCTAssertEqual(voice.forwardedSender, "c")
+        XCTAssertEqual(voice.reply?.quote, "в восемь")
+        XCTAssertEqual(voice.listenedAt, 0)
+        let sticker = ChatMessage(try json(#"{"id":"s","sender":"b","text":"","sticker":"b:utya:birthday","postShare":null}"#))
+        XCTAssertEqual(sticker.sticker, "b:utya:birthday")
+        XCTAssertEqual(sticker.summary, "Стикер")
+        let post = ChatMessage(try json(#"{"id":"p","sender":"b","text":"","postShare":{"id":"post-1"}}"#))
+        XCTAssertEqual(post.postShare, "post-1")
+        let room = ChatMessage(room: try json(#"{"id":"r","roomId":"g","sender":"b","senderName":"Боб","text":"","deletedAt":5,"attachments":[{"id":"o","kind":"round","type":"video/mp4","duration":12000}],"forwardedName":"Кэрол","forwardedFrom":"c","topicId":"t1","replyTo":"q"}"#))
+        XCTAssertTrue(room.deleted)
+        XCTAssertEqual(room.round?.duration, 12)
+        XCTAssertEqual(room.forwardedSender, "c")
+        XCTAssertEqual(room.topicId, "t1")
+        XCTAssertEqual(room.recipient, "g")
+        XCTAssertEqual(room.reply?.id, "q")
     }
 }

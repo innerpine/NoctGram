@@ -361,6 +361,14 @@ const builtin = await read('bob', 'action=pack&name=utya');
 assert.equal(builtin.body.builtin, true);
 assert.equal(builtin.body.stickers[0].ref, 'b:utya:birthday');
 assert.equal((await read('bob', 'action=pack&name=nothing_here')).status, 404);
+// The iOS app lists the built-in packs instead of bundling the catalog.
+const builtins = (await read('bob', 'action=builtin')).body.packs;
+assert.deepEqual(
+  builtins.map((pack) => pack.ref),
+  ['b:utya', 'b:monkey', 'b:holiday', 'b:tgweb'],
+);
+assert.equal(builtins[3].type, 'emoji');
+assert.equal(builtins[3].stickers[0].token, ':noct_star_gold:');
 assert.equal(
   (await stickers('bob', { action: 'install', ref: 'u:' + cats.body.id }))
     .status,

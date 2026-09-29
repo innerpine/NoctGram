@@ -3,6 +3,7 @@ import { readJsonBody, readMultipart } from '@/lib/request-body';
 import { rateLimit } from '@/lib/rate-limit';
 import {
   addSticker,
+  builtinStickerPacks,
   createPack,
   deletePack,
   faveSticker,
@@ -24,7 +25,9 @@ export const dynamic = 'force-dynamic';
 const MAX_BODY = 16000;
 const headers = { 'Cache-Control': 'private, no-store' };
 
-// GET ?action=panel | pack&name=<short name or u:id> | mine | resolve&refs=a,b
+// GET ?action=panel | builtin | pack&name=<short name or u:id> | mine | resolve&refs=a,b
+// «builtin» lists the packs of lib/sticker-catalog.json for clients that do
+// not bundle the catalog (the iOS app).
 export async function GET(req: Request) {
   try {
     const me = await viewer();
@@ -35,17 +38,19 @@ export async function GET(req: Request) {
     const result =
       action === 'panel'
         ? await stickerPanel(me)
-        : action === 'pack'
-          ? await readPack(me, params.get('name'))
-          : action === 'mine'
-            ? await myPacks(me)
-            : action === 'resolve'
-              ? {
-                  stickers: await resolveStickers(
-                    (params.get('refs') || '').split(',').filter(Boolean),
-                  ),
-                }
-              : null;
+        : action === 'builtin'
+          ? { packs: builtinStickerPacks() }
+          : action === 'pack'
+            ? await readPack(me, params.get('name'))
+            : action === 'mine'
+              ? await myPacks(me)
+              : action === 'resolve'
+                ? {
+                    stickers: await resolveStickers(
+                      (params.get('refs') || '').split(',').filter(Boolean),
+                    ),
+                  }
+                : null;
     if (!result) throw new ApiError(400, 'Неизвестное действие');
     return Response.json(result, { headers });
   } catch (error) {

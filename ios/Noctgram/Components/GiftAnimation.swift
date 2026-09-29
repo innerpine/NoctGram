@@ -35,7 +35,9 @@ final class GiftAnimations {
         if let task = running[url] { return await task.value?.animation }
         let task = Task.detached(priority: .utility) { () -> Box? in
             guard var data = await ImagePipeline.shared.data(for: url) else { return nil }
-            if url.pathExtension == "tgs" {
+            // .tgs files are gzipped Lottie; uploaded stickers come from
+            // /api/media without an extension, so the header decides.
+            if data.starts(with: [0x1F, 0x8B]) {
                 guard let json = Gzip.inflate(data) else { return nil }
                 data = json
             }
@@ -59,10 +61,16 @@ final class GiftAnimations {
 /// static picture, and a player that stops frees its Lottie layers.
 @MainActor
 final class GiftPlayback: NSObject {
-    static let shared = GiftPlayback()
+    static let shared = GiftPlayback(limit: 3)
+    /// Stickers and custom emoji: six at once, as lib/gift-animation-runtime.ts.
+    static let stickers = GiftPlayback(limit: 6)
 
-    private let limit = 3
+    private let limit: Int
     private let settle: CFTimeInterval = 0.25
+
+    init(limit: Int) {
+        self.limit = limit
+    }
     private var players: [GiftPlayerView] = []
     private var link: CADisplayLink?
     #if DEBUG
@@ -145,6 +153,8 @@ final class GiftPlayerView: UIView {
     private(set) var featured = false
     private(set) var screenFrame = CGRect.null
     private(set) var stillSince: CFTimeInterval = 0
+    /// Which limit this player counts against.
+    private var pool = GiftPlayback.shared
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -159,9 +169,14 @@ final class GiftPlayerView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func configure(art: URL?, animation: URL?, featured: Bool) {
+    func configure(art: URL?, animation: URL?, featured: Bool, pool: GiftPlayback = .shared) {
         self.featured = featured
-        if art != artURL {
+        if pool !== self.pool {
+            if registered { self.pool.unregister(self) }
+            registered = false
+            self.pool = pool
+        }
+        if art != artURL || (art == nil && animation != animationURL) {
             artURL = art
             imageTask?.cancel()
             imageView.image = art.flatMap { ImagePipeline.shared.cached($0, maxPixel: 360) }
@@ -169,6 +184,13 @@ final class GiftPlayerView: UIView {
                 imageTask = Task { [weak self] in
                     let image = await ImagePipeline.shared.image(for: art, maxPixel: 360)
                     guard !Task.isCancelled, let self, self.artURL == art else { return }
+                    self.imageView.image = image
+                }
+            } else if art == nil, let animation {
+                // Uploaded stickers have no poster: the first frame stands in.
+                imageTask = Task { [weak self] in
+                    let image = await LottieStill.image(for: animation)
+                    guard !Task.isCancelled, let self, self.artURL == nil else { return }
                     self.imageView.image = image
                 }
             }
@@ -203,9 +225,9 @@ final class GiftPlayerView: UIView {
         guard wanted != registered else { return }
         registered = wanted
         if wanted {
-            GiftPlayback.shared.register(self)
+            pool.register(self)
         } else {
-            GiftPlayback.shared.unregister(self)
+            pool.unregister(self)
         }
     }
 
@@ -319,6 +341,7 @@ struct GiftPlayer: UIViewRepresentable {
     let art: URL?
     let animation: URL?
     var featured = false
+    var pool: GiftPlayback = .shared
 
     func makeUIView(context: Context) -> GiftPlayerView {
         GiftPlayerView(frame: .zero)
@@ -326,11 +349,33 @@ struct GiftPlayer: UIViewRepresentable {
 
     func updateUIView(_ view: GiftPlayerView, context: Context) {
         ChatProbe.count("gift update")
-        view.configure(art: art, animation: animation, featured: featured)
+        view.configure(art: art, animation: animation, featured: featured, pool: pool)
     }
 
     static func dismantleUIView(_ view: GiftPlayerView, coordinator: ()) {
         view.teardown()
+    }
+}
+
+/// The first frame of a Lottie animation as a picture, for stickers that
+/// come without a poster (lib/lottie-poster.ts draws it the same way).
+@MainActor
+enum LottieStill {
+    private static let cache = NSCache<NSURL, UIImage>()
+
+    static func image(for url: URL, side: CGFloat = 160) async -> UIImage? {
+        if let image = cache.object(forKey: url as NSURL) { return image }
+        guard let animation = await GiftAnimations.shared.animation(for: url) else { return nil }
+        let view = LottieAnimationView(animation: animation, configuration: LottieConfiguration(renderingEngine: .mainThread))
+        view.frame = CGRect(x: 0, y: 0, width: side, height: side)
+        view.contentMode = .scaleAspectFit
+        view.currentProgress = 0
+        view.layoutIfNeeded()
+        let image = UIGraphicsImageRenderer(size: view.bounds.size).image { context in
+            view.layer.render(in: context.cgContext)
+        }
+        cache.setObject(image, forKey: url as NSURL)
+        return image
     }
 }
 

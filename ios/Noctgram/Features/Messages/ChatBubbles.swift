@@ -342,7 +342,7 @@ struct BubbleTime: View {
 }
 
 /// Message text with tappable links and, when given, the time at the end
-/// of the last line.
+/// of the last line. Premium and custom emoji are inline pictures.
 struct InlineTimeText: View {
     @EnvironmentObject private var session: AppSession
     let text: String
@@ -351,10 +351,18 @@ struct InlineTimeText: View {
 
     var body: some View {
         let _ = ChatProbe.count("text body")
-        let message = Text(RichText.attributed(text, baseURL: session.api.baseURL))
+        if EmojiTokens.contains(text) {
+            TokenTimeText(text: text, time: time, accent: accent)
+        } else {
+            Self.layout(Text(RichText.attributed(text, baseURL: session.api.baseURL)), time: time, accent: accent)
+        }
+    }
+
+    static func layout(_ text: Text, time: BubbleTime?, accent: Color) -> some View {
+        let message = text
             .font(.system(size: 16))
             .foregroundColor(Color.white.opacity(0.93))
-        (time.map { message + $0.placeholder } ?? message)
+        return (time.map { message + $0.placeholder } ?? message)
             .lineSpacing(2)
             .tint(accent)
             .fixedSize(horizontal: false, vertical: true)
@@ -362,6 +370,22 @@ struct InlineTimeText: View {
             .overlay(alignment: .bottomTrailing) {
                 if let time { time.accessibilityHidden(true) }
             }
+    }
+}
+
+/// Text with emoji tokens: redrawn when their pictures arrive.
+private struct TokenTimeText: View {
+    @EnvironmentObject private var session: AppSession
+    @ObservedObject private var images = EmojiImages.shared
+    @ObservedObject private var stickers = StickerStore.shared
+    let text: String
+    let time: BubbleTime?
+    let accent: Color
+
+    var body: some View {
+        let _ = (images.revision, stickers.revision)
+        InlineTimeText.layout(EmojiText.text(text, fontSize: 16, session: session), time: time, accent: accent)
+            .task { await stickers.load(api: session.api, me: session.myId ?? "") }
     }
 }
 

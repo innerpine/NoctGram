@@ -144,6 +144,15 @@ struct ThreadsView: View {
         .navigationTitle("Сообщения")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    if let me = session.me { nav.push(.chat(Person(identity: me.identity))) }
+                } label: {
+                    Image(systemName: "bookmark")
+                }
+                .accessibilityLabel("Избранное")
+                .accessibilityIdentifier("open-saved")
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     showNew = true
@@ -276,11 +285,12 @@ struct ThreadsView: View {
             } label: {
                 ThreadRow(
                     identity: person.identity,
-                    title: nil,
+                    title: person.id == session.myId ? "Избранное" : nil,
                     text: PremiumEmoji.replace(person.lastText),
                     time: person.lastTime,
                     unread: person.unread,
-                    online: Format.isOnline(person.lastSeen)
+                    online: person.id != session.myId && Format.isOnline(person.lastSeen),
+                    saved: person.id == session.myId
                 )
             }
             .buttonStyle(PressableStyle())
@@ -322,10 +332,12 @@ struct ThreadRow: View {
     let time: Double
     let unread: Int
     let online: Bool
+    /// «Избранное», the dialogue with oneself.
+    var saved = false
 
     var body: some View {
         HStack(spacing: 12) {
-            AvatarView(person: identity, size: 52)
+            avatar
                 .overlay(alignment: .bottomTrailing) {
                     if online {
                         Circle()
@@ -368,6 +380,14 @@ struct ThreadRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder private var avatar: some View {
+        if saved {
+            SavedAvatar(size: 52)
+        } else {
+            AvatarView(person: identity, size: 52)
+        }
     }
 }
 

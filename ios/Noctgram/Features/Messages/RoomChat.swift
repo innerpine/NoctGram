@@ -1,49 +1,33 @@
+import PhotosUI
 import SwiftUI
 
-struct RoomMessage: Identifiable, Hashable {
-    var id: String
-    var sender: String
-    var senderName: String
-    var senderAvatar: String
-    /// Premium palette and badges of the author, for the name above the bubble.
-    var senderAppearance = Appearance()
-    var text: String
-    var encrypted: Bool
-    var replyTo: String
-    var created: Double
-    var deleted: Bool
-    var reactions: [Reaction]
-    var pending = false
+/// A forum topic of a group (lib/room-topic-shared.ts).
+struct RoomTopic: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let color: Int
+    let emoji: String
+    let closed: Bool
+    let unread: Int
+    let lastText: String
+    let lastTime: Double
 
     init(_ j: JSON) {
         id = j["id"].str
-        sender = j["sender"].str
-        senderName = j["senderName"].str
-        senderAvatar = j["senderAvatar"].str
-        senderAppearance = Appearance(j["senderAppearance"])
-        text = j["text"].str
-        encrypted = !j["ciphertext"].isNull
-        replyTo = j["replyTo"].str
-        created = j["created"].double ?? 0
-        deleted = (j["deletedAt"].double ?? 0) > 0
-        reactions = j["reactions"].array.map {
-            Reaction(emoji: $0["emoji"].str, count: $0["count"].int ?? 0, own: $0["own"].bool)
-        }
+        title = j["title"].str
+        color = j["color"].int ?? 0
+        emoji = j["emoji"].str
+        closed = (j["closedAt"].double ?? 0) > 0
+        unread = j["unread"].int ?? 0
+        let last = j["lastMessage"]
+        lastText = last["text"].str
+        lastTime = last["created"].double ?? (j["updatedAt"].double ?? 0)
     }
 
-    init(localId: String, sender: String, name: String, avatar: String, text: String, replyTo: String) {
-        id = localId
-        self.sender = sender
-        senderName = name
-        senderAvatar = avatar
-        self.text = text
-        encrypted = false
-        self.replyTo = replyTo
-        created = Format.nowMs
-        deleted = false
-        reactions = []
-        pending = true
-    }
+    /// The six topic colours of the web.
+    static let palette: [UInt32] = [0x6FB9F0, 0xFFD67E, 0xCB86DB, 0x8EEE98, 0xFF93B2, 0xFB6F5F]
+    var tint: Color { Color(hex: Self.palette[max(0, min(5, color))]) }
+    var isGeneral: Bool { id == "general" }
 }
 
 @MainActor
@@ -54,10 +38,16 @@ final class RoomStore: ObservableObject {
     @Published var memberCount = 0
     @Published var canSend = false
     @Published var role = "member"
-    @Published var messages: [RoomMessage] = []
+    @Published var forum = false
+    @Published var topics: [RoomTopic] = []
+    /// The open topic of a forum; nil shows every topic mixed.
+    @Published var topic: String?
+    @Published var messages: [ChatMessage] = []
     @Published var loaded = false
     @Published var error: String?
-    private var pending: [RoomMessage] = []
+    @Published var attachments: [ChatAttachment] = []
+    @Published var uploading = 0
+    private var pending: [ChatMessage] = []
     private var lastRead = ""
 
     init(roomId: String) {
@@ -68,13 +58,25 @@ final class RoomStore: ObservableObject {
 
     func load(api: APIClient) async {
         do {
-            let data = try await api.get("/api/rooms", ["action": "room", "id": roomId])
+            var query: [String: String?] = ["action": "room", "id": roomId]
+            if let topic { query["topic"] = topic }
+            let data = try await api.get("/api/rooms", query)
             name = data["name"].str
             kind = data["kind"].string ?? "group"
             memberCount = data["memberCount"].int ?? data["members"].array.count
             canSend = data["canSend"].bool
             role = data["role"].string ?? "member"
-            let server = data["messages"].array.map { RoomMessage($0) }
+            forum = data["forum"].bool || !data["topics"].array.isEmpty
+            topics = data["topics"].array.map(RoomTopic.init)
+            var server = data["messages"].array.map { ChatMessage(room: $0) }
+            // An older server sends only the id of the answered message.
+            for index in server.indices {
+                guard let reply = server[index].reply, reply.text.isEmpty, !reply.unavailable,
+                      let original = server.first(where: { $0.id == reply.id }) else { continue }
+                server[index].reply = ReplyPreview(id: original.id, sender: original.sender, name: original.senderName,
+                                                   text: original.deleted ? "Сообщение удалено" : original.summary,
+                                                   unavailable: original.deleted)
+            }
             let known = Set(server.map(\.id))
             pending.removeAll { known.contains($0.id) }
             let merged = server + pending
@@ -82,7 +84,9 @@ final class RoomStore: ObservableObject {
             error = nil
             if let last = server.last?.id, last != lastRead {
                 lastRead = last
-                _ = try? await api.post("/api/rooms", ["action": "read", "id": roomId, "through": last])
+                var body: [String: Any] = ["action": "read", "id": roomId, "through": last]
+                if let topic { body["topic"] = topic }
+                _ = try? await api.post("/api/rooms", body)
             }
         } catch {
             if let message = error.userMessage, messages.isEmpty { self.error = message }
@@ -90,31 +94,116 @@ final class RoomStore: ObservableObject {
         loaded = true
     }
 
-    func send(_ text: String, reply: RoomMessage?, session: AppSession) async {
-        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty, let me = session.me else { return }
-        let key = UUID().uuidString.lowercased()
-        let local = RoomMessage(localId: key, sender: me.id, name: me.name, avatar: me.avatar, text: value, replyTo: reply?.id ?? "")
-        pending.append(local)
-        messages.append(local)
-        var body: [String: Any] = ["action": "send", "id": roomId, "key": key, "text": value]
+    private func preview(_ reply: ChatMessage?) -> ReplyPreview? {
+        reply.map { ReplyPreview(id: $0.id, sender: $0.sender, name: $0.senderName, text: $0.summary, unavailable: false) }
+    }
+
+    private func local(_ key: String, text: String, attachments: [ChatAttachment], reply: ChatMessage?, sticker: String, session: AppSession) -> ChatMessage? {
+        guard let me = session.me else { return nil }
+        var message = ChatMessage(localId: key, sender: me.id, recipient: roomId, text: text, attachments: attachments, reply: preview(reply), sticker: sticker)
+        message.senderName = me.name
+        message.senderAvatar = me.avatar
+        return message
+    }
+
+    /// Sends with the key as the message id; a message held for moderation
+    /// comes back `queued` and is not shown until approved.
+    private func deliver(_ message: ChatMessage, extra: [String: Any], reply: ChatMessage?, session: AppSession) async {
+        pending.append(message)
+        messages.append(message)
+        var body: [String: Any] = [
+            "action": "send",
+            "actor": message.sender,
+            "id": roomId,
+            "key": message.id,
+            "text": message.text,
+            "attachments": message.attachments.map(\.id),
+        ]
+        body.merge(extra) { _, new in new }
         if let reply { body["replyTo"] = reply.id }
+        // Answers stay in the topic of the answered message.
+        if forum, let chosen = reply.map({ $0.topicId.isEmpty ? "general" : $0.topicId }) ?? topic { body["topic"] = chosen }
         do {
             let result = try await session.api.post("/api/rooms", body)
-            if result["id"].string == nil {
-                session.show("Сообщение отправлено на проверку")
-                pending.removeAll { $0.id == key }
+            if result["queued"].bool || result["id"].string == nil {
+                session.show(result["notice"].string ?? "Сообщение отправлено на проверку")
+                pending.removeAll { $0.id == message.id }
+                messages.removeAll { $0.id == message.id }
             }
             await load(api: session.api)
         } catch {
-            pending.removeAll { $0.id == key }
-            messages.removeAll { $0.id == key }
+            pending.removeAll { $0.id == message.id }
+            messages.removeAll { $0.id == message.id }
+            session.report(error)
+        }
+    }
+
+    func send(_ text: String, reply: ChatMessage?, session: AppSession) async {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let files = attachments
+        guard !value.isEmpty || !files.isEmpty else { return }
+        let key = UUID().uuidString.lowercased()
+        guard let message = local(key, text: value, attachments: files, reply: reply, sticker: "", session: session) else { return }
+        attachments = []
+        await deliver(message, extra: [:], reply: reply, session: session)
+    }
+
+    func sendSticker(_ sticker: Sticker, reply: ChatMessage?, session: AppSession) async {
+        let key = UUID().uuidString.lowercased()
+        guard let message = local(key, text: "", attachments: [], reply: reply, sticker: sticker.ref, session: session) else { return }
+        await deliver(message, extra: ["sticker": sticker.ref], reply: reply, session: session)
+    }
+
+    func sendRecording(_ file: URL, round: Bool, duration: Double, waveform: [Int], reply: ChatMessage?, session: AppSession) async {
+        defer { try? FileManager.default.removeItem(at: file) }
+        let milliseconds = max(1, Int((duration * 1000).rounded()))
+        var fields = [
+            "room": roomId,
+            "intent": round ? "round" : "voice",
+            "duration": String(round ? min(milliseconds, 61000) : milliseconds),
+        ]
+        if !round { fields["waveform"] = Waveform.encode(waveform) }
+        uploading += 1
+        do {
+            guard let data = try? Data(contentsOf: file) else { throw MediaEncoder.Failure(errorDescription: "Запись не сохранилась.") }
+            let result = try await session.api.upload(
+                "/api/chat-upload",
+                data: data,
+                filename: round ? "video-message.mp4" : "voice.m4a",
+                mimeType: round ? "video/mp4" : "audio/mp4",
+                fields: fields
+            )
+            uploading -= 1
+            let key = UUID().uuidString.lowercased()
+            guard let message = local(key, text: "", attachments: [ChatAttachment(result)], reply: reply, sticker: "", session: session) else { return }
+            await deliver(message, extra: [:], reply: reply, session: session)
+        } catch {
+            uploading -= 1
+            session.report(error)
+        }
+    }
+
+    func upload(_ item: PhotosPickerItem, session: AppSession) async {
+        uploading += 1
+        defer { uploading -= 1 }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else { return }
+            let prepared = try MediaEncoder.prepare(data, types: item.supportedContentTypes)
+            let result = try await session.api.upload(
+                "/api/chat-upload",
+                data: prepared.data,
+                filename: prepared.filename,
+                mimeType: prepared.mimeType,
+                fields: ["room": roomId]
+            )
+            attachments.append(ChatAttachment(result))
+        } catch {
             session.report(error)
         }
     }
 
     /// Shows the reaction at once; nil takes the viewer's reaction back.
-    func react(_ message: RoomMessage, emoji: String?, session: AppSession) async {
+    func react(_ message: ChatMessage, emoji: String?, session: AppSession) async {
         let before = messages.first { $0.id == message.id }?.reactions ?? message.reactions
         setReactions(Reaction.applying(emoji, to: before), for: message.id)
         do {
@@ -136,7 +225,7 @@ final class RoomStore: ObservableObject {
         if let index = messages.firstIndex(where: { $0.id == id }) { messages[index].reactions = reactions }
     }
 
-    func delete(_ message: RoomMessage, session: AppSession) async {
+    func delete(_ message: ChatMessage, session: AppSession) async {
         do {
             _ = try await session.api.post("/api/rooms", ["action": "deleteMessage", "id": roomId, "messageId": message.id])
             await load(api: session.api)
@@ -146,7 +235,25 @@ final class RoomStore: ObservableObject {
     }
 }
 
-/// A group chat (app/room-conversation.tsx). Secret chats need the device
+/// Group recordings have no server mark: the web keeps the last 500 played
+/// ids on the device (lib/media-playback.ts), and so does the app.
+enum PlayedRecordings {
+    private static let key = "noct.listened"
+
+    static func contains(_ id: String) -> Bool {
+        (UserDefaults.standard.array(forKey: key) as? [String] ?? []).contains(id)
+    }
+
+    static func add(_ id: String) {
+        var list = UserDefaults.standard.array(forKey: key) as? [String] ?? []
+        guard !list.contains(id) else { return }
+        list.append(id)
+        UserDefaults.standard.set(Array(list.suffix(500)), forKey: key)
+    }
+}
+
+/// A group chat (app/room-conversation.tsx): the same bubbles as a
+/// dialogue with the author's name and face. Secret chats need the device
 /// keys of the web client and open there.
 struct RoomChatView: View {
     @EnvironmentObject private var session: AppSession
@@ -154,10 +261,17 @@ struct RoomChatView: View {
     let roomId: String
     let title: String
     @StateObject private var store: RoomStore
+    @StateObject private var recorder = MessageRecorder()
     @State private var text = ""
-    @State private var replyTo: RoomMessage?
+    @State private var replyTo: ChatMessage?
     @State private var atEnd = true
     @State private var window = ChatWindow()
+    @State private var picked: [PhotosPickerItem] = []
+    @State private var forwarding: ChatMessage?
+    @State private var openPack: StickerPanel.PackRequest?
+    @State private var panel = false
+    @State private var keyboard: CGFloat = 0
+    @State private var played: Set<String> = []
     @EnvironmentObject private var focus: MessageFocus
     @FocusState private var focused: Bool
 
@@ -204,6 +318,7 @@ struct RoomChatView: View {
             .modifier(ChatEndTracker(atEnd: $atEnd))
             .modifier(ChatFollowsEnd(proxy: proxy, last: store.messages.last?.id, atEnd: atEnd, bar: replyTo?.id, messages: store.messages))
             .background(ChatBackdrop(palette: .noct))
+            .simultaneousGesture(TapGesture().onEnded { if panel { withAnimation(Noct.quick) { panel = false } } })
             .onChange(of: store.messages.last?.id) { id in
                 guard let id else { return }
                 withAnimation(Noct.quick) { proxy.scrollTo(id, anchor: .bottom) }
@@ -212,26 +327,12 @@ struct RoomChatView: View {
                 window.hidden = window.start(store.messages.count)
             }
         }
-        .glassBottomBar {
-            if store.canSend && !store.isSecret && !session.readOnly {
-                VStack(spacing: 0) {
-                    if let reply = replyTo {
-                        ComposerContext(title: "Ответ \(reply.senderName)", text: reply.text) {
-                            replyTo = nil
-                        }
-                    }
-                    ComposerBar(text: $text, placeholder: "Сообщение в группу", sending: false, focus: $focused, leading: nil) {
-                        let value = text
-                        let reply = replyTo
-                        text = ""
-                        replyTo = nil
-                        Task { await store.send(value, reply: reply, session: session) }
-                    }
-                }
-            } else if store.loaded && !store.isSecret {
-                ComposerNotice(text: session.readOnly ? "В режиме только для чтения отправка недоступна." : "Писать в эту группу могут только администраторы.")
+        .overlay {
+            if recorder.mode == .round && recorder.active {
+                RoundCaptureOverlay(recorder: recorder, round: recorder.round, accent: Noct.lilac)
             }
         }
+        .glassBottomBar { bottom }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
@@ -240,14 +341,72 @@ struct RoomChatView: View {
                     Text(store.name.isEmpty ? title : store.name)
                         .font(.system(size: 15, weight: .semibold))
                         .lineLimit(1)
-                    if store.memberCount > 0 {
+                    if let topic = currentTopic {
+                        Text(topic.title)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(topic.tint)
+                            .lineLimit(1)
+                    } else if store.memberCount > 0 {
                         Text("\(Format.count(store.memberCount)) \(Format.plural(store.memberCount, "участник", "участника", "участников"))")
                             .font(.system(size: 11))
                             .foregroundColor(Noct.text48)
                     }
                 }
             }
+            if store.forum && !store.topics.isEmpty {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button {
+                            store.topic = nil
+                            reload()
+                        } label: {
+                            Label("Все темы", systemImage: store.topic == nil ? "checkmark" : "bubble.left.and.bubble.right")
+                        }
+                        ForEach(store.topics) { topic in
+                            Button {
+                                store.topic = topic.id
+                                reload()
+                            } label: {
+                                Label((topic.emoji.isEmpty ? "" : topic.emoji + " ") + topic.title + (topic.unread > 0 ? " · \(topic.unread)" : ""),
+                                      systemImage: store.topic == topic.id ? "checkmark" : (topic.closed ? "lock" : "number"))
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "number.square")
+                    }
+                    .accessibilityLabel("Темы")
+                }
+            }
         }
+        .sheet(item: $forwarding) { message in
+            ForwardSheet(source: .room(roomId: roomId, ids: [message.id]))
+                .environmentObject(session)
+        }
+        .sheet(item: $openPack) { request in
+            StickerPackSheet(name: request.name, send: canWrite ? stickerSender : nil)
+                .environmentObject(session)
+        }
+        .onChange(of: picked) { items in
+            guard !items.isEmpty else { return }
+            picked = []
+            for item in items {
+                Task { await store.upload(item, session: session) }
+            }
+        }
+        .onChange(of: focused) { value in
+            if value && panel { panel = false }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { note in
+            if let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                keyboard = max(0, frame.height - ScreenInsets.current.bottom)
+            }
+        }
+        .onAppear(perform: wireRecorder)
+        .onDisappear {
+            recorder.cancel()
+            VoicePlayback.shared.stop()
+        }
+        .task { await StickerStore.shared.load(api: session.api, me: session.myId ?? "") }
         .task {
             while !Task.isCancelled {
                 await store.load(api: session.api)
@@ -258,21 +417,46 @@ struct RoomChatView: View {
         .onDisappear { Task { await session.refreshCounters() } }
     }
 
+    private var currentTopic: RoomTopic? {
+        store.topic.flatMap { id in store.topics.first { $0.id == id } }
+    }
+
+    private func reload() {
+        Task { await store.load(api: session.api) }
+    }
+
+    private func wireRecorder() {
+        recorder.report = { session.show($0) }
+        recorder.sendVoice = { recording in
+            let reply = replyTo
+            replyTo = nil
+            Task { await store.sendRecording(recording.url, round: false, duration: recording.duration, waveform: recording.waveform, reply: reply, session: session) }
+        }
+        recorder.sendRound = { recording in
+            let reply = replyTo
+            replyTo = nil
+            Task { await store.sendRecording(recording.url, round: true, duration: recording.duration, waveform: [], reply: reply, session: session) }
+        }
+    }
+
     /// Consecutive messages of one member within ten minutes form a group.
-    static func joins(_ previous: RoomMessage, _ message: RoomMessage) -> Bool {
+    static func joins(_ previous: ChatMessage, _ message: ChatMessage) -> Bool {
         previous.sender == message.sender && message.created - previous.created < 10 * 60 * 1000
             && Calendar.current.isDate(Format.date(previous.created), inSameDayAs: Format.date(message.created))
     }
 
-    private var canWrite: Bool { store.canSend && !store.isSecret && !session.readOnly }
+    private var canWrite: Bool {
+        guard store.canSend && !store.isSecret && !session.readOnly else { return false }
+        return !(currentTopic?.closed ?? false) || store.role == "owner" || store.role == "admin"
+    }
 
-    private func focusAction(_ message: RoomMessage, joinsPrevious: Bool) -> (CGRect) -> Void {
+    private func focusAction(_ message: ChatMessage, joinsPrevious: Bool) -> (CGRect) -> Void {
         { frame in present(message, frame: frame, joinsPrevious: joinsPrevious) }
     }
 
     private var reactable: Bool { !store.isSecret && !session.readOnly }
 
-    private func reactAction(_ message: RoomMessage) -> (String?) -> Void {
+    private func reactAction(_ message: ChatMessage) -> (String?) -> Void {
         { emoji in Task { await store.react(message, emoji: emoji, session: session) } }
     }
 
@@ -283,18 +467,63 @@ struct RoomChatView: View {
         return [me]
     }
 
-    private func replyAction(_ message: RoomMessage) -> () -> Void {
+    private func replyAction(_ message: ChatMessage) -> () -> Void {
         {
             replyTo = message
-            focused = true
+            if !panel { focused = true }
         }
+    }
+
+    private var stickerSender: (Sticker) -> Void {
+        { sticker in send(sticker) }
+    }
+
+    private func send(_ sticker: Sticker) {
+        let reply = replyTo
+        replyTo = nil
+        Task { await store.sendSticker(sticker, reply: reply, session: session) }
+    }
+
+    private func unheard(_ message: ChatMessage) -> Bool {
+        guard message.voice != nil || message.round != nil, message.sender != session.myId, !message.pending else { return false }
+        return !played.contains(message.id) && !PlayedRecordings.contains(message.id)
+    }
+
+    private func listen(_ message: ChatMessage) {
+        played.insert(message.id)
+        PlayedRecordings.add(message.id)
+    }
+
+    private func bubble(_ message: ChatMessage, joinsPrevious: Bool, standalone: Bool) -> MessageBubble {
+        let mine = message.sender == session.myId
+        return MessageBubble(
+            message: message,
+            mine: mine,
+            peer: Identity(id: message.sender, name: message.senderName, avatar: message.senderAvatar, handle: "", appearance: message.senderAppearance),
+            palette: .noct,
+            joinsPrevious: joinsPrevious,
+            openMedia: { items, position in
+                MediaPresenter.shared.show(MediaViewerState(items: items, index: position, title: message.senderName, date: message.created))
+            },
+            standalone: standalone,
+            author: !mine && !joinsPrevious ? BubbleAuthor(name: message.senderName, appearance: message.senderAppearance) : nil,
+            readReceipts: false,
+            unheard: unheard(message),
+            onListen: { listen(message) },
+            onReact: reactable ? reactAction(message) : nil,
+            reactors: reactors,
+            onOpenProfile: { nav.push(.profile($0)) },
+            onOpenPost: { nav.push(.post($0)) },
+            onOpenPack: { openPack = StickerPanel.PackRequest(name: $0.packName) }
+        )
     }
 
     /// The same bubbles as a dialogue; the author's name and avatar mark the
     /// start and end of each group. Swipe left to answer, hold for reactions.
-    private func roomBubble(_ message: RoomMessage, joinsPrevious: Bool, joinsNext: Bool) -> some View {
+    private func roomBubble(_ message: ChatMessage, joinsPrevious: Bool, joinsNext: Bool) -> some View {
         let mine = message.sender == session.myId
         let active = !message.deleted && !message.pending
+        let content = bubble(message, joinsPrevious: joinsPrevious, standalone: true)
         return HStack(alignment: .bottom, spacing: 6) {
             if mine {
                 Spacer(minLength: 52)
@@ -308,8 +537,8 @@ struct RoomChatView: View {
                 }
                 .buttonStyle(PressableStyle())
             }
-            bubbleBody(message, joinsPrevious: joinsPrevious)
-                .modifier(SpokenBubble(label: spoken(message)))
+            content
+                .modifier(SpokenBubble(label: content.spoken))
                 .accessibilityIdentifier("message-" + message.id)
                 .modifier(HoldToFocus(action: active ? focusAction(message, joinsPrevious: joinsPrevious) : nil))
             if !mine { Spacer(minLength: 52) }
@@ -317,69 +546,8 @@ struct RoomChatView: View {
         .modifier(SwipeToReply(action: active && canWrite ? replyAction(message) : nil))
     }
 
-    /// What VoiceOver says: who, what, the reactions and the time.
-    private func spoken(_ message: RoomMessage) -> String {
-        var parts: [String] = []
-        if message.sender != session.myId { parts.append(message.senderName) }
-        parts.append(message.deleted ? "Сообщение удалено" : message.text)
-        parts += SpokenBubble.reactions(message.reactions)
-        parts.append(Format.clock(message.created))
-        return parts.joined(separator: ", ")
-    }
-
-    private func bubbleBody(_ message: RoomMessage, joinsPrevious: Bool) -> some View {
-        let mine = message.sender == session.myId
-        let reply = message.replyTo.isEmpty ? nil : store.messages.first(where: { $0.id == message.replyTo })
-        let shape = BubbleShape.message(mine: mine, joinsPrevious: joinsPrevious)
-        let time = BubbleTime(created: message.created, status: mine ? (message.pending ? .pending : .sent) : nil, mine: mine)
-        return BubbleStack() {
-            if (!mine && !joinsPrevious) || reply != nil {
-                VStack(alignment: .leading, spacing: 6) {
-                    if !mine && !joinsPrevious {
-                        SenderName(name: message.senderName, look: message.senderAppearance)
-                    }
-                    if let reply {
-                        BubbleQuote(name: reply.senderName, text: reply.text, accent: Noct.lilac)
-                    }
-                }
-                .padding(.horizontal, mine || joinsPrevious ? 8 : 12)
-                .padding(.top, 7)
-            }
-            if message.deleted {
-                HStack(alignment: .bottom, spacing: 8) {
-                    Text("Сообщение удалено")
-                        .font(.system(size: 15).italic())
-                        .foregroundColor(Noct.text48)
-                    Spacer(minLength: 4)
-                    time
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-            } else if message.reactions.isEmpty {
-                InlineTimeText(text: message.text, time: time, accent: Noct.lilac)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-            } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    InlineTimeText(text: message.text, accent: Noct.lilac)
-                    HStack(alignment: .bottom, spacing: 8) {
-                        BubbleReactions(reactions: message.reactions, accent: Noct.lilac, reactors: reactors, toggle: reactable ? reactAction(message) : nil)
-                        Spacer(minLength: 4)
-                        time
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-            }
-        }
-        .background(shape.fill(mine ? ChatPalette.noct.outgoing : ChatPalette.noct.incoming))
-        .clipShape(shape)
-        .overlay(shape.stroke(Color.white.opacity(0.06), lineWidth: 1))
-        .opacity(message.pending ? 0.7 : 1)
-    }
-
     /// Lifts a held message over the blurred screen, as in Telegram.
-    private func present(_ message: RoomMessage, frame: CGRect, joinsPrevious: Bool) {
+    private func present(_ message: ChatMessage, frame: CGRect, joinsPrevious: Bool) {
         let mine = message.sender == session.myId
         var actions: [MessageAction] = []
         if canWrite {
@@ -387,6 +555,15 @@ struct RoomChatView: View {
         }
         if !message.text.isEmpty {
             actions.append(MessageAction(title: "Скопировать", icon: "doc.on.doc") { session.copy(message.text) })
+        }
+        if let sticker = StickerStore.shared.sticker(message.sticker), sticker.available, !session.readOnly {
+            let favorite = StickerStore.shared.isFavorite(sticker.ref)
+            actions.append(MessageAction(title: favorite ? "Убрать из избранного" : "В избранные стикеры", icon: favorite ? "bookmark.slash" : "bookmark") {
+                Task { await StickerStore.shared.setFavorite(sticker, !favorite, session: session) }
+            })
+        }
+        if !session.readOnly && !message.encrypted {
+            actions.append(MessageAction(title: "Переслать", icon: "arrowshape.turn.up.right") { forwarding = message })
         }
         if mine || store.role == "owner" || store.role == "admin" {
             actions.append(MessageAction(title: "Удалить", icon: "trash", destructive: true) {
@@ -396,44 +573,102 @@ struct RoomChatView: View {
         focus.present(MessageFocus.Item(
             frame: frame,
             mine: mine,
-            bubble: AnyView(bubbleBody(message, joinsPrevious: joinsPrevious).environmentObject(session)),
+            bubble: AnyView(bubble(message, joinsPrevious: joinsPrevious, standalone: true).environmentObject(session)),
             reactions: reactable ? messageReactions : [],
             chosen: message.reactions.first(where: \.own)?.emoji,
             actions: actions,
             react: reactAction(message)
         ))
     }
-}
 
-/// The author above a bubble in a group, as in Telegram: the name in the
-/// colour of their Premium palette with the badges after it.
-private struct SenderName: View {
-    let name: String
-    let look: Appearance
+    private var panelHeight: CGFloat { max(keyboard > 0 ? keyboard : 290, 260) }
 
-    var body: some View {
-        HStack(spacing: 4) {
-            styled
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
-            if look.verified {
-                VerifiedBadge(appearance: look, size: 14)
+    @ViewBuilder private var bottom: some View {
+        if canWrite {
+            VStack(spacing: 0) {
+                if let reply = replyTo {
+                    ComposerContext(title: "Ответ \(reply.senderName)", text: PremiumEmoji.replace(reply.summary)) {
+                        replyTo = nil
+                    }
+                }
+                if !store.attachments.isEmpty || store.uploading > 0 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(store.attachments) { file in
+                                ZStack(alignment: .topTrailing) {
+                                    Group {
+                                        if file.isImage {
+                                            RemoteImage(url: session.api.mediaURL(file.path), maxPixel: 200)
+                                        } else {
+                                            ZStack {
+                                                Noct.coverFill
+                                                Image(systemName: file.isVideo ? "video" : "doc").foregroundColor(Noct.text60)
+                                            }
+                                        }
+                                    }
+                                    .frame(width: 64, height: 64)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    Button {
+                                        store.attachments.removeAll { $0.id == file.id }
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundStyle(.white, .black.opacity(0.7))
+                                    }
+                                    .padding(3)
+                                }
+                            }
+                            if store.uploading > 0 {
+                                ProgressView()
+                                    .tint(.white)
+                                    .frame(width: 64, height: 64)
+                                    .glassRect(12)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+                    }
+                }
+                if EmojiTokens.contains(text) {
+                    TokenPreview(text: text)
+                }
+                ChatComposer(
+                    text: $text,
+                    placeholder: currentTopic.map { "Сообщение в «\($0.title)»" } ?? "Сообщение в группу",
+                    focus: $focused,
+                    accent: Noct.lilac,
+                    attach: AnyView(attachButton),
+                    panel: $panel,
+                    recorder: recorder,
+                    hasAttachments: !store.attachments.isEmpty
+                ) {
+                    let value = text
+                    let reply = replyTo
+                    text = ""
+                    replyTo = nil
+                    Task { await store.send(value, reply: reply, session: session) }
+                }
+                if panel {
+                    StickerPanel(text: $text, height: panelHeight) { sticker in send(sticker) }
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
-            if look.premium {
-                PremiumBadge(appearance: look, size: 14)
-            }
+            .animation(Noct.quick, value: panel)
+        } else if store.loaded && !store.isSecret {
+            ComposerNotice(text: session.readOnly
+                ? "В режиме только для чтения отправка недоступна."
+                : ((currentTopic?.closed ?? false) ? "Тема закрыта. Писать в неё могут её автор и администраторы." : "Писать в эту группу могут только администраторы."))
         }
     }
 
-    @ViewBuilder private var styled: some View {
-        if look.hasDesign && look.nameGradient {
-            Text(name).foregroundStyle(
-                LinearGradient(colors: [look.theme.first, look.theme.second], startPoint: .leading, endPoint: .trailing)
-            )
-        } else if look.hasDesign {
-            Text(name).foregroundColor(look.theme.first)
-        } else {
-            Text(name).foregroundColor(Noct.lilac)
+    private var attachButton: some View {
+        PhotosPicker(selection: $picked, maxSelectionCount: 10, matching: .any(of: [.images, .videos])) {
+            Image(systemName: "paperclip")
+                .font(.system(size: 19, weight: .medium))
+                .foregroundColor(.white)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
+        .glassCircle(interactive: true)
+        .accessibilityLabel("Прикрепить фото или видео")
     }
 }

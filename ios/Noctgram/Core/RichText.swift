@@ -25,27 +25,11 @@ enum AppLink {
     }
 }
 
-/// Premium emoji tokens (:noct_fire:) shown as their regular emoji fallback.
+/// Premium emoji tokens (:noct_fire:, :ce_<id>:) as their plain emoji,
+/// where only text fits (lists, quotes, notifications).
 enum PremiumEmoji {
-    static let fallbacks: [String: String] = [
-        "smile": "😀", "laugh": "😂", "skull": "💀", "eyes": "👀", "heart": "❤️",
-        "archive": "🗃", "fire": "🔥", "star": "⭐️", "moon": "🌛",
-    ]
-    private static let token = try? NSRegularExpression(pattern: ":noct_([a-z0-9_]+):")
-
     static func replace(_ text: String) -> String {
-        guard text.contains(":noct_"), let token else { return text }
-        let ns = text as NSString
-        var result = ""
-        var cursor = 0
-        for match in token.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
-            result += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
-            let name = ns.substring(with: match.range(at: 1))
-            result += fallbacks[name] ?? "✨"
-            cursor = match.range.location + match.range.length
-        }
-        result += ns.substring(from: cursor)
-        return result
+        EmojiTokens.fallback(text)
     }
 }
 
@@ -53,12 +37,8 @@ enum PremiumEmoji {
 enum Emoji {
     /// Only emoji (up to `limit`, spaces aside): shown large without a bubble.
     static func isOnly(_ text: String, limit: Int) -> Bool {
-        let characters = text.filter { !$0.isWhitespace }
-        guard !characters.isEmpty, characters.count <= limit else { return false }
-        return characters.allSatisfy { character in
-            guard let first = character.unicodeScalars.first else { return false }
-            return first.properties.isEmojiPresentation || (first.properties.isEmoji && character.unicodeScalars.count > 1)
-        }
+        let count = EmojiTokens.largeCount(text)
+        return count > 0 && count <= limit
     }
 }
 
