@@ -52,6 +52,7 @@ type DraftFile = {
 export function ChatComposer({
   premium = false,
   peerId,
+  roomId,
   text,
   onText,
   disabled,
@@ -61,7 +62,9 @@ export function ChatComposer({
   onCancelReply,
 }: {
   premium?: boolean;
-  peerId: string;
+  // Uploads are drafted for exactly one conversation: a person or a group.
+  peerId?: string;
+  roomId?: string;
   text: string;
   onText: (text: string) => void;
   disabled: boolean;
@@ -107,7 +110,8 @@ export function ChatComposer({
     try {
       const form = new FormData();
       form.set('file', item.file);
-      form.set('peer', peerId);
+      if (roomId) form.set('room', roomId);
+      else form.set('peer', peerId || '');
       const attachment = await chatRequest<ChatAttachment>('/api/chat-upload', {
         method: 'POST',
         body: form,
@@ -204,7 +208,7 @@ export function ChatComposer({
   const frozen = disabled;
   useEffect(() => {
     setEmojiOpen(false);
-  }, [peerId, frozen]);
+  }, [peerId, roomId, frozen]);
   const chooseEmoji = (emoji: string) => {
     if (frozen) return;
     setError('');

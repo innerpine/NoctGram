@@ -7,12 +7,27 @@ import {
   saveMessageReaction,
 } from './message-reactions-store';
 import { parseReactions } from './message-reactions';
+import { messageSummarySql } from './message-summary-sql';
+import {
+  CHAT_ATTACHMENT_LIMIT,
+  attachmentJsonSql,
+  type ChatAttachment,
+} from './chat-files';
 import { COMMUNITY_ROOM_ID } from './community-group';
 import { ApiError } from './api-error';
 import {
   validateSecretPublicKey,
   validateSecretEnvelope,
 } from './secret-format';
+import {
+  access,
+  accepts,
+  canSend,
+  readable,
+  unblocked,
+  visibleRoom,
+  writable,
+} from './room-access';
 import type {
   RoomDetail,
   RoomMember,
@@ -24,45 +39,7 @@ import type {
 
 const PAGE_SIZE = 100;
 const LIMIT = 200;
-const clockSql = "strftime('%s','now')*1000";
-// Arguments to these predicates are internal SQL expressions, never user input.
-const readable = (
-  u: string,
-) => `${u}.kind='person' AND ${u}.deletedAt=0 AND ${u}.onboardingComplete=1
-  AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=${u}.id AND ar.mode='blocked' AND (ar.expiresAt IS NULL OR ar.expiresAt>${clockSql}))`;
-const writable = (u: string) =>
-  `${readable(u)} AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=${u}.id AND (ar.expiresAt IS NULL OR ar.expiresAt>${clockSql}))`;
-const unblocked = (a: string, b: string) =>
-  `NOT EXISTS(SELECT 1 FROM user_blocks ub WHERE (ub.blocker=${a} AND ub.blocked=${b}) OR (ub.blocker=${b} AND ub.blocked=${a}))`;
-const accepts = (
-  sender: string,
-  recipient: string,
-) => `${unblocked(sender, recipient)} AND
-  (COALESCE((SELECT messagePolicy FROM user_privacy WHERE userId=${recipient}),'everyone')='everyone'
-  OR ((SELECT messagePolicy FROM user_privacy WHERE userId=${recipient})='following' AND EXISTS(SELECT 1 FROM follows WHERE follower=${recipient} AND following=${sender})))`;
-const visibleRoom = (
-  r: string,
-  actor: string,
-) => `${r}.deletedAt=0 AND EXISTS(SELECT 1 FROM users owner WHERE owner.id=${r}.ownerId AND ${readable('owner')})
-  AND EXISTS(SELECT 1 FROM users viewu WHERE viewu.id=${actor} AND ${readable('viewu')})
-  AND ${unblocked(actor, `${r}.ownerId`)}
-  AND (${r}.kind<>'secret' OR NOT EXISTS(SELECT 1 FROM chat_room_members sm JOIN users peer ON peer.id=sm.userId WHERE sm.roomId=${r}.id AND (sm.status<>'active' OR NOT (${readable('peer')}) OR NOT (${unblocked(actor, 'peer.id')}))))`;
-const access = (
-  r: string,
-  actor: string,
-  write = false,
-  roles?: string[],
-) => `${visibleRoom(r, actor)}
-  AND EXISTS(SELECT 1 FROM chat_room_members accessm JOIN users accessu ON accessu.id=accessm.userId
-  WHERE accessm.roomId=${r}.id AND accessm.userId=${actor} AND accessm.status='active'
-  ${roles ? `AND accessm.role IN (${roles.map((role) => `'${role}'`).join(',')})` : ''}
-  AND ${write ? writable('accessu') : readable('accessu')})`;
-export const canSend = (
-  r: string,
-  actor: string,
-) => `${access(r, actor, true)} AND (${r}.kind='group' OR
-  ((SELECT COUNT(*) FROM chat_room_members km WHERE km.roomId=${r}.id AND km.status='active' AND km.publicKey<>'')=2
-  AND NOT EXISTS(SELECT 1 FROM chat_room_members pm WHERE pm.roomId=${r}.id AND pm.userId<>${actor} AND NOT (${accepts(actor, 'pm.userId')}))))`;
+export { canSend };
 const memberCount = (r: string) =>
   `(SELECT COUNT(*) FROM chat_room_members countm WHERE countm.roomId=${r}.id AND countm.status='active')`;
 // The shared community admits every registered person. Ordinary groups retain
@@ -138,6 +115,75 @@ function uuid(value: unknown) {
     throw new ApiError(400, 'Некорректный ключ сообщения');
   return result;
 }
+function attachmentIds(value: unknown) {
+  if (value === undefined) return [];
+  if (
+    !Array.isArray(value) ||
+    value.length > CHAT_ATTACHMENT_LIMIT ||
+    value.some((item) => typeof item !== 'string' || !item || item.length > 100) ||
+    new Set(value).size !== value.length
+  )
+    throw new ApiError(400, 'Можно прикрепить до 10 разных файлов');
+  return value as string[];
+}
+const sameIds = (media: string, ids: string[]) =>
+  JSON.stringify((JSON.parse(media) as ChatAttachment[]).map((file) => file.id)) ===
+  JSON.stringify(ids);
+export type RoomMessageInput = {
+  id: string;
+  roomId: string;
+  sender: string;
+  kind: 'group' | 'secret';
+  text: string;
+  ciphertext: string | null;
+  replyTo: string | null;
+  attachments: string[];
+  now: number;
+};
+// The single write path for new room messages: sending, moderator approval and
+// forwarding. Attachments must be the sender's own ready drafts for this room;
+// the second statement binds them to the message in the same batch.
+export function roomMessageStatements(
+  message: RoomMessageInput,
+  gate = '',
+  gateBindings: (string | number | null)[] = [],
+) {
+  const ids = JSON.stringify(message.attachments);
+  return [
+    db()
+      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,ciphertext,replyTo,media,created)
+      SELECT ?,r.id,u.id,?,?,?,
+        (SELECT json_group_array(json(${attachmentJsonSql('up', 'cu')}))
+          FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_room_uploads cu ON cu.uploadId=up.id),
+        MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0))
+      FROM chat_rooms r,users u WHERE r.id=? AND u.id=? AND ${canSend('r', 'u.id')}
+      AND r.kind=? AND (? IS NULL OR EXISTS(SELECT 1 FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=r.id AND rp.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('rp')})))
+      AND NOT EXISTS(SELECT 1 FROM json_each(?) j WHERE NOT EXISTS(
+        SELECT 1 FROM uploads up JOIN chat_room_uploads cu ON cu.uploadId=up.id WHERE up.id=j.value AND up.userId=u.id
+          AND up.state='ready' AND cu.roomId=r.id AND cu.messageId IS NULL AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)))
+      ${gate ? 'AND ' + gate : ''}
+      ON CONFLICT(id) DO NOTHING`)
+      .bind(
+        message.id,
+        message.text,
+        message.ciphertext,
+        message.replyTo,
+        ids,
+        message.now,
+        message.roomId,
+        message.sender,
+        message.kind,
+        message.replyTo,
+        message.replyTo,
+        ids,
+        ...gateBindings,
+      ),
+    db()
+      .prepare(`UPDATE chat_room_uploads SET messageId=? WHERE messageId IS NULL AND uploadId IN(
+      SELECT json_extract(j.value,'$.id') FROM chat_room_messages m,json_each(m.media) j WHERE m.id=? AND m.sender=?)`)
+      .bind(message.id, message.id, message.sender),
+  ];
+}
 function changed(result: { meta: { changes?: number } }) {
   if (!result.meta.changes)
     throw new ApiError(
@@ -196,7 +242,7 @@ export async function listRooms(
   const result = await db()
     .prepare(`SELECT ${summaryColumns('m.userId')},m.role,m.archivedAt,${memberCount('r')} AS memberCount,
     (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('unreadm')})) AS unread,
-    (SELECT json_object('id',lastm.id,'text',CASE WHEN r.kind='secret' THEN '' ELSE lastm.text END,'created',lastm.created,'sender',lastm.sender)
+    (SELECT json_object('id',lastm.id,'text',CASE WHEN r.kind='secret' THEN '' ELSE ${messageSummarySql('lastm', { empty: '' })} END,'created',lastm.created,'sender',lastm.sender)
     FROM chat_room_messages lastm WHERE lastm.roomId=r.id AND lastm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('lastm')}) ORDER BY lastm.created DESC,lastm.id DESC LIMIT 1) AS lastMessage
     FROM chat_rooms r JOIN chat_room_members m ON m.roomId=r.id WHERE m.userId=? AND (m.archivedAt>0)=? AND ${access('r', 'm.userId')}
     ORDER BY MAX(r.updatedAt,COALESCE((SELECT MAX(created) FROM chat_room_messages latest WHERE latest.roomId=r.id AND (r.kind='secret' OR ${groupSenderVisible('latest')})),0)) DESC,r.id LIMIT 100`)
@@ -308,9 +354,14 @@ export async function readRoom(
     .all<Omit<RoomMember, 'publicKey'> & { publicKey: string }>();
   const messages = await viewerQuery(
     `SELECT msg.id,msg.roomId,msg.sender,u.name AS senderName,u.avatar AS senderAvatar,msg.text,msg.ciphertext,msg.replyTo,msg.created,msg.deletedAt,msg.giveawayId,
+    CASE WHEN msg.deletedAt=0 THEN msg.media ELSE '[]' END AS media,
+    rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
+    CASE WHEN rp.id IS NULL THEN NULL ELSE ${messageSummarySql('rp', { textLimit: 240 })} END AS replyText,
     CASE WHEN r.kind='group' AND msg.deletedAt=0 AND msg.ciphertext IS NULL
       THEN ${reactionSummarySql('chat_room_message_reactions', 'msg.id', ':viewer')} ELSE '[]' END AS reactionData
     FROM chat_room_messages msg JOIN users u ON u.id=msg.sender JOIN chat_rooms r ON r.id=msg.roomId
+    LEFT JOIN chat_room_messages rp ON rp.id=msg.replyTo AND rp.roomId=msg.roomId AND rp.deletedAt=0 AND rp.ciphertext IS NULL AND ${groupSenderVisible('rp')}
+    LEFT JOIN users ru ON ru.id=rp.sender
     WHERE msg.roomId=? AND ${access('r', ':viewer')} AND (r.kind='secret' OR ${groupSenderVisible('msg')}) ${cursor ? 'AND (msg.created<? OR (msg.created=? AND msg.id<?))' : ''}
     ORDER BY msg.created DESC,msg.id DESC LIMIT ${PAGE_SIZE + 1}`,
     me,
@@ -319,7 +370,16 @@ export async function readRoom(
       roomId,
       ...(cursor ? [cursor.created, cursor.created, cursor.id] : []),
     )
-    .all<RoomMessage & { reactionData: string }>();
+    .all<
+      RoomMessage & {
+        reactionData: string;
+        media: string;
+        replyId: string | null;
+        replySender: string | null;
+        replyName: string | null;
+        replyText: string | null;
+      }
+    >();
   const permission = await viewerQuery(
     `SELECT 1 FROM chat_rooms r WHERE r.id=? AND ${canSend('r', ':viewer')}`,
     me,
@@ -335,12 +395,38 @@ export async function readRoom(
       ...m,
       publicKey: m.publicKey ? JSON.parse(m.publicKey) : null,
     })),
-    messages: page.reverse().map(({ reactionData, ...message }) => ({
-      ...message,
-      ...(row.kind === 'group'
-        ? { reactions: parseReactions(reactionData) }
-        : {}),
-    })),
+    messages: page
+      .reverse()
+      .map(
+        ({
+          reactionData,
+          media,
+          replyId,
+          replySender,
+          replyName,
+          replyText,
+          ...message
+        }) => ({
+          ...message,
+          attachments: JSON.parse(media) as ChatAttachment[],
+          ...(message.replyTo && row.kind === 'group'
+            ? {
+                reply: {
+                  id: message.replyTo,
+                  sender: replySender || '',
+                  name: replyName || '',
+                  text: replyId
+                    ? replyText || 'Сообщение'
+                    : 'Сообщение недоступно',
+                  unavailable: !replyId,
+                },
+              }
+            : {}),
+          ...(row.kind === 'group'
+            ? { reactions: parseReactions(reactionData) }
+            : {}),
+        }),
+      ),
     canSend: !!permission,
     nextCursor:
       messages.results.length > PAGE_SIZE && oldest
@@ -358,14 +444,14 @@ async function avatarValue(me: string, input: unknown) {
   if (
     !(await db()
       .prepare(`SELECT 1 FROM uploads u WHERE u.id=? AND u.userId=? AND u.type IN ('image/jpeg','image/png','image/webp','image/gif') AND u.state='ready'
-    AND NOT EXISTS(SELECT 1 FROM chat_uploads c WHERE c.uploadId=u.id) AND NOT EXISTS(SELECT 1 FROM moderated_uploads m WHERE m.uploadId=u.id)`)
+    AND NOT EXISTS(SELECT 1 FROM chat_uploads c WHERE c.uploadId=u.id) AND NOT EXISTS(SELECT 1 FROM chat_room_uploads rc WHERE rc.uploadId=u.id) AND NOT EXISTS(SELECT 1 FROM moderated_uploads m WHERE m.uploadId=u.id)`)
       .bind(uploadId, me)
       .first())
   )
     throw new ApiError(400, 'Изображение недоступно');
   return avatar;
 }
-const avatarGuard = `(?='' OR EXISTS(SELECT 1 FROM uploads av WHERE '/api/media/'||av.id=? AND av.userId=? AND av.state='ready' AND av.type IN ('image/jpeg','image/png','image/webp','image/gif') AND NOT EXISTS(SELECT 1 FROM chat_uploads ca WHERE ca.uploadId=av.id) AND NOT EXISTS(SELECT 1 FROM moderated_uploads ma WHERE ma.uploadId=av.id)))`;
+const avatarGuard = `(?='' OR EXISTS(SELECT 1 FROM uploads av WHERE '/api/media/'||av.id=? AND av.userId=? AND av.state='ready' AND av.type IN ('image/jpeg','image/png','image/webp','image/gif') AND NOT EXISTS(SELECT 1 FROM chat_uploads ca WHERE ca.uploadId=av.id) AND NOT EXISTS(SELECT 1 FROM chat_room_uploads cra WHERE cra.uploadId=av.id) AND NOT EXISTS(SELECT 1 FROM moderated_uploads ma WHERE ma.uploadId=av.id)))`;
 
 export async function changeRoom(
   me: string,
@@ -617,7 +703,8 @@ export async function changeRoom(
     const key = uuid(body.key ?? body.messageId);
     let text = '',
       ciphertext: string | null = null,
-      replyTo: string | null = null;
+      replyTo: string | null = null,
+      attachments: string[] = [];
     if (row.kind === 'secret') {
       if (
         'text' in body ||
@@ -644,9 +731,10 @@ export async function changeRoom(
         );
       }
     } else {
-      if ('ciphertext' in body || 'media' in body || 'attachments' in body)
-        throw new ApiError(400, 'В группе поддерживаются текстовые сообщения');
-      text = string(body.text, 4000);
+      if ('ciphertext' in body || 'media' in body)
+        throw new ApiError(400, 'Некорректное сообщение группы');
+      attachments = attachmentIds(body.attachments);
+      text = string(body.text ?? '', 4000, !attachments.length);
       await assertPremiumEmoji(me, text);
       replyTo = body.replyTo == null ? null : id(body.replyTo);
     }
@@ -672,49 +760,50 @@ export async function changeRoom(
         targetId: key,
         actorId: me,
         contextId: roomId,
-        payload: { text, replyTo },
+        payload: {
+          text,
+          replyTo,
+          ...(attachments.length
+            ? { media: JSON.stringify(attachments.map((file) => ({ id: file }))) }
+            : {}),
+        },
       });
       if (held) return held;
     }
-    const result = await db()
-      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,ciphertext,replyTo,created)
-      SELECT ?,r.id,u.id,?,?,?,MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0))
-      FROM chat_rooms r,users u WHERE r.id=? AND u.id=? AND ${canSend('r', 'u.id')}
-      AND r.kind=? AND (? IS NULL OR EXISTS(SELECT 1 FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=r.id AND rp.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('rp')})))
-      ON CONFLICT(id) DO NOTHING`)
-      .bind(
-        key,
+    const [result] = await db().batch(
+      roomMessageStatements({
+        id: key,
+        roomId,
+        sender: me,
+        kind: row.kind,
         text,
         ciphertext,
         replyTo,
+        attachments,
         now,
-        roomId,
-        me,
-        row.kind,
-        replyTo,
-        replyTo,
-      )
-      .run();
+      }),
+    );
     if (!result.meta.changes) {
       const saved = await db()
         .prepare(
           `SELECT msg.* FROM chat_room_messages msg JOIN chat_rooms r ON r.id=msg.roomId WHERE msg.id=? AND msg.sender=? AND ${canSend('r', 'msg.sender')}`,
         )
         .bind(key, me)
-        .first<RoomMessage>();
+        .first<RoomMessage & { media: string }>();
       if (
         !saved ||
         saved.roomId !== roomId ||
         saved.text !== text ||
         saved.ciphertext !== ciphertext ||
         saved.replyTo !== replyTo ||
+        !sameIds(saved.media, attachments) ||
         saved.deletedAt
       )
         throw new ApiError(
           saved ? 409 : 403,
           saved
             ? 'Этот ключ уже использован для другого сообщения'
-            : 'Отправка недоступна. Проверьте участников и настройки приватности',
+            : 'Отправка недоступна. Проверьте участников, вложения и настройки приватности',
         );
     }
     return { id: key };
@@ -911,7 +1000,7 @@ export function groupRoomExportSections(
     ],
     [
       'groupMessages',
-      `SELECT msg.id,msg.roomId,msg.sender,msg.text,msg.replyTo,msg.created FROM chat_room_messages msg
+      `SELECT msg.id,msg.roomId,msg.sender,msg.text,msg.replyTo,msg.media,msg.created FROM chat_room_messages msg
       JOIN chat_rooms r ON r.id=msg.roomId JOIN chat_room_members m ON m.roomId=r.id
       WHERE m.userId=? AND r.kind='group' AND msg.ciphertext IS NULL AND msg.deletedAt=0 AND ${groupSenderVisible('msg')}
       AND ${access('r', 'm.userId')} AND msg.id>? ORDER BY msg.id LIMIT 100`,

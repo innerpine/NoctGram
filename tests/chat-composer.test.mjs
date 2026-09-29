@@ -117,6 +117,7 @@ globalThis.fetch = async (url, init) => {
     };
     uploads.push({
       peer: init.body.get('peer'),
+      room: init.body.get('room'),
       signal: init.signal,
       attachment,
       finish: () => resolve(Response.json(attachment)),
@@ -137,7 +138,7 @@ function flatten(node) {
   return [node, ...[node.props?.children].flat(Infinity).flatMap(flatten)];
 }
 const mounted = [];
-function mount(peerId = 'bob') {
+function mount(peerId = 'bob', roomId) {
   const owner = {
     first: true,
     slots: [],
@@ -149,6 +150,7 @@ function mount(peerId = 'bob') {
   };
   const props = {
     peerId,
+    roomId,
     text: '',
     disabled: false,
     onText: (text) => {
@@ -288,6 +290,15 @@ try {
     'A late result cannot clear the next conversation draft',
   );
   newPeer.dispose();
+
+  const group = mount('bob', 'room-1');
+  group.pick([photo('group.png')]);
+  await flush();
+  assert.equal(uploads.at(-1).room, 'room-1', 'Group drafts upload to the room');
+  assert.equal(uploads.at(-1).peer, null);
+  uploads.at(-1).finish();
+  await flush();
+  group.dispose();
 
   const immediate = mount();
   immediate.props.text = 'Следующее сообщение';

@@ -30,6 +30,8 @@ const source = (file) => readFileSync(join(root, file), 'utf8');
 const modules = new Map();
 const allowed = new Set([
   'lib/media-access.ts',
+  'lib/room-access.ts',
+  'lib/antispam-access.ts',
   'lib/chat-access.ts',
   'lib/chat-files.ts',
   'lib/premium-access.ts',

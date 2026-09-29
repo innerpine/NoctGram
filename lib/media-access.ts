@@ -3,6 +3,7 @@ import { db, ApiError } from './server';
 import { published, channelPermission, sqlNow } from './channel-access';
 import { visibleAccount } from './account-access';
 import { messageVisible } from './chat-access';
+import { groupMessageReadable } from './room-access';
 export async function assertMediaRead(
   id: string,
   me: string,
@@ -10,19 +11,27 @@ export async function assertMediaRead(
 ) {
   const d = db(),
     url = '/api/media/' + id;
-  const privateFile = await d
-    .prepare('SELECT recipient,messageId FROM chat_uploads WHERE uploadId=?')
+  // Chat files: the uploader may preview an unsent draft; afterwards access
+  // follows any live copy of the message the viewer can read, in a DM or group.
+  const chatFile = await d
+    .prepare(
+      `SELECT EXISTS(SELECT 1 FROM chat_uploads WHERE uploadId=?1) OR EXISTS(SELECT 1 FROM chat_room_uploads WHERE uploadId=?1) AS drafted,
+      EXISTS(SELECT 1 FROM chat_uploads WHERE uploadId=?1 AND messageId IS NOT NULL) OR EXISTS(SELECT 1 FROM chat_room_uploads WHERE uploadId=?1 AND messageId IS NOT NULL) AS bound,
+      EXISTS(SELECT 1 FROM chat_media_refs WHERE uploadId=?1) AS referenced`,
+    )
     .bind(id)
-    .first<{ recipient: string; messageId: string | null }>();
-  if (privateFile) {
-    if (me === uploader && !privateFile.messageId) return;
+    .first<{ drafted: number; bound: number; referenced: number }>();
+  if (chatFile?.drafted || chatFile?.referenced) {
+    if (me === uploader && !chatFile.bound && !chatFile.referenced) return;
     if (
-      privateFile.messageId &&
+      chatFile.referenced &&
       (await d
         .prepare(
-          `SELECT 1 FROM messages m,json_each(m.media) j WHERE (m.sender=? OR m.recipient=?) AND ${messageVisible('m', '?')} AND json_extract(j.value,'$.id')=? LIMIT 1`,
+          `SELECT 1 FROM chat_media_refs ref WHERE ref.uploadId=?1 AND (
+          (ref.surface='dm' AND EXISTS(SELECT 1 FROM messages m WHERE m.id=ref.messageId AND (m.sender=?2 OR m.recipient=?2) AND ${messageVisible('m', '?2')}))
+          OR (ref.surface='room' AND EXISTS(SELECT 1 FROM chat_room_messages rm WHERE rm.id=ref.messageId AND ${groupMessageReadable('rm', '?2')}))) LIMIT 1`,
         )
-        .bind(me, me, me, id)
+        .bind(id, me)
         .first())
     )
       return;
@@ -59,7 +68,7 @@ export async function assertMediaRead(
 // content writes so revoking a channel editor cannot race an attachment check.
 export function mediaPermission(idExpr: string, actorExpr: string) {
   // Keep both D1 limits: shallow expressions and at most five compound SELECTs.
-  return `NOT EXISTS(SELECT 1 FROM chat_uploads cu WHERE cu.uploadId=${idExpr}) AND EXISTS(SELECT 1 FROM uploads live WHERE live.id=${idExpr} AND live.state='ready') AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=${idExpr}) AND (EXISTS(
+  return `NOT EXISTS(SELECT 1 FROM chat_uploads cu WHERE cu.uploadId=${idExpr}) AND NOT EXISTS(SELECT 1 FROM chat_room_uploads cru WHERE cru.uploadId=${idExpr}) AND EXISTS(SELECT 1 FROM uploads live WHERE live.id=${idExpr} AND live.state='ready') AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=${idExpr}) AND (EXISTS(
  SELECT 1 FROM users pu WHERE (pu.avatar='/api/media/'||${idExpr} OR pu.cover='/api/media/'||${idExpr}) AND ${visibleAccount('pu')}
  UNION SELECT 1 FROM profile_appearance ma JOIN users pu ON pu.id=ma.userId WHERE ma.avatarMotion='/api/media/'||${idExpr} AND ${visibleAccount('pu')} AND ${animatedAvatarActive('pu')}
  UNION SELECT 1 FROM posts mp JOIN users pu ON pu.id=mp.userId WHERE ${published('mp')} AND ${visibleAccount('pu')} AND EXISTS(SELECT 1 FROM json_each(mp.media) mm WHERE json_extract(mm.value,'$.id')=${idExpr})

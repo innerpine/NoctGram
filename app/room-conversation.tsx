@@ -1,29 +1,26 @@
 'use client';
 import type { QueuedSubmission } from '@/lib/antispam-types';
-import { RoomMessageGesture } from './room-message-gesture';
-import { MessageReactions } from './message-reactions';
 import type { ReactionEmoji } from '@/lib/message-reactions';
 import { EmojiPicker, EmojiPreview } from './premium-emoji';
-import { MentionText } from './profile-link';
-import { GiveawayCard } from './giveaway-card';
 import { GiveawayCreateButton } from './giveaway-create';
 /* eslint-disable react/react-compiler */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
   ArrowLeft,
-  Check,
   ChevronDown,
   KeyRound,
   LoaderCircle,
   LockKeyhole,
-  MoreHorizontal,
-  Reply,
   Send,
   Settings,
   ShieldCheck,
-  Trash2,
   Users,
-  X,
 } from 'lucide-react';
 import {
   Dialog,
@@ -31,12 +28,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import type { Person } from '@/lib/client';
 import type { RoomDetail, RoomMessage, RoomPreview } from '@/lib/rooms-types';
 import { roomAction, roomRequest, type RoomTarget } from '@/lib/rooms-client';
@@ -48,16 +39,18 @@ import {
   type SecretSession,
 } from '@/lib/secret-crypto';
 import { RoomAvatar } from './room-list';
+import { RoomMessageRow } from './room-message';
+import { ChatComposer } from './chat-composer';
+import {
+  emptyRoomOutbox,
+  mergeRoomOutgoing,
+  roomOutbox,
+} from '@/lib/room-outbox';
+import { messageSummary } from '@/lib/chat-message-display';
 import { RoomManagement } from './room-management';
-import { Avatar } from './post-card';
 
 const reason = (error: unknown) =>
   error instanceof Error ? error.message : 'Не удалось загрузить чат';
-const time = (date: number) =>
-  new Date(date).toLocaleTimeString('ru', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 export function RoomConversation({
   target,
   me,
@@ -84,6 +77,7 @@ export function RoomConversation({
     [busy, setBusy] = useState(false);
   const [text, setText] = useState(''),
     [reply, setReply] = useState<RoomMessage | null>(null),
+    [replyFocus, setReplyFocus] = useState(0),
     [settingsOpen, setSettingsOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false),
     [safety, setSafety] = useState(''),
@@ -93,6 +87,12 @@ export function RoomConversation({
     () => new Set(),
   );
   const reactionLocks = useRef(new Set<string>());
+  const outbox = useSyncExternalStore(
+    roomOutbox.subscribe,
+    roomOutbox.getSnapshot,
+    () => emptyRoomOutbox,
+  );
+  const handledSends = useRef(new Set<string>());
   const [plaintext, setPlaintext] = useState<Record<string, string>>({}),
     [pending, setPending] = useState(false),
     [older, setOlder] = useState(false);
@@ -127,8 +127,22 @@ export function RoomConversation({
     )
       return;
     setReply(message);
-    composer.current?.focus({ preventScroll: true });
+    setReplyFocus((value) => value + 1);
   };
+  const jumpTo = (id: string) => {
+    const target = document.getElementById('room-message-' + id);
+    if (!target || !scroll.current?.contains(target)) {
+      setMutationError('Это сообщение выше в истории. Откройте предыдущие.');
+      return;
+    }
+    follow.current = false;
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    target.classList.remove('room-message-flash');
+    void target.offsetWidth;
+    target.classList.add('room-message-flash');
+    target.focus({ preventScroll: true });
+  };
+  const retryOutgoing = (id: string) => roomOutbox.retry(id, me.id);
   const load = useCallback(async () => {
     const ticket = ++serial.current;
     readController.current?.abort();
@@ -366,12 +380,37 @@ export function RoomConversation({
       setReply(null);
       setMutationError('');
     }
-  }, [room?.messages, plaintext, me.id]);
+  }, [room?.messages, plaintext, me.id, outbox]);
   const refresh = async () => {
     if (!alive.current) return;
     await latestLoad.current();
     if (alive.current) await onRoomsChanged();
   };
+  const latestRefresh = useRef(refresh);
+  latestRefresh.current = refresh;
+  const currentRoomId = room?.id;
+  useEffect(() => {
+    if (currentRoomId && roomMessages)
+      roomOutbox.acknowledge(currentRoomId, roomMessages);
+  }, [currentRoomId, roomMessages]);
+  useEffect(() => {
+    for (const entry of outbox) {
+      if (
+        entry.message.sender !== me.id ||
+        entry.roomId !== currentRoomId ||
+        handledSends.current.has(entry.message.id + ':' + entry.status)
+      )
+        continue;
+      if (entry.status === 'queued') {
+        handledSends.current.add(entry.message.id + ':queued');
+        setReviewNotice(entry.notice || 'Сообщение отправлено на проверку.');
+        roomOutbox.dismiss(entry.message.id);
+      } else if (entry.status === 'sent') {
+        handledSends.current.add(entry.message.id + ':sent');
+        void latestRefresh.current().catch((error) => setError(reason(error)));
+      }
+    }
+  }, [outbox, me.id, currentRoomId]);
   const registerSecret = async () => {
     if (!room || busy || disabled) return;
     setBusy(true);
@@ -467,6 +506,15 @@ export function RoomConversation({
       if (alive.current) setBusy(false);
     }
   };
+  const pendingSends = outbox.filter(
+    (entry) =>
+      entry.roomId === currentRoomId &&
+      entry.message.sender === me.id &&
+      room?.kind === 'group',
+  );
+  const visibleMessages = room
+    ? mergeRoomOutgoing(room.messages, pageBefore.current ? [] : pendingSends)
+    : [];
   const head = room || preview;
   const ownKey = room?.members.find(
     (member) => member.userId === me.id,
@@ -697,155 +745,48 @@ export function RoomConversation({
                 </p>
               </div>
             )}
-            {room.messages.map((message) => {
+            {visibleMessages.map((message) => {
               const self = message.sender === me.id;
-              const giveawayEvent = !!message.giveawayId && !message.deletedAt;
-              const content = message.deletedAt
-                ? 'Сообщение удалено'
-                : room.kind === 'secret'
-                  ? plaintext[message.id] || 'Зашифрованное сообщение'
-                  : message.text;
-              const quoted = message.replyTo
-                ? room.messages.find((item) => item.id === message.replyTo)
-                : null;
+              const delivery = room.messages.some(
+                (item) => item.id === message.id,
+              )
+                ? undefined
+                : pendingSends.find((entry) => entry.message.id === message.id);
               return (
-                <RoomMessageGesture
+                <RoomMessageRow
                   key={message.id}
-                  enabled={
+                  message={message}
+                  roomKind={room.kind}
+                  meId={me.id}
+                  content={
+                    message.deletedAt
+                      ? 'Сообщение удалено'
+                      : room.kind === 'secret'
+                        ? plaintext[message.id] || 'Зашифрованное сообщение'
+                        : message.text
+                  }
+                  interactive={
                     room.kind === 'group' &&
                     room.canSend &&
                     !disabled &&
                     !busy &&
-                    !pending &&
+                    !delivery &&
                     !message.deletedAt
                   }
-                  onReply={() => selectReply(message)}
-                  className={
-                    giveawayEvent
-                      ? 'room-giveaway-event'
-                      : 'room-message ' + (self ? 'self' : 'other')
+                  canReply={room.kind === 'group'}
+                  canDelete={
+                    self || (room.role !== 'member' && room.kind === 'group')
                   }
-                >
-                  {!giveawayEvent && !self && room.kind === 'group' && (
-                    <button
-                      className="room-message-avatar"
-                      aria-label={'Профиль ' + message.senderName}
-                      onClick={() => onProfile(message.sender)}
-                    >
-                      <Avatar
-                        person={{
-                          name: message.senderName,
-                          avatar: message.senderAvatar,
-                        }}
-                        size={28}
-                      />
-                    </button>
-                  )}
-                  <div
-                    className={
-                      giveawayEvent
-                        ? 'room-giveaway-content'
-                        : 'room-bubble' + (message.deletedAt ? ' deleted' : '')
-                    }
-                  >
-                    {!giveawayEvent && !self && room.kind === 'group' && (
-                      <button
-                        className="room-sender"
-                        onClick={() => onProfile(message.sender)}
-                      >
-                        {message.senderName}
-                      </button>
-                    )}
-                    {message.replyTo && (
-                      <div className="room-quote">
-                        <Reply size={13} />
-                        <span>
-                          {quoted && !quoted.deletedAt
-                            ? quoted.text.slice(0, 160)
-                            : 'Ответ на сообщение'}
-                        </span>
-                      </div>
-                    )}
-                    {message.giveawayId && !message.deletedAt ? (
-                      <GiveawayCard id={message.giveawayId} viewerId={me.id} />
-                    ) : (
-                      <p>
-                        <MentionText text={content} />
-                      </p>
-                    )}
-                    {room.kind === 'group' && !message.deletedAt && (
-                      <MessageReactions
-                        reactions={message.reactions}
-                        disabled={disabled || !room.canSend || busy}
-                        pending={reactionPending.has(message.id)}
-                        onReact={(emoji) => reactToMessage(message, emoji)}
-                      />
-                    )}
-                    {giveawayEvent ? (
-                      <div className="room-giveaway-meta">
-                        <button
-                          className="room-giveaway-organizer"
-                          aria-label={'Организатор: ' + message.senderName}
-                          onClick={() => onProfile(message.sender)}
-                        >
-                          {message.senderName}
-                        </button>
-                        <span aria-hidden="true">·</span>
-                        <span className="room-message-time">
-                          <time
-                            dateTime={new Date(message.created).toISOString()}
-                          >
-                            {time(message.created)}
-                          </time>
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="room-message-time">
-                        {time(message.created)}
-                        {self && <Check size={12} />}
-                      </span>
-                    )}
-                  </div>
-                  {!message.deletedAt && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        className="room-message-more icon-button"
-                        aria-label={
-                          giveawayEvent
-                            ? 'Действия с розыгрышем'
-                            : 'Действия с сообщением'
-                        }
-                      >
-                        <MoreHorizontal size={16} />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        className="chat-options-menu"
-                        align="end"
-                      >
-                        {room.kind === 'group' && (
-                          <DropdownMenuItem
-                            disabled={disabled || !room.canSend || pending}
-                            onClick={() => selectReply(message)}
-                          >
-                            <Reply size={15} />
-                            Ответить
-                          </DropdownMenuItem>
-                        )}
-                        {(self ||
-                          (room.role !== 'member' &&
-                            room.kind === 'group')) && (
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => setRemove(message)}
-                          >
-                            <Trash2 size={15} />
-                            Удалить у всех
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </RoomMessageGesture>
+                  reactionsDisabled={disabled || !room.canSend || busy}
+                  reactionPending={reactionPending.has(message.id)}
+                  delivery={delivery}
+                  onReply={selectReply}
+                  onDelete={setRemove}
+                  onProfile={onProfile}
+                  onJump={jumpTo}
+                  onReact={reactToMessage}
+                  onRetry={retryOutgoing}
+                />
               );
             })}
           </div>
@@ -861,88 +802,108 @@ export function RoomConversation({
               К новым сообщениям <ChevronDown size={14} />
             </button>
           )}
-          {reply && (
-            <div className="room-reply-preview">
-              <Reply size={17} />
-              <span>
-                <strong>{reply.senderName}</strong>
-                <small>{reply.text.slice(0, 140)}</small>
-              </span>
-              <button
-                className="icon-button"
-                aria-label="Отменить ответ"
-                disabled={pending}
-                onClick={() => setReply(null)}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          )}
-          <EmojiPreview text={text} />
-          <form
-            className="room-composer"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void send();
-            }}
-          >
-            <EmojiPicker
+          {room.kind === 'group' ? (
+            <ChatComposer
               premium={!!me.premium}
+              roomId={room.id}
+              replyFocus={replyFocus}
               text={text}
               onText={setText}
-              disabled={disabled || pending || !room.canSend}
-            />
-            <textarea
-              ref={composer}
-              aria-label="Сообщение"
-              placeholder={
-                room.kind === 'secret'
-                  ? 'Зашифрованное сообщение…'
-                  : 'Сообщение в группу…'
+              disabled={disabled || !room.canSend}
+              reply={
+                reply
+                  ? {
+                      id: reply.id,
+                      sender: reply.sender,
+                      name: reply.sender === me.id ? 'Вы' : reply.senderName,
+                      text: messageSummary(reply),
+                      unavailable: false,
+                    }
+                  : null
               }
-              rows={1}
-              maxLength={4000}
-              value={text}
-              disabled={
-                disabled ||
-                !room.canSend ||
-                pending ||
-                (room.kind === 'secret' && !secretReady)
-              }
-              onChange={(event) => setText(event.target.value)}
-              onKeyDown={(event) => {
-                if (
-                  event.key === 'Enter' &&
-                  !event.shiftKey &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  event.preventDefault();
-                  void send();
+              onCancelReply={() => setReply(null)}
+              onSend={(draft) => {
+                follow.current = true;
+                if (pageBefore.current) {
+                  pageBefore.current = '';
+                  void refresh().catch((error) => setError(reason(error)));
                 }
+                roomOutbox.enqueue(
+                  { id: me.id, name: me.name, avatar: me.avatar },
+                  room.id,
+                  draft,
+                );
               }}
             />
-            <button
-              className="room-send"
-              type="submit"
-              aria-label={
-                pending ? 'Повторить отправку' : 'Отправить сообщение'
-              }
-              title={pending ? 'Повторить отправку' : 'Отправить'}
-              disabled={
-                busy ||
-                disabled ||
-                !room.canSend ||
-                !text.trim() ||
-                (room.kind === 'secret' && !secretReady)
-              }
+          ) : (
+            <>
+            <EmojiPreview text={text} />
+            <form
+              className="room-composer"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void send();
+              }}
             >
-              {busy ? (
-                <LoaderCircle className="spin" size={19} />
-              ) : (
-                <Send size={19} />
-              )}
-            </button>
-          </form>
+              <EmojiPicker
+                premium={!!me.premium}
+                text={text}
+                onText={setText}
+                disabled={disabled || pending || !room.canSend}
+              />
+              <textarea
+                ref={composer}
+                aria-label="Сообщение"
+                placeholder={
+                  room.kind === 'secret'
+                    ? 'Зашифрованное сообщение…'
+                    : 'Сообщение в группу…'
+                }
+                rows={1}
+                maxLength={4000}
+                value={text}
+                disabled={
+                  disabled ||
+                  !room.canSend ||
+                  pending ||
+                  (room.kind === 'secret' && !secretReady)
+                }
+                onChange={(event) => setText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === 'Enter' &&
+                    !event.shiftKey &&
+                    !event.nativeEvent.isComposing
+                  ) {
+                    event.preventDefault();
+                    void send();
+                  }
+                }}
+              />
+              <button
+                className="room-send"
+                type="submit"
+                aria-label={
+                  pending ? 'Повторить отправку' : 'Отправить сообщение'
+                }
+                title={pending ? 'Повторить отправку' : 'Отправить'}
+                disabled={
+                  busy ||
+                  disabled ||
+                  !room.canSend ||
+                  !text.trim() ||
+                  (room.kind === 'secret' && !secretReady)
+                }
+              >
+                {busy ? (
+                  <LoaderCircle className="spin" size={19} />
+                ) : (
+                  <Send size={19} />
+                )}
+              </button>
+            </form>
+            </>
+          )}
           {(!room.canSend || disabled) && (
             <p className="room-write-note">
               Отправка сообщений недоступна из-за ограничений аккаунта или

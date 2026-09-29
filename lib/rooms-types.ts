@@ -1,4 +1,5 @@
 import type { SecretPublicKey } from './secret-format';
+import type { ChatAttachment } from './chat-files';
 
 export type RoomKind = 'group' | 'secret';
 export type RoomRole = 'owner' | 'admin' | 'member';
@@ -25,6 +26,17 @@ export type RoomMessage = {
   replyTo: string | null;
   created: number;
   deletedAt: number;
+  attachments?: ChatAttachment[];
+  reply?: RoomMessageReply;
+  forwardedName?: string;
+  forwardedFrom?: string | null;
+};
+export type RoomMessageReply = {
+  id: string;
+  sender: string;
+  name: string;
+  text: string;
+  unavailable: boolean;
 };
 export type RoomPreview = {
   id: string;

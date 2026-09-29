@@ -11,7 +11,7 @@ export async function GET(
     const { id } = await params;
     const upload = await db()
       .prepare(
-        "SELECT up.userId,up.name,u.onboardingComplete,u.deletedAt,c.kind FROM uploads up JOIN users u ON u.id=up.userId LEFT JOIN chat_uploads c ON c.uploadId=up.id WHERE up.id=? AND up.state='ready'",
+        "SELECT up.userId,up.name,u.onboardingComplete,u.deletedAt,COALESCE(c.kind,rc.kind) AS kind FROM uploads up JOIN users u ON u.id=up.userId LEFT JOIN chat_uploads c ON c.uploadId=up.id LEFT JOIN chat_room_uploads rc ON rc.uploadId=up.id WHERE up.id=? AND up.state='ready'",
       )
       .bind(id)
       .first<{

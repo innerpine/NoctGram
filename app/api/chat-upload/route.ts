@@ -1,7 +1,11 @@
 import { viewer, failure, ApiError } from '@/lib/server';
 import { readJsonBody } from '@/lib/request-body';
 import { CHAT_FILE_LIMIT } from '@/lib/chat-files';
-import { storeChatUpload, discardChatUpload } from '@/lib/chat-uploads';
+import {
+  storeChatUpload,
+  storeRoomUpload,
+  discardChatUpload,
+} from '@/lib/chat-uploads';
 import { assertWritable } from '@/lib/account-access';
 import { rateLimit } from '@/lib/rate-limit';
 import { readMultipart } from '@/lib/request-body';
@@ -23,10 +27,15 @@ export async function POST(req: Request) {
     const max = CHAT_FILE_LIMIT + 65536;
     if (Number(req.headers.get('content-length')) > max)
       throw new ApiError(413, 'Файл должен быть меньше 25 МБ');
-    const form = await readMultipart(req, max, ['file', 'peer']);
+    const form = await readMultipart(req, max, ['file', 'peer', 'room']);
     const file = form.get('file'),
-      peer = form.get('peer');
-    if (!(file instanceof File) || typeof peer !== 'string')
+      peer = form.get('peer'),
+      room = form.get('room');
+    if (!(file instanceof File) || (peer === null) === (room === null))
+      throw new ApiError(400, 'Выбери файл и собеседника');
+    if (typeof room === 'string')
+      return Response.json(await storeRoomUpload(me, room, file));
+    if (typeof peer !== 'string')
       throw new ApiError(400, 'Выбери файл и собеседника');
     return Response.json(await storeChatUpload(me, peer, file));
   } catch (e) {

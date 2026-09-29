@@ -5,9 +5,8 @@ import type { ReactionEmoji } from '@/lib/message-reactions';
 import { Check, CheckCheck, Clock3, RotateCcw } from 'lucide-react';
 import type { Message, Person } from '@/lib/client';
 import { ChatGift } from './chat-gift';
-import { ProfileLink } from './profile-link';
 import { ChatEmojiText } from './chat-emoji-text';
-import { largeEmojiCount } from '@/lib/chat-emoji';
+import { forwardedHeader, messageLayout, replyQuote } from './message-body';
 import type { OutgoingMessage } from '@/lib/chat-outbox';
 import { Avatar } from './profile-identity';
 import { MusicLinkCard } from './music-link-card';
@@ -74,20 +73,7 @@ export const ChatMessage = memo(function ChatMessage({
     onAction,
     unconfirmed: !!delivery,
   };
-  const emojiCount =
-    !message.attachments?.length && !message.reply && !message.forwardedName
-      ? largeEmojiCount(message.text)
-      : 0;
-  const visualMedia =
-    !!message.attachments?.length &&
-    message.attachments.every(
-      (file) => file.kind === 'image' || file.kind === 'video',
-    );
-  const mediaOnly =
-    visualMedia &&
-    !message.text.trim() &&
-    !message.reply &&
-    !message.forwardedName;
+  const { emojiCount, visualMedia, mediaOnly } = messageLayout(message);
   const metadata = (
     <span className="message-time">
       <time dateTime={new Date(message.created).toISOString()}>
@@ -170,39 +156,8 @@ export const ChatMessage = memo(function ChatMessage({
           id={'chat-message-' + message.id}
           tabIndex={-1}
         >
-          {!!message.forwardedName && (
-            <div className="chat-forwarded">
-              <span>Переслано от</span>
-              <strong>
-                {message.forwardedSender ? (
-                  <ProfileLink target={{ id: message.forwardedSender }}>
-                    {message.forwardedName}
-                  </ProfileLink>
-                ) : (
-                  message.forwardedName
-                )}
-              </strong>
-            </div>
-          )}
-          {message.reply && (
-            <button
-              type="button"
-              className="chat-reply-quote"
-              disabled={message.reply.unavailable}
-              onClick={() => onJump(message.reply!.id)}
-            >
-              <strong>
-                {message.reply.unavailable
-                  ? 'Ответ на сообщение'
-                  : message.reply.sender === me?.id
-                    ? 'Вы'
-                    : message.reply.name}
-              </strong>
-              <span>
-                <ChatEmojiText text={message.reply.text} />
-              </span>
-            </button>
-          )}
+          {forwardedHeader(message.forwardedName, message.forwardedSender)}
+          {replyQuote(message.reply, me?.id, onJump)}
           {!!message.attachments?.length && (
             <ChatMessageFiles
               files={message.attachments}

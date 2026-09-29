@@ -819,9 +819,17 @@ await test('account deletion clears attachment FK and preserves private access t
   const { owner, peer, reader, ids } = await chatDeletionFixture();
   const outsider = await fixture();
   const { messageVisible } = load('lib/chat-access.ts', {}, ['messageVisible']);
+  const { groupSenderVisible } = load('lib/antispam-access.ts', {}, [
+    'groupSenderVisible',
+  ]);
+  const { groupMessageReadable } = load(
+    'lib/room-access.ts',
+    { groupSenderVisible },
+    ['groupMessageReadable'],
+  );
   const { assertMediaRead } = load(
     'lib/media-access.ts',
-    { db: () => d, ApiError, messageVisible },
+    { db: () => d, ApiError, messageVisible, groupMessageReadable },
     ['assertMediaRead'],
   );
   await deleteAccount(owner.id, owner.h, false);

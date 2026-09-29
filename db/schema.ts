@@ -303,6 +303,8 @@ export const chatUploads = sqliteTable('chat_uploads', {
   size: integer().notNull(),
   kind: text().notNull(),
   messageId: text().references(() => messages.id),
+  duration: integer().notNull().default(0),
+  waveform: text().notNull().default(''),
 });
 export const messagePins = sqliteTable(
   'message_pins',
@@ -1351,6 +1353,7 @@ export const chatRoomMessages = sqliteTable(
     giveawayId: text().references(() => giveaways.id),
     created: integer().notNull(),
     deletedAt: integer().notNull().default(0),
+    media: text().notNull().default('[]'),
   },
   (t) => [
     index('chat_room_messages_room').on(t.roomId, t.created, t.id),
@@ -1359,6 +1362,44 @@ export const chatRoomMessages = sqliteTable(
       'chat_room_message_payload',
       sql`${t.ciphertext} IS NULL OR (${t.text} = '' AND ${t.replyTo} IS NULL)`,
     ),
+  ],
+);
+// Group attachments are drafted for one room, then bound to their first message.
+export const chatRoomUploads = sqliteTable(
+  'chat_room_uploads',
+  {
+    uploadId: text()
+      .primaryKey()
+      .references(() => uploads.id, { onDelete: 'cascade' }),
+    roomId: text()
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    size: integer().notNull(),
+    kind: text().notNull(),
+    duration: integer().notNull().default(0),
+    waveform: text().notNull().default(''),
+    messageId: text().references(() => chatRoomMessages.id, {
+      onDelete: 'set null',
+    }),
+  },
+  (t) => [index('chat_room_uploads_room').on(t.roomId, t.messageId)],
+);
+// Every chat message that shows an upload, maintained by triggers. Access to a
+// forwarded file follows any live copy the viewer can read, in DMs or groups.
+export const chatMediaRefs = sqliteTable(
+  'chat_media_refs',
+  {
+    uploadId: text()
+      .notNull()
+      .references(() => uploads.id, { onDelete: 'cascade' }),
+    surface: text().notNull(),
+    messageId: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.uploadId, t.surface, t.messageId] }),
+    index('chat_media_refs_message').on(t.surface, t.messageId),
+    check('chat_media_refs_surface', sql`${t.surface} IN ('dm','room')`),
   ],
 );
 export const giveaways = sqliteTable(

@@ -16,8 +16,7 @@ import {
   published,
 } from './channel-access';
 import { mediaPermission } from './media-access';
-import { canSend } from './rooms';
-import { groupSenderVisible } from './antispam-access';
+import { roomMessageStatements } from './rooms';
 import { spamSettings } from './antispam';
 import type { SpamReview, SpamPayload } from './antispam-types';
 
@@ -75,7 +74,8 @@ async function approve(review: StoredReview, me: string, note: string) {
     await d.prepare(`SELECT id FROM ${table} WHERE id=?`).bind(targetId).first()
   )
     throw new ApiError(409, 'Публикация уже существует. Обновите очередь.');
-  let insert;
+  let insert: D1PreparedStatement,
+    bindUploads: D1PreparedStatement | null = null;
   const now = Date.now();
   if (kind === 'post') {
     if (!(await allowed(contextId, actorId)))
@@ -119,23 +119,22 @@ async function approve(review: StoredReview, me: string, note: string) {
       AND ${queueGate}`)
       .bind(targetId, p.text, now, contextId, actorId, id, me);
   } else {
-    insert = d
-      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,ciphertext,replyTo,created)
-      SELECT ?,r.id,u.id,?,NULL,?,MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0))
-      FROM chat_rooms r,users u WHERE r.id=? AND u.id=? AND r.kind='group' AND ${canSend('r', 'u.id')}
-      AND (? IS NULL OR EXISTS(SELECT 1 FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=r.id AND rp.deletedAt=0 AND ${groupSenderVisible('rp')})) AND ${queueGate}`)
-      .bind(
-        targetId,
-        p.text,
-        p.replyTo || null,
+    const media = JSON.parse(p.media || '[]') as { id: string }[];
+    [insert, bindUploads] = roomMessageStatements(
+      {
+        id: targetId,
+        roomId: contextId,
+        sender: actorId,
+        kind: 'group',
+        text: p.text,
+        ciphertext: null,
+        replyTo: p.replyTo || null,
+        attachments: media.map((file) => file.id),
         now,
-        contextId,
-        actorId,
-        p.replyTo || null,
-        p.replyTo || null,
-        id,
-        me,
-      );
+      },
+      queueGate,
+      [id, me],
+    );
   }
   const authorColumn =
     kind === 'post' ? 'publisherId' : kind === 'comment' ? 'userId' : 'sender';
@@ -158,6 +157,7 @@ async function approve(review: StoredReview, me: string, note: string) {
             .bind(targetId),
         ]
       : []),
+    ...(bindUploads ? [bindUploads] : []),
   ]);
   if (!results[0].meta.changes || !results[1].meta.changes)
     throw new ApiError(409, 'Отправка или права изменились. Обновите очередь.');

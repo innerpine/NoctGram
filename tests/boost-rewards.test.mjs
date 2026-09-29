@@ -156,6 +156,8 @@ function fixture(t) {
     'lib/antispam-detection.ts',
     'lib/rate-limit.ts',
     'lib/media-access.ts',
+    'lib/room-access.ts',
+    'lib/antispam-access.ts',
     'lib/avatar-media.ts',
     'lib/appearance.ts',
   ]);
