@@ -24,7 +24,7 @@ export function PremiumEmoji({ emoji }: { emoji: Emoji }) {
     return mountGiftAnimation(host.current, 'emoji:' + emoji.id, setReady);
   }, [emoji.id]);
   return (
-    <span className="premium-emoji">
+    <span className="premium-emoji" data-raw={emojiToken(emoji)}>
       <img
         src={'/assets/emoji/' + emoji.id + '.preview.webp'}
         alt={emoji.fallback}

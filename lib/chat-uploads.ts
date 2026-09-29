@@ -1,7 +1,7 @@
 import { db, bucket } from './storage';
 import { ApiError } from './api-error';
 import { assertWritable, visibleAccount } from './account-access';
-import { messageAllowed } from './privacy';
+import { directMessageAllowed } from './privacy';
 import { reserveUpload } from './upload-storage';
 import { canSend } from './room-access';
 import {
@@ -94,12 +94,12 @@ export async function storeChatUpload(
   recording?: ChatRecording,
 ): Promise<ChatAttachment> {
   await assertWritable(me);
-  if (!peer || peer.length > 100 || peer === me)
+  if (!peer || peer.length > 100)
     throw new ApiError(400, 'Выбери собеседника');
   checkedFile(file);
   const access = await db()
     .prepare(`SELECT 1 FROM users s,users r WHERE s.id=? AND r.id=?
-    AND s.kind='person' AND r.kind='person' AND ${visibleAccount('r')} AND ${messageAllowed}`)
+    AND s.kind='person' AND r.kind='person' AND ${visibleAccount('r')} AND ${directMessageAllowed}`)
     .bind(me, peer)
     .first();
   if (!access)

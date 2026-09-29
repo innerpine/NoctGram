@@ -6,7 +6,12 @@ import { Check, CheckCheck, Clock3, RotateCcw } from 'lucide-react';
 import type { Message, Person } from '@/lib/client';
 import { ChatGift } from './chat-gift';
 import { ChatEmojiText } from './chat-emoji-text';
-import { forwardedHeader, messageLayout, replyQuote } from './message-body';
+import {
+  forwardedHeader,
+  messageLayout,
+  replyQuote,
+  sharedPost,
+} from './message-body';
 import type { OutgoingMessage } from '@/lib/chat-outbox';
 import { Avatar } from './profile-identity';
 import { MusicLinkCard } from './music-link-card';
@@ -42,7 +47,7 @@ export const ChatMessage = memo(function ChatMessage({
   peer: Person;
   onProfile: (id: string) => void;
   onAvatar: (id: string) => void;
-  onAction: (action: ChatAction, message: Message) => void;
+  onAction: (action: ChatAction, message: Message, quote?: string) => void;
   disabled: boolean;
   canSend: boolean;
   selected: boolean;
@@ -57,6 +62,8 @@ export const ChatMessage = memo(function ChatMessage({
   onListened?: (message: Message) => void;
 }) {
   const own = message.sender === me?.id;
+  // «Избранное»: no second participant, so no read receipts or unheard dots.
+  const saved = peer.id === me?.id;
   const reactions = (
     <MessageReactions
       reactions={message.reactions}
@@ -88,7 +95,7 @@ export const ChatMessage = memo(function ChatMessage({
           ·
         </span>
       )}
-      {own && (
+      {own && (!saved || (delivery && delivery.status !== 'sent')) && (
         <span
           aria-label={
             delivery?.status === 'sending'
@@ -169,12 +176,13 @@ export const ChatMessage = memo(function ChatMessage({
               flush={visualMedia}
               metadata={mediaOnly ? metadata : undefined}
               own={own}
-              listened={!!message.listenedAt || !!delivery}
+              listened={!!message.listenedAt || !!delivery || saved}
               onListened={own ? undefined : () => onListened?.(message)}
             />
           )}
+          {sharedPost(message.postShare, me?.id)}
           {!!message.text.trim() && (
-            <p>
+            <p className="chat-message-text">
               <ChatEmojiText text={message.text} large={!!emojiCount} />
             </p>
           )}

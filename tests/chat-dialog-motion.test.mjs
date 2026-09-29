@@ -66,7 +66,7 @@ const compiled = await build({
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
                 : path === 'lucide-react'
-                  ? 'export const Check="Check", Forward="Forward", LoaderCircle="LoaderCircle", Search="Search", Trash2="Trash2", Download="Download", File="File", ChevronDown="ChevronDown", Pin="Pin", PinOff="PinOff";'
+                  ? 'export const Bookmark="Bookmark", Check="Check", Forward="Forward", LoaderCircle="LoaderCircle", Search="Search", Trash2="Trash2", Download="Download", File="File", ChevronDown="ChevronDown", Pin="Pin", PinOff="PinOff", Users="Users";'
                   : path === './chat-text-editor'
                     ? 'export const ChatTextEditor="ChatTextEditor";'
                     : path === './chat-emoji-text'
@@ -77,9 +77,9 @@ const compiled = await build({
                           ? 'export const VoiceMessage="VoiceMessage";'
                           : path === './round-video-message'
                             ? 'export const RoundVideoMessage="RoundVideoMessage";'
-                        : path === './profile-identity'
-                          ? 'export const Avatar="Avatar";'
-                          : 'export const Dialog="Dialog", DialogContent="DialogContent", DialogDescription="DialogDescription", DialogTitle="DialogTitle";',
+                            : path === './profile-identity'
+                              ? 'export const Avatar="Avatar";'
+                              : 'export const Dialog="Dialog", DialogContent="DialogContent", DialogDescription="DialogDescription", DialogTitle="DialogTitle";',
         }));
       },
     },
@@ -355,4 +355,94 @@ void test('pin navigation waits for the dialog to exit and retains send-time ord
   assert.deepEqual(jumps, []);
   find(tree, 'Dialog').props.onOpenChangeComplete(false);
   assert.deepEqual(jumps, ['older']);
+});
+
+void test('forwarding offers «Избранное» first, picks several chats and posts one request', async (t) => {
+  const calls = [];
+  mockFetch(t, async (url, init) => {
+    calls.push([url, JSON.parse(init.body)]);
+    return Response.json({
+      results: [
+        { target: { dm: { peer: 'me' } }, ok: true, ids: ['a'] },
+        { target: { room: { roomId: 'g1' } }, ok: true, ids: ['b'] },
+      ],
+    });
+  });
+  const done = [];
+  const component = mount(t, ChatForwardDialog, {
+    ...props(),
+    threads: [
+      { id: 'friend', name: 'Друг', handle: 'friend', lastTime: 5 },
+      { id: 'me', name: 'Я', handle: 'me' },
+      { id: 'noctgram', name: 'Noctgram', handle: 'noctgram' },
+    ],
+    rooms: [
+      {
+        id: 'g1',
+        kind: 'group',
+        name: 'Группа',
+        memberCount: 3,
+        updatedAt: 1,
+        lastMessage: null,
+      },
+      {
+        id: 's1',
+        kind: 'secret',
+        name: '',
+        memberCount: 2,
+        updatedAt: 9,
+        lastMessage: null,
+      },
+    ],
+    onDone: (result, chosen) => done.push([result, chosen]),
+  });
+  const targets = (tree) =>
+    nodes(tree).filter(
+      (node) => node.type === 'button' && 'aria-pressed' in node.props,
+    );
+  const label = (node) => find(node, 'strong').props.children;
+  let tree = component.render();
+  assert.deepEqual(
+    targets(tree).map(label),
+    ['Избранное', 'Друг', 'Группа'],
+    'Secret chats, yourself and the system account are not targets',
+  );
+  const submit = () =>
+    find(
+      component.render(),
+      'button',
+      (props) => props.className === 'primary',
+    );
+  assert.equal(submit().props.disabled, true, 'Nothing is chosen yet');
+  targets(tree)[0].props.onClick();
+  tree = component.render();
+  targets(tree)[2].props.onClick();
+  tree = component.render();
+  assert.deepEqual(
+    targets(tree).map((node) => node.props['aria-pressed']),
+    [true, false, true],
+  );
+  find(tree, 'textarea').props.onChange({ target: { value: '  Смотри  ' } });
+  submit().props.onClick();
+  submit().props.onClick();
+  await flush();
+  assert.equal(calls.length, 1, 'A double click sends one request');
+  const [url, body] = calls[0];
+  assert.equal(url, '/api/chat-forward');
+  assert.deepEqual(body.source, { dm: { peer: 'peer', ids: ['m1'] } });
+  assert.deepEqual(body.targets, [
+    { dm: { peer: 'me' } },
+    { room: { roomId: 'g1' } },
+  ]);
+  assert.equal(body.comment, 'Смотри');
+  assert.match(body.key, /^[0-9a-f-]{36}$/);
+  assert.equal(done.length, 1);
+  assert.deepEqual(
+    done[0][1].map((choice) => [choice.name, !!choice.saved]),
+    [
+      ['Избранное', true],
+      ['Группа', false],
+    ],
+  );
+  assert.equal(component.render().props.open, false);
 });

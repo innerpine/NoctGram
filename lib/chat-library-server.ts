@@ -48,7 +48,7 @@ export async function readChatLibrary(
   kind = '',
   before = '',
 ): Promise<ChatLibraryStats | ChatLibraryPage> {
-  if (!peer || peer.length > 100 || peer === me)
+  if (!peer || peer.length > 100)
     throw new ApiError(400, 'Выбери собеседника');
   await assertAccountVisible(peer);
   const args = [me, peer, peer, me, me];

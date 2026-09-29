@@ -30,6 +30,7 @@ export type RoomMessage = {
   reply?: RoomMessageReply;
   forwardedName?: string;
   forwardedFrom?: string | null;
+  postShare?: { id: string };
 };
 export type RoomMessageReply = {
   id: string;
@@ -37,6 +38,7 @@ export type RoomMessageReply = {
   name: string;
   text: string;
   unavailable: boolean;
+  quote?: string;
 };
 export type RoomPreview = {
   id: string;

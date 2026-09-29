@@ -1,7 +1,8 @@
 import { emojiFallback } from './premium-emoji';
 import type { Message } from './client';
 export function messageSummary(
-  message: Pick<Message, 'text' | 'attachments' | 'gift'>,
+  message: Pick<Message, 'text' | 'attachments' | 'gift'> &
+    Partial<Pick<Message, 'postShare'>>,
 ) {
   return (
     emojiFallback(message.text) ||
@@ -18,7 +19,7 @@ export function messageSummary(
                 : file.name,
       )
       .join(', ') ||
-    (message.gift ? 'Подарок' : 'Сообщение')
+    (message.gift ? 'Подарок' : message.postShare ? 'Публикация' : 'Сообщение')
   );
 }
 export function sortedPins(messages: Message[]) {

@@ -4,6 +4,7 @@
 import type { ReactNode } from 'react';
 import { ProfileLink } from './profile-link';
 import { ChatEmojiText } from './chat-emoji-text';
+import { SharedPostCard } from './shared-post-card';
 import { largeEmojiCount } from '@/lib/chat-emoji';
 import type { ChatAttachment } from '@/lib/chat-files';
 
@@ -13,16 +14,21 @@ export type MessageReplyPreview = {
   name: string;
   text: string;
   unavailable: boolean;
+  quote?: string;
 };
 type LayoutInput = {
   text: string;
   attachments?: ChatAttachment[];
   reply?: MessageReplyPreview;
   forwardedName?: string;
+  postShare?: { id: string };
 };
 export function messageLayout(message: LayoutInput) {
   const emojiCount =
-    !message.attachments?.length && !message.reply && !message.forwardedName
+    !message.attachments?.length &&
+    !message.reply &&
+    !message.forwardedName &&
+    !message.postShare
       ? largeEmojiCount(message.text)
       : 0;
   const visualMedia =
@@ -65,10 +71,11 @@ export function replyQuote(
   onJump: (id: string) => void,
 ): ReactNode {
   if (!reply) return null;
+  // A quote reply shows the quoted fragment instead of the whole message.
   return (
     <button
       type="button"
-      className="chat-reply-quote"
+      className={'chat-reply-quote' + (reply.quote ? ' has-quote' : '')}
       disabled={reply.unavailable}
       onClick={() => onJump(reply.id)}
     >
@@ -80,8 +87,15 @@ export function replyQuote(
             : reply.name}
       </strong>
       <span>
-        <ChatEmojiText text={reply.text} />
+        <ChatEmojiText text={reply.quote || reply.text} />
       </span>
     </button>
   );
+}
+export function sharedPost(
+  share: { id: string } | undefined,
+  viewerId: string | undefined,
+): ReactNode {
+  if (!share || !viewerId) return null;
+  return <SharedPostCard id={share.id} viewerId={viewerId} />;
 }

@@ -17,6 +17,7 @@ import {
   Video,
   ShieldCheck,
   Megaphone,
+  Forward,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -131,6 +132,7 @@ export const PostCard = memo(function PostCard({
   onMenu,
   onSupport,
   onView,
+  onShare,
   canModerate = false,
 }: {
   p: Post;
@@ -144,6 +146,8 @@ export const PostCard = memo(function PostCard({
   onMenu: (p: Post, kind: string) => void;
   onSupport: (p: Post) => void;
   onView: (id: string) => Promise<boolean>;
+  // Forwards the post to chats, including «Избранное».
+  onShare?: (p: Post) => void;
   canModerate?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false),
@@ -494,6 +498,16 @@ export const PostCard = memo(function PostCard({
               {p.comments}
             </span>
           </button>
+          {onShare && (
+            <button
+              aria-label="Поделиться в чате"
+              title="Переслать в чат или в Избранное"
+              disabled={busy}
+              onClick={() => onShare(p)}
+            >
+              <Forward size={18} />
+            </button>
+          )}
           <span className="grow" />
           <button
             aria-label={

@@ -194,6 +194,7 @@ function fixture(t) {
     'lib/turn.ts',
     'lib/account-access.ts',
     'lib/privacy.ts',
+    'lib/reply-quote.ts',
     'lib/chat-files.ts',
     'lib/chat-access.ts',
     'lib/premium-access.ts',

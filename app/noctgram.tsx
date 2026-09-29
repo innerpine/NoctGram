@@ -112,6 +112,10 @@ import { StarsPanel, SupportPanel } from './stars-panel';
 import { SendGiftButton, ProfileGifts } from './gifts';
 import { ChatThemeMenu } from './chat-theme-menu';
 import { ChatConversation } from './chat-conversation';
+import { ChatForwardDialog } from './forward-dialog';
+import { SAVED_MESSAGES, SavedMessagesAvatar } from './saved-messages';
+import { forwardNotice } from '@/lib/forward-client';
+import { APP_NOTICE_EVENT } from '@/lib/app-notice';
 import { ChatPeerProfile } from './chat-peer-profile';
 import {
   chatTheme,
@@ -378,6 +382,7 @@ export default function Noctgram({
   const chatSnapshots = useRef(createChatSnapshots());
   chatSnapshots.current.reset(accountBlocked ? '' : me?.id || '');
   const [openingChat, setOpeningChat] = useState('');
+  const [sharedPost, setSharedPost] = useState<Post | null>(null);
   const chatPreparation = useRef(0),
     preparedMessageLoad = useRef('');
   const audioCalls = useAudioCalls(me?.id, readOnly || accountBlocked);
@@ -746,6 +751,36 @@ export default function Noctgram({
       });
     return () => {
       active = false;
+    };
+  }, [myId, notify]);
+  // Shared post cards in chats open the post; nested views raise toasts.
+  useEffect(() => {
+    if (!myId) return;
+    let active = true;
+    const openPost = (event: Event) => {
+      const id = (event as CustomEvent<{ id?: string }>).detail?.id;
+      if (!id) return;
+      request<Post>('?action=post&id=' + encodeURIComponent(id))
+        .then((p) => {
+          if (active) {
+            setCommentPost(p);
+            setModal('comments');
+          }
+        })
+        .catch((e) => {
+          if (active) notify(e.message);
+        });
+    };
+    const showNotice = (event: Event) => {
+      const text = (event as CustomEvent<{ text?: string }>).detail?.text;
+      if (text) notify(text);
+    };
+    window.addEventListener('noctgram:open-post', openPost);
+    window.addEventListener(APP_NOTICE_EVENT, showNotice);
+    return () => {
+      active = false;
+      window.removeEventListener('noctgram:open-post', openPost);
+      window.removeEventListener(APP_NOTICE_EVENT, showNotice);
     };
   }, [myId, notify]);
   const refreshPost = async (id: string) => {
@@ -1829,6 +1864,9 @@ export default function Noctgram({
           setModalOpen(true);
         }
       },
+      onShare: (post: Post) => {
+        if (cardActions.current.writable()) setSharedPost(post);
+      },
     }),
     [],
   );
@@ -2775,6 +2813,17 @@ export default function Noctgram({
                 />
                 <button
                   className="icon-button"
+                  aria-label={SAVED_MESSAGES}
+                  title={SAVED_MESSAGES}
+                  disabled={!me}
+                  onClick={() => {
+                    if (me) openChat(me);
+                  }}
+                >
+                  <Bookmark size={16} />
+                </button>
+                <button
+                  className="icon-button"
                   aria-label="Новый диалог"
                   onClick={() => {
                     setPeopleQuery('');
@@ -2827,6 +2876,7 @@ export default function Noctgram({
                     </ArchiveRow>
                   );
                 const t = dialog.person;
+                const saved = t.id === myId;
                 return (
                   <ArchiveRow
                     key={myId + ':' + t.id}
@@ -2841,14 +2891,22 @@ export default function Noctgram({
                       className={
                         'thread-row ' + (peer?.id === t.id ? 'active' : '')
                       }
-                      aria-label={'Открыть диалог с ' + t.name}
+                      aria-label={
+                        saved
+                          ? 'Открыть ' + SAVED_MESSAGES
+                          : 'Открыть диалог с ' + t.name
+                      }
                       aria-busy={openingChat === t.id}
                       onClick={() => openChat(t)}
                     >
-                      <Avatar person={t} size={38} />
+                      {saved ? (
+                        <SavedMessagesAvatar size={38} />
+                      ) : (
+                        <Avatar person={t} size={38} />
+                      )}
                       <span className="thread-copy">
                         <strong>
-                          <DisplayName person={t} />
+                          {saved ? SAVED_MESSAGES : <DisplayName person={t} />}
                         </strong>
                         <small>
                           <ChatEmojiText
@@ -2919,104 +2977,118 @@ export default function Noctgram({
                     >
                       <ArrowLeft size={18} />
                     </button>
-                    <ChatPeerProfile
-                      key={'peer-profile:' + me.id + ':' + peer.id}
-                      peer={peer}
-                      viewerId={me.id}
-                      lastSeen={
-                        (
-                          threads.find((thread) => thread.id === peer.id) ||
-                          peer
-                        ).lastSeen
-                      }
-                    />
-                    <button
-                      className="icon-button call-button"
-                      aria-label="Аудиозвонок"
-                      title="Аудиозвонок"
-                      disabled={
-                        readOnly || audioCalls.active || !messageAccess?.allowed
-                      }
-                      onClick={() => void audioCalls.start(peer)}
-                    >
-                      <Phone size={18} />
-                    </button>
-                    {me && peer.id !== me.id && (
-                      <SendGiftButton
-                        key={'chat-gift:' + me.id + ':' + peer.id}
-                        recipient={peer}
-                        senderId={me.id}
-                        disabled={busy || readOnly || !messageAccess?.allowed}
+                    {peer.id === me.id ? (
+                      <div className="chat-saved-heading">
+                        <SavedMessagesAvatar size={36} />
+                        <span>
+                          <strong>{SAVED_MESSAGES}</strong>
+                          <small>Заметки и пересланное — только для вас</small>
+                        </span>
+                      </div>
+                    ) : (
+                      <ChatPeerProfile
+                        key={'peer-profile:' + me.id + ':' + peer.id}
+                        peer={peer}
+                        viewerId={me.id}
+                        lastSeen={
+                          (
+                            threads.find((thread) => thread.id === peer.id) ||
+                            peer
+                          ).lastSeen
+                        }
                       />
                     )}
-                    <button
-                      className="chat-block icon-button"
-                      disabled={busy || !messageAccess}
-                      aria-label={
-                        messageAccess?.blockedByMe
-                          ? 'Разблокировать собеседника'
-                          : 'Заблокировать собеседника'
-                      }
-                      title={
-                        messageAccess?.blockedByMe
-                          ? 'Разблокировать собеседника'
-                          : 'Заблокировать собеседника'
-                      }
-                      onClick={() =>
-                        void run(async () => {
-                          await request('', {
-                            action: 'blockUser',
-                            id: peer.id,
-                            value: !messageAccess?.blockedByMe,
-                          });
-                          chatSnapshots.current.remove(peer.id);
-                          await loadMessages();
-                          setPrivacyVersion((v) => v + 1);
-                          notify(
+                    {peer.id !== me.id && (
+                      <>
+                        <button
+                          className="icon-button call-button"
+                          aria-label="Аудиозвонок"
+                          title="Аудиозвонок"
+                          disabled={
+                            readOnly || audioCalls.active || !messageAccess?.allowed
+                          }
+                          onClick={() => void audioCalls.start(peer)}
+                        >
+                          <Phone size={18} />
+                        </button>
+                        {me && peer.id !== me.id && (
+                          <SendGiftButton
+                            key={'chat-gift:' + me.id + ':' + peer.id}
+                            recipient={peer}
+                            senderId={me.id}
+                            disabled={busy || readOnly || !messageAccess?.allowed}
+                          />
+                        )}
+                        <button
+                          className="chat-block icon-button"
+                          disabled={busy || !messageAccess}
+                          aria-label={
                             messageAccess?.blockedByMe
-                              ? 'Собеседник разблокирован'
-                              : 'Собеседник добавлен в чёрный список',
-                          );
-                        })
-                      }
-                    >
-                      <Ban size={17} />
-                    </button>
-                    <ChatThemeMenu
-                      key={'chat-theme:' + myId + ':' + peer.id}
-                      value={currentChatTheme}
-                      canShare={!readOnly && !!messageAccess?.allowed}
-                      onRefresh={() => {
-                        void Promise.all([loadThreads(), loadMessages()]).catch(
-                          (e) => notify(e.message),
-                        );
-                      }}
-                      onSave={async (scope, theme) => {
-                        const saved = await request<ChatThemeState>('', {
-                          action: 'chatTheme',
-                          peer: peer.id,
-                          scope,
-                          theme,
-                        });
-                        if (activePeer.current === peer.id) {
-                          chatSnapshots.current.updateTheme(peer.id, saved);
-                          setChatAppearance((previous) => {
-                            if (
-                              previous &&
-                              previous.viewer === myId &&
-                              previous.peer === peer.id &&
-                              previous.value.revision > saved.revision
-                            )
-                              return previous;
-                            return {
-                              viewer: myId || '',
+                              ? 'Разблокировать собеседника'
+                              : 'Заблокировать собеседника'
+                          }
+                          title={
+                            messageAccess?.blockedByMe
+                              ? 'Разблокировать собеседника'
+                              : 'Заблокировать собеседника'
+                          }
+                          onClick={() =>
+                            void run(async () => {
+                              await request('', {
+                                action: 'blockUser',
+                                id: peer.id,
+                                value: !messageAccess?.blockedByMe,
+                              });
+                              chatSnapshots.current.remove(peer.id);
+                              await loadMessages();
+                              setPrivacyVersion((v) => v + 1);
+                              notify(
+                                messageAccess?.blockedByMe
+                                  ? 'Собеседник разблокирован'
+                                  : 'Собеседник добавлен в чёрный список',
+                              );
+                            })
+                          }
+                        >
+                          <Ban size={17} />
+                        </button>
+                        <ChatThemeMenu
+                          key={'chat-theme:' + myId + ':' + peer.id}
+                          value={currentChatTheme}
+                          canShare={!readOnly && !!messageAccess?.allowed}
+                          onRefresh={() => {
+                            void Promise.all([loadThreads(), loadMessages()]).catch(
+                              (e) => notify(e.message),
+                            );
+                          }}
+                          onSave={async (scope, theme) => {
+                            const saved = await request<ChatThemeState>('', {
+                              action: 'chatTheme',
                               peer: peer.id,
-                              value: saved,
-                            };
-                          });
-                        }
-                      }}
-                    />
+                              scope,
+                              theme,
+                            });
+                            if (activePeer.current === peer.id) {
+                              chatSnapshots.current.updateTheme(peer.id, saved);
+                              setChatAppearance((previous) => {
+                                if (
+                                  previous &&
+                                  previous.viewer === myId &&
+                                  previous.peer === peer.id &&
+                                  previous.value.revision > saved.revision
+                                )
+                                  return previous;
+                                return {
+                                  viewer: myId || '',
+                                  peer: peer.id,
+                                  value: saved,
+                                };
+                              });
+                            }
+                          }}
+                        />
+                      </>
+                    )}
                   </div>
                   <ChatConversation
                     key={'conversation:' + myId + ':' + peer.id}
@@ -3161,6 +3233,28 @@ export default function Noctgram({
             <p>Меньше шума. Больше своего.</p>
           </div>
         </aside>
+      )}
+      {sharedPost && me && (
+        <ChatForwardDialog
+          key={'share:' + me.id + ':' + sharedPost.id}
+          me={me}
+          source={{ post: { postId: sharedPost.id } }}
+          preview={
+            sharedPost.name +
+            ': ' +
+            (sharedPost.text.slice(0, 200) ||
+              (sharedPost.media.length ? 'медиа' : 'публикация'))
+          }
+          threads={threads}
+          rooms={roomList.rooms}
+          fetchTargets
+          onClose={() => setSharedPost(null)}
+          onDone={(result, chosen) => {
+            notify(forwardNotice(result, chosen));
+            void loadThreads().catch(() => {});
+            void roomList.refresh();
+          }}
+        />
       )}
       <CreateGroupDialog
         key={'create-group:' + (me?.id || '')}

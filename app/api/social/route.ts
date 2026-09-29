@@ -80,6 +80,7 @@ import { messageVisible } from '@/lib/chat-access';
 import { readChatTheme, saveChatTheme } from '@/lib/chat-theme-settings';
 import { readChatLibrary } from '@/lib/chat-library-server';
 import { messageSummarySql } from '@/lib/message-summary-sql';
+import { readPostPreviews } from '@/lib/post-preview-server';
 export const dynamic = 'force-dynamic';
 // A listed username that was removed or promoted to main is no longer for sale.
 const staleUsernameLots = (d: D1Database, me: string) =>
@@ -153,6 +154,10 @@ export async function GET(req: Request) {
       if (!result[0]) throw new ApiError(404, 'Публикация не найдена');
       return Response.json(result[0]);
     }
+    if (action === 'postPreviews')
+      return Response.json(await readPostPreviews(me, s.get('ids')), {
+        headers: { 'Cache-Control': 'private, no-store' },
+      });
     if (action === 'topics') {
       const rows = await d
         .prepare(
@@ -721,8 +726,8 @@ export async function POST(req: Request) {
     }
     if (action === 'message') {
       await assertAccountVisible(id);
+      // A message to yourself is saved to «Избранное».
       if (
-        id === me ||
         id === 'noctgram' ||
         !(await d
           .prepare("SELECT id FROM users WHERE id=? AND kind='person'")
@@ -738,6 +743,7 @@ export async function POST(req: Request) {
           b.attachments ?? [],
           b.key,
           b.replyTo ?? null,
+          { quote: b.quote },
         ),
       );
     }

@@ -16,6 +16,7 @@ type Send = (body: {
   attachments: string[];
   key: string;
   replyTo: string | null;
+  quote?: string;
   expectedSender: string;
 }) => Promise<{ id: string }>;
 
@@ -44,6 +45,7 @@ export function createChatOutbox(send: Send) {
         attachments: message.attachments?.map((file) => file.id) ?? [],
         key,
         replyTo: message.reply?.id ?? null,
+        ...(message.reply?.quote ? { quote: message.reply.quote } : {}),
         expectedSender: message.sender,
       });
       if (result.id !== message.id)

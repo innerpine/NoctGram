@@ -18,6 +18,7 @@ import {
   Send,
   Video,
   X,
+  Quote,
   Reply,
   Smile,
 } from 'lucide-react';
@@ -272,12 +273,19 @@ export function ChatComposer({
     >
       <ChatReveal>
         {reply && (
-          <div className="chat-reply-draft">
-            <Reply size={19} />
-            <span key={reply.id}>
-              <strong>Ответ · {reply.name}</strong>
+          <div
+            className={'chat-reply-draft' + (reply.quote ? ' has-quote' : '')}
+          >
+            {reply.quote ? <Quote size={19} /> : <Reply size={19} />}
+            <span key={reply.id + ':' + (reply.quote || '')}>
+              <strong>
+                {reply.quote ? 'Цитата' : 'Ответ'} · {reply.name}
+              </strong>
               <small>
-                <ChatEmojiText text={reply.text} mentions={false} />
+                <ChatEmojiText
+                  text={reply.quote || reply.text}
+                  mentions={false}
+                />
               </small>
             </span>
             <button

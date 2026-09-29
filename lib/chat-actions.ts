@@ -2,7 +2,7 @@ import { assertPremiumEmoji } from './premium-emoji-access';
 import { db } from './storage';
 import { ApiError } from './api-error';
 import { assertWritable, visibleAccount } from './account-access';
-import { messageAllowed } from './privacy';
+import { directMessageAllowed } from './privacy';
 import { messageVisible, messagePair, messageWritable } from './chat-access';
 
 function selection(body: Record<string, unknown>) {
@@ -26,7 +26,7 @@ export async function deleteMessages(
 ) {
   await assertWritable(me);
   const { ids, peer, json } = selection(body);
-  if (typeof body.everyone !== 'boolean' || peer === me)
+  if (typeof body.everyone !== 'boolean')
     throw new ApiError(400, 'Выбери способ удаления');
   const access = await db()
     .prepare(
@@ -90,7 +90,7 @@ export async function editMessage(me: string, body: Record<string, unknown>) {
     throw new ApiError(400, 'Некорректное редактирование');
   const caption = text.trim();
   await assertPremiumEmoji(me, caption);
-  const access = `m.sender=s.id AND m.recipient=r.id AND m.giftReceiptId IS NULL AND m.forwardSourceId IS NULL AND ${messageVisible('m', 's.id')} AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageWritable('s.id')} AND ${messageAllowed}`;
+  const access = `m.sender=s.id AND m.recipient=r.id AND m.giftReceiptId IS NULL AND m.forwardSourceId IS NULL AND m.forwardedName='' AND m.postShareId IS NULL AND ${messageVisible('m', 's.id')} AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageWritable('s.id')} AND ${directMessageAllowed}`;
   const message = await db()
     .prepare(
       `SELECT m.text,m.media,m.editedAt FROM messages m,users s,users r WHERE m.id=? AND s.id=? AND r.id=? AND ${access}`,
@@ -131,7 +131,6 @@ export async function forwardMessages(
     typeof recipient !== 'string' ||
     !recipient ||
     recipient.length > 100 ||
-    recipient === me ||
     recipient === 'noctgram' ||
     typeof key !== 'string' ||
     !/^[a-zA-Z0-9-]{16,80}$/.test(key)
@@ -167,11 +166,12 @@ export async function forwardMessages(
     AND NOT EXISTS(SELECT 1 FROM json_each(src.media) a JOIN moderated_uploads mu ON mu.uploadId=json_extract(a.value,'$.id'))`;
   const results = await db().batch([
     db()
-      .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,forwardedName,forwardSourceId)
+      .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,forwardedName,forwardedFrom,forwardSourceId,read)
       SELECT 'forward:'||s.id||':'||?||':'||j.key,s.id,r.id,src.text,src.media,?+CAST(j.key AS INTEGER),
-        CASE WHEN src.forwardedName<>'' THEN src.forwardedName ELSE origin.name END,src.id
+        CASE WHEN src.forwardedName<>'' THEN src.forwardedName ELSE origin.name END,
+        CASE WHEN src.forwardedName<>'' THEN src.forwardedFrom ELSE src.sender END,src.id,CASE WHEN s.id=r.id THEN 1 ELSE 0 END
       FROM json_each(?) j JOIN messages src ON src.id=j.value JOIN users origin ON origin.id=src.sender,users s,users r
-      WHERE s.id=? AND r.id=? AND s.kind='person' AND r.kind='person' AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageWritable('s.id')} AND ${messageAllowed}
+      WHERE s.id=? AND r.id=? AND s.kind='person' AND r.kind='person' AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageWritable('s.id')} AND ${directMessageAllowed}
       AND (SELECT COUNT(*) FROM messages src,json_each(?) requested WHERE src.id=requested.value AND ${sourceAccess})=?
       AND NOT EXISTS(SELECT 1 FROM messages WHERE id IN (SELECT value FROM json_each(?)))
       ON CONFLICT(id) DO NOTHING`)
@@ -189,7 +189,7 @@ export async function forwardMessages(
       ),
     db()
       .prepare(
-        `INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created) SELECT 'message:'||id,recipient,sender,'message',id,created FROM messages WHERE id IN (SELECT value FROM json_each(?)) AND deletedAt=0`,
+        `INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created) SELECT 'message:'||id,recipient,sender,'message',id,created FROM messages WHERE id IN (SELECT value FROM json_each(?)) AND deletedAt=0 AND recipient<>sender`,
       )
       .bind(outputJson),
   ]);

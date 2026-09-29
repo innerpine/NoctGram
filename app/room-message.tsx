@@ -1,9 +1,11 @@
 'use client';
-import { memo } from 'react';
+import { memo, useRef, useState } from 'react';
 import {
   Check,
   Clock3,
+  Forward,
   MoreHorizontal,
+  Quote,
   Reply,
   RotateCcw,
   Trash2,
@@ -22,8 +24,14 @@ import { MessageReactions } from './message-reactions';
 import { GiveawayCard } from './giveaway-card';
 import { ChatEmojiText } from './chat-emoji-text';
 import { ChatMessageFiles } from './chat-message-files';
-import { forwardedHeader, messageLayout, replyQuote } from './message-body';
+import {
+  forwardedHeader,
+  messageLayout,
+  replyQuote,
+  sharedPost,
+} from './message-body';
 import { locallyListened, markLocallyListened } from '@/lib/media-playback';
+import { selectionQuote } from '@/lib/message-selection';
 import { Avatar } from './post-card';
 
 const time = (date: number) =>
@@ -40,10 +48,13 @@ export const RoomMessageRow = memo(function RoomMessageRow({
   interactive,
   canReply,
   canDelete,
+  canForward = false,
   reactionsDisabled,
   reactionPending,
   delivery,
   onReply,
+  onQuote,
+  onForward,
   onDelete,
   onProfile,
   onJump,
@@ -58,10 +69,13 @@ export const RoomMessageRow = memo(function RoomMessageRow({
   interactive: boolean;
   canReply: boolean;
   canDelete: boolean;
+  canForward?: boolean;
   reactionsDisabled: boolean;
   reactionPending: boolean;
   delivery?: RoomOutgoing;
   onReply: (message: RoomMessage) => void;
+  onQuote?: (message: RoomMessage, quote: string) => void;
+  onForward?: (message: RoomMessage) => void;
   onDelete: (message: RoomMessage) => void;
   onProfile: (id: string) => void;
   onJump: (id: string) => void;
@@ -70,6 +84,9 @@ export const RoomMessageRow = memo(function RoomMessageRow({
 }) {
   const self = message.sender === meId;
   const deleted = !!message.deletedAt;
+  const bubble = useRef<HTMLDivElement>(null);
+  // Text selected when the menu opens becomes a quote reply.
+  const [quote, setQuote] = useState('');
   const group = roomKind === 'group';
   const giveawayEvent = !!message.giveawayId && !deleted;
   const attachments = deleted ? [] : (message.attachments ?? []);
@@ -77,6 +94,8 @@ export const RoomMessageRow = memo(function RoomMessageRow({
     text: deleted ? '' : content,
     attachments,
     reply: message.reply,
+    forwardedName: message.forwardedName,
+    postShare: message.postShare,
   });
   const stamp = (
     <span className="room-message-time">
@@ -112,6 +131,7 @@ export const RoomMessageRow = memo(function RoomMessageRow({
         </button>
       )}
       <div
+        ref={bubble}
         id={'room-message-' + message.id}
         tabIndex={-1}
         data-delivery={delivery?.status}
@@ -148,11 +168,12 @@ export const RoomMessageRow = memo(function RoomMessageRow({
             onListened={() => markLocallyListened(message.id)}
           />
         )}
+        {!deleted && sharedPost(message.postShare, meId)}
         {giveawayEvent ? (
           <GiveawayCard id={message.giveawayId!} viewerId={meId} />
         ) : (
           (deleted || !!content.trim()) && (
-            <p>
+            <p className="chat-message-text">
               <ChatEmojiText text={content} large={!!emojiCount} />
             </p>
           )
@@ -195,9 +216,19 @@ export const RoomMessageRow = memo(function RoomMessageRow({
           </button>
         )}
       </div>
-      {!deleted && !delivery && (canReply || canDelete) && (
+      {!deleted && !delivery && (canReply || canDelete || canForward) && (
         <DropdownMenu>
           <DropdownMenuTrigger
+            onPointerDown={() =>
+              setQuote(
+                canReply && group
+                  ? selectionQuote(
+                      bubble.current?.querySelector('.chat-message-text'),
+                      message.text,
+                    )
+                  : '',
+              )
+            }
             className="room-message-more icon-button"
             aria-label={
               giveawayEvent ? 'Действия с розыгрышем' : 'Действия с сообщением'
@@ -213,6 +244,21 @@ export const RoomMessageRow = memo(function RoomMessageRow({
               >
                 <Reply size={15} />
                 Ответить
+              </DropdownMenuItem>
+            )}
+            {canReply && !!quote && (
+              <DropdownMenuItem
+                disabled={!interactive}
+                onClick={() => onQuote?.(message, quote)}
+              >
+                <Quote size={15} />
+                Ответить с цитатой
+              </DropdownMenuItem>
+            )}
+            {canForward && !giveawayEvent && (
+              <DropdownMenuItem onClick={() => onForward?.(message)}>
+                <Forward size={15} />
+                Переслать
               </DropdownMenuItem>
             )}
             {canDelete && (

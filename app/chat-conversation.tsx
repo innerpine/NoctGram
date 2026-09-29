@@ -14,6 +14,7 @@ import { chatRequest } from '@/lib/chat-client';
 import type { ReactionEmoji } from '@/lib/message-reactions';
 import { chatOutbox, emptyOutbox, mergeOutgoing } from '@/lib/chat-outbox';
 import { messageSummary } from '@/lib/chat-message-display';
+import { forwardNotice } from '@/lib/forward-client';
 import { createChatNavigator } from '@/lib/chat-navigation';
 import { createChatDragSelection } from '@/lib/chat-drag-selection';
 import { createChatRemoval } from '@/lib/chat-removal';
@@ -104,7 +105,9 @@ export function ChatConversation({
     setProfileId(id);
     setProfileOpen(true);
   }, []);
+  const saved = peer.id === me.id;
   const [reply, setReply] = useState<Message | null>(null),
+    [quote, setQuote] = useState(''),
     [selected, setSelected] = useState<string[]>([]),
     [working, setWorking] = useState(false);
   const [operation, setOperation] = useState<{
@@ -252,10 +255,10 @@ export function ChatConversation({
   const selectedMessages = messages.filter((message) =>
     selected.includes(message.id),
   );
-  const action = useRef<(action: ChatAction, message: Message) => void>(
-    () => {},
-  );
-  action.current = (kind, message) => {
+  const action = useRef<
+    (action: ChatAction, message: Message, quote?: string) => void
+  >(() => {});
+  action.current = (kind, message, fragment = '') => {
     if (removal.current?.has(message.id)) return;
     if (kind === 'copy') {
       void navigator.clipboard
@@ -287,9 +290,10 @@ export function ChatConversation({
         !messages.some((item) => item.id === message.id))
     )
       return;
-    if (kind === 'reply') {
+    if (kind === 'reply' || kind === 'quote') {
       if (canSend) {
         setReply(message);
+        setQuote(kind === 'quote' ? fragment : '');
         setReplyFocus((version) => version + 1);
         setSelected([]);
       }
@@ -324,7 +328,8 @@ export function ChatConversation({
       setOperation({ type: kind, messages: [message] });
   };
   const onAction = useCallback(
-    (kind: ChatAction, message: Message) => action.current(kind, message),
+    (kind: ChatAction, message: Message, quote?: string) =>
+      action.current(kind, message, quote),
     [],
   );
   const onPin = useCallback(
@@ -401,10 +406,6 @@ export function ChatConversation({
         setReply(null);
       setSelected([]);
     }
-    if (operation?.type === 'forward') {
-      setSelected([]);
-      notify('Сообщения пересланы');
-    }
     void onRefresh().catch((error) => notify(error.message));
   };
   const readonly = disabled || working;
@@ -468,9 +469,18 @@ export function ChatConversation({
               64;
         }}
       >
-        {!visibleMessages.length && (
-          <p className="chat-empty-history">Здесь начинается ваш разговор.</p>
-        )}
+        {!visibleMessages.length &&
+          (saved ? (
+            <div className="chat-empty-history saved-empty">
+              <strong>Избранное</strong>
+              <p>
+                Пересылайте сюда сообщения и публикации, чтобы сохранить их.
+                Заметки, файлы и голосовые тоже можно отправлять себе.
+              </p>
+            </div>
+          ) : (
+            <p className="chat-empty-history">Здесь начинается ваш разговор.</p>
+          ))}
         {visibleMessages.map((message) => (
           <ChatMessage
             key={message.id}
@@ -522,10 +532,14 @@ export function ChatConversation({
                 name: reply.sender === me.id ? 'Вы' : peer.name,
                 text: messageSummary(reply),
                 unavailable: false,
+                ...(quote ? { quote } : {}),
               }
             : null
         }
-        onCancelReply={() => setReply(null)}
+        onCancelReply={() => {
+          setReply(null);
+          setQuote('');
+        }}
         onSend={(draft) => {
           followTail.current = true;
           chatOutbox.enqueue(me.id, peer.id, draft);
@@ -535,6 +549,7 @@ export function ChatConversation({
         <ChatDeleteDialog
           messages={operation.messages}
           peer={peer}
+          saved={saved}
           onClose={() => setOperation(null)}
           onDone={finished}
         />
@@ -553,8 +568,13 @@ export function ChatConversation({
           me={me}
           peer={peer}
           threads={threads}
+          fetchTargets
           onClose={() => setOperation(null)}
-          onDone={finished}
+          onDone={(result, chosen) => {
+            setSelected([]);
+            notify(forwardNotice(result, chosen));
+            void onRefresh().catch((error) => notify(error.message));
+          }}
         />
       )}
     </div>

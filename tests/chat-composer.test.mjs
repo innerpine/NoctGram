@@ -68,7 +68,7 @@ const { outputFiles } = await build({
                         ? 'export const ChatRecorder="ChatRecorder";'
                       : path.includes('chat-emoji-picker')
                         ? 'export default "Picker";'
-                        : 'export const File="File", LoaderCircle="LoaderCircle", Paperclip="Paperclip", RotateCcw="RotateCcw", Send="Send", Video="Video", X="X", Reply="Reply", Smile="Smile";',
+                        : 'export const File="File", LoaderCircle="LoaderCircle", Paperclip="Paperclip", RotateCcw="RotateCcw", Send="Send", Video="Video", X="X", Reply="Reply", Quote="Quote", Smile="Smile";',
         }));
       },
     },

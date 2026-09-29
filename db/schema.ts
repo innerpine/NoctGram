@@ -235,6 +235,12 @@ export const messages = sqliteTable(
     read: integer().notNull().default(0),
     // When the recipient first played a voice or round video message.
     listenedAt: integer().notNull().default(0),
+    // Original author of a forwarded message or shared post (any surface).
+    forwardedFrom: text(),
+    // The quoted fragment of the replied message, if the reply quotes one.
+    replyQuote: text().notNull().default(''),
+    // A feed post shared into the chat; rendered live for each viewer.
+    postShareId: text(),
   },
   (t) => [
     index('messages_recipient').on(t.recipient, t.created),
@@ -1356,6 +1362,10 @@ export const chatRoomMessages = sqliteTable(
     created: integer().notNull(),
     deletedAt: integer().notNull().default(0),
     media: text().notNull().default('[]'),
+    forwardedName: text().notNull().default(''),
+    forwardedFrom: text(),
+    replyQuote: text().notNull().default(''),
+    postShareId: text(),
   },
   (t) => [
     index('chat_room_messages_room').on(t.roomId, t.created, t.id),

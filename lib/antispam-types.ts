@@ -8,6 +8,7 @@ export type SpamPayload = {
   adult?: number;
   publishAt?: number;
   replyTo?: string | null;
+  quote?: string;
 };
 export type SpamSubmission = {
   kind: SpamKind;

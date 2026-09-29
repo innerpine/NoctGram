@@ -19,6 +19,7 @@ export type RoomSendBody = {
   text: string;
   attachments: string[];
   replyTo: string | null;
+  quote?: string;
 };
 type Send = (body: RoomSendBody) => Promise<{ id: string } | QueuedSubmission>;
 type Author = { id: string; name: string; avatar: string };
@@ -50,6 +51,7 @@ export function createRoomOutbox(send: Send) {
         text: message.text,
         attachments: message.attachments?.map((file) => file.id) ?? [],
         replyTo: message.replyTo,
+        ...(message.reply?.quote ? { quote: message.reply.quote } : {}),
       });
       if ('queued' in result)
         update(message.id, {

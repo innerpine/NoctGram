@@ -133,6 +133,7 @@ function fixture(t) {
     'lib/account-access.ts',
     'lib/channel-access.ts',
     'lib/privacy.ts',
+    'lib/reply-quote.ts',
     'lib/chat-files.ts',
     'lib/chat-access.ts',
     'lib/api-error.ts',

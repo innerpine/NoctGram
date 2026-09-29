@@ -9,6 +9,7 @@ import {
 } from './chat-files';
 import { messageVisible, messagePair } from './chat-access';
 import { readPresencePrivacy, savePresencePrivacy } from './presence-privacy';
+import { replyQuoteValue } from './reply-quote';
 
 // Each predicate consumes one viewer binding; aliases are internal identifiers.
 export function personalVisibility(alias: string) {
@@ -27,6 +28,8 @@ export const messageAllowed = `NOT EXISTS(SELECT 1 FROM user_blocks WHERE
   OR ((SELECT messagePolicy FROM user_privacy WHERE userId=r.id)='following'
     AND EXISTS(SELECT 1 FROM follows WHERE follower=r.id AND following=s.id)))`;
 
+// Direct messages to yourself (Избранное) skip block and policy checks.
+export const directMessageAllowed = `(s.id=r.id OR (${messageAllowed}))`;
 export async function assertCanInteract(me: string, target: string) {
   const denied = await db()
     .prepare(`SELECT 1 FROM users u JOIN user_blocks b
@@ -63,8 +66,10 @@ export async function sendPrivateMessage(
   attachments: unknown = [],
   key: unknown = crypto.randomUUID(),
   replyTo: unknown = null,
+  options: { quote?: unknown } = {},
 ) {
   await assertPremiumEmoji(me, text);
+  const quote = replyQuoteValue(options.quote, replyTo);
   if (
     replyTo !== null &&
     (typeof replyTo !== 'string' || !replyTo || replyTo.length > 250)
@@ -88,7 +93,7 @@ export async function sendPrivateMessage(
     ids = JSON.stringify(attachments);
   const existing = await db()
     .prepare(
-      'SELECT recipient,text,media,replyTo FROM messages WHERE id=? AND sender=?',
+      'SELECT recipient,text,media,replyTo,replyQuote FROM messages WHERE id=? AND sender=?',
     )
     .bind(id, me)
     .first<{
@@ -96,11 +101,13 @@ export async function sendPrivateMessage(
       text: string;
       media: string;
       replyTo: string | null;
+      replyQuote: string;
     }>();
   const same = (row: NonNullable<typeof existing>) =>
     row.recipient === recipient &&
     row.text === text &&
     row.replyTo === replyTo &&
+    row.replyQuote === quote &&
     JSON.stringify(
       (JSON.parse(row.media) as ChatAttachment[]).map((file) => file.id),
     ) === ids;
@@ -114,14 +121,14 @@ export async function sendPrivateMessage(
   }
   const results = await db().batch([
     db()
-      .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,replyTo)
+      .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,replyTo,replyQuote,read)
     SELECT ?,s.id,r.id,?,(SELECT json_group_array(json(${attachmentJsonSql('up', 'cu')}))
-      FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_uploads cu ON cu.uploadId=up.id),?,? FROM users s,users r
-    WHERE s.id=? AND r.id=? AND s.id<>r.id AND r.kind='person'
+      FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_uploads cu ON cu.uploadId=up.id),?,?,?,CASE WHEN s.id=r.id THEN 1 ELSE 0 END FROM users s,users r
+    WHERE s.id=? AND r.id=? AND r.kind='person'
     AND ${visibleAccount('s')} AND ${visibleAccount('r')}
     AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=s.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
-    AND ${messageAllowed}
-    AND (? IS NULL OR EXISTS(SELECT 1 FROM messages rp WHERE rp.id=? AND ${messagePair('rp', 's.id', 'r.id')} AND ${messageVisible('rp', 's.id')}))
+    AND ${directMessageAllowed}
+    AND (? IS NULL OR EXISTS(SELECT 1 FROM messages rp WHERE rp.id=? AND ${messagePair('rp', 's.id', 'r.id')} AND ${messageVisible('rp', 's.id')} AND (?='' OR instr(rp.text,?)>0)))
     AND NOT EXISTS(SELECT 1 FROM json_each(?) j WHERE NOT EXISTS(
       SELECT 1 FROM uploads up JOIN chat_uploads cu ON cu.uploadId=up.id WHERE up.id=j.value AND up.userId=s.id
         AND up.state='ready' AND cu.recipient=r.id AND cu.messageId IS NULL AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)))
@@ -132,10 +139,13 @@ export async function sendPrivateMessage(
         ids,
         Date.now(),
         replyTo,
+        quote,
         me,
         recipient,
         replyTo,
         replyTo,
+        quote,
+        quote,
         ids,
       ),
     db()
@@ -144,14 +154,14 @@ export async function sendPrivateMessage(
       .bind(id, id, me),
     db()
       .prepare(
-        "INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created) SELECT ?,recipient,sender,'message',id,created FROM messages WHERE id=?",
+        "INSERT OR IGNORE INTO notifications(id,userId,actorId,kind,targetId,created) SELECT ?,recipient,sender,'message',id,created FROM messages WHERE id=? AND recipient<>sender",
       )
       .bind('message:' + id, id),
   ]);
   if (!results[0].meta.changes) {
     const saved = await db()
       .prepare(
-        'SELECT recipient,text,media,replyTo FROM messages WHERE id=? AND sender=?',
+        'SELECT recipient,text,media,replyTo,replyQuote FROM messages WHERE id=? AND sender=?',
       )
       .bind(id, me)
       .first<NonNullable<typeof existing>>();
@@ -209,9 +219,9 @@ export async function privacyGet(
   }
   if (action === 'messageAccess') {
     const row = await db()
-      .prepare(`SELECT (${messageAllowed}) AS allowed,
+      .prepare(`SELECT (${directMessageAllowed}) AS allowed,
       EXISTS(SELECT 1 FROM user_blocks WHERE blocker=s.id AND blocked=r.id) AS blockedByMe
-      FROM users s,users r WHERE s.id=? AND r.id=? AND r.kind='person' AND r.id<>s.id AND ${visibleAccount('r')}`)
+      FROM users s,users r WHERE s.id=? AND r.id=? AND r.kind='person' AND ${visibleAccount('r')}`)
       .bind(me, s.get('peer') || '')
       .first();
     return Response.json({

@@ -44,6 +44,7 @@ const allowed = new Set([
   'lib/channel-access.ts',
   'lib/account-access.ts',
   'lib/privacy.ts',
+  'lib/reply-quote.ts',
   'lib/api-error.ts',
 ]);
 function load(file) {

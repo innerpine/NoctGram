@@ -47,7 +47,10 @@ import {
   roomOutbox,
 } from '@/lib/room-outbox';
 import { messageSummary } from '@/lib/chat-message-display';
+import { forwardNotice } from '@/lib/forward-client';
+import { appNotice } from '@/lib/app-notice';
 import { RoomManagement } from './room-management';
+import { ChatForwardDialog } from './forward-dialog';
 
 const reason = (error: unknown) =>
   error instanceof Error ? error.message : 'Не удалось загрузить чат';
@@ -98,6 +101,8 @@ export function RoomConversation({
     [older, setOlder] = useState(false);
   const [remove, setRemove] = useState<RoomMessage | null>(null),
     [leaveSecret, setLeaveSecret] = useState(false);
+  const [quote, setQuote] = useState(''),
+    [forwarding, setForwarding] = useState<RoomMessage | null>(null);
   const alive = useRef(true),
     serial = useRef(0),
     newestRead = useRef('');
@@ -116,7 +121,7 @@ export function RoomConversation({
     paging = useRef(false);
   const sending = useRef(false);
   const composer = useRef<HTMLTextAreaElement>(null);
-  const selectReply = (message: RoomMessage) => {
+  const selectReply = (message: RoomMessage, fragment = '') => {
     if (
       disabled ||
       busy ||
@@ -127,6 +132,7 @@ export function RoomConversation({
     )
       return;
     setReply(message);
+    setQuote(fragment);
     setReplyFocus((value) => value + 1);
   };
   const jumpTo = (id: string) => {
@@ -378,6 +384,7 @@ export function RoomConversation({
       setPending(false);
       setText((current) => (current.trim() === item.text ? '' : current));
       setReply(null);
+      setQuote('');
       setMutationError('');
     }
   }, [room?.messages, plaintext, me.id, outbox]);
@@ -481,6 +488,7 @@ export function RoomConversation({
           setPending(false);
           setText('');
           setReply(null);
+          setQuote('');
           setReviewNotice(sent.notice);
         }
         return;
@@ -781,6 +789,11 @@ export function RoomConversation({
                   reactionPending={reactionPending.has(message.id)}
                   delivery={delivery}
                   onReply={selectReply}
+                  onQuote={selectReply}
+                  canForward={
+                    room.kind === 'group' && !disabled && !message.giveawayId
+                  }
+                  onForward={setForwarding}
                   onDelete={setRemove}
                   onProfile={onProfile}
                   onJump={jumpTo}
@@ -818,10 +831,14 @@ export function RoomConversation({
                       name: reply.sender === me.id ? 'Вы' : reply.senderName,
                       text: messageSummary(reply),
                       unavailable: false,
+                      ...(quote ? { quote } : {}),
                     }
                   : null
               }
-              onCancelReply={() => setReply(null)}
+              onCancelReply={() => {
+                setReply(null);
+                setQuote('');
+              }}
               onSend={(draft) => {
                 follow.current = true;
                 if (pageBefore.current) {
@@ -971,6 +988,20 @@ export function RoomConversation({
             </DialogContent>
           </Dialog>
         </>
+      )}
+      {forwarding && room && (
+        <ChatForwardDialog
+          key={forwarding.id}
+          me={me}
+          source={{ room: { roomId: room.id, ids: [forwarding.id] } }}
+          preview={messageSummary(forwarding)}
+          fetchTargets
+          onClose={() => setForwarding(null)}
+          onDone={(result, chosen) => {
+            appNotice(forwardNotice(result, chosen));
+            void onRoomsChanged().catch(() => {});
+          }}
+        />
       )}
       {reviewNotice && (
         <output className="room-review-notice">
