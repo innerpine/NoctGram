@@ -141,6 +141,7 @@ struct RoundMessageView: View {
     var body: some View {
         ZStack {
             RoundPlayerSurface(player: model.player)
+                .allowsHitTesting(false)
                 .frame(width: Self.side, height: Self.side)
                 .background(Circle().fill(Noct.coverFill))
                 .clipShape(Circle())

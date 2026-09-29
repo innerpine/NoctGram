@@ -18,13 +18,17 @@ struct StickerImage: View {
         } else if sticker.animated {
             // Without a poster the player draws the first frame; a still
             // one never gets a turn to play.
+            // Touches go to the message or the panel around it (holding a
+            // message, choosing a sticker), not to the player's UIKit view.
             GiftPlayer(
                 art: sticker.poster.flatMap { session.api.mediaURL($0) },
                 animation: session.api.mediaURL(sticker.src),
                 pool: animated ? .stickers : .stickerStills
             )
+            .allowsHitTesting(false)
         } else {
             RemoteImage(url: session.api.mediaURL(sticker.poster ?? sticker.src), maxPixel: 360, contentMode: .fit, placeholder: .clear)
+                .allowsHitTesting(false)
         }
     }
 }
@@ -109,6 +113,7 @@ struct StickerPackSheet: View {
                                 StickerImage(sticker: sticker)
                                     .aspectRatio(1, contentMode: .fit)
                                     .padding(4)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(PressableStyle())
                             .accessibilityLabel("Стикер \(sticker.emoji)")
@@ -257,6 +262,7 @@ struct BigEmojiView: View {
                 }
             }
         }
+        .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(EmojiTokens.fallback(text))
     }

@@ -28,6 +28,8 @@ struct MessageBubble: View {
     var author: BubbleAuthor?
     /// Groups have no read receipts: a sent message shows one state.
     var readReceipts = true
+    /// «Избранное» shows no ticks at all, only sending and failures.
+    var ticks = true
     /// A voice or round message nobody has listened to yet.
     var unheard = false
     /// The first play of a recording (listened marks).
@@ -61,6 +63,7 @@ struct MessageBubble: View {
         guard mine else { return nil }
         if message.failed { return .failed }
         if message.pending { return .pending }
+        guard ticks else { return nil }
         return message.read && readReceipts ? .read : .sent
     }
     /// Nothing around the text or media: no quote, forward, files, gift or reactions.

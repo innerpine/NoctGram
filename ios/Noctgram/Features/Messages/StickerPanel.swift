@@ -316,7 +316,9 @@ private struct StickersPage: View {
                 if term.isEmpty { packBar(proxy) }
                 PanelSearch(query: $query, prompt: "Поиск стикеров")
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
+                    // A plain stack of lazy grids: every section has its
+                    // place, so the pack bar can jump to any of them.
+                    VStack(alignment: .leading, spacing: 0) {
                         let list = sections
                         ForEach(list) { section in
                             VStack(alignment: .leading, spacing: 0) {
@@ -450,7 +452,7 @@ private struct EmojiPage: View {
                 if term.isEmpty { categoryBar(proxy) }
                 PanelSearch(query: $query, prompt: "Поиск эмодзи")
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 0) {
                         if !term.isEmpty {
                             let found = EmojiCatalog.shared.search(term)
                             grid(found)

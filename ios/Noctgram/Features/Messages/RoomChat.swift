@@ -40,6 +40,8 @@ final class RoomStore: ObservableObject {
     @Published var role = "member"
     @Published var forum = false
     @Published var topics: [RoomTopic] = []
+    /// Members with their role, for the group card.
+    @Published var members: [GroupMember] = []
     /// The open topic of a forum; nil shows every topic mixed.
     @Published var topic: String?
     @Published var messages: [ChatMessage] = []
@@ -72,6 +74,10 @@ final class RoomStore: ObservableObject {
             role = data["role"].string ?? "member"
             forum = data["forum"].bool || !data["topics"].array.isEmpty
             topics = data["topics"].array.map(RoomTopic.init)
+            members = data["members"].array.map { member in
+                GroupMember(identity: Identity(id: member["userId"].str, name: member["name"].str, avatar: member["avatar"].str, handle: member["handle"].str),
+                            role: member["role"].string ?? "member")
+            }
             var server = data["messages"].array.map { ChatMessage(room: $0) }
             // An older server sends only the id of the answered message.
             for index in server.indices {
@@ -288,6 +294,7 @@ struct RoomChatView: View {
     @State private var glow: String?
     @State private var searchingChat = false
     @State private var jumpTo: String?
+    @State private var showingInfo = false
 
     init(roomId: String, title: String, focus: String? = nil) {
         self.roomId = roomId
@@ -386,22 +393,35 @@ struct RoomChatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
+            // As in a dialogue: the name and the members on a glass
+            // capsule; a tap shows who is in the group.
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 1) {
-                    Text(store.name.isEmpty ? title : store.name)
-                        .font(.system(size: 15, weight: .semibold))
-                        .lineLimit(1)
-                    if let topic = currentTopic {
-                        Text(topic.title)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(topic.tint)
+                Button {
+                    showingInfo = true
+                } label: {
+                    VStack(spacing: 1) {
+                        Text(store.name.isEmpty ? title : store.name)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
                             .lineLimit(1)
-                    } else if store.memberCount > 0 {
-                        Text("\(Format.count(store.memberCount)) \(Format.plural(store.memberCount, "участник", "участника", "участников"))")
-                            .font(.system(size: 11))
-                            .foregroundColor(Noct.text48)
+                        if let topic = currentTopic {
+                            Text(topic.title)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(topic.tint)
+                                .lineLimit(1)
+                        } else if store.memberCount > 0 {
+                            Text("\(Format.count(store.memberCount)) \(Format.plural(store.memberCount, "участник", "участника", "участников"))")
+                                .font(.system(size: 12))
+                                .foregroundColor(Noct.text48)
+                        }
                     }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 5)
+                    .frame(minHeight: 44)
+                    .glassCapsule(interactive: true)
                 }
+                .buttonStyle(PressableStyle())
+                .accessibilityIdentifier("group-title")
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 if !store.isSecret {
@@ -445,6 +465,12 @@ struct RoomChatView: View {
         .sheet(item: $openPack) { request in
             StickerPackSheet(name: request.name, send: canWrite ? stickerSender : nil)
                 .environmentObject(session)
+        }
+        .sheet(isPresented: $showingInfo) {
+            GroupMembersSheet(name: store.name.isEmpty ? title : store.name, members: store.members) { id in
+                nav.push(.profile(id))
+            }
+            .environmentObject(session)
         }
         .sheet(isPresented: $searchingChat) {
             ChatSearchSheet(scope: store.topic.map { ["room": roomId, "topic": $0] } ?? ["room": roomId]) { id in
@@ -756,5 +782,63 @@ struct RoomChatView: View {
         }
         .glassCircle(interactive: true)
         .accessibilityLabel("Прикрепить фото или видео")
+    }
+}
+
+struct GroupMember: Identifiable {
+    let identity: Identity
+    let role: String
+    var id: String { identity.id }
+}
+
+/// Who is in a group: owners and admins first, as the web lists them.
+struct GroupMembersSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let name: String
+    let members: [GroupMember]
+    let open: (String) -> Void
+
+    private var ordered: [GroupMember] {
+        let rank = ["owner": 0, "admin": 1]
+        return members.sorted { (rank[$0.role] ?? 2, $0.identity.name) < (rank[$1.role] ?? 2, $1.identity.name) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(ordered) { member in
+                        Button {
+                            dismiss()
+                            open(member.identity.id)
+                        } label: {
+                            PersonRow(person: member.identity, subtitle: subtitle(member))
+                        }
+                        .listRowBackground(Noct.sheetRow)
+                    }
+                } header: {
+                    Text("\(Format.count(members.count)) \(Format.plural(members.count, "участник", "участника", "участников"))")
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .sheetSurface()
+            .navigationTitle(name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Закрыть") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func subtitle(_ member: GroupMember) -> String {
+        switch member.role {
+        case "owner": return "владелец"
+        case "admin": return "администратор"
+        default: return member.identity.handle.isEmpty ? "участник" : "@" + member.identity.handle
+        }
     }
 }

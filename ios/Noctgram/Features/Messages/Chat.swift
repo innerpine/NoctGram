@@ -694,6 +694,7 @@ struct ChatView: View {
             },
             standalone: standalone,
             readReceipts: !isSaved,
+            ticks: !isSaved,
             unheard: unheard(message),
             onListen: { store.markListened(message, session: session) },
             onFocus: holdAction(message, joins: joins),

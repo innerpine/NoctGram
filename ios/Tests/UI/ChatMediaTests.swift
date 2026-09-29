@@ -121,14 +121,17 @@ final class ChatMediaTests: XCTestCase {
         // look at the playback before it ends.
         record.press(forDuration: 4.5)
         expect(poll(15) { voices.count > before }, "The recording is not sent", in: app, shot: "52-voice-sent")
-        // Playing the sent voice message: pause and the speed show.
+        // Playing the sent voice message: pause and the speed show. It is
+        // paused before the speed changes, so it does not end meanwhile.
         voices.element(boundBy: voices.count - 1).tap()
-        expect(app.buttons["Пауза"].waitForExistence(timeout: 10), "The voice message does not play", in: app, shot: "52-voice")
-        let speed = app.buttons["Скорость 1×"]
-        expect(speed.waitForExistence(timeout: 5), "No speed button while playing", in: app, shot: "52-voice")
-        speed.tap()
-        expect(app.buttons["Скорость 1,5×"].waitForExistence(timeout: 5), "The speed does not change", in: app, shot: "52-voice")
+        let pause = app.buttons["Пауза"]
+        expect(pause.waitForExistence(timeout: 10), "The voice message does not play", in: app, shot: "52-voice")
         save("52-voice")
+        pause.tap()
+        let speed = app.buttons["Скорость 1×"]
+        expect(speed.waitForExistence(timeout: 5), "No speed button on a started message", in: app, shot: "52-voice-speed")
+        speed.tap()
+        expect(app.buttons["Скорость 1,5×"].waitForExistence(timeout: 5), "The speed does not change", in: app, shot: "52-voice-speed")
     }
 
     func testRoundVideoPlaysInACircle() {
