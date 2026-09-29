@@ -84,4 +84,6 @@ export type RoomDetail = RoomSummary & {
   topic?: string;
   // The first message of a thread, when reading its replies.
   threadRoot?: RoomMessage;
+  // Set when the history was opened around this message.
+  around?: string;
 };

@@ -241,11 +241,16 @@ export const messages = sqliteTable(
     replyQuote: text().notNull().default(''),
     // A feed post shared into the chat; rendered live for each viewer.
     postShareId: text(),
+    // Lower-cased text for search (D1 folds only ASCII); NULL until indexed.
+    searchText: text(),
   },
   (t) => [
     index('messages_recipient').on(t.recipient, t.created),
     index('messages_sender').on(t.sender, t.created),
     uniqueIndex('messages_gift_receipt').on(t.giftReceiptId),
+    index('messages_search_pending')
+      .on(t.id)
+      .where(sql`${t.searchText} IS NULL`),
   ],
 );
 export const messageReactions = sqliteTable(
@@ -1372,6 +1377,8 @@ export const chatRoomMessages = sqliteTable(
     topicId: text().notNull().default(''),
     // The first message of the reply thread this message belongs to.
     threadRootId: text(),
+    // Lower-cased text for search; NULL until indexed, '' when encrypted.
+    searchText: text(),
   },
   (t) => [
     index('chat_room_messages_room').on(t.roomId, t.created, t.id),
@@ -1382,12 +1389,39 @@ export const chatRoomMessages = sqliteTable(
       t.created,
       t.id,
     ),
+    index('chat_room_messages_search_pending')
+      .on(t.id)
+      .where(sql`${t.searchText} IS NULL`),
     uniqueIndex('chat_room_messages_giveaway').on(t.giveawayId),
     check(
       'chat_room_message_payload',
       sql`${t.ciphertext} IS NULL OR (${t.text} = '' AND ${t.replyTo} IS NULL)`,
     ),
   ],
+);
+// Chat folders: tabs above the chat list, like Telegram's folders.
+export const chatFolders = sqliteTable(
+  'chat_folders',
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    title: text().notNull(),
+    emoji: text().notNull().default(''),
+    position: integer().notNull().default(0),
+    includePersonal: integer().notNull().default(0),
+    includeGroups: integer().notNull().default(0),
+    includeSecret: integer().notNull().default(0),
+    excludeRead: integer().notNull().default(0),
+    excludeArchived: integer().notNull().default(0),
+    // JSON arrays of 'person:<id>' and 'room:<id>'.
+    includePeers: text().notNull().default('[]'),
+    excludePeers: text().notNull().default('[]'),
+    created: integer().notNull(),
+    updated: integer().notNull(),
+  },
+  (t) => [index('chat_folders_user').on(t.userId, t.position)],
 );
 export const chatRoomTopics = sqliteTable(
   'chat_room_topics',

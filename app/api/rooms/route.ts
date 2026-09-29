@@ -29,6 +29,7 @@ export async function GET(req: Request) {
         topic: params.get('topic'),
         thread: params.get('thread'),
         view: params.get('view'),
+        around: params.get('around'),
       });
     else if (action === 'search')
       result = await searchRooms(me, params.get('q') || '');

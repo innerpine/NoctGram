@@ -153,6 +153,7 @@ export async function deleteAccount(
     'message_reactions',
     'chat_room_message_reactions',
     'chat_room_topic_reads',
+    'chat_folders',
     'likes',
     'bookmarks',
     'votes',

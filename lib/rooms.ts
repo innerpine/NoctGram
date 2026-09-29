@@ -9,6 +9,7 @@ import {
 import { parseReactions } from './message-reactions';
 import { messageSummarySql } from './message-summary-sql';
 import { replyQuoteValue } from './reply-quote';
+import { normalizeSearch } from './search-text';
 import {
   CHAT_ATTACHMENT_LIMIT,
   attachmentJsonSql,
@@ -171,8 +172,8 @@ export function roomMessageStatements(
   const ids = JSON.stringify(message.attachments);
   return [
     db()
-      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,ciphertext,replyTo,replyQuote,media,created,topicId,threadRootId)
-      SELECT ?,r.id,u.id,?,?,?,?,
+      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,searchText,ciphertext,replyTo,replyQuote,media,created,topicId,threadRootId)
+      SELECT ?,r.id,u.id,?,?,?,?,?,
         (SELECT json_group_array(json(${attachmentJsonSql('up', 'cu')}))
           FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_room_uploads cu ON cu.uploadId=up.id),
         MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0)),
@@ -190,6 +191,7 @@ export function roomMessageStatements(
       .bind(
         message.id,
         message.text,
+        normalizeSearch(message.text),
         message.ciphertext,
         message.replyTo,
         message.quote ?? '',
@@ -431,7 +433,11 @@ export type RoomReadOptions = {
   thread?: string | null;
   // 'topics': a forum's topic list without messages.
   view?: string | null;
+  // A message to open with its context, e.g. a search result.
+  around?: string | null;
 };
+const AROUND_BEFORE = 60,
+  AROUND_AFTER = 40;
 export async function readRoom(
   me: string,
   roomId: string,
@@ -459,7 +465,8 @@ export async function readRoom(
   const forum = group && !!row.forum;
   const thread = group && options.thread ? id(options.thread) : null;
   const topic = forum && !thread ? topicKey(options.topic) : null;
-  const listOnly = forum && options.view === 'topics' && !thread;
+  const around = group && options.around && !thread ? id(options.around) : null;
+  const listOnly = forum && options.view === 'topics' && !thread && !around;
   const members = await viewerQuery(
     `SELECT m.userId,u.name,u.avatar,COALESCE((SELECT h.handle FROM handles h WHERE h.userId=u.id AND h.main=1),'') AS handle,
     m.role,m.status,m.publicKey,m.joinedAt FROM chat_room_members m JOIN users u ON u.id=m.userId JOIN chat_rooms r ON r.id=m.roomId
@@ -475,19 +482,49 @@ export async function readRoom(
     : topic !== null
       ? 'AND msg.topicId=?'
       : '';
+  const filterArgs = thread ? [thread] : topic !== null ? [topic] : [];
+  const target = around
+    ? await db()
+        .prepare('SELECT created FROM chat_room_messages WHERE id=? AND roomId=?')
+        .bind(around, roomId)
+        .first<{ created: number }>()
+    : null;
+  if (around && !target) throw new ApiError(404, 'Сообщение недоступно');
   const messages = listOnly
     ? { results: [] as MessageRow[] }
     : await viewerQuery(
-        `${messageSelect(`${filter} ${cursor ? 'AND (msg.created<? OR (msg.created=? AND msg.id<?))' : ''}`)}
-        ORDER BY msg.created DESC,msg.id DESC LIMIT ${PAGE_SIZE + 1}`,
+        `${messageSelect(
+          `${filter} ${
+            target
+              ? 'AND (msg.created<? OR (msg.created=? AND msg.id<=?))'
+              : cursor
+                ? 'AND (msg.created<? OR (msg.created=? AND msg.id<?))'
+                : ''
+          }`,
+        )}
+        ORDER BY msg.created DESC,msg.id DESC LIMIT ${(target ? AROUND_BEFORE : PAGE_SIZE) + 1}`,
         me,
       )
         .bind(
           roomId,
-          ...(thread ? [thread] : topic !== null ? [topic] : []),
-          ...(cursor ? [cursor.created, cursor.created, cursor.id] : []),
+          ...filterArgs,
+          ...(target
+            ? [target.created, target.created, around!]
+            : cursor
+              ? [cursor.created, cursor.created, cursor.id]
+              : []),
         )
         .all<MessageRow>();
+  // Messages after the one being opened, oldest first.
+  const later = target
+    ? await viewerQuery(
+        `${messageSelect(`${filter} AND (msg.created>? OR (msg.created=? AND msg.id>?))`)}
+        ORDER BY msg.created,msg.id LIMIT ${AROUND_AFTER}`,
+        me,
+      )
+        .bind(roomId, ...filterArgs, target.created, target.created, around!)
+        .all<MessageRow>()
+    : null;
   const root = thread
     ? await viewerQuery(messageSelect('AND msg.id=?'), me)
         .bind(roomId, thread)
@@ -500,7 +537,8 @@ export async function readRoom(
   )
     .bind(roomId)
     .first();
-  const page = messages.results.slice(0, PAGE_SIZE);
+  const size = target ? AROUND_BEFORE : PAGE_SIZE;
+  const page = messages.results.slice(0, size);
   const oldest = page.at(-1);
   const view = messageView(row.kind);
   return {
@@ -510,12 +548,13 @@ export async function readRoom(
       ...m,
       publicKey: m.publicKey ? JSON.parse(m.publicKey) : null,
     })),
-    messages: page.reverse().map(view),
+    messages: [...page.reverse(), ...(later?.results || [])].map(view),
     canSend: !!permission,
     nextCursor:
-      messages.results.length > PAGE_SIZE && oldest
+      messages.results.length > size && oldest
         ? btoa(JSON.stringify({ created: oldest.created, id: oldest.id }))
         : null,
+    ...(target ? { around: around! } : {}),
     ...(forum ? { topics: await readTopics(me, roomId) } : {}),
     ...(topic !== null ? { topic: topicName(topic) } : {}),
     ...(root ? { threadRoot: view(root) } : {}),
@@ -974,7 +1013,7 @@ export async function changeRoom(
     const messageId = id(body.messageId);
     const result = await db().batch([
       db()
-        .prepare(`UPDATE chat_room_messages SET text='',ciphertext=NULL,deletedAt=? WHERE id=? AND roomId=?
+        .prepare(`UPDATE chat_room_messages SET text='',searchText='',ciphertext=NULL,deletedAt=? WHERE id=? AND roomId=?
       AND EXISTS(SELECT 1 FROM chat_rooms r JOIN chat_room_members a ON a.roomId=r.id AND a.userId=? WHERE r.id=chat_room_messages.roomId
       AND ${access('r', 'a.userId', true)} AND (chat_room_messages.sender=a.userId OR (r.kind='group' AND a.role IN ('owner','admin'))))`)
         .bind(now, messageId, roomId, me),

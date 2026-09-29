@@ -15,6 +15,8 @@ import type { ReactionEmoji } from '@/lib/message-reactions';
 import { chatOutbox, emptyOutbox, mergeOutgoing } from '@/lib/chat-outbox';
 import { messageSummary } from '@/lib/chat-message-display';
 import { forwardNotice } from '@/lib/forward-client';
+import { CHAT_FOCUS_EVENT, takeChatFocus } from '@/lib/chat-focus';
+import { ChatSearchBar } from './chat-search';
 import { createChatNavigator } from '@/lib/chat-navigation';
 import { createChatDragSelection } from '@/lib/chat-drag-selection';
 import { createChatRemoval } from '@/lib/chat-removal';
@@ -45,6 +47,8 @@ export function ChatConversation({
   onProfile,
   onReport,
   notify,
+  searchOpen = false,
+  onCloseSearch,
 }: {
   messages: Message[];
   me: Person;
@@ -60,6 +64,8 @@ export function ChatConversation({
   onProfile: (id: string) => void;
   onReport: (message: Message) => void;
   notify: (text: string) => void;
+  searchOpen?: boolean;
+  onCloseSearch?: () => void;
 }) {
   const outbox = useSyncExternalStore(
     chatOutbox.subscribe,
@@ -226,6 +232,16 @@ export function ChatConversation({
         }
       });
   }, []);
+  // A search result chosen elsewhere opens here with its context.
+  useEffect(() => {
+    const take = () => {
+      const id = takeChatFocus('dm:' + peer.id);
+      if (id) onJump(id);
+    };
+    take();
+    window.addEventListener(CHAT_FOCUS_EVENT, take);
+    return () => window.removeEventListener(CHAT_FOCUS_EVENT, take);
+  }, [peer.id, onJump]);
   const last = history.at(-1);
   useLayoutEffect(() => {
     const previous = previousNewest.current;
@@ -412,6 +428,14 @@ export function ChatConversation({
   const visibleMessages = removal.current?.visible(history) ?? history;
   return (
     <div className="chat-conversation">
+      {searchOpen && (
+        <ChatSearchBar
+          meId={me.id}
+          scope={{ peer: peer.id }}
+          onJump={(hit) => onJump(hit.id)}
+          onClose={() => onCloseSearch?.()}
+        />
+      )}
       <ChatPins
         messages={messages}
         disabled={readonly || !canSend}

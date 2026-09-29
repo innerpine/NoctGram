@@ -10,6 +10,7 @@ import {
 import { messageVisible, messagePair } from './chat-access';
 import { readPresencePrivacy, savePresencePrivacy } from './presence-privacy';
 import { replyQuoteValue } from './reply-quote';
+import { normalizeSearch } from './search-text';
 
 // Each predicate consumes one viewer binding; aliases are internal identifiers.
 export function personalVisibility(alias: string) {
@@ -121,9 +122,9 @@ export async function sendPrivateMessage(
   }
   const results = await db().batch([
     db()
-      .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,replyTo,replyQuote,read)
+      .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,replyTo,replyQuote,read,searchText)
     SELECT ?,s.id,r.id,?,(SELECT json_group_array(json(${attachmentJsonSql('up', 'cu')}))
-      FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_uploads cu ON cu.uploadId=up.id),?,?,?,CASE WHEN s.id=r.id THEN 1 ELSE 0 END FROM users s,users r
+      FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_uploads cu ON cu.uploadId=up.id),?,?,?,CASE WHEN s.id=r.id THEN 1 ELSE 0 END,? FROM users s,users r
     WHERE s.id=? AND r.id=? AND r.kind='person'
     AND ${visibleAccount('s')} AND ${visibleAccount('r')}
     AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=s.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
@@ -140,6 +141,7 @@ export async function sendPrivateMessage(
         Date.now(),
         replyTo,
         quote,
+        normalizeSearch(text),
         me,
         recipient,
         replyTo,

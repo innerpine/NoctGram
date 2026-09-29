@@ -4,6 +4,7 @@ import { ApiError } from './api-error';
 import { assertWritable, visibleAccount } from './account-access';
 import { directMessageAllowed } from './privacy';
 import { messageVisible, messagePair, messageWritable } from './chat-access';
+import { normalizeSearch } from './search-text';
 
 function selection(body: Record<string, unknown>) {
   const { ids, peer } = body;
@@ -112,9 +113,9 @@ export async function editMessage(me: string, body: Record<string, unknown>) {
     );
   const result = await db()
     .prepare(
-      `UPDATE messages SET text=?,editedAt=MAX(editedAt+1,?) WHERE id=? AND editedAt=? AND EXISTS(SELECT 1 FROM messages m,users s,users r WHERE m.id=messages.id AND s.id=? AND r.id=? AND ${access})`,
+      `UPDATE messages SET text=?,searchText=?,editedAt=MAX(editedAt+1,?) WHERE id=? AND editedAt=? AND EXISTS(SELECT 1 FROM messages m,users s,users r WHERE m.id=messages.id AND s.id=? AND r.id=? AND ${access})`,
     )
-    .bind(caption, Date.now(), id, revision, me, peer)
+    .bind(caption, normalizeSearch(caption), Date.now(), id, revision, me, peer)
     .run();
   if (!result.meta.changes)
     throw new ApiError(409, 'Сообщение изменилось или больше недоступно');
@@ -166,8 +167,8 @@ export async function forwardMessages(
     AND NOT EXISTS(SELECT 1 FROM json_each(src.media) a JOIN moderated_uploads mu ON mu.uploadId=json_extract(a.value,'$.id'))`;
   const results = await db().batch([
     db()
-      .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,forwardedName,forwardedFrom,forwardSourceId,read)
-      SELECT 'forward:'||s.id||':'||?||':'||j.key,s.id,r.id,src.text,src.media,?+CAST(j.key AS INTEGER),
+      .prepare(`INSERT INTO messages(id,sender,recipient,text,searchText,media,created,forwardedName,forwardedFrom,forwardSourceId,read)
+      SELECT 'forward:'||s.id||':'||?||':'||j.key,s.id,r.id,src.text,src.searchText,src.media,?+CAST(j.key AS INTEGER),
         CASE WHEN src.forwardedName<>'' THEN src.forwardedName ELSE origin.name END,
         CASE WHEN src.forwardedName<>'' THEN src.forwardedFrom ELSE src.sender END,src.id,CASE WHEN s.id=r.id THEN 1 ELSE 0 END
       FROM json_each(?) j JOIN messages src ON src.id=j.value JOIN users origin ON origin.id=src.sender,users s,users r

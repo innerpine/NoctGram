@@ -1,0 +1,342 @@
+/* Message search and chat folders. */
+.chat-search-bar {
+  position: relative;
+  z-index: 3;
+  padding: 8px 14px;
+  border-bottom: 1px solid #ffffff0f;
+  background: #17151bf2;
+}
+.chat-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #bdb0c8;
+}
+.chat-search-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  background: none;
+  border: 0;
+  outline: 0;
+  font-size: 15px;
+}
+.chat-search-count {
+  flex: 0 0 auto;
+  font-size: 13px;
+  color: #a89bb5;
+  white-space: nowrap;
+}
+.chat-search-row .icon-button:disabled {
+  opacity: 0.35;
+}
+.chat-search-error {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #f0a3a8;
+}
+.chat-search-results {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: calc(100% + 4px);
+  display: grid;
+  gap: 2px;
+  max-height: min(360px, 55dvh);
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid #ffffff14;
+  border-radius: 14px;
+  background: #1c1920;
+  box-shadow: 0 18px 40px #0009;
+}
+.chat-search-results > button,
+.chat-list-search-results .chat-search-hit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 10px;
+  text-align: left;
+}
+.chat-search-results > button:hover,
+.chat-search-results > button.current {
+  background: #ffffff0c;
+}
+.chat-search-results .chat-search-copy {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.chat-search-results .avatar {
+  flex: 0 0 30px;
+}
+.chat-search-results strong,
+.chat-list-search-results .thread-copy strong {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.chat-search-results time,
+.chat-list-search-results time {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: #9c90aa;
+}
+.chat-search-results small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: #b9b1c4;
+}
+.chat-search-bar mark,
+.chat-list-search mark {
+  border-radius: 3px;
+  color: inherit;
+  background: #c6a3e45c;
+}
+.chat-search-more {
+  justify-self: center;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--chat-accent, #cdb5e2);
+}
+
+/* Search above the chat list. */
+.chat-list-search {
+  padding: 8px 10px 4px;
+}
+.chat-list-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 12px;
+  color: #a89bb5;
+  background: #ffffff0a;
+}
+.chat-list-search-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 0;
+  background: none;
+  border: 0;
+  outline: 0;
+  font-size: 14px;
+}
+.chat-list-search-results {
+  display: grid;
+  margin-top: 6px;
+}
+.chat-list-search-results h3 {
+  margin: 10px 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9c90aa;
+}
+.chat-list-search-results .thread-row {
+  width: 100%;
+  margin: 0;
+}
+.chat-list-search-results .thread-copy {
+  flex: 1;
+  min-width: 0;
+}
+.chat-search-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.chat-list-search-results .thread-copy small {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.chat-list-search-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 8px;
+  font-size: 13px;
+  color: #a89bb5;
+}
+/* While searching, results replace the folders and the chat list. */
+.chat-list-search.active ~ * {
+  display: none !important;
+}
+
+/* Folder tabs. */
+.chat-folder-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid #ffffff0a;
+}
+.chat-folder-bar::-webkit-scrollbar {
+  display: none;
+}
+.chat-folder-bar > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #b3a7bf;
+  white-space: nowrap;
+}
+.chat-folder-bar > button.active {
+  color: #fff;
+  background: #ffffff14;
+}
+.chat-folder-bar > button:hover:not(.active) {
+  background: #ffffff0a;
+}
+.chat-folder-bar .unread {
+  position: static;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+}
+.chat-folder-bar > .chat-folder-add {
+  padding: 7px;
+}
+
+/* Folder editor. */
+.folder-editor-dialog.noct-dialog {
+  width: min(460px, calc(100vw - 26px));
+  max-width: 460px !important;
+  max-height: calc(100dvh - 26px);
+  overflow: auto;
+  border-radius: 20px;
+  background: #1c1920 !important;
+}
+.folder-editor {
+  display: grid;
+  gap: 14px;
+}
+.folder-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.folder-title-row input {
+  flex: 1;
+  min-width: 0;
+}
+.folder-emoji-preview {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 22px;
+  background: #ffffff0a;
+}
+.folder-emoji {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.folder-emoji button {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 19px;
+  background: #ffffff08;
+}
+.folder-emoji button.selected {
+  background: #bf98df2e;
+  box-shadow: inset 0 0 0 1px #d0a9ed5c;
+}
+.folder-types,
+.folder-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #ffffff12;
+  border-radius: 14px;
+}
+.folder-types legend,
+.folder-picker legend {
+  padding: 0 6px;
+  font-size: 13px;
+  color: #a89bb5;
+}
+.folder-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #ffffff08;
+}
+.folder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 6px 5px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  background: #bf98df24;
+}
+.folder-chip button {
+  display: inline-grid;
+  place-items: center;
+  padding: 2px;
+  border-radius: 50%;
+}
+.folder-picker-toggle {
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--chat-accent, #cdb5e2);
+}
+.folder-picker-list {
+  display: grid;
+  flex-basis: 100%;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.folder-picker-list > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  text-align: left;
+}
+.folder-picker-list > button span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.folder-picker-list > button small {
+  font-size: 12px;
+  color: #9c90aa;
+}
+.folder-picker-list > button.chosen {
+  background: #bf98df1c;
+}

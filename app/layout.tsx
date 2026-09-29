@@ -53,6 +53,7 @@ import './market.css';
 import './voice-messages.css';
 import './chat-sharing.css';
 import './room-topics.css';
+import './chat-organize.css';
 import './viewport.css';
 import { MusicProvider } from './music-provider';
 import { APP_HISTORY_BOOTSTRAP } from '@/lib/app-history-bootstrap';

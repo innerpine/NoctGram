@@ -45,6 +45,7 @@ const allowed = new Set([
   'lib/account-access.ts',
   'lib/privacy.ts',
   'lib/reply-quote.ts',
+  'lib/search-text.ts',
   'lib/api-error.ts',
 ]);
 function load(file) {

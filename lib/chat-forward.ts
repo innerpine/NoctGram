@@ -12,6 +12,7 @@ import { messagePair, messageVisible, messageWritable } from './chat-access';
 import { canSend, groupMessageReadable } from './room-access';
 import { published } from './channel-access';
 import { rateLimit } from './rate-limit';
+import { normalizeSearch } from './search-text';
 
 export const FORWARD_ITEM_LIMIT = 20;
 export const FORWARD_TARGET_LIMIT = 10;
@@ -36,6 +37,7 @@ type Row = {
   forwardedFrom: string | null;
   forwardSourceId: string | null;
   postShareId: string | null;
+  searchText?: string;
 };
 type SourceRow = {
   id: string;
@@ -206,7 +208,7 @@ async function readSource(me: string, source: ForwardSource) {
 }
 
 const column = (name: string) => `json_extract(j.value,'$.${name}')`;
-const copyColumns = `${column('id')},${column('text')},json(${column('media')})`;
+const copyColumns = `${column('id')},${column('text')},${column('searchText')},json(${column('media')})`;
 const noModeratedMedia = `NOT EXISTS(SELECT 1 FROM json_each(${column('media')}) a JOIN moderated_uploads mu ON mu.uploadId=json_extract(a.value,'$.id'))`;
 
 function directStatements(
@@ -220,7 +222,7 @@ function directStatements(
     idList = JSON.stringify(rows.map((row) => row.id));
   return [
     db()
-      .prepare(`INSERT INTO messages(id,text,media,sender,recipient,created,forwardedName,forwardedFrom,forwardSourceId,postShareId,read)
+      .prepare(`INSERT INTO messages(id,text,searchText,media,sender,recipient,created,forwardedName,forwardedFrom,forwardSourceId,postShareId,read)
       SELECT ${copyColumns},s.id,r.id,?+CAST(j.key AS INTEGER),${column('forwardedName')},${column('forwardedFrom')},
         ${column('forwardSourceId')},${column('postShareId')},CASE WHEN s.id=r.id THEN 1 ELSE 0 END
       FROM json_each(?) j,users s,users r
@@ -245,7 +247,7 @@ function roomStatement(
   now: number,
 ) {
   return db()
-    .prepare(`INSERT INTO chat_room_messages(id,text,media,roomId,sender,ciphertext,replyTo,created,forwardedName,forwardedFrom,postShareId)
+    .prepare(`INSERT INTO chat_room_messages(id,text,searchText,media,roomId,sender,ciphertext,replyTo,created,forwardedName,forwardedFrom,postShareId)
     SELECT ${copyColumns},r.id,s.id,NULL,NULL,
       MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0))+CAST(j.key AS INTEGER),
       ${column('forwardedName')},${column('forwardedFrom')},${column('postShareId')}
@@ -338,6 +340,7 @@ export async function forwardToChats(
         : []),
       ...items.map((item, i) => ({ ...item, id: list[i + (note ? 1 : 0)] })),
     ];
+    for (const row of rows) row.searchText = normalizeSearch(row.text);
     try {
       if (await delivered(target, me, list)) {
         results.push({ target, ok: true, ids: list });

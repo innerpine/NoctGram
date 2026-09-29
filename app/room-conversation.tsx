@@ -17,6 +17,7 @@ import {
   KeyRound,
   LoaderCircle,
   LockKeyhole,
+  Search,
   Send,
   Settings,
   ShieldCheck,
@@ -42,6 +43,12 @@ import { RoomAvatar } from './room-list';
 import { RoomTopicList } from './room-topics';
 import { TopicIcon } from './topic-icon';
 import { GENERAL_TOPIC } from '@/lib/room-topic-shared';
+import {
+  CHAT_FOCUS_EVENT,
+  requestChatFocus,
+  takeChatFocus,
+} from '@/lib/chat-focus';
+import { ChatSearchBar } from './chat-search';
 import { RoomMessageRow, repliesLabel } from './room-message';
 import { ChatComposer } from './chat-composer';
 import {
@@ -113,6 +120,10 @@ export function RoomConversation({
   const [threadId, setThreadId] = useState<string | null>(null);
   const threadRef = useRef<string | null>(null);
   threadRef.current = threadId;
+  const [searchOpen, setSearchOpen] = useState(false);
+  // History opened around one message (a search result or an old reply).
+  const aroundRef = useRef(''),
+    pendingFlash = useRef('');
   const alive = useRef(true),
     serial = useRef(0),
     newestRead = useRef('');
@@ -145,19 +156,32 @@ export function RoomConversation({
     setQuote(fragment);
     setReplyFocus((value) => value + 1);
   };
-  const jumpTo = (id: string) => {
-    const target = document.getElementById('room-message-' + id);
-    if (!target || !scroll.current?.contains(target)) {
-      setMutationError('Это сообщение выше в истории. Откройте предыдущие.');
-      return;
-    }
-    follow.current = false;
+  const flashMessage = (target: HTMLElement) => {
     target.scrollIntoView({ block: 'center', behavior: 'smooth' });
     target.classList.remove('room-message-flash');
     void target.offsetWidth;
     target.classList.add('room-message-flash');
     target.focus({ preventScroll: true });
   };
+  const jumpTo = (id: string) => {
+    const target = document.getElementById('room-message-' + id);
+    follow.current = false;
+    if (target && scroll.current?.contains(target)) {
+      flashMessage(target);
+      return;
+    }
+    if (room?.kind !== 'group' || threadRef.current) {
+      setMutationError('Это сообщение выше в истории. Откройте предыдущие.');
+      return;
+    }
+    // Load the message with its neighbours, then highlight it.
+    aroundRef.current = id;
+    pageBefore.current = '';
+    pendingFlash.current = id;
+    void latestLoad.current().catch((error) => setMutationError(reason(error)));
+  };
+  const latestJump = useRef(jumpTo);
+  latestJump.current = jumpTo;
   const retryOutgoing = (id: string) => roomOutbox.retry(id, me.id);
   const load = useCallback(async () => {
     const ticket = ++serial.current;
@@ -173,7 +197,11 @@ export function RoomConversation({
             actor: me.id,
             action: 'room',
             id: target.roomId,
-            ...(pageBefore.current ? { before: pageBefore.current } : {}),
+            ...(aroundRef.current && !thread
+              ? { around: aroundRef.current }
+              : pageBefore.current
+                ? { before: pageBefore.current }
+                : {}),
             // Without a topic a forum shows its topic list; other groups
             // ignore the view and return their history.
             ...(thread
@@ -300,12 +328,33 @@ export function RoomConversation({
       return;
     }
     pageBefore.current = '';
+    aroundRef.current = '';
     newestRead.current = '';
     follow.current = true;
     setReply(null);
     setQuote('');
     void latestLoad.current().catch(() => {});
   }, [threadId]);
+  const loadedMessages = room?.messages;
+  useEffect(() => {
+    const id = pendingFlash.current;
+    const target = id && document.getElementById('room-message-' + id);
+    if (target && scroll.current?.contains(target)) {
+      pendingFlash.current = '';
+      flashMessage(target);
+    }
+  }, [loadedMessages]);
+  const openedRoom = room?.id;
+  useEffect(() => {
+    if (!openedRoom) return;
+    const take = () => {
+      const id = takeChatFocus('room:' + openedRoom);
+      if (id) latestJump.current(id);
+    };
+    take();
+    window.addEventListener(CHAT_FOCUS_EVENT, take);
+    return () => window.removeEventListener(CHAT_FOCUS_EVENT, take);
+  }, [openedRoom]);
   useEffect(() => {
     alive.current = true;
     const abortLatestRequest = () => readController.current?.abort();
@@ -711,6 +760,17 @@ export function RoomConversation({
         ) : (
           <strong>{loading ? 'Открываем чат…' : 'Чат недоступен'}</strong>
         )}
+        {room?.kind === 'group' && !threadId && (
+          <button
+            className="icon-button"
+            aria-label="Поиск по группе"
+            title="Поиск по группе"
+            aria-pressed={searchOpen}
+            onClick={() => setSearchOpen(!searchOpen)}
+          >
+            <Search size={18} />
+          </button>
+        )}
         {room?.kind === 'group' && (
           <GiveawayCreateButton
             targetKind="group"
@@ -746,6 +806,23 @@ export function RoomConversation({
           </button>
         )}
       </div>
+      {searchOpen && room?.kind === 'group' && !threadId && (
+        <ChatSearchBar
+          meId={me.id}
+          scope={{
+            room: room.id,
+            ...(room.forum && target.topic ? { topic: target.topic } : {}),
+          }}
+          onJump={(hit) => {
+            // From the topic list, a result opens in its own topic.
+            if (room.forum && !target.topic) {
+              requestChatFocus('room:' + room.id, hit.id);
+              onOpenTopic?.(room.id, hit.topicId || GENERAL_TOPIC);
+            } else jumpTo(hit.id);
+          }}
+          onClose={() => setSearchOpen(false)}
+        />
+      )}
       {loading && !head && (
         <div className="room-center">
           <LoaderCircle className="spin" size={25} />
@@ -934,11 +1011,12 @@ export function RoomConversation({
               </>
             )}
           </div>
-          {pageBefore.current && (
+          {(pageBefore.current || aroundRef.current) && (
             <button
               className="room-return-new"
               onClick={() => {
                 pageBefore.current = '';
+                aroundRef.current = '';
                 follow.current = true;
                 void refresh().catch((error) => setError(reason(error)));
               }}

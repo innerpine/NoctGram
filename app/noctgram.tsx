@@ -116,6 +116,11 @@ import { ChatForwardDialog } from './forward-dialog';
 import { SAVED_MESSAGES, SavedMessagesAvatar } from './saved-messages';
 import { forwardNotice } from '@/lib/forward-client';
 import { APP_NOTICE_EVENT } from '@/lib/app-notice';
+import { ChatFolderBar } from './chat-folders';
+import { ChatListSearch } from './chat-search';
+import { folderIncludes, type ChatFolder } from '@/lib/chat-folders-filter';
+import { requestChatFocus } from '@/lib/chat-focus';
+import type { SearchHit } from '@/lib/message-search';
 import { ChatPeerProfile } from './chat-peer-profile';
 import {
   chatTheme,
@@ -387,6 +392,8 @@ export default function Noctgram({
   chatSnapshots.current.reset(accountBlocked ? '' : me?.id || '');
   const [openingChat, setOpeningChat] = useState('');
   const [sharedPost, setSharedPost] = useState<Post | null>(null);
+  const [chatFolderTab, setChatFolderTab] = useState<ChatFolder | null>(null);
+  const [searchPeer, setSearchPeer] = useState('');
   const chatPreparation = useRef(0),
     preparedMessageLoad = useRef('');
   const audioCalls = useAudioCalls(me?.id, readOnly || accountBlocked);
@@ -1936,6 +1943,87 @@ export default function Noctgram({
   const archiveDone = async () => {
     await Promise.all([loadThreads(), roomList.refresh()]);
   };
+  // Chats as folders and search see them; built inline for every dialog.
+  const folderChats = dialogs.map((d) =>
+    d.type === 'room'
+      ? {
+          key: 'room:' + d.room.id,
+          kind:
+            d.room.kind === 'secret' ? ('secret' as const) : ('group' as const),
+          unread: d.room.unread,
+          archived: !!d.room.archivedAt,
+          name: d.room.name || 'Секретный чат',
+        }
+      : {
+          key: 'person:' + d.person.id,
+          kind: 'person' as const,
+          unread: d.person.unread || 0,
+          archived: !!d.person.archivedAt,
+          name: d.person.id === myId ? SAVED_MESSAGES : d.person.name,
+        },
+  );
+  const shownDialogs = chatFolderTab
+    ? dialogs.filter((_, index) =>
+        folderIncludes(chatFolderTab, folderChats[index]),
+      )
+    : visibleDialogs;
+  const searchChats = [
+    ...(me
+      ? [
+          {
+            key: 'saved',
+            name: SAVED_MESSAGES,
+            subtitle: 'Заметки и пересланное',
+            avatar: '',
+            saved: true,
+            open: () => openChat(me),
+          },
+        ]
+      : []),
+    ...dialogs
+      .filter((d) => d.type === 'room' || d.person.id !== myId)
+      .map((d) =>
+        d.type === 'room'
+          ? {
+              key: 'room:' + d.room.id,
+              name: d.room.name || 'Секретный чат',
+              subtitle:
+                d.room.kind === 'secret'
+                  ? 'Секретный чат'
+                  : `${d.room.memberCount} участников`,
+              avatar: d.room.avatar,
+              open: () => openRoom(d.room.id),
+            }
+          : {
+              key: 'person:' + d.person.id,
+              name: d.person.name,
+              subtitle: d.person.handle ? '@' + d.person.handle : '',
+              avatar: d.person.avatar,
+              open: () => openChat(d.person),
+            },
+      ),
+  ];
+  const openSearchHit = (hit: SearchHit) => {
+    if (hit.kind === 'dm') {
+      requestChatFocus('dm:' + hit.chatId, hit.id);
+      const person =
+        hit.chatId === myId
+          ? me
+          : threads.find((thread) => thread.id === hit.chatId);
+      openChat(
+        person ||
+          ({
+            id: hit.chatId,
+            name: hit.chatName,
+            avatar: hit.chatAvatar,
+            handle: '',
+          } as Person),
+      );
+    } else {
+      requestChatFocus('room:' + hit.chatId, hit.id);
+      openRoom(hit.chatId, hit.forum ? hit.topicId || 'general' : undefined);
+    }
+  };
   const online = !!profile?.lastSeen && Date.now() - profile.lastSeen < 120000;
   if (accountBlocked && me)
     return (
@@ -2840,6 +2928,20 @@ export default function Noctgram({
                   <Pencil size={16} />
                 </button>
               </div>
+              <ChatListSearch
+                meId={myId || ''}
+                chats={searchChats}
+                onOpenHit={openSearchHit}
+              />
+              {!!myId && (
+                <ChatFolderBar
+                  owner={myId}
+                  chats={folderChats}
+                  active={chatFolderTab?.id || ''}
+                  onSelect={setChatFolderTab}
+                />
+              )}
+              {!chatFolderTab && (
               <ArchiveFolderButton
                 archived={chatFolder === 'archive'}
                 count={archivedDialogs.length}
@@ -2853,6 +2955,7 @@ export default function Noctgram({
                   setChatFolder(chatFolder === 'archive' ? 'active' : 'archive')
                 }
               />
+              )}
               {roomList.error && (
                 <div className="room-error" role="alert">
                   {roomList.error}
@@ -2864,7 +2967,7 @@ export default function Noctgram({
                   </button>
                 </div>
               )}
-              {visibleDialogs.map((dialog) => {
+              {shownDialogs.map((dialog) => {
                 if (dialog.type === 'room')
                   return (
                     <ArchiveRow
@@ -2934,12 +3037,14 @@ export default function Noctgram({
                   </ArchiveRow>
                 );
               })}
-              {!visibleDialogs.length && (
+              {!shownDialogs.length && (
                 <Empty>
                   <p>
-                    {chatFolder === 'archive'
-                      ? 'Здесь появятся диалоги, которые ты перенесёшь в архив.'
-                      : 'Найди человека по юзернейму и начни разговор.'}
+                    {chatFolderTab
+                      ? 'В этой папке пока нет чатов. Измените её настройки правой кнопкой по вкладке.'
+                      : chatFolder === 'archive'
+                        ? 'Здесь появятся диалоги, которые ты перенесёшь в архив.'
+                        : 'Найди человека по юзернейму и начни разговор.'}
                   </p>
                   <button
                     className="secondary"
@@ -3006,6 +3111,17 @@ export default function Noctgram({
                         }
                       />
                     )}
+                    <button
+                      className="icon-button chat-search-toggle"
+                      aria-label="Поиск по чату"
+                      title="Поиск по чату"
+                      aria-pressed={searchPeer === peer.id}
+                      onClick={() =>
+                        setSearchPeer(searchPeer === peer.id ? '' : peer.id)
+                      }
+                    >
+                      <Search size={18} />
+                    </button>
                     {peer.id !== me.id && (
                       <>
                         <button
@@ -3105,6 +3221,8 @@ export default function Noctgram({
                     peer={peer}
                     threads={threads}
                     disabled={busy || !!readOnly}
+                    searchOpen={searchPeer === peer.id}
+                    onCloseSearch={() => setSearchPeer('')}
                     canSend={!!messageAccess?.allowed}
                     privacyNote={
                       messageAccess?.allowed

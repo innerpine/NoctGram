@@ -51,11 +51,16 @@ export async function readConversation(
       .bind(me, peer, me),
   ]);
   const rows = await db()
-    .prepare(`WITH RECURSIVE scope AS (SELECT ? AS me,? AS peer), visible AS (
+    .prepare(`WITH RECURSIVE scope AS (SELECT ? AS me,? AS peer,? AS focus), visible AS (
       SELECT m.* FROM messages m,scope s WHERE ${messagePair('m', 's.me', 's.peer')} AND ${messageVisible('m', 's.me')}
-    ), recent AS (SELECT * FROM visible ORDER BY created DESC,id DESC LIMIT 300), chosen AS (
+    ), recent AS (SELECT * FROM visible ORDER BY created DESC,id DESC LIMIT 300),
+    target AS (SELECT created,id FROM visible WHERE id=(SELECT focus FROM scope)),
+    -- A message found by search or a reply jump arrives with its context.
+    earlier AS (SELECT v.* FROM visible v,target t WHERE v.created<t.created OR (v.created=t.created AND v.id<t.id) ORDER BY v.created DESC,v.id DESC LIMIT 40),
+    later AS (SELECT v.* FROM visible v,target t WHERE v.created>t.created OR (v.created=t.created AND v.id>=t.id) ORDER BY v.created,v.id LIMIT 41),
+    chosen AS (
       SELECT * FROM recent UNION SELECT m.* FROM visible m JOIN message_pins p ON p.messageId=m.id
-      UNION SELECT * FROM visible WHERE id=?
+      UNION SELECT * FROM earlier UNION SELECT * FROM later
     ), attribution(copyId,id,sender,forwardSourceId,forwardedName) AS (
       SELECT m.id,src.id,src.sender,src.forwardSourceId,src.forwardedName
       FROM chosen m JOIN messages src ON src.id=m.forwardSourceId WHERE m.forwardedName<>''

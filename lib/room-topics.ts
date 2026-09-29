@@ -167,7 +167,7 @@ export async function deleteTopic(
       .bind(me, now, now, topicId, roomId),
     db()
       .prepare(
-        `UPDATE chat_room_messages SET text='',ciphertext=NULL,deletedAt=? WHERE roomId=? AND topicId=? AND deletedAt=0
+        `UPDATE chat_room_messages SET text='',searchText='',ciphertext=NULL,deletedAt=? WHERE roomId=? AND topicId=? AND deletedAt=0
         AND EXISTS(SELECT 1 FROM chat_room_topics t WHERE t.id=? AND t.roomId=? AND t.deletedAt=?)`,
       )
       .bind(now, roomId, topicId, topicId, roomId, now),

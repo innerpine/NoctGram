@@ -60,6 +60,12 @@ export async function moderationGet(
         'following',
       ],
       [
+        'chatFolders',
+        'SELECT id,title,emoji,position,includePersonal,includeGroups,includeSecret,excludeRead,excludeArchived,includePeers,excludePeers,created,updated FROM chat_folders WHERE userId=? AND id>? ORDER BY id LIMIT 100',
+        [me],
+        'id',
+      ],
+      [
         'uploads',
         'SELECT id,type,name,created FROM uploads WHERE userId=? AND id>? ORDER BY id LIMIT 100',
         [me],
