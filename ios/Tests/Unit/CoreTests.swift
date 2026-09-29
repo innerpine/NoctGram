@@ -288,6 +288,21 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(EmojiTokens.legacySticker(EmojiTokens.legacy[6]).poster, "/assets/emoji/5424972470023104089.preview.webp")
     }
 
+    /// Chat folders pick chats by the site's rules (lib/chat-folders-filter.ts).
+    func testFoldersPickChatsAsTheSite() throws {
+        func json(_ text: String) throws -> JSON { try XCTUnwrap(JSON.parse(Data(text.utf8))) }
+        let folder = ChatFolder(try json(#"{"id":"f","title":"Личные","includePersonal":true,"excludeArchived":true,"includePeers":["room:g"],"excludePeers":["person:b"]}"#))
+        let open = ThreadItem.direct(Person(try json(#"{"id":"a"}"#)))
+        let excluded = ThreadItem.direct(Person(try json(#"{"id":"b"}"#)))
+        let archived = ThreadItem.direct(Person(try json(#"{"id":"c","archivedAt":5}"#)))
+        let chosenGroup = ThreadItem.room(RoomSummary(try json(#"{"id":"g","kind":"group"}"#)))
+        let otherGroup = ThreadItem.room(RoomSummary(try json(#"{"id":"h","kind":"group"}"#)))
+        XCTAssertEqual([open, excluded, archived, chosenGroup, otherGroup].filter(folder.includes), [open, chosenGroup])
+        let unread = ChatFolder(try json(#"{"id":"u","title":"Новые","includePersonal":true,"includeGroups":true,"excludeRead":true}"#))
+        let fresh = ThreadItem.direct(Person(try json(#"{"id":"d","unread":2}"#)))
+        XCTAssertEqual([open, fresh, otherGroup].filter(unread.includes), [fresh])
+    }
+
     /// Voice, round, sticker, quote and shared post fields of a message.
     func testChatMessagesCarryTheNewKinds() throws {
         func json(_ text: String) throws -> JSON { try XCTUnwrap(JSON.parse(Data(text.utf8))) }

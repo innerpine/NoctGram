@@ -236,6 +236,20 @@ final class ChatStore: ObservableObject {
         }
     }
 
+    /// Deletes chosen messages, twenty at a time as the server takes them.
+    func delete(ids: [String], everyone: Bool, session: AppSession) async {
+        do {
+            for start in stride(from: 0, to: ids.count, by: 20) {
+                let chunk = Array(ids[start..<min(start + 20, ids.count)])
+                _ = try await session.api.socialPost("messageDelete", ["ids": chunk, "peer": peer.id, "everyone": everyone])
+            }
+            messages.removeAll { ids.contains($0.id) }
+            await load(api: session.api)
+        } catch {
+            session.report(error)
+        }
+    }
+
     func delete(_ message: ChatMessage, everyone: Bool, session: AppSession) async {
         do {
             _ = try await session.api.socialPost("messageDelete", ["ids": [message.id], "peer": peer.id, "everyone": everyone])
@@ -313,6 +327,11 @@ struct ChatView: View {
     @State private var searchingChat = false
     /// A found message of this chat to scroll to.
     @State private var jumpTo: String?
+    /// «Выбрать»: messages chosen to forward or delete together.
+    @State private var selecting = false
+    @State private var selected: Set<String> = []
+    @State private var forwardingMany = false
+    @State private var deletingMany = false
 
     init(peer: Person, focus: String? = nil) {
         self.peer = peer
@@ -457,6 +476,28 @@ struct ChatView: View {
         .sheet(item: $openPack) { request in
             StickerPackSheet(name: request.name, send: canWrite ? stickerSender : nil)
                 .environmentObject(session)
+        }
+        .sheet(isPresented: $forwardingMany) {
+            ForwardSheet(source: .dm(peer: peer.id, ids: chosenInOrder)) {
+                endSelection()
+            }
+            .environmentObject(session)
+        }
+        .confirmationDialog(
+            "Удалить \(selected.count) \(Format.plural(selected.count, "сообщение", "сообщения", "сообщений"))?",
+            isPresented: $deletingMany,
+            titleVisibility: .visible
+        ) {
+            let ids = chosenInOrder
+            if isSaved {
+                Button("Удалить", role: .destructive) { deleteChosen(ids, everyone: true) }
+            } else {
+                if store.messages.filter({ selected.contains($0.id) }).allSatisfy({ $0.sender == session.myId }) {
+                    Button("Удалить у всех", role: .destructive) { deleteChosen(ids, everyone: true) }
+                }
+                Button("Удалить у меня", role: .destructive) { deleteChosen(ids, everyone: false) }
+            }
+            Button("Отмена", role: .cancel) {}
         }
         .sheet(isPresented: $searchingChat) {
             ChatSearchSheet(scope: ["peer": peer.id]) { id in
@@ -606,6 +647,24 @@ struct ChatView: View {
                     .padding(.bottom, 2)
             }
             bubble(message, joins: joins)
+                .padding(.leading, selecting ? 34 : 0)
+                .overlay(alignment: .leading) {
+                    if selecting {
+                        SelectionMark(on: selected.contains(message.id), accent: store.palette.accent)
+                            .padding(.leading, 2)
+                    }
+                }
+                .overlay {
+                    // While choosing, a tap anywhere on the row picks it.
+                    if selecting {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture { toggle(message) }
+                            .accessibilityElement()
+                            .accessibilityLabel(selected.contains(message.id) ? "Выбрано" : "Выбрать")
+                            .accessibilityIdentifier("select-" + message.id)
+                    }
+                }
                 .padding(.top, joins ? 2 : 8)
                 .background {
                     if glow == message.id {
@@ -636,13 +695,19 @@ struct ChatView: View {
             readReceipts: !isSaved,
             unheard: unheard(message),
             onListen: { store.markListened(message, session: session) },
-            onFocus: { frame in present(message, frame: frame, joinsPrevious: joins) },
-            onReply: canWrite ? replyAction(message) : nil,
+            onFocus: holdAction(message, joins: joins),
+            onReply: canWrite && !selecting ? replyAction(message) : nil,
             onReact: canWrite ? reactAction(message) : nil,
             onOpenProfile: { nav.push(.profile($0)) },
             onOpenPost: { nav.push(.post($0)) },
             onOpenPack: { openPack = StickerPanel.PackRequest(name: $0.packName) }
         )
+    }
+
+    /// Holding lifts the message with its actions; not while choosing.
+    private func holdAction(_ message: ChatMessage, joins: Bool) -> ((CGRect) -> Void)? {
+        guard !selecting else { return nil }
+        return { frame in present(message, frame: frame, joinsPrevious: joins) }
     }
 
     /// Nobody played the recording yet: the recipient sees a dot until
@@ -747,6 +812,14 @@ struct ChatView: View {
                 list.append(MessageAction(title: "Переслать", icon: "arrowshape.turn.up.right") { forwarding = message })
             }
         }
+        if !message.pending {
+            list.append(MessageAction(title: "Выбрать", icon: "checkmark.circle") {
+                selected = [message.id]
+                withAnimation(Noct.quick) { selecting = true }
+                focused = false
+                panel = false
+            })
+        }
         list.append(MessageAction(title: "Удалить", icon: "trash", destructive: true) { deleting = message })
         if !mine && !isSaved {
             list.append(MessageAction(title: "Пожаловаться", icon: "flag", destructive: true) { reporting = message })
@@ -756,8 +829,77 @@ struct ChatView: View {
 
     private var panelHeight: CGFloat { max(keyboard > 0 ? keyboard : 290, 260) }
 
+    /// The chosen messages oldest first, as the web forwards them.
+    private var chosenInOrder: [String] {
+        store.messages.filter { selected.contains($0.id) }.sorted { $0.created < $1.created }.map(\.id)
+    }
+
+    private func toggle(_ message: ChatMessage) {
+        Haptics.tap()
+        if selected.contains(message.id) {
+            selected.remove(message.id)
+            if selected.isEmpty { endSelection() }
+        } else {
+            selected.insert(message.id)
+        }
+    }
+
+    private func endSelection() {
+        withAnimation(Noct.quick) { selecting = false }
+        selected = []
+    }
+
+    private func deleteChosen(_ ids: [String], everyone: Bool) {
+        endSelection()
+        Task { await store.delete(ids: ids, everyone: everyone, session: session) }
+    }
+
+    /// While choosing: cancel, the count, delete and forward, on glass.
+    private var selectionBar: some View {
+        let gifts = store.messages.contains { selected.contains($0.id) && $0.gift != nil }
+        return HStack(spacing: 12) {
+            Button("Отмена") { endSelection() }
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+                .accessibilityIdentifier("selection-cancel")
+            Spacer(minLength: 4)
+            Text("Выбрано: \(selected.count)")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(Noct.text75)
+            Spacer(minLength: 4)
+            Button {
+                deletingMany = true
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(CircleButtonStyle(size: 40))
+            .accessibilityLabel("Удалить выбранные")
+            Button {
+                if selected.count > 20 {
+                    session.show("Можно переслать до 20 сообщений за раз")
+                } else {
+                    forwardingMany = true
+                }
+            } label: {
+                Image(systemName: "arrowshape.turn.up.right")
+            }
+            .buttonStyle(CircleButtonStyle(size: 40, tint: gifts ? nil : store.palette.accent))
+            .disabled(gifts || session.readOnly)
+            .accessibilityLabel("Переслать выбранные")
+            .accessibilityIdentifier("selection-forward")
+        }
+        .padding(.leading, 18)
+        .padding(.trailing, 8)
+        .padding(.vertical, 6)
+        .glassRect(26)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
     @ViewBuilder private var bottom: some View {
-        if store.blockedByMe && !isSaved {
+        if selecting {
+            selectionBar
+        } else if store.blockedByMe && !isSaved {
             ComposerNotice(text: "Ты заблокировал(а) этого пользователя.", action: "Разблокировать") {
                 Task { await store.setBlocked(false, session: session) }
             }
@@ -888,5 +1030,27 @@ struct TokenPreview: View {
             .padding(.horizontal, 12)
             .padding(.top, 6)
             .accessibilityLabel("Предпросмотр: " + PremiumEmoji.replace(text))
+    }
+}
+
+/// The round mark of a chosen message, as in Telegram.
+struct SelectionMark: View {
+    let on: Bool
+    let accent: Color
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(on ? accent : Color.white.opacity(0.55), lineWidth: 1.5)
+            if on {
+                Circle().fill(accent)
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.black.opacity(0.85))
+            }
+        }
+        .frame(width: 24, height: 24)
+        .animation(Noct.quick, value: on)
+        .accessibilityHidden(true)
     }
 }

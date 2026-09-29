@@ -117,8 +117,9 @@ final class ChatMediaTests: XCTestCase {
         expect(poll(5) { record.label == "Видеосообщение" }, "A tap does not switch to round videos", in: app, shot: "52-voice-mode")
         record.tap()
         expect(poll(5) { record.label == "Голосовое сообщение" }, "A second tap does not switch back", in: app, shot: "52-voice-mode")
-        // Holding records; letting go sends.
-        record.press(forDuration: 2.5)
+        // Holding records; letting go sends. Four seconds leave time to
+        // look at the playback before it ends.
+        record.press(forDuration: 4.5)
         expect(poll(15) { voices.count > before }, "The recording is not sent", in: app, shot: "52-voice-sent")
         // Playing the sent voice message: pause and the speed show.
         voices.element(boundBy: voices.count - 1).tap()
@@ -178,6 +179,27 @@ final class ChatMediaTests: XCTestCase {
         let context = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "«")).firstMatch
         expect(context.waitForExistence(timeout: 5), "The quote is not over the field", in: app, shot: "58-quote")
         save("58-quote")
+    }
+
+    /// «Выбрать» picks several messages to forward together.
+    func testChooseSeveralAndForward() {
+        let app = launch()
+        let first = element("message-message:local_carol:media-5", in: app)
+        expect(first.waitForExistence(timeout: 30), "No message with emoji", in: app, shot: "59-select")
+        first.press(forDuration: 0.8)
+        let choose = app.buttons["Выбрать"]
+        expect(choose.waitForExistence(timeout: 5), "No «Выбрать» in the menu", in: app, shot: "59-select")
+        choose.tap()
+        expect(app.staticTexts["Выбрано: 1"].waitForExistence(timeout: 5), "Choosing does not start", in: app, shot: "59-select")
+        element("select-message:local_alice:media-6", in: app).tap()
+        expect(app.staticTexts["Выбрано: 2"].waitForExistence(timeout: 5), "A tap does not choose a second message", in: app, shot: "59-select")
+        save("59-select")
+        element("selection-forward", in: app).tap()
+        let saved = element("forward-person:local_alice", in: app)
+        expect(saved.waitForExistence(timeout: 10), "The forward sheet does not open", in: app, shot: "59-select-forward")
+        saved.tap()
+        element("forward-send", in: app).tap()
+        expect(poll(10) { !app.staticTexts["Выбрано: 2"].exists }, "Choosing does not end after forwarding", in: app, shot: "59-select-sent")
     }
 
     func testForwardToSaved() {

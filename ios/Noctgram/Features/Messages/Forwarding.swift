@@ -66,6 +66,8 @@ struct ForwardSheet: View {
     @EnvironmentObject private var session: AppSession
     @Environment(\.dismiss) private var dismiss
     let source: ForwardSource
+    /// Called once the messages went out.
+    var onSent: (() -> Void)?
     @State private var query = ""
     @State private var chats: [ForwardTarget] = []
     @State private var found: [ForwardTarget] = []
@@ -218,6 +220,7 @@ struct ForwardSheet: View {
             let line = try await Forwarder.send(source, to: chosen, comment: comment, session: session)
             Haptics.success()
             session.show(line)
+            onSent?()
             dismiss()
         } catch {
             session.report(error)
