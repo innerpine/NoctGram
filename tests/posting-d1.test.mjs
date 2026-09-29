@@ -30,18 +30,23 @@ const source = (file) => readFileSync(join(root, file), 'utf8');
 const modules = new Map();
 const allowed = new Set([
   'lib/media-access.ts',
+  'lib/room-access.ts',
+  'lib/antispam-access.ts',
   'lib/chat-access.ts',
   'lib/chat-files.ts',
   'lib/premium-access.ts',
   'lib/presence-privacy.ts',
   'lib/premium-predicate.ts',
   'lib/premium-emoji.ts',
+  'lib/premium-emoji-catalog.ts',
   'lib/premium-emoji-access.ts',
   'lib/boost-access.ts',
   'lib/boost-rules.ts',
   'lib/channel-access.ts',
   'lib/account-access.ts',
   'lib/privacy.ts',
+  'lib/reply-quote.ts',
+  'lib/search-text.ts',
   'lib/api-error.ts',
 ]);
 function load(file) {

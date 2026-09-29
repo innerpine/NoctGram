@@ -341,8 +341,50 @@
     {
       "idx": 48,
       "version": "6",
-      "when": 1790461199364,
-      "tag": "0050_comment_replies",
+      "when": 1790655085375,
+      "tag": "0050_chat_media_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1790656417787,
+      "tag": "0051_voice_round",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "6",
+      "when": 1790657792301,
+      "tag": "0052_forward_saved_quotes",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "6",
+      "when": 1790660736536,
+      "tag": "0053_threads_topics",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "6",
+      "when": 1790662268979,
+      "tag": "0054_search_folders",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1790664274637,
+      "tag": "0055_stickers",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1790678045841,
+      "tag": "0056_comment_replies",
       "breakpoints": true
     }
   ]

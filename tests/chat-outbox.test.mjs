@@ -138,6 +138,20 @@ assert.equal(largeEmojiCount('😀\n😀\n😀\n😀'), 4);
 assert.equal(largeEmojiCount('👍🏽 👨‍👩‍👧‍👦 🇺🇦'), 3);
 assert.equal(largeEmojiCount('Текст 😀'), 0);
 assert.equal(largeEmojiCount('😀'.repeat(7)), 0);
+// A sticker message carries only its sticker reference.
+const stickerCalls = [];
+const stickerOutbox = createChatOutbox(
+  (body) => new Promise((resolve) => stickerCalls.push({ body, resolve })),
+);
+stickerOutbox.enqueue('alice', 'carol', {
+  text: '',
+  attachments: [],
+  sticker: 'b:utya:birthday',
+});
+assert.equal(stickerCalls[0].body.sticker, 'b:utya:birthday');
+assert.equal(stickerOutbox.getSnapshot()[0].message.sticker, 'b:utya:birthday');
+stickerOutbox.enqueue('alice', 'dave', { text: 'Без стикера', attachments: [] });
+assert.equal('sticker' in stickerCalls[1].body, false, 'Old request shape unchanged');
 const mixed = 'Привет @alice 👨‍👩‍👧‍👦 ❤️\nhttps://soundcloud.com/a/b';
 assert.equal(
   chatEmojiParts(mixed)

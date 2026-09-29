@@ -1,6 +1,7 @@
 'use client';
 import {
   useRef,
+  useState,
   type ReactNode,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
@@ -12,10 +13,12 @@ import {
   Pencil,
   Pin,
   PinOff,
+  Quote,
   Reply,
   Trash2,
 } from 'lucide-react';
 import type { Message } from '@/lib/client';
+import { selectionQuote } from '@/lib/message-selection';
 import { useMessageReplyGesture } from './use-message-reply-gesture';
 import {
   ContextMenu,
@@ -27,6 +30,7 @@ import {
 
 export type ChatAction =
   | 'reply'
+  | 'quote'
   | 'pin'
   | 'forward'
   | 'copy'
@@ -41,7 +45,7 @@ export type ChatActionProps = {
   canSend: boolean;
   selected?: boolean;
   unconfirmed?: boolean;
-  onAction: (action: ChatAction, message: Message) => void;
+  onAction: (action: ChatAction, message: Message, quote?: string) => void;
 };
 // Portalled dialogs and media players own their context menu, even when their
 // React ancestry passes through a message. Never suppress native events there.
@@ -62,10 +66,10 @@ export function chatHistoryContextMenu(event: ReactMouseEvent<HTMLElement>) {
   event.preventDefault();
   event.stopPropagation();
 }
-function Items(props: ChatActionProps) {
+function Items(props: ChatActionProps & { quote: string }) {
   const Item = ContextMenuItem;
   const Separator = ContextMenuSeparator;
-  const { message, own, disabled, canSend, selected, onAction } = props;
+  const { message, own, disabled, canSend, selected, onAction, quote } = props;
   return (
     <>
       <Item
@@ -75,6 +79,15 @@ function Items(props: ChatActionProps) {
         <Reply />
         Ответить
       </Item>
+      {!!quote && (
+        <Item
+          disabled={disabled || !canSend}
+          onClick={() => onAction('quote', message, quote)}
+        >
+          <Quote />
+          Ответить с цитатой
+        </Item>
+      )}
       <Item
         disabled={disabled || !canSend}
         onClick={() => onAction('pin', message)}
@@ -92,7 +105,7 @@ function Items(props: ChatActionProps) {
           Копировать текст
         </Item>
       )}
-      {own && !message.gift && !message.forwardedName && (
+      {own && !message.gift && !message.forwardedName && !message.postShare && (
         <Item
           disabled={disabled || !canSend}
           onClick={() => onAction('edit', message)}
@@ -136,6 +149,8 @@ export function ChatMessageContext({
   initial?: boolean;
 }) {
   const pointer = useRef<{ x: number; y: number } | null>(null);
+  // A text fragment selected when the menu opens becomes a quote reply.
+  const [quote, setQuote] = useState('');
   const canQuickReply =
     !selecting &&
     !removing &&
@@ -188,6 +203,14 @@ export function ChatMessageContext({
           );
         }}
         onContextMenu={(event) => {
+          setQuote(
+            props.canSend
+              ? selectionQuote(
+                  event.currentTarget.querySelector('.chat-message-text'),
+                  props.message.text,
+                )
+              : '',
+          );
           if (preserveContextTarget(event.target, event.currentTarget)) {
             event.preventBaseUIHandler();
             // Base UI also prevents native menus in a document listener for
@@ -265,7 +288,7 @@ export function ChatMessageContext({
         </span>
       </ContextMenuTrigger>
       <ContextMenuContent className="chat-action-menu">
-        <Items {...props} />
+        <Items {...props} quote={quote} />
       </ContextMenuContent>
     </ContextMenu>
   );

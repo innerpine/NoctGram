@@ -632,7 +632,58 @@ await test('deletion requires explicit owned-channel confirmation; revoked sessi
     f.id,
     peer.id,
   );
+  // Own sticker packs leave every panel; the peer's own pack stays.
+  const pack = 'pack-' + f.id,
+    peerPack = 'peer-pack-' + f.id,
+    upload = 'sticker-upload-' + f.id;
+  statement(
+    "INSERT INTO sticker_packs(id,ownerId,type,shortName,title,created,updated) VALUES(?,?,'stickers',?,'Own',?,?),(?,?,'stickers',?,'Peer',?,?)",
+    pack,
+    f.id,
+    'own_' + f.id.slice(0, 20),
+    now,
+    now,
+    peerPack,
+    peer.id,
+    'peer_' + f.id.slice(0, 20),
+    now,
+    now,
+  );
+  statement(
+    "INSERT INTO uploads(id,userId,type,name,bytes,state,created) VALUES(?,?,'image/png','sticker.png',10,'ready',?)",
+    upload,
+    f.id,
+    now,
+  );
+  statement(
+    "INSERT INTO stickers(id,packId,emoji,format,uploadId,width,height,created) VALUES(?,?,'😺','png',?,512,512,?)",
+    'sticker-' + f.id,
+    pack,
+    upload,
+    now,
+  );
+  statement(
+    'INSERT INTO user_sticker_packs(userId,packRef,installedAt) VALUES(?,?,?),(?,?,?)',
+    peer.id,
+    'u:' + pack,
+    now,
+    f.id,
+    'u:' + peerPack,
+    now,
+  );
+  statement(
+    'INSERT INTO faved_stickers(userId,stickerRef,created) VALUES(?,?,?)',
+    peer.id,
+    'u:sticker-' + f.id,
+    now,
+  );
   await deleteAccount(f.id, f.h, true);
+  assert.equal(count('sticker_packs', 'id', pack), 0);
+  assert.equal(count('sticker_packs', 'id', peerPack), 1);
+  assert.equal(count('stickers', 'packId', pack), 0);
+  assert.equal(count('user_sticker_packs', 'userId', f.id), 0);
+  assert.equal(count('user_sticker_packs', 'packRef', 'u:' + pack), 0);
+  assert.equal(count('faved_stickers', 'userId', peer.id), 0);
   assert.equal(count('music_playlists', 'ownerId', f.id), 0);
   assert.equal(count('music_playlists', 'ownerId', peer.id), 1);
   assert.equal(count('music_playlist_members', 'userId', f.id), 0);
@@ -819,9 +870,17 @@ await test('account deletion clears attachment FK and preserves private access t
   const { owner, peer, reader, ids } = await chatDeletionFixture();
   const outsider = await fixture();
   const { messageVisible } = load('lib/chat-access.ts', {}, ['messageVisible']);
+  const { groupSenderVisible } = load('lib/antispam-access.ts', {}, [
+    'groupSenderVisible',
+  ]);
+  const { groupMessageReadable } = load(
+    'lib/room-access.ts',
+    { groupSenderVisible },
+    ['groupMessageReadable'],
+  );
   const { assertMediaRead } = load(
     'lib/media-access.ts',
-    { db: () => d, ApiError, messageVisible },
+    { db: () => d, ApiError, messageVisible, groupMessageReadable },
     ['assertMediaRead'],
   );
   await deleteAccount(owner.id, owner.h, false);

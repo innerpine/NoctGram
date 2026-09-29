@@ -4,6 +4,7 @@ import { expireCalls } from '@/lib/calls';
 import { cleanUploads } from '@/lib/upload-storage';
 import { cleanSpamActivity } from '@/lib/antispam';
 import { settleDueGiveaways } from '@/lib/giveaways';
+import { backfillSearchText } from '@/lib/message-search';
 export async function POST(req: Request) {
   const secret = setting('NOCT_JOBS_SECRET'),
     supplied = req.headers.get('authorization') || '';
@@ -15,5 +16,10 @@ export async function POST(req: Request) {
   await expireCalls();
   await cleanSpamActivity();
   const push = await flushPush();
-  return Response.json({ ...push, giveaways, uploads: await cleanUploads() });
+  return Response.json({
+    ...push,
+    giveaways,
+    uploads: await cleanUploads(),
+    searchIndexed: await backfillSearchText(),
+  });
 }

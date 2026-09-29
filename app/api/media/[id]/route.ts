@@ -11,13 +11,14 @@ export async function GET(
     const { id } = await params;
     const upload = await db()
       .prepare(
-        "SELECT up.userId,up.name,u.onboardingComplete,u.deletedAt,c.kind FROM uploads up JOIN users u ON u.id=up.userId LEFT JOIN chat_uploads c ON c.uploadId=up.id WHERE up.id=? AND up.state='ready'",
+        "SELECT up.userId,up.name,u.onboardingComplete,u.deletedAt,COALESCE(c.kind,rc.kind) AS kind,EXISTS(SELECT 1 FROM stickers st WHERE st.uploadId=up.id) AS sticker FROM uploads up JOIN users u ON u.id=up.userId LEFT JOIN chat_uploads c ON c.uploadId=up.id LEFT JOIN chat_room_uploads rc ON rc.uploadId=up.id WHERE up.id=? AND up.state='ready'",
       )
       .bind(id)
       .first<{
         userId: string;
         name: string;
         kind: string | null;
+        sticker: number;
         onboardingComplete: number;
         deletedAt: number;
       }>();
@@ -54,7 +55,12 @@ export async function GET(
         headers.set('Content-Type', 'application/octet-stream');
     }
     headers.set('X-Content-Type-Options', 'nosniff');
-    headers.set('Cache-Control', 'private, no-store');
+    // Sticker files never change; a short private cache keeps panels fast
+    // while a moderator's removal still takes effect within the hour.
+    headers.set(
+      'Cache-Control',
+      upload.sticker ? 'private, max-age=3600' : 'private, no-store',
+    );
     headers.set('Accept-Ranges', 'bytes');
     headers.set('ETag', object.httpEtag);
     let status = 200;

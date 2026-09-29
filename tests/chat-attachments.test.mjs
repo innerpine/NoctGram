@@ -219,7 +219,6 @@ await assert.rejects(
   upload('alice', 'bob', file('definitely not a png')),
   status(400),
 );
-await assert.rejects(upload('alice', 'alice'), status(400));
 await assert.rejects(upload('alice', 'missing'), status(403));
 await assert.rejects(upload('alice', 'bob', file('')), status(400));
 await assert.rejects(
@@ -526,6 +525,11 @@ assert.equal(
   ).status,
   401,
 );
+
+// Files can be saved to «Избранное», the chat with yourself.
+const savedFile = await upload('alice', 'alice');
+assert.equal((await media(savedFile.id, 'alice')).status, 200);
+assert.equal((await media(savedFile.id, 'bob')).status, 404);
 
 await checkChatActions(api, sqlite, {
   upload,

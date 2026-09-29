@@ -24,6 +24,8 @@ export async function readChatTheme(
   me: string,
   peer: string,
 ): Promise<ChatThemeState> {
+  // Избранное has no second participant and always uses the default theme.
+  if (peer === me) return DEFAULT_CHAT_THEME;
   const { ids, own } = pair(me, peer);
   const row = await db()
     .prepare(`SELECT sharedTheme AS shared, ${own} AS personal, revision

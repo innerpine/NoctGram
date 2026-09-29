@@ -25,6 +25,7 @@ const stubs = {
   '@/lib/calls': 'export async function expireCalls(){globalThis.__giveawayRoutes.calls.push(["calls"]);}',
   '@/lib/antispam': 'export async function cleanSpamActivity(){globalThis.__giveawayRoutes.calls.push(["antispam"]);}',
   '@/lib/upload-storage': 'export async function cleanUploads(){globalThis.__giveawayRoutes.calls.push(["uploads"]);return {deleted:4};}',
+  '@/lib/message-search': 'export async function backfillSearchText(){globalThis.__giveawayRoutes.calls.push(["search"]);return 5;}',
 };
 async function route(file) {
   const compiled = await build({
@@ -48,7 +49,7 @@ const payload = () => ({ action: 'create', actor: 'owner', key: crypto.randomUUI
 function request(body = payload(), headers = {}) {
   return new Request('https://noctgram.test/api/giveaways', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://noctgram.test', ...headers }, body: JSON.stringify(body) });
 }
-const mutations = (s) => s.calls.filter(([name]) => ['create', 'settle', 'push', 'calls', 'antispam', 'uploads'].includes(name));
+const mutations = (s) => s.calls.filter(([name]) => ['create', 'settle', 'push', 'calls', 'antispam', 'uploads', 'search'].includes(name));
 
 test('session actor mismatch and missing actor never reach payment creation', async () => {
   for (const actor of ['different-account', undefined]) {
@@ -127,6 +128,6 @@ test('ordinary authorized jobs still settle prizes, calls, push and upload clean
   const s = setup();
   const response = await jobs.POST(new Request('https://noctgram.test/api/jobs/run', { method: 'POST', headers: { authorization: 'Bearer isolated-test-secret' } }));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { giveaways: { completed: 2, failed: 0 }, sent: 3, uploads: { deleted: 4 } });
-  assert.deepEqual(s.calls, [['settle'], ['calls'], ['antispam'], ['push'], ['uploads']]);
+  assert.deepEqual(await response.json(), { giveaways: { completed: 2, failed: 0 }, sent: 3, uploads: { deleted: 4 }, searchIndexed: 5 });
+  assert.deepEqual(s.calls, [['settle'], ['calls'], ['antispam'], ['push'], ['uploads'], ['search']]);
 });

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2f28f1e2-5348-42af-8dc6-f6912fc18315",
+  "id": "15c96f71-fc9c-4473-93fc-db17f95f775a",
   "prevId": "fca4c5f0-50a3-4dc3-a9d3-4668202f6d1d",
   "tables": {
     "account_challenges": {
@@ -1519,6 +1519,81 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "chat_media_refs": {
+      "name": "chat_media_refs",
+      "columns": {
+        "uploadId": {
+          "name": "uploadId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "surface": {
+          "name": "surface",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "messageId": {
+          "name": "messageId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created": {
+          "name": "created",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "chat_media_refs_message": {
+          "name": "chat_media_refs_message",
+          "columns": [
+            "surface",
+            "messageId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "chat_media_refs_uploadId_uploads_id_fk": {
+          "name": "chat_media_refs_uploadId_uploads_id_fk",
+          "tableFrom": "chat_media_refs",
+          "tableTo": "uploads",
+          "columnsFrom": [
+            "uploadId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "chat_media_refs_uploadId_surface_messageId_pk": {
+          "columns": [
+            "uploadId",
+            "surface",
+            "messageId"
+          ],
+          "name": "chat_media_refs_uploadId_surface_messageId_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "chat_media_refs_surface": {
+          "name": "chat_media_refs_surface",
+          "value": "\"chat_media_refs\".\"surface\" IN ('dm','room')"
+        }
+      }
+    },
     "chat_room_invites": {
       "name": "chat_room_invites",
       "columns": {
@@ -1885,6 +1960,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        },
+        "media": {
+          "name": "media",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
         }
       },
       "indexes": {
@@ -1954,6 +2037,116 @@
           "value": "\"chat_room_messages\".\"ciphertext\" IS NULL OR (\"chat_room_messages\".\"text\" = '' AND \"chat_room_messages\".\"replyTo\" IS NULL)"
         }
       }
+    },
+    "chat_room_uploads": {
+      "name": "chat_room_uploads",
+      "columns": {
+        "uploadId": {
+          "name": "uploadId",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "roomId": {
+          "name": "roomId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "size": {
+          "name": "size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "duration": {
+          "name": "duration",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "waveform": {
+          "name": "waveform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "messageId": {
+          "name": "messageId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "chat_room_uploads_room": {
+          "name": "chat_room_uploads_room",
+          "columns": [
+            "roomId",
+            "messageId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "chat_room_uploads_uploadId_uploads_id_fk": {
+          "name": "chat_room_uploads_uploadId_uploads_id_fk",
+          "tableFrom": "chat_room_uploads",
+          "tableTo": "uploads",
+          "columnsFrom": [
+            "uploadId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "chat_room_uploads_roomId_chat_rooms_id_fk": {
+          "name": "chat_room_uploads_roomId_chat_rooms_id_fk",
+          "tableFrom": "chat_room_uploads",
+          "tableTo": "chat_rooms",
+          "columnsFrom": [
+            "roomId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "chat_room_uploads_messageId_chat_room_messages_id_fk": {
+          "name": "chat_room_uploads_messageId_chat_room_messages_id_fk",
+          "tableFrom": "chat_room_uploads",
+          "tableTo": "chat_room_messages",
+          "columnsFrom": [
+            "messageId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "chat_rooms": {
       "name": "chat_rooms",
@@ -2220,6 +2413,22 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "duration": {
+          "name": "duration",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "waveform": {
+          "name": "waveform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         }
       },
       "indexes": {},
@@ -2297,13 +2506,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "replyTo": {
-          "name": "replyTo",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "created": {

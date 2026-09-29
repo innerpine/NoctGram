@@ -1,0 +1,622 @@
+/* Stickers and custom emoji: the composer panel, sticker messages and packs. */
+.sticker-view {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  height: 100%;
+  vertical-align: middle;
+}
+.sticker-view > img,
+.sticker-view > video,
+.sticker-animation {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+.sticker-animation svg,
+.sticker-animation canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+.sticker-view.unavailable {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 18%;
+  background: #ffffff0a;
+  font-size: 28px;
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+.chat-sticker .sticker-view.unavailable {
+  font-size: 72px;
+}
+.sticker-view.loading {
+  border-radius: 18%;
+  background: #ffffff08;
+}
+.premium-emoji.custom-emoji .sticker-view {
+  position: absolute;
+  inset: 0;
+}
+.premium-emoji.custom-emoji.missing {
+  display: inline;
+  width: auto;
+  height: auto;
+}
+
+/* Panel next to the composer. */
+.emoji-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.emoji-panel-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 8px 6px;
+  border-bottom: 1px solid #ffffff0f;
+}
+.emoji-panel-tabs button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 6px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #a99fb6;
+}
+.emoji-panel-tabs button:hover:not(.active) {
+  background: #ffffff08;
+}
+.emoji-panel-tabs button.active {
+  color: #fff;
+  background: #ab99f329;
+}
+.emoji-panel-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.emoji-panel-body > .EmojiPickerReact {
+  flex: 1;
+}
+.emoji-panel-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 10px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.emoji-panel-section h3 {
+  position: sticky;
+  top: -4px;
+  z-index: 1;
+  margin: 0;
+  padding: 8px 2px 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #a99fb6;
+  background: #222224;
+}
+.emoji-panel-pack-link {
+  color: inherit;
+  font: inherit;
+}
+.emoji-panel-pack-link:hover {
+  color: #d9ccf5;
+}
+.emoji-panel-lock,
+.emoji-panel-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 10px 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #a99fb6;
+  text-align: center;
+}
+.emoji-panel-lock {
+  justify-content: flex-start;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #ab99f314;
+  text-align: left;
+}
+.emoji-panel-manage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #cdb5e2;
+  background: #ffffff08;
+}
+.custom-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 2px;
+}
+.custom-emoji-grid button {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 10px;
+}
+.custom-emoji-grid button:hover:not(:disabled) {
+  background: #ffffff0d;
+}
+.custom-emoji-grid button:disabled {
+  opacity: 0.55;
+}
+.custom-emoji-grid .premium-emoji {
+  font-size: 22px;
+}
+
+/* Stickers tab. */
+.sticker-tab {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.sticker-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 8px 10px 4px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: #a99fb6;
+  background: #ffffff08;
+}
+.sticker-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  font-size: 14px;
+}
+.sticker-pack-bar {
+  display: flex;
+  gap: 2px;
+  padding: 4px 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid #ffffff0a;
+}
+.sticker-pack-bar::-webkit-scrollbar {
+  display: none;
+}
+.sticker-pack-bar button {
+  display: grid;
+  flex: 0 0 36px;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 4px;
+  border-radius: 10px;
+  color: #a99fb6;
+}
+.sticker-pack-bar button:hover {
+  background: #ffffff0d;
+}
+/* Grid cells size their content, so pictures get explicit sizes. */
+.sticker-pack-bar .sticker-view {
+  width: 28px;
+  height: 28px;
+}
+.sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 4px;
+}
+.sticker-grid button {
+  aspect-ratio: 1;
+  padding: 4px;
+  border-radius: 12px;
+  transition: background 0.15s;
+}
+.sticker-grid button:hover,
+.sticker-grid button.menu-open {
+  background: #ffffff0d;
+}
+.sticker-menu {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #ffffff14;
+  border-radius: 14px;
+  background: #2b2a30;
+  box-shadow: 0 12px 30px #0008;
+}
+.sticker-menu-preview {
+  width: 44px;
+  height: 44px;
+}
+.sticker-menu > button:not(.icon-button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: 13px;
+  background: #ffffff0a;
+}
+.sticker-menu > .icon-button {
+  margin-left: auto;
+}
+.sticker-menu small {
+  flex-basis: 100%;
+  color: #f0a3a8;
+}
+
+/* Sticker messages: no bubble, time on a pill like large emoji. */
+.chat-sticker {
+  display: block;
+  width: 200px;
+  height: 200px;
+  padding: 0;
+  cursor: pointer;
+}
+.chat-sticker:disabled {
+  cursor: default;
+}
+.chat-sticker small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #a99fb6;
+}
+.chat-message-row > .bubble.chat-sticker-message,
+.room-message > .room-bubble.room-sticker-message {
+  padding: 2px 0;
+  overflow: visible;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.chat-sticker-message .message-time,
+.room-sticker-message .room-message-time {
+  float: none;
+  display: inline-flex;
+  margin: 2px 0 0;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: #0006;
+  color: #ffffffe0;
+}
+.chat-sticker-message .chat-forwarded,
+.chat-sticker-message .chat-reply-quote,
+.room-sticker-message .chat-forwarded,
+.room-sticker-message .chat-reply-quote,
+.room-sticker-message .room-sender {
+  width: fit-content;
+  max-width: 220px;
+  margin-bottom: 4px;
+  padding: 4px 9px;
+  border-radius: 10px;
+  background: #1f1d24e6;
+}
+@media (max-width: 640px) {
+  .chat-sticker {
+    width: 170px;
+    height: 170px;
+  }
+}
+
+/* Pack preview and «Мои наборы». */
+.sticker-pack-dialog.noct-dialog,
+.sticker-manager-dialog.noct-dialog {
+  max-width: 520px !important;
+  background: #18171b !important;
+}
+.sticker-pack-grid,
+.sticker-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+  max-height: min(52dvh, 440px);
+  overflow-y: auto;
+}
+.sticker-pack-grid.emoji,
+.sticker-editor-grid.emoji {
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+}
+.sticker-pack-item {
+  aspect-ratio: 1;
+  padding: 6px;
+  border-radius: 14px;
+  background: #ffffff05;
+}
+.sticker-pack-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.sticker-pack-actions button,
+.sticker-editor button.primary,
+.sticker-editor button.secondary,
+.sticker-editor button.danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.sticker-pack-actions .primary {
+  flex: 1 1 100%;
+}
+.sticker-report,
+.sticker-create {
+  display: grid;
+  gap: 12px;
+}
+.sticker-report label,
+.sticker-create > label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #b9b1c4;
+}
+.sticker-create small {
+  font-size: 12px;
+  color: #8f8699;
+}
+.sticker-type {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.sticker-type legend {
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #b9b1c4;
+}
+.sticker-type label {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #ffffff14;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.sticker-type label.selected {
+  border-color: #ab99f38c;
+  background: #ab99f314;
+}
+.sticker-type span {
+  display: grid;
+  gap: 2px;
+}
+.sticker-type strong {
+  font-size: 14px;
+}
+.sticker-manager-list {
+  display: grid;
+  gap: 4px;
+}
+.sticker-manager-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 12px;
+  text-align: left;
+}
+.sticker-manager-row:hover {
+  background: #ffffff08;
+}
+.sticker-manager-cover {
+  display: grid;
+  flex: 0 0 48px;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  color: #a99fb6;
+}
+.sticker-manager-cover .sticker-view {
+  width: 48px;
+  height: 48px;
+}
+.sticker-manager-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sticker-manager-copy strong,
+.sticker-manager-copy small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sticker-manager-copy small {
+  font-size: 12.5px;
+  color: #9c90aa;
+}
+.sticker-manager-list .chat-operation-buttons {
+  margin-top: 8px;
+}
+.sticker-editor {
+  display: grid;
+  gap: 12px;
+}
+.sticker-title-row {
+  display: flex;
+  gap: 8px;
+}
+.sticker-title-row input {
+  flex: 1;
+  min-width: 0;
+}
+.sticker-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 10px;
+  background: #ffffff08;
+}
+.sticker-link-row code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: #cdb5e2;
+}
+.sticker-upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed #ffffff24;
+  border-radius: 14px;
+}
+.sticker-upload > span {
+  flex-basis: 100%;
+  font-size: 13px;
+  color: #b9b1c4;
+}
+.sticker-upload small {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: #8f8699;
+}
+.sticker-emoji-field {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sticker-emoji-field input {
+  width: 64px;
+  text-align: center;
+}
+.sticker-emoji-field button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 17px;
+}
+.sticker-emoji-field button.selected {
+  background: #ab99f32e;
+  box-shadow: inset 0 0 0 1px #ab99f38c;
+}
+.sticker-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  color: #b9b1c4;
+}
+.sticker-upload-row.failed small {
+  color: #f0a3a8;
+}
+.sticker-upload-row span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sticker-editor-item {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px;
+  border-radius: 12px;
+  background: #ffffff05;
+}
+.sticker-editor-item > .sticker-view {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+.sticker-editor-item form {
+  display: flex;
+  gap: 4px;
+}
+.sticker-editor-item input {
+  width: 48px;
+  padding: 3px;
+  text-align: center;
+}
+.sticker-editor-emoji {
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-size: 17px;
+  background: #ffffff0a;
+}
+.sticker-editor-tools {
+  display: flex;
+  gap: 0;
+}
+.sticker-editor-tools .icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+}
+.sticker-confirm p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #f0bdc7;
+}
+.moderation-sticker-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.moderation-sticker-thumbs img,
+.moderation-sticker-thumbs span {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 10px;
+  font-size: 11px;
+  color: #9c90aa;
+  background: #ffffff08;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sticker-grid button {
+    transition: none;
+  }
+}

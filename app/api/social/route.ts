@@ -1,4 +1,5 @@
 import { assertPremiumEmoji } from '@/lib/premium-emoji-access';
+import { stickerForMessage } from '@/lib/sticker-send';
 import { archiveDirectChat } from '@/lib/chat-archive';
 import { visibleLastSeen } from '@/lib/presence-privacy';
 import { telegramGet, telegramPost } from '@/lib/telegram';
@@ -80,6 +81,8 @@ import {
 import { messageVisible } from '@/lib/chat-access';
 import { readChatTheme, saveChatTheme } from '@/lib/chat-theme-settings';
 import { readChatLibrary } from '@/lib/chat-library-server';
+import { messageSummarySql } from '@/lib/message-summary-sql';
+import { readPostPreviews } from '@/lib/post-preview-server';
 export const dynamic = 'force-dynamic';
 // A listed username that was removed or promoted to main is no longer for sale.
 const staleUsernameLots = (d: D1Database, me: string) =>
@@ -153,6 +156,10 @@ export async function GET(req: Request) {
       if (!result[0]) throw new ApiError(404, 'Публикация не найдена');
       return Response.json(result[0]);
     }
+    if (action === 'postPreviews')
+      return Response.json(await readPostPreviews(me, s.get('ids')), {
+        headers: { 'Cache-Control': 'private, no-store' },
+      });
     if (action === 'topics') {
       const rows = await d
         .prepare(
@@ -249,7 +256,7 @@ export async function GET(req: Request) {
           await d
             .prepare(
               `WITH visible_messages AS (SELECT m.* FROM messages m WHERE (m.sender=? OR m.recipient=?) AND ${messageVisible('m', '?')})
-              SELECT u.id,u.name,u.avatar,${visibleLastSeen('u')} AS lastSeen,COALESCE(a.archivedAt,0) AS archivedAt,${appearanceColumns('u')},h.handle,(SELECT CASE WHEN text<>'' THEN text WHEN json_array_length(media)>0 THEN CASE json_extract(media,'$[0].kind') WHEN 'image' THEN 'Фото' WHEN 'video' THEN 'Видео' ELSE 'Файл: '||json_extract(media,'$[0].name') END ELSE text END FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC,id DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM visible_messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 LEFT JOIN direct_chat_archives a ON a.peerId=u.id AND a.userId=? WHERE (COALESCE(a.archivedAt,0)>0)=? AND ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
+              SELECT u.id,u.name,u.avatar,${visibleLastSeen('u')} AS lastSeen,COALESCE(a.archivedAt,0) AS archivedAt,${appearanceColumns('u')},h.handle,(SELECT ${messageSummarySql('', { filePrefix: 'Файл: ', empty: '' })} FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?) ORDER BY created DESC,id DESC LIMIT 1) as lastText,(SELECT MAX(created) FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) as lastTime,(SELECT COUNT(*) FROM visible_messages WHERE sender=u.id AND recipient=? AND read=0) as unread FROM users u JOIN handles h ON h.userId=u.id AND h.main=1 LEFT JOIN direct_chat_archives a ON a.peerId=u.id AND a.userId=? WHERE (COALESCE(a.archivedAt,0)>0)=? AND ${visibleAccount('u')} AND EXISTS(SELECT 1 FROM visible_messages WHERE (sender=? AND recipient=u.id) OR (sender=u.id AND recipient=?)) ORDER BY lastTime DESC LIMIT 100`,
             )
             .bind(
               me,
@@ -364,6 +371,24 @@ export async function POST(req: Request) {
     if (moderation) return moderation;
     if (action === 'archiveChat')
       return Response.json(await archiveDirectChat(me, b));
+    // Listening is a read: read-only accounts still mark voice messages heard.
+    if (action === 'messageListened') {
+      if (
+        typeof b.peer !== 'string' ||
+        typeof b.id !== 'string' ||
+        b.peer.length > 100 ||
+        b.id.length > 250
+      )
+        throw new ApiError(400, 'Некорректное сообщение');
+      await d
+        .prepare(
+          `UPDATE messages SET listenedAt=? WHERE id=? AND recipient=? AND sender=? AND listenedAt=0 AND deletedAt=0
+          AND EXISTS(SELECT 1 FROM json_each(messages.media) j WHERE json_extract(j.value,'$.kind') IN ('voice','round'))`,
+        )
+        .bind(Date.now(), b.id, me, b.peer)
+        .run();
+      return Response.json({ ok: true });
+    }
     if (
       ['post', 'comment'].includes(String(action)) &&
       typeof b.text === 'string'
@@ -705,8 +730,8 @@ export async function POST(req: Request) {
     }
     if (action === 'message') {
       await assertAccountVisible(id);
+      // A message to yourself is saved to «Избранное».
       if (
-        id === me ||
         id === 'noctgram' ||
         !(await d
           .prepare("SELECT id FROM users WHERE id=? AND kind='person'")
@@ -722,6 +747,7 @@ export async function POST(req: Request) {
           b.attachments ?? [],
           b.key,
           b.replyTo ?? null,
+          { quote: b.quote, sticker: await stickerForMessage(b.sticker) },
         ),
       );
     }

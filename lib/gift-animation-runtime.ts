@@ -51,15 +51,23 @@ function dataFor(id: string) {
   const emoji = id.startsWith('emoji:')
     ? premiumEmoji.find((e) => e.id === id.slice(6))
     : null;
+  // Built-in stickers are static Lottie JSON; user stickers are TGS uploads.
+  const sticker = /^sticker:(\/assets\/stickers\/[a-z0-9_]+\/[A-Za-z0-9_]+\.json)$/.exec(id)?.[1];
+  const upload = /^tgs:([0-9a-f-]{36})$/.exec(id)?.[1];
+  const gzip = id.startsWith('collectible-') || !!upload;
   const asset = emoji
-    ? '/assets/emoji/' + emoji.id + '.json'
-    : '/assets/gifts/' + encodeURIComponent(id) + (id.startsWith('collectible-') ? '.tgs' : '.json');
+    ? emoji.asset || '/assets/emoji/' + emoji.id + '.json'
+    : sticker
+      ? sticker
+      : upload
+        ? '/api/media/' + upload
+        : '/assets/gifts/' + encodeURIComponent(id) + (id.startsWith('collectible-') ? '.tgs' : '.json');
   const promise: Promise<object> = fetch(asset, {
     signal: AbortSignal.timeout(15000),
   })
     .then(async (response) => {
       if (!response.ok) throw new Error('Gift animation unavailable');
-      if (id.startsWith('collectible-')) {
+      if (gzip) {
         if (!response.body) throw new Error('Missing collectible animation');
         const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
         return new Response(stream).json() as Promise<object>;
@@ -74,6 +82,8 @@ function dataFor(id: string) {
   if (dataCache.size > 24) dataCache.delete(dataCache.keys().next().value!);
   return promise;
 }
+// Shared with lib/lottie-poster.ts, which draws first frames from the cache.
+export const animationData = (id: string) => dataFor(id);
 function selected(now: number) {
   if (document.hidden || motion?.matches) return [];
   return [...entries.values()]

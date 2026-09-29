@@ -1,7 +1,10 @@
 import type { Message } from './client';
 import { chatRequest } from './chat-client';
 
-export type ChatDraft = Pick<Message, 'text' | 'attachments' | 'reply'>;
+export type ChatDraft = Pick<
+  Message,
+  'text' | 'attachments' | 'reply' | 'sticker'
+>;
 export type OutgoingMessage = {
   message: Message;
   key: string;
@@ -16,6 +19,8 @@ type Send = (body: {
   attachments: string[];
   key: string;
   replyTo: string | null;
+  quote?: string;
+  sticker?: string;
   expectedSender: string;
 }) => Promise<{ id: string }>;
 
@@ -44,6 +49,8 @@ export function createChatOutbox(send: Send) {
         attachments: message.attachments?.map((file) => file.id) ?? [],
         key,
         replyTo: message.reply?.id ?? null,
+        ...(message.reply?.quote ? { quote: message.reply.quote } : {}),
+        ...(message.sticker ? { sticker: message.sticker } : {}),
         expectedSender: message.sender,
       });
       if (result.id !== message.id)

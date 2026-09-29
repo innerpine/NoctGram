@@ -1,5 +1,11 @@
 import { chatRequest } from './chat-client';
-export type RoomTarget = { roomId?: string; group?: string; invite?: string };
+export type RoomTarget = {
+  roomId?: string;
+  // Forum topic: 'general' or a topic id.
+  topic?: string;
+  group?: string;
+  invite?: string;
+};
 export async function roomRequest<T>(
   query: Record<string, string>,
   signal?: AbortSignal,

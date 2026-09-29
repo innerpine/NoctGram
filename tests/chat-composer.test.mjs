@@ -48,7 +48,7 @@ const { outputFiles } = await build({
         build.onResolve(
           {
             filter:
-              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/popover|\.\/chat-emoji-picker|\.\/chat-text-editor|\.\/chat-emoji-text)$/,
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/popover|\.\/chat-emoji-panel|@\/lib\/sticker-client|\.\/chat-text-editor|\.\/chat-emoji-text|\.\/chat-recorder)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
@@ -64,9 +64,13 @@ const { outputFiles } = await build({
                     ? 'export const ChatTextEditor="ChatTextEditor";'
                     : path.includes('chat-emoji-text')
                       ? 'export const ChatEmojiText="ChatEmojiText";'
-                      : path.includes('chat-emoji-picker')
-                        ? 'export default "Picker";'
-                        : 'export const File="File", LoaderCircle="LoaderCircle", Paperclip="Paperclip", RotateCcw="RotateCcw", Send="Send", Video="Video", X="X", Reply="Reply", Smile="Smile";',
+                      : path.includes('chat-recorder')
+                        ? 'export const ChatRecorder="ChatRecorder";'
+                      : path.includes('chat-emoji-panel')
+                        ? 'export default "Panel";'
+                        : path.includes('sticker-client')
+                          ? 'export const rememberRecentSticker=(meId,ref)=>globalThis.__recentStickers?.push(ref);'
+                        : 'export const File="File", LoaderCircle="LoaderCircle", Paperclip="Paperclip", RotateCcw="RotateCcw", Send="Send", Video="Video", X="X", Reply="Reply", Quote="Quote", Smile="Smile";',
         }));
       },
     },
@@ -117,6 +121,7 @@ globalThis.fetch = async (url, init) => {
     };
     uploads.push({
       peer: init.body.get('peer'),
+      room: init.body.get('room'),
       signal: init.signal,
       attachment,
       finish: () => resolve(Response.json(attachment)),
@@ -137,7 +142,7 @@ function flatten(node) {
   return [node, ...[node.props?.children].flat(Infinity).flatMap(flatten)];
 }
 const mounted = [];
-function mount(peerId = 'bob') {
+function mount(peerId = 'bob', roomId) {
   const owner = {
     first: true,
     slots: [],
@@ -149,6 +154,7 @@ function mount(peerId = 'bob') {
   };
   const props = {
     peerId,
+    roomId,
     text: '',
     disabled: false,
     onText: (text) => {
@@ -289,6 +295,15 @@ try {
   );
   newPeer.dispose();
 
+  const group = mount('bob', 'room-1');
+  group.pick([photo('group.png')]);
+  await flush();
+  assert.equal(uploads.at(-1).room, 'room-1', 'Group drafts upload to the room');
+  assert.equal(uploads.at(-1).peer, null);
+  uploads.at(-1).finish();
+  await flush();
+  group.dispose();
+
   const immediate = mount();
   immediate.props.text = 'Следующее сообщение';
   immediate.props.reply = {
@@ -307,6 +322,23 @@ try {
   );
   assert.equal(calls.at(-1).reply.id, 'original');
   immediate.dispose();
+
+  // A sticker goes out at once as its own message; the typed draft stays.
+  const sticking = mount();
+  sticking.props.text = 'Черновик';
+  globalThis.__recentStickers = [];
+  const panel = sticking.find((n) => n.type === 'Lazy' && n.props.onSticker);
+  panel.props.onSticker({ ref: 'b:utya:birthday', available: true });
+  assert.equal(calls.at(-1).sticker, 'b:utya:birthday');
+  assert.equal(calls.at(-1).text, '');
+  assert.deepEqual(calls.at(-1).attachments, []);
+  assert.equal(sticking.props.text, 'Черновик');
+  assert.deepEqual(globalThis.__recentStickers, ['b:utya:birthday']);
+  const sent = calls.length;
+  panel.props.onSticker({ ref: 'u:gone', available: false });
+  assert.equal(calls.length, sent, 'An unavailable sticker is not sent');
+  sticking.dispose();
+  delete globalThis.__recentStickers;
   assert.deepEqual(revoked, previews, 'All preview object URLs are released');
   console.log(
     'Chat composer: upload queue, remove/retry, conversation switch, cleanup, double submit and instant draft handoff passed.',

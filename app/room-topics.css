@@ -1,0 +1,245 @@
+/* Forum topics and reply threads in groups. */
+.topic-icon {
+  flex: 0 0 auto;
+  display: inline-block;
+  overflow: visible;
+}
+.topic-icon-general {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #cfc6da;
+  background: #ffffff12;
+}
+.room-topic-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 10px 8px 16px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c1a4d12b transparent;
+}
+.room-topic-create {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 4px 8px;
+  padding: 11px 14px;
+  border-radius: 13px;
+  color: var(--chat-accent, #cdb5e2);
+  font-weight: 600;
+  background: #ffffff08;
+}
+.room-topic-create:hover:not(:disabled) {
+  background: #ffffff10;
+}
+.room-topic-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.room-topic-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 44px 10px 10px;
+  border-radius: 13px;
+  text-align: left;
+}
+.room-topic-open:hover {
+  background: #ffffff09;
+}
+.room-topic-copy {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+.room-topic-copy strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 15px;
+  font-weight: 600;
+}
+.room-topic-copy strong svg {
+  flex: 0 0 auto;
+  color: #a89bb5;
+}
+.room-topic-copy small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: #a89bb5;
+}
+.room-topic-meta {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #9c90aa;
+}
+.room-topic-meta .unread {
+  position: static;
+}
+.room-topic-more {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.6;
+}
+.room-topic-row:hover .room-topic-more,
+.room-topic-more:focus-visible {
+  opacity: 1;
+}
+.room-topic-row.closed .room-topic-copy small {
+  color: #8d8199;
+}
+
+/* Topic editor. */
+.topic-editor-dialog.noct-dialog {
+  width: min(430px, calc(100vw - 26px));
+  max-width: 430px !important;
+  border-radius: 20px;
+  background: #1c1920 !important;
+}
+.topic-editor {
+  display: grid;
+  gap: 16px;
+}
+.topic-editor-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.topic-editor-title input {
+  flex: 1;
+  min-width: 0;
+}
+.topic-colors,
+.topic-emoji {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.topic-colors legend,
+.topic-emoji legend {
+  width: 100%;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #a89bb5;
+}
+.topic-colors button {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px #0000002e;
+  transition: transform 0.14s ease;
+}
+.topic-colors button.selected {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  transform: scale(1.06);
+}
+.topic-emoji button {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  font-size: 20px;
+  background: #ffffff08;
+}
+.topic-emoji button.selected {
+  background: #bf98df2e;
+  box-shadow: inset 0 0 0 1px #d0a9ed5c;
+}
+
+/* Threads and topics always offer a way back, also beside the chat list. */
+.room-header .chat-back.room-nested {
+  display: inline-flex !important;
+}
+
+/* Reply threads. */
+.room-thread-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--chat-accent, #cdb5e2);
+  background: #ffffff0d;
+}
+.room-thread-chip:hover {
+  background: #ffffff17;
+}
+.room-thread-separator {
+  align-self: center;
+  margin: 4px 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #cfc6da;
+  background: #ffffff0f;
+}
+.room-thread-heading {
+  cursor: default;
+}
+.room-thread-heading > span {
+  display: grid;
+}
+.room-topic-closed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 16px 6px;
+  font-size: 13px;
+  color: #a89bb5;
+}
+.room-forum-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 13px 14px;
+  border-radius: 14px;
+  background: #ffffff08;
+}
+.room-forum-toggle > span {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+}
+.room-forum-toggle small {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #a89bb5;
+}
+.room-forum-toggle input {
+  width: 42px;
+  height: 24px;
+  accent-color: var(--chat-accent, #9f7ccc);
+}
+@media (max-width: 480px) {
+  .room-topic-open {
+    padding-right: 40px;
+  }
+}

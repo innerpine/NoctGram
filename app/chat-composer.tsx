@@ -1,5 +1,5 @@
 'use client';
-import { EmojiPicker, EmojiPreview } from './premium-emoji';
+import { EmojiPreview } from './premium-emoji';
 /* File transfers are scoped to this mounted conversation. */
 /* eslint-disable react/react-compiler, next/no-img-element */
 import {
@@ -18,6 +18,7 @@ import {
   Send,
   Video,
   X,
+  Quote,
   Reply,
   Smile,
 } from 'lucide-react';
@@ -39,8 +40,12 @@ import {
 import { ChatTextEditor, type ChatTextEditorHandle } from './chat-text-editor';
 import { ChatEmojiText } from './chat-emoji-text';
 import type { ChatDraft } from '@/lib/chat-outbox';
+import { ChatRecorder } from './chat-recorder';
+import type { RecordingResult } from '@/lib/media-recorder';
+import type { StickerInfo } from '@/lib/sticker-types';
+import { rememberRecentSticker } from '@/lib/sticker-client';
 
-const ChatEmojiPicker = lazy(() => import('./chat-emoji-picker'));
+const ChatEmojiPanel = lazy(() => import('./chat-emoji-panel'));
 
 type DraftFile = {
   id: string;
@@ -51,7 +56,9 @@ type DraftFile = {
 };
 export function ChatComposer({
   premium = false,
+  meId = '',
   peerId,
+  roomId,
   text,
   onText,
   disabled,
@@ -61,7 +68,11 @@ export function ChatComposer({
   onCancelReply,
 }: {
   premium?: boolean;
-  peerId: string;
+  // The signed-in account: its stickers and recently sent stickers.
+  meId?: string;
+  // Uploads are drafted for exactly one conversation: a person or a group.
+  peerId?: string;
+  roomId?: string;
   text: string;
   onText: (text: string) => void;
   disabled: boolean;
@@ -75,6 +86,12 @@ export function ChatComposer({
   const input = useRef<HTMLInputElement>(null);
   const editor = useRef<ChatTextEditorHandle>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  // A finished recording is uploaded, then handed to the outbox like a file.
+  const [recorded, setRecorded] = useState<{
+    result: RecordingResult;
+    error?: string;
+  } | null>(null);
   const alive = useRef(true);
   const controllers = useRef(new Map<string, AbortController>());
   const locked = useRef(false);
@@ -107,7 +124,8 @@ export function ChatComposer({
     try {
       const form = new FormData();
       form.set('file', item.file);
-      form.set('peer', peerId);
+      if (roomId) form.set('room', roomId);
+      else form.set('peer', peerId || '');
       const attachment = await chatRequest<ChatAttachment>('/api/chat-upload', {
         method: 'POST',
         body: form,
@@ -167,6 +185,37 @@ export function ChatComposer({
         await uploadFile(item);
     }
   };
+  const sendRecording = async (result: RecordingResult) => {
+    setRecorded({ result });
+    setError('');
+    try {
+      const form = new FormData();
+      form.set('file', result.file);
+      if (roomId) form.set('room', roomId);
+      else form.set('peer', peerId || '');
+      form.set('intent', result.kind);
+      form.set('duration', String(result.duration));
+      if (result.kind === 'voice') form.set('waveform', result.waveform);
+      const attachment = await chatRequest<ChatAttachment>('/api/chat-upload', {
+        method: 'POST',
+        body: form,
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!alive.current) {
+        void discardChatFile(attachment.id);
+        return;
+      }
+      setRecorded(null);
+      onSend({ text: '', attachments: [attachment], reply: reply ?? undefined });
+      onCancelReply?.();
+    } catch (e) {
+      if (alive.current)
+        setRecorded({
+          result,
+          error: e instanceof Error ? e.message : 'Не удалось отправить запись',
+        });
+    }
+  };
   const remove = (item: DraftFile) => {
     controllers.current.get(item.id)?.abort();
     if (item.preview) URL.revokeObjectURL(item.preview);
@@ -204,11 +253,25 @@ export function ChatComposer({
   const frozen = disabled;
   useEffect(() => {
     setEmojiOpen(false);
-  }, [peerId, frozen]);
+  }, [peerId, roomId, frozen]);
   const chooseEmoji = (emoji: string) => {
     if (frozen) return;
     setError('');
     editor.current?.insertEmoji(emoji);
+    setEmojiOpen(false);
+  };
+  // A sticker is its own message; the typed draft stays as it is.
+  const sendSticker = (sticker: StickerInfo) => {
+    if (frozen || !sticker.available) return;
+    setError('');
+    rememberRecentSticker(meId, sticker.ref);
+    onSend({
+      text: '',
+      attachments: [],
+      sticker: sticker.ref,
+      reply: reply ?? undefined,
+    });
+    onCancelReply?.();
     setEmojiOpen(false);
   };
   useEffect(() => {
@@ -229,12 +292,19 @@ export function ChatComposer({
     >
       <ChatReveal>
         {reply && (
-          <div className="chat-reply-draft">
-            <Reply size={19} />
-            <span key={reply.id}>
-              <strong>Ответ · {reply.name}</strong>
+          <div
+            className={'chat-reply-draft' + (reply.quote ? ' has-quote' : '')}
+          >
+            {reply.quote ? <Quote size={19} /> : <Reply size={19} />}
+            <span key={reply.id + ':' + (reply.quote || '')}>
+              <strong>
+                {reply.quote ? 'Цитата' : 'Ответ'} · {reply.name}
+              </strong>
               <small>
-                <ChatEmojiText text={reply.text} mentions={false} />
+                <ChatEmojiText
+                  text={reply.quote || reply.text}
+                  mentions={false}
+                />
               </small>
             </span>
             <button
@@ -300,6 +370,34 @@ export function ChatComposer({
           </small>
         </div>
       )}
+      {recorded && (
+        <div
+          className={'chat-recording-upload' + (recorded.error ? ' failed' : '')}
+          role={recorded.error ? 'alert' : 'status'}
+        >
+          {recorded.error ? <X size={16} /> : <LoaderCircle className="spin" size={16} />}
+          <span>
+            {recorded.error ||
+              (recorded.result.kind === 'voice'
+                ? 'Отправляем голосовое сообщение…'
+                : 'Отправляем видеосообщение…')}
+          </span>
+          {recorded.error && (
+            <button
+              type="button"
+              disabled={frozen}
+              onClick={() => void sendRecording(recorded.result)}
+            >
+              <RotateCcw size={15} /> Повторить
+            </button>
+          )}
+          {recorded.error && (
+            <button type="button" onClick={() => setRecorded(null)}>
+              Удалить
+            </button>
+          )}
+        </div>
+      )}
       {error && (
         <p className="chat-send-error" role="alert">
           {error}
@@ -307,7 +405,7 @@ export function ChatComposer({
       )}
       <EmojiPreview text={text} />
       <form
-        className="message-composer"
+        className={'message-composer' + (recording ? ' recording' : '')}
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -333,14 +431,6 @@ export function ChatComposer({
         >
           <Paperclip size={21} />
         </button>
-        <EmojiPicker
-          premium={premium}
-          text={text}
-          onText={onText}
-          onPrepareOpen={() => editor.current?.rememberSelection()}
-          onInsert={(token) => editor.current?.insertEmoji(token)}
-          disabled={frozen}
-        />
         <div className="chat-editor-container">
           <ChatTextEditor
             ref={editor}
@@ -360,8 +450,8 @@ export function ChatComposer({
             type="button"
             className="chat-emoji-button"
             disabled={frozen}
-            title="Эмодзи"
-            aria-label="Выбрать эмодзи"
+            title="Эмодзи и стикеры"
+            aria-label="Выбрать эмодзи или стикер"
             onPointerDown={() => editor.current?.rememberSelection()}
           >
             <Smile size={23} />
@@ -377,7 +467,7 @@ export function ChatComposer({
               return false;
             }}
           >
-            <PopoverTitle className="sr-only">Эмодзи</PopoverTitle>
+            <PopoverTitle className="sr-only">Эмодзи и стикеры</PopoverTitle>
             <Suspense
               fallback={
                 <output className="chat-emoji-loading">
@@ -386,22 +476,38 @@ export function ChatComposer({
                 </output>
               }
             >
-              <ChatEmojiPicker onSelect={chooseEmoji} />
+              <ChatEmojiPanel
+                meId={meId}
+                premium={premium}
+                onEmoji={chooseEmoji}
+                onToken={chooseEmoji}
+                onSticker={sendSticker}
+              />
             </Suspense>
           </PopoverContent>
         </Popover>
-        <button
-          type="submit"
-          className="send-button"
-          aria-label="Отправить сообщение"
-          disabled={
-            disabled ||
-            files.some((file) => !file.attachment) ||
-            (!text.trim() && !files.length)
-          }
-        >
-          <Send size={21} fill="currentColor" strokeWidth={1.5} />
-        </button>
+        {!text.trim() && !files.length && !recorded ? (
+          <ChatRecorder
+            disabled={frozen}
+            onRecorded={(result) => void sendRecording(result)}
+            onError={setError}
+            onActiveChange={setRecording}
+          />
+        ) : (
+          <button
+            type="submit"
+            className="send-button"
+            aria-label="Отправить сообщение"
+            disabled={
+              disabled ||
+              !!recorded ||
+              files.some((file) => !file.attachment) ||
+              (!text.trim() && !files.length)
+            }
+          >
+            <Send size={21} fill="currentColor" strokeWidth={1.5} />
+          </button>
+        )}
       </form>
     </div>
   );

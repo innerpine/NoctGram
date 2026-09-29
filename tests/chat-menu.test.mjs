@@ -26,7 +26,7 @@ const compiled = await build({
               : path === 'react/jsx-runtime'
                 ? 'export const jsx=(type,props,key)=>({type,props,key}); export const jsxs=jsx, Fragment="Fragment";'
                 : path === 'lucide-react'
-                  ? 'export const CheckSquare="CheckSquare", Copy="Copy", Ellipsis="Ellipsis", Flag="Flag", Forward="Forward", Pencil="Pencil", Pin="Pin", PinOff="PinOff", Reply="Reply", Trash2="Trash2";'
+                  ? 'export const CheckSquare="CheckSquare", Copy="Copy", Ellipsis="Ellipsis", Flag="Flag", Forward="Forward", Pencil="Pencil", Pin="Pin", PinOff="PinOff", Quote="Quote", Reply="Reply", Trash2="Trash2";'
                   : path.endsWith('/context-menu')
                     ? 'export const ContextMenu="ContextMenu", ContextMenuTrigger="ContextMenuTrigger", ContextMenuContent="ContextMenuContent", ContextMenuItem="ContextMenuItem", ContextMenuSeparator="ContextMenuSeparator";'
                     : 'export const DropdownMenu="DropdownMenu", DropdownMenuTrigger="DropdownMenuTrigger", DropdownMenuContent="DropdownMenuContent", DropdownMenuItem="DropdownMenuItem", DropdownMenuSeparator="DropdownMenuSeparator";',
@@ -141,6 +141,7 @@ Object.defineProperty(globalThis, 'Element', {
 try {
   const root = {
     contains: (target) => !!target?.contained,
+    querySelector: () => null,
     ownerDocument: { getSelection: () => null },
   };
   const trigger = nodes(menu).find(

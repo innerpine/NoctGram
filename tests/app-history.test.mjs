@@ -20,6 +20,10 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 void test('group, invite and secret-room links survive routing without opening a personal dialog', () => {
   const examples = [
     [{ page: 'messages', roomId: 'secret-room-123' }, '/?room=secret-room-123'],
+    [
+      { page: 'messages', roomId: 'forum-room', topic: 'general' },
+      '/?room=forum-room&topic=general',
+    ],
     [{ page: 'messages', group: 'night_club' }, '/?group=night_club'],
     [
       { page: 'messages', invite: 'random-private_token' },
@@ -39,6 +43,15 @@ void test('group, invite and secret-room links survive routing without opening a
     '/?group=night_club',
   );
   assert.equal(appRouteHref({ page: 'feed', invite: 'must-not-leak' }), '/');
+  assert.equal(
+    appRouteHref({ page: 'messages', group: 'night_club', topic: 'stray' }),
+    '/?group=night_club',
+    'A topic only belongs to an opened group',
+  );
+  assert.notEqual(
+    appRouteKey({ page: 'messages', roomId: 'forum-room', topic: 'a' }),
+    appRouteKey({ page: 'messages', roomId: 'forum-room', topic: 'b' }),
+  );
 });
 const deferred = () => {
   let resolve, reject;

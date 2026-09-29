@@ -1,5 +1,23 @@
 # Обновление локальной версии
 
+## Чаты как в Telegram — 29 сентября
+
+Пересылка, «Избранное», цитаты, голосовые и кружки, медиа в группах, ветки и темы, поиск, папки, стикеры и эмодзи из наборов. Сохраните резервную копию базы и примените шесть миграций строго по порядку, каждую один раз:
+
+```sh
+npx wrangler d1 export DB --local --config wrangler.local.json --output work/before-chat-features.sql
+npx wrangler d1 execute DB --local --config wrangler.local.json --file drizzle/0050_chat_media_foundation.sql
+npx wrangler d1 execute DB --local --config wrangler.local.json --file drizzle/0051_voice_round.sql
+npx wrangler d1 execute DB --local --config wrangler.local.json --file drizzle/0052_forward_saved_quotes.sql
+npx wrangler d1 execute DB --local --config wrangler.local.json --file drizzle/0053_threads_topics.sql
+npx wrangler d1 execute DB --local --config wrangler.local.json --file drizzle/0054_search_folders.sql
+npx wrangler d1 execute DB --local --config wrangler.local.json --file drizzle/0055_stickers.sql
+```
+
+Миграции только добавляют столбцы, таблицы, индексы и триггеры; существующие сообщения, файлы и группы сохраняются. `0050` заполняет таблицу доступа к файлам `chat_media_refs` по уже отправленным личным сообщениям. Старые сообщения попадают в поиск после нескольких запусков фонового задания (`npm run dev:jobs` локально). Файлы встроенных стикеров лежат в `public/assets/stickers` и приходят вместе с кодом. Микрофону и камере нужен `localhost` или HTTPS.
+
+Подробнее: [CHAT_FEATURES.md](CHAT_FEATURES.md), [VOICE_MESSAGES.md](VOICE_MESSAGES.md), [FORUM_TOPICS.md](FORUM_TOPICS.md), [STICKERS.md](STICKERS.md).
+
 ## Сведения профиля и личные каналы — 23 сентября
 
 Примените `0049_profile_details.sql`, предварительно сохранив резервную копию базы:

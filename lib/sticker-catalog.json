@@ -1,0 +1,469 @@
+{
+  "revision": "8125029807ad94a6c35492229113d4386c3a8f52",
+  "packs": [
+    {
+      "id": "utya",
+      "type": "stickers",
+      "title": "Утя",
+      "source": "Telegram Web K",
+      "items": [
+        {
+          "id": "utya:birthday",
+          "slug": "birthday",
+          "emoji": "🎂",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/UtyanBirthday.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "utya:disappear",
+          "slug": "disappear",
+          "emoji": "🙈",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/UtyanDisappear.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "utya:discussion",
+          "slug": "discussion",
+          "emoji": "💬",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/UtyanDiscussion.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "utya:links",
+          "slug": "links",
+          "emoji": "🔗",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/UtyanLinks.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "utya:passcode",
+          "slug": "passcode",
+          "emoji": "🔐",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/UtyanPasscode.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "utya:restricted",
+          "slug": "restricted",
+          "emoji": "🚫",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/UtyanRestricted.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "utya:search",
+          "slug": "search",
+          "emoji": "🔍",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/UtyanSearch.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "utya:stories",
+          "slug": "stories",
+          "emoji": "📸",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/UtyanStories.json",
+          "w": 512,
+          "h": 512
+        }
+      ]
+    },
+    {
+      "id": "monkey",
+      "type": "stickers",
+      "title": "Обезьянка",
+      "source": "Telegram Web K",
+      "items": [
+        {
+          "id": "monkey:idle",
+          "slug": "idle",
+          "emoji": "🐵",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/TwoFactorSetupMonkeyIdle.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "monkey:tracking",
+          "slug": "tracking",
+          "emoji": "👀",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/TwoFactorSetupMonkeyTracking.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "monkey:close",
+          "slug": "close",
+          "emoji": "🙈",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/TwoFactorSetupMonkeyClose.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "monkey:peek",
+          "slug": "peek",
+          "emoji": "🫣",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/TwoFactorSetupMonkeyPeek.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "monkey:close_peek",
+          "slug": "close_peek",
+          "emoji": "😏",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/TwoFactorSetupMonkeyCloseAndPeek.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "monkey:back",
+          "slug": "back",
+          "emoji": "🙂",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/TwoFactorSetupMonkeyCloseAndPeekToIdle.json",
+          "w": 512,
+          "h": 512
+        }
+      ]
+    },
+    {
+      "id": "holiday",
+      "type": "stickers",
+      "title": "Праздник",
+      "source": "Telegram Web K",
+      "items": [
+        {
+          "id": "holiday:cake",
+          "slug": "cake",
+          "emoji": "🍰",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Cake.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:congratulations",
+          "slug": "congratulations",
+          "emoji": "🎉",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Congratulations.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:gift",
+          "slug": "gift",
+          "emoji": "🎁",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Gift3.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:gift_bow",
+          "slug": "gift_bow",
+          "emoji": "🎀",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Gift6.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:gift_big",
+          "slug": "gift_big",
+          "emoji": "🎊",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Gift12.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:diamond",
+          "slug": "diamond",
+          "emoji": "💎",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Diamond.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:love_letter",
+          "slug": "love_letter",
+          "emoji": "💌",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/LoveLetter.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:mailbox",
+          "slug": "mailbox",
+          "emoji": "📬",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Mailbox.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:jolly_roger",
+          "slug": "jolly_roger",
+          "emoji": "🏴‍☠️",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/jolly_roger.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:key",
+          "slug": "key",
+          "emoji": "🔑",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/key.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:stop",
+          "slug": "stop",
+          "emoji": "✋",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/hand_stop.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:stats",
+          "slug": "stats",
+          "emoji": "📊",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/StatsEmoji.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:empty_folder",
+          "slug": "empty_folder",
+          "emoji": "📂",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/EmptyFolder.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:folder",
+          "slug": "folder",
+          "emoji": "📁",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Folders_1.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:folders",
+          "slug": "folders",
+          "emoji": "🗂",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Folders_2.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:cloud",
+          "slug": "cloud",
+          "emoji": "☁️",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Folders_Shared.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:automation",
+          "slug": "automation",
+          "emoji": "🤖",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/ChatAutomation.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "holiday:dino",
+          "slug": "dino",
+          "emoji": "🦖",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Cubigator2.json",
+          "w": 512,
+          "h": 512
+        }
+      ]
+    },
+    {
+      "id": "tgweb",
+      "type": "emoji",
+      "title": "Telegram Web",
+      "source": "Telegram Web K",
+      "items": [
+        {
+          "id": "tgweb:star_gold",
+          "slug": "star_gold",
+          "emoji": "⭐",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/StarReaction.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:star_shine",
+          "slug": "star_shine",
+          "emoji": "🌟",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/StarReactionSelect.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:sparkles",
+          "slug": "sparkles",
+          "emoji": "✨",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/StarReactionAppear.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:diamond",
+          "slug": "diamond",
+          "emoji": "💎",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Diamond.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:key",
+          "slug": "key",
+          "emoji": "🔑",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/key.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:stop",
+          "slug": "stop",
+          "emoji": "✋",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/hand_stop.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:letter",
+          "slug": "letter",
+          "emoji": "💌",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/LoveLetter.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:mailbox",
+          "slug": "mailbox",
+          "emoji": "📬",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Mailbox.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:cake",
+          "slug": "cake",
+          "emoji": "🍰",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Cake.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:gift",
+          "slug": "gift",
+          "emoji": "🎁",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Gift3.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:party",
+          "slug": "party",
+          "emoji": "🎉",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Congratulations.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:pirate",
+          "slug": "pirate",
+          "emoji": "🏴‍☠️",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/jolly_roger.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:dino",
+          "slug": "dino",
+          "emoji": "🦖",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Cubigator2.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:chart",
+          "slug": "chart",
+          "emoji": "📊",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/StatsEmoji.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:folder",
+          "slug": "folder",
+          "emoji": "📁",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/Folders_1.json",
+          "w": 512,
+          "h": 512
+        },
+        {
+          "id": "tgweb:duck",
+          "slug": "duck",
+          "emoji": "🐥",
+          "format": "lottie",
+          "path": "/assets/stickers/tgs/UtyanSearch.json",
+          "w": 512,
+          "h": 512
+        }
+      ]
+    }
+  ]
+}

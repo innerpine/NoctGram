@@ -1,5 +1,5 @@
 'use client';
-/* eslint-disable react/react-compiler */
+/* eslint-disable react/react-compiler, next/no-img-element */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw, ExternalLink, ShieldCheck } from 'lucide-react';
 import { request } from '@/lib/client';
@@ -8,7 +8,7 @@ import { ContentDecisionForm } from './content-decision-form';
 type Status = 'new' | 'reviewing' | 'closed';
 type Report = {
   id: string;
-  targetType: 'post' | 'comment' | 'message' | 'story';
+  targetType: 'post' | 'comment' | 'message' | 'story' | 'sticker_pack';
   targetId: string;
   postId: string;
   authorId: string;
@@ -23,7 +23,17 @@ type Report = {
   reviewNote: string;
   created: number;
   available: number;
+  snapshot?: string;
 };
+// A reported sticker pack keeps its link name and files in the snapshot.
+function packName(report: Report) {
+  try {
+    const value = JSON.parse(report.snapshot || '{}') as { shortName?: unknown };
+    return typeof value.shortName === 'string' ? value.shortName : '';
+  } catch {
+    return '';
+  }
+}
 type Removal = {
   id: string;
   targetType: string;
@@ -44,6 +54,34 @@ const states = {
   reviewing: 'Рассматривается',
   closed: 'Закрыта',
 };
+// Pictures of a reported pack; animated stickers are marked, not played.
+function PackThumbs({ report }: { report: Report }) {
+  let media: { id: string; format: string }[] = [];
+  try {
+    const value = JSON.parse(report.snapshot || '{}') as {
+      media?: { id: string; format: string }[];
+    };
+    media = Array.isArray(value.media) ? value.media.slice(0, 12) : [];
+  } catch {
+    media = [];
+  }
+  return (
+    <div className="moderation-sticker-thumbs">
+      {media.map((item) =>
+        item.format === 'tgs' ? (
+          <span key={item.id}>TGS</span>
+        ) : (
+          <img
+            key={item.id}
+            src={'/api/media/' + encodeURIComponent(item.id)}
+            alt=""
+            loading="lazy"
+          />
+        ),
+      )}
+    </div>
+  );
+}
 const accountLabel = (handle: string | null) =>
   handle ? '@' + handle : 'Удалённый аккаунт';
 export function ModerationReports({
@@ -168,8 +206,10 @@ export function ModerationReports({
               {accountLabel(r.handle)} ·{' '}
               {r.targetType === 'story'
                 ? 'История'
-                : r.targetType === 'message'
-                  ? 'Личное сообщение'
+                : r.targetType === 'sticker_pack'
+                  ? 'Набор стикеров'
+                  : r.targetType === 'message'
+                    ? 'Личное сообщение'
                   : r.targetType === 'comment'
                     ? 'Комментарий'
                     : r.kind === 'channel'
@@ -183,6 +223,9 @@ export function ModerationReports({
           <p className="moderation-evidence">
             {r.text || 'Публикация с медиа или кодом'}
           </p>
+          {r.targetType === 'sticker_pack' && !!r.available && (
+            <PackThumbs report={r} />
+          )}
           <p className="meta">Жалоба: {r.reason}</p>
           <small>
             {r.reporterHandle
@@ -206,8 +249,22 @@ export function ModerationReports({
               Найти автора
             </button>
             {!!r.available &&
+              r.targetType === 'sticker_pack' &&
+              !!packName(r) && (
+                <a
+                  className="secondary"
+                  href={'/?stickers=' + encodeURIComponent(packName(r))}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink size={14} />
+                  Открыть набор
+                </a>
+              )}
+            {!!r.available &&
               r.targetType !== 'message' &&
-              r.targetType !== 'story' && (
+              r.targetType !== 'story' &&
+              r.targetType !== 'sticker_pack' && (
                 <a
                   className="secondary"
                   href={'/?post=' + encodeURIComponent(r.postId)}
@@ -229,7 +286,9 @@ export function ModerationReports({
                   ? 'пост'
                   : r.targetType === 'story'
                     ? 'историю'
-                    : 'комментарий'}
+                    : r.targetType === 'sticker_pack'
+                      ? 'набор'
+                      : 'комментарий'}
               </button>
             )}
           </div>
@@ -374,7 +433,9 @@ export function RemovalHistory() {
                 ? 'Пост'
                 : r.targetType === 'story'
                   ? 'История'
-                  : 'Комментарий'}{' '}
+                  : r.targetType === 'sticker_pack'
+                    ? 'Набор стикеров'
+                    : 'Комментарий'}{' '}
               · {accountLabel(r.handle)} ·{' '}
               {r.targetType === 'story' ? 'удалена' : 'удалён'}
             </span>
