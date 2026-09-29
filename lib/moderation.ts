@@ -66,6 +66,30 @@ export async function moderationGet(
         'id',
       ],
       [
+        'stickerPacks',
+        'SELECT id,type,shortName,title,stickerCount,created,updated,removedAt FROM sticker_packs WHERE ownerId=? AND deletedAt=0 AND id>? ORDER BY id LIMIT 100',
+        [me],
+        'id',
+      ],
+      [
+        'stickers',
+        'SELECT st.id,st.packId,st.position,st.emoji,st.format,st.uploadId,st.width,st.height,st.created FROM stickers st JOIN sticker_packs sp ON sp.id=st.packId WHERE sp.ownerId=? AND sp.deletedAt=0 AND st.id>? ORDER BY st.id LIMIT 100',
+        [me],
+        'id',
+      ],
+      [
+        'installedStickerPacks',
+        'SELECT packRef,position,installedAt FROM user_sticker_packs WHERE userId=? AND packRef>? ORDER BY packRef LIMIT 100',
+        [me],
+        'packRef',
+      ],
+      [
+        'favoriteStickers',
+        'SELECT stickerRef,created FROM faved_stickers WHERE userId=? AND stickerRef>? ORDER BY stickerRef LIMIT 100',
+        [me],
+        'stickerRef',
+      ],
+      [
         'uploads',
         'SELECT id,type,name,created FROM uploads WHERE userId=? AND id>? ORDER BY id LIMIT 100',
         [me],

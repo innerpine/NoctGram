@@ -11,6 +11,7 @@ import {
   messageLayout,
   replyQuote,
   sharedPost,
+  stickerContent,
 } from './message-body';
 import type { OutgoingMessage } from '@/lib/chat-outbox';
 import { Avatar } from './profile-identity';
@@ -82,7 +83,7 @@ export const ChatMessage = memo(function ChatMessage({
     onAction,
     unconfirmed: !!delivery,
   };
-  const { emojiCount, visualMedia, mediaOnly, round, voice } =
+  const { emojiCount, visualMedia, mediaOnly, round, voice, sticker } =
     messageLayout(message);
   const metadata = (
     <span className="message-time">
@@ -161,7 +162,8 @@ export const ChatMessage = memo(function ChatMessage({
             (visualMedia ? ' chat-media-message' : '') +
             (mediaOnly ? ' chat-media-only' : '') +
             (round ? ' chat-round-message' : '') +
-            (voice ? ' chat-voice-message' : '')
+            (voice ? ' chat-voice-message' : '') +
+            (sticker ? ' chat-sticker-message' : '')
           }
           data-emoji-count={emojiCount || undefined}
           data-delivery={delivery?.status}
@@ -181,6 +183,7 @@ export const ChatMessage = memo(function ChatMessage({
             />
           )}
           {sharedPost(message.postShare, me?.id)}
+          {stickerContent(message.sticker)}
           {!!message.text.trim() && (
             <p className="chat-message-text">
               <ChatEmojiText text={message.text} large={!!emojiCount} />

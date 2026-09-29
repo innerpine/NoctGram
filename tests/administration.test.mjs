@@ -211,6 +211,7 @@ function fixture(t) {
     'lib/premium-access.ts',
     'lib/premium-predicate.ts',
     'lib/premium-emoji.ts',
+    'lib/premium-emoji-catalog.ts',
     'lib/premium-emoji-access.ts',
     'lib/boost-access.ts',
     'lib/boost-rules.ts',

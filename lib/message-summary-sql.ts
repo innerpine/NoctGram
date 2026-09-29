@@ -16,5 +16,5 @@ export function messageSummarySql(
     ? `substr(${column('text')},1,${Math.trunc(textLimit)})`
     : column('text');
   return `CASE WHEN ${column('text')}<>'' THEN ${text} WHEN json_array_length(${column('media')})>0 THEN ${mediaLabelSql(column('media'), filePrefix)}
-    WHEN ${column('postShareId')} IS NOT NULL THEN 'Публикация' ELSE '${empty.replace(/'/g, "''")}' END`;
+    WHEN ${column('stickerId')} IS NOT NULL THEN 'Стикер' WHEN ${column('postShareId')} IS NOT NULL THEN 'Публикация' ELSE '${empty.replace(/'/g, "''")}' END`;
 }

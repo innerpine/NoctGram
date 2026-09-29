@@ -543,6 +543,7 @@ export function ChatConversation({
       />
       <ChatComposer
         premium={!!me.premium}
+        meId={me.id}
         peerId={peer.id}
         replyFocus={replyFocus}
         text={text}

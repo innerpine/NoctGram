@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { ProfileLink } from './profile-link';
 import { ChatEmojiText } from './chat-emoji-text';
 import { SharedPostCard } from './shared-post-card';
+import { StickerMessage } from './sticker-view';
 import { largeEmojiCount } from '@/lib/chat-emoji';
 import type { ChatAttachment } from '@/lib/chat-files';
 
@@ -22,9 +23,12 @@ type LayoutInput = {
   reply?: MessageReplyPreview;
   forwardedName?: string;
   postShare?: { id: string };
+  sticker?: string;
 };
 export function messageLayout(message: LayoutInput) {
+  const sticker = !!message.sticker;
   const emojiCount =
+    !sticker &&
     !message.attachments?.length &&
     !message.reply &&
     !message.forwardedName &&
@@ -45,7 +49,11 @@ export function messageLayout(message: LayoutInput) {
     !message.text.trim() &&
     !message.reply &&
     !message.forwardedName;
-  return { emojiCount, visualMedia, mediaOnly, round, voice };
+  return { emojiCount, visualMedia, mediaOnly, round, voice, sticker };
+}
+export function stickerContent(ref: string | undefined): ReactNode {
+  if (!ref) return null;
+  return <StickerMessage stickerRef={ref} />;
 }
 export function forwardedHeader(
   name: string | undefined,

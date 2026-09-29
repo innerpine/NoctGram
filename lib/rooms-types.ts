@@ -31,6 +31,8 @@ export type RoomMessage = {
   forwardedName?: string;
   forwardedFrom?: string | null;
   postShare?: { id: string };
+  // A sticker message: 'b:<pack>:<slug>' or 'u:<sticker id>'.
+  sticker?: string;
   // Forum topic id; absent for «Общее».
   topicId?: string;
   // The thread this reply belongs to, and how many replies a message has.

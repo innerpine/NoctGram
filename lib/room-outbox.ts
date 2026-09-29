@@ -24,6 +24,7 @@ export type RoomSendBody = {
   quote?: string;
   // Forum topic of the message: 'general' or a topic id.
   topic?: string;
+  sticker?: string;
 };
 type Send = (body: RoomSendBody) => Promise<{ id: string } | QueuedSubmission>;
 type Author = { id: string; name: string; avatar: string };
@@ -57,6 +58,7 @@ export function createRoomOutbox(send: Send) {
         replyTo: message.replyTo,
         ...(message.reply?.quote ? { quote: message.reply.quote } : {}),
         ...(entry.topic ? { topic: entry.topic } : {}),
+        ...(message.sticker ? { sticker: message.sticker } : {}),
       });
       if ('queued' in result)
         update(message.id, {
@@ -138,6 +140,7 @@ export function createRoomOutbox(send: Send) {
             deletedAt: 0,
             attachments: draft.attachments?.map((file) => ({ ...file })) ?? [],
             reply: reply ? { ...reply } : undefined,
+            ...(draft.sticker ? { sticker: draft.sticker } : {}),
             ...(context.topic && context.topic !== 'general'
               ? { topicId: context.topic }
               : {}),

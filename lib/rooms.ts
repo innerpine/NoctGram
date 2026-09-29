@@ -9,6 +9,7 @@ import {
 import { parseReactions } from './message-reactions';
 import { messageSummarySql } from './message-summary-sql';
 import { replyQuoteValue } from './reply-quote';
+import { stickerForMessage } from './sticker-send';
 import { normalizeSearch } from './search-text';
 import {
   CHAT_ATTACHMENT_LIMIT,
@@ -159,6 +160,8 @@ export type RoomMessageInput = {
   // Forum topic ('' is «Общее»); a reply joins its parent's thread.
   topicId?: string;
   attachments: string[];
+  // A sticker message, checked by lib/sticker-send.ts.
+  stickerId?: string | null;
   now: number;
 };
 // The single write path for new room messages: sending, moderator approval and
@@ -172,8 +175,8 @@ export function roomMessageStatements(
   const ids = JSON.stringify(message.attachments);
   return [
     db()
-      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,searchText,ciphertext,replyTo,replyQuote,media,created,topicId,threadRootId)
-      SELECT ?,r.id,u.id,?,?,?,?,?,
+      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,searchText,ciphertext,replyTo,replyQuote,stickerId,media,created,topicId,threadRootId)
+      SELECT ?,r.id,u.id,?,?,?,?,?,?,
         (SELECT json_group_array(json(${attachmentJsonSql('up', 'cu')}))
           FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_room_uploads cu ON cu.uploadId=up.id),
         MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0)),
@@ -195,6 +198,7 @@ export function roomMessageStatements(
         message.ciphertext,
         message.replyTo,
         message.quote ?? '',
+        message.stickerId ?? null,
         ids,
         message.now,
         message.topicId ?? '',
@@ -363,6 +367,7 @@ type MessageRow = RoomMessage & {
   forwardedFrom: string | null;
   replyQuote: string;
   postShareId: string | null;
+  stickerId: string | null;
   topicId: string;
   threadRootId: string | null;
   replyCount: number;
@@ -377,6 +382,7 @@ const messageSelect = (where: string) => `SELECT msg.id,msg.roomId,msg.sender,u.
     CASE WHEN msg.deletedAt=0 THEN msg.forwardedName ELSE '' END AS forwardedName,msg.forwardedFrom,
     CASE WHEN msg.deletedAt=0 THEN msg.replyQuote ELSE '' END AS replyQuote,
     CASE WHEN msg.deletedAt=0 THEN msg.postShareId END AS postShareId,
+    CASE WHEN msg.deletedAt=0 THEN msg.stickerId END AS stickerId,
     msg.topicId,msg.threadRootId,
     CASE WHEN r.kind='group' THEN (SELECT COUNT(*) FROM chat_room_messages tm WHERE tm.roomId=msg.roomId AND tm.threadRootId=msg.id AND tm.deletedAt=0 AND ${groupSenderVisible('tm')}) ELSE 0 END AS replyCount,
     rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
@@ -395,6 +401,7 @@ function messageView(kind: RoomKind) {
     forwardedFrom,
     replyQuote,
     postShareId,
+    stickerId,
     topicId,
     threadRootId,
     replyCount,
@@ -408,6 +415,7 @@ function messageView(kind: RoomKind) {
     attachments: JSON.parse(media) as ChatAttachment[],
     ...(forwardedName ? { forwardedName, forwardedFrom } : {}),
     ...(postShareId ? { postShare: { id: postShareId } } : {}),
+    ...(stickerId ? { sticker: stickerId } : {}),
     ...(topicId ? { topicId } : {}),
     ...(threadRootId ? { threadRootId } : {}),
     ...(replyCount ? { replies: replyCount } : {}),
@@ -860,6 +868,7 @@ export async function changeRoom(
       replyTo: string | null = null,
       quote = '',
       topicId = '',
+      sticker: string | null = null,
       attachments: string[] = [];
     if (row.kind === 'secret') {
       if (
@@ -868,7 +877,8 @@ export async function changeRoom(
         'attachments' in body ||
         'replyTo' in body ||
         'quote' in body ||
-        'topic' in body
+        'topic' in body ||
+        'sticker' in body
       )
         throw new ApiError(
           400,
@@ -892,7 +902,10 @@ export async function changeRoom(
       if ('ciphertext' in body || 'media' in body)
         throw new ApiError(400, 'Некорректное сообщение группы');
       attachments = attachmentIds(body.attachments);
-      text = string(body.text ?? '', 4000, !attachments.length);
+      sticker = await stickerForMessage(body.sticker);
+      text = string(body.text ?? '', 4000, !attachments.length && !sticker);
+      if (sticker && (text || attachments.length))
+        throw new ApiError(400, 'Стикер отправляется отдельным сообщением');
       await assertPremiumEmoji(me, text);
       if (
         (attachments.length > 1 || text) &&
@@ -958,6 +971,7 @@ export async function changeRoom(
           replyTo,
           ...(quote ? { quote } : {}),
           ...(topicId ? { topic: topicId } : {}),
+          ...(sticker ? { sticker } : {}),
           ...(attachments.length
             ? { media: JSON.stringify(attachments.map((file) => ({ id: file }))) }
             : {}),
@@ -977,6 +991,7 @@ export async function changeRoom(
         quote,
         topicId,
         attachments,
+        stickerId: sticker,
         now,
       }),
     );
@@ -987,7 +1002,12 @@ export async function changeRoom(
         )
         .bind(key, me)
         .first<
-          RoomMessage & { media: string; replyQuote: string; topicId: string }
+          RoomMessage & {
+            media: string;
+            replyQuote: string;
+            topicId: string;
+            stickerId: string | null;
+          }
         >();
       if (
         !saved ||
@@ -997,6 +1017,7 @@ export async function changeRoom(
         saved.replyTo !== replyTo ||
         saved.replyQuote !== quote ||
         saved.topicId !== topicId ||
+        saved.stickerId !== sticker ||
         !sameIds(saved.media, attachments) ||
         saved.deletedAt
       )

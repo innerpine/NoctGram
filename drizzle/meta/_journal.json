@@ -372,6 +372,13 @@
       "when": 1790662268979,
       "tag": "0054_search_folders",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1790664274637,
+      "tag": "0055_stickers",
+      "breakpoints": true
     }
   ]
 }

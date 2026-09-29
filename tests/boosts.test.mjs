@@ -129,6 +129,7 @@ function fixture(t) {
     'lib/presence-privacy.ts',
     'lib/premium-predicate.ts',
     'lib/premium-emoji.ts',
+    'lib/premium-emoji-catalog.ts',
     'lib/premium-emoji-access.ts',
     'lib/account-access.ts',
     'lib/channel-access.ts',

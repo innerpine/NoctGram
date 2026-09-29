@@ -196,7 +196,7 @@ export function createAppHistory(
     const href = new URL(appRouteHref(route), host.location.origin);
     if (keepExtras) {
       const current = new URL(host.location.href);
-      for (const key of ['post', 'provider', 'result']) {
+      for (const key of ['post', 'provider', 'result', 'stickers']) {
         const value = current.searchParams.get(key);
         if (value) href.searchParams.set(key, value);
       }

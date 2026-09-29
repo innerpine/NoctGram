@@ -113,6 +113,7 @@ import { SendGiftButton, ProfileGifts } from './gifts';
 import { ChatThemeMenu } from './chat-theme-menu';
 import { ChatConversation } from './chat-conversation';
 import { ChatForwardDialog } from './forward-dialog';
+import { StickerPackHost } from './sticker-pack-dialog';
 import { SAVED_MESSAGES, SavedMessagesAvatar } from './saved-messages';
 import { forwardNotice } from '@/lib/forward-client';
 import { APP_NOTICE_EVENT } from '@/lib/app-notice';
@@ -3360,6 +3361,7 @@ export default function Noctgram({
           </div>
         </aside>
       )}
+      <StickerPackHost meId={me?.id} />
       {sharedPost && me && (
         <ChatForwardDialog
           key={'share:' + me.id + ':' + sharedPost.id}

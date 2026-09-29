@@ -7,6 +7,7 @@
   overflow: hidden;
 }
 .premium-emoji > img,
+.premium-emoji > video,
 .premium-emoji-animation {
   position: absolute;
   inset: 0;
@@ -21,6 +22,8 @@
 }
 .emoji-picker {
   width: 260px;
+  max-height: min(460px, 70dvh);
+  overflow-y: auto;
   padding: 16px;
   background: var(--popover);
   border: 1px solid var(--border);
@@ -53,14 +56,15 @@
 }
 .emoji-pack > div {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   margin-top: 6px;
 }
 .emoji-pack button {
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 48px;
+  width: 48px;
+  height: 44px;
   border-radius: 12px;
   transition:
     background 0.18s,

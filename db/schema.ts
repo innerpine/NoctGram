@@ -243,6 +243,8 @@ export const messages = sqliteTable(
     postShareId: text(),
     // Lower-cased text for search (D1 folds only ASCII); NULL until indexed.
     searchText: text(),
+    // A sticker: 'b:<pack>:<slug>' (built-in) or 'u:<sticker id>'.
+    stickerId: text(),
   },
   (t) => [
     index('messages_recipient').on(t.recipient, t.created),
@@ -1379,6 +1381,7 @@ export const chatRoomMessages = sqliteTable(
     threadRootId: text(),
     // Lower-cased text for search; NULL until indexed, '' when encrypted.
     searchText: text(),
+    stickerId: text(),
   },
   (t) => [
     index('chat_room_messages_room').on(t.roomId, t.created, t.id),
@@ -1398,6 +1401,79 @@ export const chatRoomMessages = sqliteTable(
       sql`${t.ciphertext} IS NULL OR (${t.text} = '' AND ${t.replyTo} IS NULL)`,
     ),
   ],
+);
+// Sticker and custom emoji packs made by users; built-in packs live in
+// lib/sticker-catalog.json.
+export const stickerPacks = sqliteTable(
+  'sticker_packs',
+  {
+    id: text().primaryKey(),
+    ownerId: text()
+      .notNull()
+      .references(() => users.id),
+    type: text().notNull().default('stickers'),
+    shortName: text().notNull(),
+    title: text().notNull(),
+    stickerCount: integer().notNull().default(0),
+    created: integer().notNull(),
+    updated: integer().notNull(),
+    deletedAt: integer().notNull().default(0),
+    removedAt: integer().notNull().default(0),
+    removalId: text(),
+  },
+  (t) => [
+    uniqueIndex('sticker_packs_short_name').on(t.shortName),
+    index('sticker_packs_owner').on(t.ownerId, t.deletedAt),
+    check('sticker_packs_type', sql`${t.type} IN ('stickers','emoji')`),
+  ],
+);
+export const stickers = sqliteTable(
+  'stickers',
+  {
+    id: text().primaryKey(),
+    packId: text()
+      .notNull()
+      .references(() => stickerPacks.id, { onDelete: 'cascade' }),
+    position: integer().notNull().default(0),
+    emoji: text().notNull(),
+    format: text().notNull(),
+    uploadId: text()
+      .notNull()
+      .references(() => uploads.id),
+    width: integer().notNull(),
+    height: integer().notNull(),
+    created: integer().notNull(),
+    deletedAt: integer().notNull().default(0),
+  },
+  (t) => [
+    index('stickers_pack').on(t.packId, t.deletedAt, t.position),
+    uniqueIndex('stickers_upload').on(t.uploadId),
+    check('stickers_format', sql`${t.format} IN ('webp','png','tgs')`),
+  ],
+);
+// Packs a person added to their sticker panel: 'u:<pack id>'.
+export const userStickerPacks = sqliteTable(
+  'user_sticker_packs',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    packRef: text().notNull(),
+    position: integer().notNull().default(0),
+    installedAt: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.packRef] })],
+);
+export const favedStickers = sqliteTable(
+  'faved_stickers',
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    stickerRef: text().notNull(),
+    created: integer().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.stickerRef] })],
 );
 // Chat folders: tabs above the chat list, like Telegram's folders.
 export const chatFolders = sqliteTable(

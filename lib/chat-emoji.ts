@@ -1,4 +1,5 @@
 import names from './chat-emoji-data.json';
+import { emojiParts } from './premium-emoji';
 
 export function appleEmojiUrl(unified: string, large = false) {
   if (large)
@@ -28,12 +29,18 @@ export function chatEmojiParts(text: string) {
   }
   return parts;
 }
+// A message of only emoji is shown large: Unicode emoji and premium or
+// custom emoji tokens count alike.
 export function largeEmojiCount(text: string) {
-  const parts = chatEmojiParts(text);
-  const count = parts.filter((part) => part.unified).length;
-  return count > 0 &&
-    count <= 6 &&
-    parts.every((part) => part.unified || !part.text.trim())
-    ? count
-    : 0;
+  let count = 0;
+  for (const token of emojiParts(text)) {
+    if (token.emoji || token.custom) {
+      count++;
+      continue;
+    }
+    const parts = chatEmojiParts(token.text);
+    if (parts.some((part) => !part.unified && part.text.trim())) return 0;
+    count += parts.filter((part) => part.unified).length;
+  }
+  return count > 0 && count <= 6 ? count : 0;
 }

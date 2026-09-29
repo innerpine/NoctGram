@@ -37,6 +37,7 @@ type Row = {
   forwardedFrom: string | null;
   forwardSourceId: string | null;
   postShareId: string | null;
+  stickerId: string | null;
   searchText?: string;
 };
 type SourceRow = {
@@ -47,6 +48,7 @@ type SourceRow = {
   forwardedName: string;
   forwardedFrom: string | null;
   postShareId: string | null;
+  stickerId: string | null;
   originName: string;
 };
 type Gate = { sql: string; bindings: (string | number)[] };
@@ -147,6 +149,7 @@ async function readSource(me: string, source: ForwardSource) {
           forwardedFrom: null,
           forwardSourceId: null,
           postShareId: source.post.postId,
+          stickerId: null,
         },
       ],
       gate: {
@@ -160,7 +163,7 @@ async function readSource(me: string, source: ForwardSource) {
   const found =
     'dm' in source
       ? await db()
-          .prepare(`SELECT src.id,src.sender,src.text,src.media,src.forwardedName,src.forwardedFrom,src.postShareId,origin.name AS originName
+          .prepare(`SELECT src.id,src.sender,src.text,src.media,src.forwardedName,src.forwardedFrom,src.postShareId,src.stickerId,origin.name AS originName
           FROM json_each(?) j JOIN messages src ON src.id=j.value JOIN users origin ON origin.id=src.sender
           WHERE ${messagePair('src', '?', '?')} AND ${messageVisible('src', '?')} AND src.giftReceiptId IS NULL AND ${mediaUsable('src.media')}
           ORDER BY j.key`)
@@ -168,7 +171,7 @@ async function readSource(me: string, source: ForwardSource) {
           .all<SourceRow>()
       : await db()
           .prepare(`WITH input AS (SELECT ? AS actor)
-          SELECT src.id,src.sender,src.text,src.media,src.forwardedName,src.forwardedFrom,src.postShareId,origin.name AS originName
+          SELECT src.id,src.sender,src.text,src.media,src.forwardedName,src.forwardedFrom,src.postShareId,src.stickerId,origin.name AS originName
           FROM input i,json_each(?) j JOIN chat_room_messages src ON src.id=j.value JOIN users origin ON origin.id=src.sender
           WHERE src.roomId=? AND src.giveawayId IS NULL AND ${groupMessageReadable('src', 'i.actor')} AND ${mediaUsable('src.media')}
           ORDER BY j.key`)
@@ -192,6 +195,7 @@ async function readSource(me: string, source: ForwardSource) {
       forwardedFrom: shared ? null : forwarded ? row.forwardedFrom : row.sender,
       forwardSourceId: 'dm' in source ? row.id : null,
       postShareId: row.postShareId,
+      stickerId: row.stickerId,
     };
   });
   const gate: Gate =
@@ -222,9 +226,9 @@ function directStatements(
     idList = JSON.stringify(rows.map((row) => row.id));
   return [
     db()
-      .prepare(`INSERT INTO messages(id,text,searchText,media,sender,recipient,created,forwardedName,forwardedFrom,forwardSourceId,postShareId,read)
+      .prepare(`INSERT INTO messages(id,text,searchText,media,sender,recipient,created,forwardedName,forwardedFrom,forwardSourceId,postShareId,stickerId,read)
       SELECT ${copyColumns},s.id,r.id,?+CAST(j.key AS INTEGER),${column('forwardedName')},${column('forwardedFrom')},
-        ${column('forwardSourceId')},${column('postShareId')},CASE WHEN s.id=r.id THEN 1 ELSE 0 END
+        ${column('forwardSourceId')},${column('postShareId')},${column('stickerId')},CASE WHEN s.id=r.id THEN 1 ELSE 0 END
       FROM json_each(?) j,users s,users r
       WHERE s.id=? AND r.id=? AND s.kind='person' AND r.kind='person' AND r.id<>'noctgram'
       AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageWritable('s.id')} AND ${directMessageAllowed}
@@ -247,10 +251,10 @@ function roomStatement(
   now: number,
 ) {
   return db()
-    .prepare(`INSERT INTO chat_room_messages(id,text,searchText,media,roomId,sender,ciphertext,replyTo,created,forwardedName,forwardedFrom,postShareId)
+    .prepare(`INSERT INTO chat_room_messages(id,text,searchText,media,roomId,sender,ciphertext,replyTo,created,forwardedName,forwardedFrom,postShareId,stickerId)
     SELECT ${copyColumns},r.id,s.id,NULL,NULL,
       MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0))+CAST(j.key AS INTEGER),
-      ${column('forwardedName')},${column('forwardedFrom')},${column('postShareId')}
+      ${column('forwardedName')},${column('forwardedFrom')},${column('postShareId')},${column('stickerId')}
     FROM json_each(?) j,chat_rooms r,users s
     WHERE r.id=? AND s.id=? AND r.kind='group' AND ${canSend('r', 's.id')}
     AND ${noModeratedMedia} ${gate.sql}
@@ -335,6 +339,7 @@ export async function forwardToChats(
               forwardedFrom: null,
               forwardSourceId: null,
               postShareId: null,
+              stickerId: null,
             },
           ]
         : []),

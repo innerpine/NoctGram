@@ -149,6 +149,8 @@ export type Message = {
   };
   // A feed post shared into the chat; the card loads it for the viewer.
   postShare?: { id: string };
+  // A sticker message: 'b:<pack>:<slug>' or 'u:<sticker id>'.
+  sticker?: string;
   gift?: {
     id: string;
     giftId: string;

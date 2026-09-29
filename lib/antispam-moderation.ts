@@ -132,6 +132,7 @@ async function approve(review: StoredReview, me: string, note: string) {
         quote: p.quote || '',
         topicId: p.topic || '',
         attachments: media.map((file) => file.id),
+        stickerId: p.sticker || null,
         now,
       },
       queueGate,

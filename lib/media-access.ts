@@ -11,6 +11,24 @@ export async function assertMediaRead(
 ) {
   const d = db(),
     url = '/api/media/' + id;
+  // Stickers are public inside NoctGram while their pack is live.
+  const sticker = await d
+    .prepare(
+      'SELECT sp.removedAt,sp.ownerId FROM stickers st JOIN sticker_packs sp ON sp.id=st.packId WHERE st.uploadId=?',
+    )
+    .bind(id)
+    .first<{ removedAt: number; ownerId: string }>();
+  if (sticker) {
+    if (
+      !sticker.removedAt &&
+      (await d
+        .prepare(`SELECT 1 FROM users o WHERE o.id=? AND ${visibleAccount('o')}`)
+        .bind(sticker.ownerId)
+        .first())
+    )
+      return;
+    throw new ApiError(404, 'Стикер недоступен');
+  }
   // Chat files: the uploader may preview an unsent draft; afterwards access
   // follows any live copy of the message the viewer can read, in a DM or group.
   const chatFile = await d
@@ -68,7 +86,7 @@ export async function assertMediaRead(
 // content writes so revoking a channel editor cannot race an attachment check.
 export function mediaPermission(idExpr: string, actorExpr: string) {
   // Keep both D1 limits: shallow expressions and at most five compound SELECTs.
-  return `NOT EXISTS(SELECT 1 FROM chat_uploads cu WHERE cu.uploadId=${idExpr}) AND NOT EXISTS(SELECT 1 FROM chat_room_uploads cru WHERE cru.uploadId=${idExpr}) AND EXISTS(SELECT 1 FROM uploads live WHERE live.id=${idExpr} AND live.state='ready') AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=${idExpr}) AND (EXISTS(
+  return `NOT EXISTS(SELECT 1 FROM chat_uploads cu WHERE cu.uploadId=${idExpr}) AND NOT EXISTS(SELECT 1 FROM chat_room_uploads cru WHERE cru.uploadId=${idExpr}) AND NOT EXISTS(SELECT 1 FROM stickers sx WHERE sx.uploadId=${idExpr}) AND EXISTS(SELECT 1 FROM uploads live WHERE live.id=${idExpr} AND live.state='ready') AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=${idExpr}) AND (EXISTS(
  SELECT 1 FROM users pu WHERE (pu.avatar='/api/media/'||${idExpr} OR pu.cover='/api/media/'||${idExpr}) AND ${visibleAccount('pu')}
  UNION SELECT 1 FROM profile_appearance ma JOIN users pu ON pu.id=ma.userId WHERE ma.avatarMotion='/api/media/'||${idExpr} AND ${visibleAccount('pu')} AND ${animatedAvatarActive('pu')}
  UNION SELECT 1 FROM posts mp JOIN users pu ON pu.id=mp.userId WHERE ${published('mp')} AND ${visibleAccount('pu')} AND EXISTS(SELECT 1 FROM json_each(mp.media) mm WHERE json_extract(mm.value,'$.id')=${idExpr})

@@ -1,4 +1,5 @@
 import { assertPremiumEmoji } from '@/lib/premium-emoji-access';
+import { stickerForMessage } from '@/lib/sticker-send';
 import { archiveDirectChat } from '@/lib/chat-archive';
 import { visibleLastSeen } from '@/lib/presence-privacy';
 import { telegramGet, telegramPost } from '@/lib/telegram';
@@ -743,7 +744,7 @@ export async function POST(req: Request) {
           b.attachments ?? [],
           b.key,
           b.replyTo ?? null,
-          { quote: b.quote },
+          { quote: b.quote, sticker: await stickerForMessage(b.sticker) },
         ),
       );
     }

@@ -167,10 +167,10 @@ export async function forwardMessages(
     AND NOT EXISTS(SELECT 1 FROM json_each(src.media) a JOIN moderated_uploads mu ON mu.uploadId=json_extract(a.value,'$.id'))`;
   const results = await db().batch([
     db()
-      .prepare(`INSERT INTO messages(id,sender,recipient,text,searchText,media,created,forwardedName,forwardedFrom,forwardSourceId,read)
+      .prepare(`INSERT INTO messages(id,sender,recipient,text,searchText,media,created,forwardedName,forwardedFrom,forwardSourceId,read,stickerId)
       SELECT 'forward:'||s.id||':'||?||':'||j.key,s.id,r.id,src.text,src.searchText,src.media,?+CAST(j.key AS INTEGER),
         CASE WHEN src.forwardedName<>'' THEN src.forwardedName ELSE origin.name END,
-        CASE WHEN src.forwardedName<>'' THEN src.forwardedFrom ELSE src.sender END,src.id,CASE WHEN s.id=r.id THEN 1 ELSE 0 END
+        CASE WHEN src.forwardedName<>'' THEN src.forwardedFrom ELSE src.sender END,src.id,CASE WHEN s.id=r.id THEN 1 ELSE 0 END,src.stickerId
       FROM json_each(?) j JOIN messages src ON src.id=j.value JOIN users origin ON origin.id=src.sender,users s,users r
       WHERE s.id=? AND r.id=? AND s.kind='person' AND r.kind='person' AND ${visibleAccount('s')} AND ${visibleAccount('r')} AND ${messageWritable('s.id')} AND ${directMessageAllowed}
       AND (SELECT COUNT(*) FROM messages src,json_each(?) requested WHERE src.id=requested.value AND ${sourceAccess})=?

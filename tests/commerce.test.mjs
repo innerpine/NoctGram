@@ -89,7 +89,7 @@ void test(
             `${a}.deletedAt=0 AND NOT EXISTS(SELECT 1 FROM account_restrictions r WHERE r.userId=${a}.id AND r.mode='blocked')`,
         };
       assert.ok(
-        /^lib\/(payments|payment-provider|premium-predicate|premium-emoji-access|premium-emoji|chat-archive|chat-access|star-wallet|rate-limit|api-error)\.ts$/.test(
+        /^lib\/(payments|payment-provider|premium-predicate|premium-emoji-access|premium-emoji-catalog|premium-emoji|chat-archive|chat-access|star-wallet|rate-limit|api-error)\.ts$/.test(
           file,
         ),
         'Unexpected dependency ' + file,

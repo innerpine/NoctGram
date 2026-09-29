@@ -1,0 +1,217 @@
+{
+  "source": "https://github.com/morethanwords/tweb",
+  "revision": "8125029807ad94a6c35492229113d4386c3a8f52",
+  "license": "Files from the public/assets/tgs folder of the Telegram Web K repository (GPL-3.0). The artwork belongs to Telegram. Only these animation files are copied; no tweb code is used.",
+  "files": [
+    {
+      "file": "tgs/Cake.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/Cake.json",
+      "sha256": "8717316d3ecd0e57adedc7a38bd19fabd81deb834b6ec3c2fbd0e84dbddf7968",
+      "bytes": 316014
+    },
+    {
+      "file": "tgs/ChatAutomation.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/ChatAutomation.json",
+      "sha256": "a8599f64a9f858b53014b9c7dcf13bbbeb4d7c381655c2f2485391ffe04f951d",
+      "bytes": 206691
+    },
+    {
+      "file": "tgs/Congratulations.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/Congratulations.json",
+      "sha256": "de4ac9e38f2c7c3bc1e4022be841ec0c26b9b75cca51df43aaf9c0e97aaa1492",
+      "bytes": 130622
+    },
+    {
+      "file": "tgs/Cubigator2.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/Cubigator2.json",
+      "sha256": "60e3e0c1071c60380a82de2306f124f9301d9b1c37b2f022ee436deef1dbec8a",
+      "bytes": 150940
+    },
+    {
+      "file": "tgs/Diamond.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/Diamond.json",
+      "sha256": "9b7ded3bd70ec639eff765bf5f30ea72e2fb2caa38f2d67ef7eaaff213eba255",
+      "bytes": 349863
+    },
+    {
+      "file": "tgs/EmptyFolder.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/EmptyFolder.json",
+      "sha256": "e720ee937ed150c70087a447444fbc9fc66259dbd09d897052cc9aca61bb5f75",
+      "bytes": 71973
+    },
+    {
+      "file": "tgs/Folders_1.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/Folders_1.json",
+      "sha256": "724a4736ea8d90e95043fbed85f763094a91c59c7ac5d3956c80ad82f65e7df6",
+      "bytes": 125685
+    },
+    {
+      "file": "tgs/Folders_2.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/Folders_2.json",
+      "sha256": "cb8ebee5429df65b8fdb2042ed8bc3143a8196cca323f378ed3b7ce6b505488e",
+      "bytes": 78665
+    },
+    {
+      "file": "tgs/Folders_Shared.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/Folders_Shared.json",
+      "sha256": "22912b575ef3a3567e0d6f0417273ff677dba3b0ae2d42026641fd3049308bf4",
+      "bytes": 48338
+    },
+    {
+      "file": "tgs/Gift12.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/Gift12.json",
+      "sha256": "7c30b835bfd64becbf8dbcada53507cb829a8b9d38a0ab972da8d20bddfab569",
+      "bytes": 337714
+    },
+    {
+      "file": "tgs/Gift3.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/Gift3.json",
+      "sha256": "d13f3307990800b6a728c6e6dbf38faf129f02285e2432f0f2f48296e15c73d6",
+      "bytes": 337956
+    },
+    {
+      "file": "tgs/Gift6.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/Gift6.json",
+      "sha256": "843e15e44758094fa4b1cd20a624267fb1f412b1dcb98e844546253d670dc95f",
+      "bytes": 337607
+    },
+    {
+      "file": "tgs/hand_stop.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/hand_stop.json",
+      "sha256": "c13be72806d44e8901916cd70a7f354e8c687852b74d690050fa4cabeadea960",
+      "bytes": 149979
+    },
+    {
+      "file": "tgs/jolly_roger.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/jolly_roger.json",
+      "sha256": "7d67361762c86cac343e6b67567df9cd22266d45460fef5f696ed65707a6f3f6",
+      "bytes": 259636
+    },
+    {
+      "file": "tgs/key.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/key.json",
+      "sha256": "4666f56f1eba4aa95281838d415cceeffd5e221699a9235ef5f8732560c667d0",
+      "bytes": 249849
+    },
+    {
+      "file": "tgs/LoveLetter.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/LoveLetter.json",
+      "sha256": "127b532eb54b68b164a864a30ce55d65478fa23cfb96232a58ce5a788ded8aa3",
+      "bytes": 51626
+    },
+    {
+      "file": "tgs/Mailbox.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/Mailbox.json",
+      "sha256": "3f5984c6f830f7569b7a68aec8d47b1939336d6fbae491117fc92169afb495eb",
+      "bytes": 40194
+    },
+    {
+      "file": "tgs/StarReaction.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/StarReaction.json",
+      "sha256": "38044d8da2a927d48f45054296c35cedf14aa3ce3aa08bfc3d4af07b77408860",
+      "bytes": 35523
+    },
+    {
+      "file": "tgs/StarReactionAppear.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/StarReactionAppear.json",
+      "sha256": "aa2bc8169ddf91dc099df500456f5bec057abb36b4b50d03b1c49624c21ddac2",
+      "bytes": 45010
+    },
+    {
+      "file": "tgs/StarReactionSelect.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/StarReactionSelect.json",
+      "sha256": "b9a4d5851757807b65128192946a523d1ca2df10f017300cd16990dc7ae1b806",
+      "bytes": 43397
+    },
+    {
+      "file": "tgs/StatsEmoji.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/StatsEmoji.json",
+      "sha256": "d182f15308984f2ed425cd37f72bb5cb1b1bd7ac80169301abd7ee87786b4bf2",
+      "bytes": 169564
+    },
+    {
+      "file": "tgs/TwoFactorSetupMonkeyClose.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/TwoFactorSetupMonkeyClose.json",
+      "sha256": "c1dfc5b97ec127c5db93ce2006f71cf2e46bc14c4d25be3888db3f105a3b3bbe",
+      "bytes": 330128
+    },
+    {
+      "file": "tgs/TwoFactorSetupMonkeyCloseAndPeek.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/TwoFactorSetupMonkeyCloseAndPeek.json",
+      "sha256": "8fd0422af484643693aa651b952953f2ec37f93d71487cfa2ea8b6c5a4f199df",
+      "bytes": 228533
+    },
+    {
+      "file": "tgs/TwoFactorSetupMonkeyCloseAndPeekToIdle.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/TwoFactorSetupMonkeyCloseAndPeekToIdle.json",
+      "sha256": "9b4d52fe6e0eec01893a14a873479c0e26a2c9e52669e7cda6a375bbbdaaa205",
+      "bytes": 228354
+    },
+    {
+      "file": "tgs/TwoFactorSetupMonkeyIdle.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/TwoFactorSetupMonkeyIdle.json",
+      "sha256": "cafea184f44ab7c806bfea6881c5ed628c99141e83e84dd43331d06d6186950c",
+      "bytes": 72927
+    },
+    {
+      "file": "tgs/TwoFactorSetupMonkeyPeek.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/TwoFactorSetupMonkeyPeek.json",
+      "sha256": "ccaaf8850d446732a1944948e5c138e33f3ab5c80f6237502fa5834760059532",
+      "bytes": 160219
+    },
+    {
+      "file": "tgs/TwoFactorSetupMonkeyTracking.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/TwoFactorSetupMonkeyTracking.json",
+      "sha256": "1719036af0c57d6762a1b9f31e6ce076c751fe52cf5a3f0e29109627760f7b0c",
+      "bytes": 80487
+    },
+    {
+      "file": "tgs/UtyanBirthday.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/UtyanBirthday.json",
+      "sha256": "d55d34a7dd56eb7eb986d67145a3aea37a09ad7502dd0195f1c9cbd62ceed65d",
+      "bytes": 101250
+    },
+    {
+      "file": "tgs/UtyanDisappear.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/UtyanDisappear.json",
+      "sha256": "c735da6b9dfcedb64a8e086be24ed272374c2b1df5b4f25eb18365e0fdd06d61",
+      "bytes": 137190
+    },
+    {
+      "file": "tgs/UtyanDiscussion.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/UtyanDiscussion.json",
+      "sha256": "d011a13cdd4f49e7a47893db39dc96f2ee4b43ae8a1532122a50cbf3f01abf23",
+      "bytes": 150758
+    },
+    {
+      "file": "tgs/UtyanLinks.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/UtyanLinks.json",
+      "sha256": "2248760134dc77e5b6ae25777aef8bd7a280038275a2ae9705fa4719458d37ef",
+      "bytes": 620040
+    },
+    {
+      "file": "tgs/UtyanPasscode.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/UtyanPasscode.json",
+      "sha256": "e0107bc71a27e278c0413789166cb60a73426d8dcb40a7c06eed23bad7fb2671",
+      "bytes": 163046
+    },
+    {
+      "file": "tgs/UtyanRestricted.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/UtyanRestricted.json",
+      "sha256": "1bb636ee6900aa09df73d9f5972b028a401670736f91a1c453342d7aa8e28be0",
+      "bytes": 86124
+    },
+    {
+      "file": "tgs/UtyanSearch.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/UtyanSearch.json",
+      "sha256": "62541ecebad812ac98b0091901711011465d906e014d354454cdbfd50a74797d",
+      "bytes": 82897
+    },
+    {
+      "file": "tgs/UtyanStories.json",
+      "url": "https://raw.githubusercontent.com/morethanwords/tweb/8125029807ad94a6c35492229113d4386c3a8f52/public/assets/tgs/UtyanStories.json",
+      "sha256": "21373a60a78b6bc57cbc6b135d17354cf1dea2c498060ff1fb6bd06ac22bba16",
+      "bytes": 241546
+    }
+  ]
+}

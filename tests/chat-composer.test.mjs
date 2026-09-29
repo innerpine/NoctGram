@@ -48,7 +48,7 @@ const { outputFiles } = await build({
         build.onResolve(
           {
             filter:
-              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/popover|\.\/chat-emoji-picker|\.\/chat-text-editor|\.\/chat-emoji-text|\.\/chat-recorder)$/,
+              /^(react(?:\/jsx-runtime)?|lucide-react|@\/components\/ui\/popover|\.\/chat-emoji-panel|@\/lib\/sticker-client|\.\/chat-text-editor|\.\/chat-emoji-text|\.\/chat-recorder)$/,
           },
           ({ path }) => ({ path, namespace: 'fixture' }),
         );
@@ -66,8 +66,10 @@ const { outputFiles } = await build({
                       ? 'export const ChatEmojiText="ChatEmojiText";'
                       : path.includes('chat-recorder')
                         ? 'export const ChatRecorder="ChatRecorder";'
-                      : path.includes('chat-emoji-picker')
-                        ? 'export default "Picker";'
+                      : path.includes('chat-emoji-panel')
+                        ? 'export default "Panel";'
+                        : path.includes('sticker-client')
+                          ? 'export const rememberRecentSticker=(meId,ref)=>globalThis.__recentStickers?.push(ref);'
                         : 'export const File="File", LoaderCircle="LoaderCircle", Paperclip="Paperclip", RotateCcw="RotateCcw", Send="Send", Video="Video", X="X", Reply="Reply", Quote="Quote", Smile="Smile";',
         }));
       },
@@ -320,6 +322,23 @@ try {
   );
   assert.equal(calls.at(-1).reply.id, 'original');
   immediate.dispose();
+
+  // A sticker goes out at once as its own message; the typed draft stays.
+  const sticking = mount();
+  sticking.props.text = 'Черновик';
+  globalThis.__recentStickers = [];
+  const panel = sticking.find((n) => n.type === 'Lazy' && n.props.onSticker);
+  panel.props.onSticker({ ref: 'b:utya:birthday', available: true });
+  assert.equal(calls.at(-1).sticker, 'b:utya:birthday');
+  assert.equal(calls.at(-1).text, '');
+  assert.deepEqual(calls.at(-1).attachments, []);
+  assert.equal(sticking.props.text, 'Черновик');
+  assert.deepEqual(globalThis.__recentStickers, ['b:utya:birthday']);
+  const sent = calls.length;
+  panel.props.onSticker({ ref: 'u:gone', available: false });
+  assert.equal(calls.length, sent, 'An unavailable sticker is not sent');
+  sticking.dispose();
+  delete globalThis.__recentStickers;
   assert.deepEqual(revoked, previews, 'All preview object URLs are released');
   console.log(
     'Chat composer: upload queue, remove/retry, conversation switch, cleanup, double submit and instant draft handoff passed.',

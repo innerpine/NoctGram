@@ -12,21 +12,47 @@ import {
   emojiToken,
   hasPremiumEmoji,
   premiumEmoji,
+  premiumEmojiPacks,
   type PremiumEmoji as Emoji,
 } from '@/lib/premium-emoji';
 import { mountGiftAnimation } from '@/lib/gift-animation-runtime';
+import { posterFor } from '@/lib/sticker-catalog';
+import { CustomEmoji } from './sticker-view';
 
 export function PremiumEmoji({ emoji }: { emoji: Emoji }) {
   const host = useRef<HTMLSpanElement>(null),
     [ready, setReady] = useState(false);
+  const animated = !emoji.format || emoji.format === 'lottie';
   useEffect(() => {
-    if (!host.current) return;
+    if (!animated || !host.current) return;
     return mountGiftAnimation(host.current, 'emoji:' + emoji.id, setReady);
-  }, [emoji.id]);
+  }, [emoji.id, animated]);
+  // Emoji imported from Telegram may be a picture or a short video.
+  if (!animated && emoji.asset)
+    return (
+      <span className="premium-emoji" data-raw={emojiToken(emoji)}>
+        {emoji.format === 'webm' ? (
+          <video
+            src={emoji.asset}
+            aria-label={emoji.fallback}
+            muted
+            loop
+            autoPlay
+            playsInline
+          />
+        ) : (
+          <img src={emoji.asset} alt={emoji.fallback} loading="lazy" />
+        )}
+      </span>
+    );
   return (
     <span className="premium-emoji" data-raw={emojiToken(emoji)}>
       <img
-        src={'/assets/emoji/' + emoji.id + '.preview.webp'}
+        src={
+          emoji.asset
+            ? posterFor(emoji.asset)
+            : '/assets/emoji/' + emoji.id + '.preview.webp'
+        }
         alt={emoji.fallback}
         loading="lazy"
         style={{ opacity: ready ? 0 : 1 }}
@@ -41,6 +67,8 @@ export function EmojiText({ text }: { text: string }) {
       {emojiParts(text).map((p, i) =>
         p.emoji ? (
           <PremiumEmoji key={i} emoji={p.emoji} />
+        ) : p.custom ? (
+          <CustomEmoji key={i} id={p.custom} />
         ) : (
           <Fragment key={i}>{p.text}</Fragment>
         ),
@@ -103,9 +131,9 @@ export function EmojiPicker({
             Для отправки нужен Noct Premium
           </p>
         )}
-        {['RestrictedEmoji', 'CreepyEmoji', 'NewsEmoji'].map((pack) => (
+        {premiumEmojiPacks.map(({ id: pack, title }) => (
           <div className="emoji-pack" key={pack}>
-            <small>{pack}</small>
+            <small>{title}</small>
             <div>
               {premiumEmoji
                 .filter((e) => e.pack === pack)
@@ -113,7 +141,7 @@ export function EmojiPicker({
                   <button
                     key={emoji.id}
                     disabled={!premium}
-                    aria-label={emoji.fallback + ' · ' + pack}
+                    aria-label={emoji.fallback + ' · ' + title}
                     title={emoji.fallback}
                     onClick={() => {
                       if (onInsert) {

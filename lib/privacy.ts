@@ -67,10 +67,14 @@ export async function sendPrivateMessage(
   attachments: unknown = [],
   key: unknown = crypto.randomUUID(),
   replyTo: unknown = null,
-  options: { quote?: unknown } = {},
+  // The sticker is checked by the caller (lib/sticker-send.ts).
+  options: { quote?: unknown; sticker?: string | null } = {},
 ) {
   await assertPremiumEmoji(me, text);
   const quote = replyQuoteValue(options.quote, replyTo);
+  const sticker = options.sticker ?? null;
+  if (sticker && (text.trim() || (Array.isArray(attachments) && attachments.length)))
+    throw new ApiError(400, 'Стикер отправляется отдельным сообщением');
   if (
     replyTo !== null &&
     (typeof replyTo !== 'string' || !replyTo || replyTo.length > 250)
@@ -85,7 +89,7 @@ export async function sendPrivateMessage(
     new Set(attachments).size !== attachments.length
   )
     throw new ApiError(400, 'Можно прикрепить до 10 разных файлов');
-  if (!text.trim() && !attachments.length)
+  if (!text.trim() && !attachments.length && !sticker)
     throw new ApiError(400, 'Напиши сообщение или прикрепи файл');
   if (typeof key !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(key))
     throw new ApiError(400, 'Некорректный запрос отправки');
@@ -94,7 +98,7 @@ export async function sendPrivateMessage(
     ids = JSON.stringify(attachments);
   const existing = await db()
     .prepare(
-      'SELECT recipient,text,media,replyTo,replyQuote FROM messages WHERE id=? AND sender=?',
+      'SELECT recipient,text,media,replyTo,replyQuote,stickerId FROM messages WHERE id=? AND sender=?',
     )
     .bind(id, me)
     .first<{
@@ -103,12 +107,14 @@ export async function sendPrivateMessage(
       media: string;
       replyTo: string | null;
       replyQuote: string;
+      stickerId: string | null;
     }>();
   const same = (row: NonNullable<typeof existing>) =>
     row.recipient === recipient &&
     row.text === text &&
     row.replyTo === replyTo &&
     row.replyQuote === quote &&
+    row.stickerId === sticker &&
     JSON.stringify(
       (JSON.parse(row.media) as ChatAttachment[]).map((file) => file.id),
     ) === ids;
@@ -122,9 +128,9 @@ export async function sendPrivateMessage(
   }
   const results = await db().batch([
     db()
-      .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,replyTo,replyQuote,read,searchText)
+      .prepare(`INSERT INTO messages(id,sender,recipient,text,media,created,replyTo,replyQuote,read,searchText,stickerId)
     SELECT ?,s.id,r.id,?,(SELECT json_group_array(json(${attachmentJsonSql('up', 'cu')}))
-      FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_uploads cu ON cu.uploadId=up.id),?,?,?,CASE WHEN s.id=r.id THEN 1 ELSE 0 END,? FROM users s,users r
+      FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_uploads cu ON cu.uploadId=up.id),?,?,?,CASE WHEN s.id=r.id THEN 1 ELSE 0 END,?,? FROM users s,users r
     WHERE s.id=? AND r.id=? AND r.kind='person'
     AND ${visibleAccount('s')} AND ${visibleAccount('r')}
     AND NOT EXISTS(SELECT 1 FROM account_restrictions ar WHERE ar.userId=s.id AND (ar.expiresAt IS NULL OR ar.expiresAt>strftime('%s','now')*1000))
@@ -142,6 +148,7 @@ export async function sendPrivateMessage(
         replyTo,
         quote,
         normalizeSearch(text),
+        sticker,
         me,
         recipient,
         replyTo,
@@ -163,7 +170,7 @@ export async function sendPrivateMessage(
   if (!results[0].meta.changes) {
     const saved = await db()
       .prepare(
-        'SELECT recipient,text,media,replyTo,replyQuote FROM messages WHERE id=? AND sender=?',
+        'SELECT recipient,text,media,replyTo,replyQuote,stickerId FROM messages WHERE id=? AND sender=?',
       )
       .bind(id, me)
       .first<NonNullable<typeof existing>>();

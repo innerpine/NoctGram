@@ -1033,6 +1033,7 @@ export function RoomConversation({
           {room.kind === 'group' ? (
             <ChatComposer
               premium={!!me.premium}
+              meId={me.id}
               roomId={room.id}
               replyFocus={replyFocus}
               text={text}

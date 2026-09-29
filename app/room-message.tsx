@@ -30,6 +30,7 @@ import {
   messageLayout,
   replyQuote,
   sharedPost,
+  stickerContent,
 } from './message-body';
 import { locallyListened, markLocallyListened } from '@/lib/media-playback';
 import { selectionQuote } from '@/lib/message-selection';
@@ -102,13 +103,15 @@ export const RoomMessageRow = memo(function RoomMessageRow({
   const group = roomKind === 'group';
   const giveawayEvent = !!message.giveawayId && !deleted;
   const attachments = deleted ? [] : (message.attachments ?? []);
-  const { emojiCount, visualMedia, mediaOnly, round, voice } = messageLayout({
-    text: deleted ? '' : content,
-    attachments,
-    reply: message.reply,
-    forwardedName: message.forwardedName,
-    postShare: message.postShare,
-  });
+  const { emojiCount, visualMedia, mediaOnly, round, voice, sticker } =
+    messageLayout({
+      text: deleted ? '' : content,
+      attachments,
+      reply: message.reply,
+      forwardedName: message.forwardedName,
+      postShare: message.postShare,
+      sticker: deleted ? undefined : message.sticker,
+    });
   const stamp = (
     <span className="room-message-time">
       {time(message.created)}
@@ -156,7 +159,8 @@ export const RoomMessageRow = memo(function RoomMessageRow({
               (visualMedia ? ' room-media-message' : '') +
               (mediaOnly ? ' room-media-only' : '') +
               (round ? ' room-round-message' : '') +
-              (voice ? ' room-voice-message' : '')
+              (voice ? ' room-voice-message' : '') +
+              (sticker ? ' room-sticker-message' : '')
         }
         data-emoji-count={emojiCount || undefined}
       >
@@ -181,6 +185,7 @@ export const RoomMessageRow = memo(function RoomMessageRow({
           />
         )}
         {!deleted && sharedPost(message.postShare, meId)}
+        {!deleted && stickerContent(message.sticker)}
         {giveawayEvent ? (
           <GiveawayCard id={message.giveawayId!} viewerId={meId} />
         ) : (

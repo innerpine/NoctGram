@@ -1,5 +1,5 @@
 'use client';
-import { EmojiPicker, EmojiPreview } from './premium-emoji';
+import { EmojiPreview } from './premium-emoji';
 /* File transfers are scoped to this mounted conversation. */
 /* eslint-disable react/react-compiler, next/no-img-element */
 import {
@@ -42,8 +42,10 @@ import { ChatEmojiText } from './chat-emoji-text';
 import type { ChatDraft } from '@/lib/chat-outbox';
 import { ChatRecorder } from './chat-recorder';
 import type { RecordingResult } from '@/lib/media-recorder';
+import type { StickerInfo } from '@/lib/sticker-types';
+import { rememberRecentSticker } from '@/lib/sticker-client';
 
-const ChatEmojiPicker = lazy(() => import('./chat-emoji-picker'));
+const ChatEmojiPanel = lazy(() => import('./chat-emoji-panel'));
 
 type DraftFile = {
   id: string;
@@ -54,6 +56,7 @@ type DraftFile = {
 };
 export function ChatComposer({
   premium = false,
+  meId = '',
   peerId,
   roomId,
   text,
@@ -65,6 +68,8 @@ export function ChatComposer({
   onCancelReply,
 }: {
   premium?: boolean;
+  // The signed-in account: its stickers and recently sent stickers.
+  meId?: string;
   // Uploads are drafted for exactly one conversation: a person or a group.
   peerId?: string;
   roomId?: string;
@@ -255,6 +260,20 @@ export function ChatComposer({
     editor.current?.insertEmoji(emoji);
     setEmojiOpen(false);
   };
+  // A sticker is its own message; the typed draft stays as it is.
+  const sendSticker = (sticker: StickerInfo) => {
+    if (frozen || !sticker.available) return;
+    setError('');
+    rememberRecentSticker(meId, sticker.ref);
+    onSend({
+      text: '',
+      attachments: [],
+      sticker: sticker.ref,
+      reply: reply ?? undefined,
+    });
+    onCancelReply?.();
+    setEmojiOpen(false);
+  };
   useEffect(() => {
     if (reply?.id) editor.current?.focus();
   }, [reply?.id, replyFocus]);
@@ -412,14 +431,6 @@ export function ChatComposer({
         >
           <Paperclip size={21} />
         </button>
-        <EmojiPicker
-          premium={premium}
-          text={text}
-          onText={onText}
-          onPrepareOpen={() => editor.current?.rememberSelection()}
-          onInsert={(token) => editor.current?.insertEmoji(token)}
-          disabled={frozen}
-        />
         <div className="chat-editor-container">
           <ChatTextEditor
             ref={editor}
@@ -439,8 +450,8 @@ export function ChatComposer({
             type="button"
             className="chat-emoji-button"
             disabled={frozen}
-            title="Эмодзи"
-            aria-label="Выбрать эмодзи"
+            title="Эмодзи и стикеры"
+            aria-label="Выбрать эмодзи или стикер"
             onPointerDown={() => editor.current?.rememberSelection()}
           >
             <Smile size={23} />
@@ -456,7 +467,7 @@ export function ChatComposer({
               return false;
             }}
           >
-            <PopoverTitle className="sr-only">Эмодзи</PopoverTitle>
+            <PopoverTitle className="sr-only">Эмодзи и стикеры</PopoverTitle>
             <Suspense
               fallback={
                 <output className="chat-emoji-loading">
@@ -465,7 +476,13 @@ export function ChatComposer({
                 </output>
               }
             >
-              <ChatEmojiPicker onSelect={chooseEmoji} />
+              <ChatEmojiPanel
+                meId={meId}
+                premium={premium}
+                onEmoji={chooseEmoji}
+                onToken={chooseEmoji}
+                onSticker={sendSticker}
+              />
             </Suspense>
           </PopoverContent>
         </Popover>

@@ -3,7 +3,7 @@
 export const SEARCH_QUERY_LIMIT = 100;
 export function normalizeSearch(text: string) {
   return text
-    .replace(/:noct_[a-z0-9_]+:/g, ' ')
+    .replace(/:noct_[a-z0-9_]+:|:ce_[0-9a-f-]{36}:/g, ' ')
     .toLocaleLowerCase('ru')
     .replace(/ё/g, 'е')
     .replace(/\s+/g, ' ')

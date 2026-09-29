@@ -70,7 +70,7 @@ export async function readConversation(
     ) SELECT m.id,m.sender,m.recipient,m.text,m.media,m.created,m.read,m.editedAt,m.forwardedName,m.listenedAt,p.created AS pinnedAt,
       ${reactionSummarySql('message_reactions', 'm.id', '(SELECT me FROM scope)')} AS reactionData,
       COALESCE(m.forwardedFrom,(SELECT a.sender FROM attribution a WHERE a.copyId=m.id AND a.forwardSourceId IS NULL AND a.forwardedName='' LIMIT 1)) AS forwardedSender,
-      m.replyTo,m.replyQuote,m.postShareId,rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
+      m.replyTo,m.replyQuote,m.postShareId,m.stickerId,rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
       ${messageSummarySql('rp', { textLimit: 240 })} AS replyText,
       g.id AS receiptId,g.giftId AS giftType,g.message AS giftMessage,t.amount AS giftPrice,
       gc.family AS collectibleFamily,gc.number AS collectibleNumber,gc.attributes AS collectibleAttributes,
@@ -104,6 +104,7 @@ export async function readConversation(
         replyTo: string | null;
         replyQuote: string;
         postShareId: string | null;
+        stickerId: string | null;
         replyId: string | null;
         replySender: string | null;
         replyName: string | null;
@@ -128,6 +129,7 @@ export async function readConversation(
       replyTo,
       replyQuote,
       postShareId,
+      stickerId,
       replyId,
       replySender,
       replyName,
@@ -151,6 +153,7 @@ export async function readConversation(
           }
         : {}),
       ...(postShareId ? { postShare: { id: postShareId } } : {}),
+      ...(stickerId ? { sticker: stickerId } : {}),
       ...(receiptId && giftType && giftPrice !== null
         ? {
             gift: {
