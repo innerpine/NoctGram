@@ -298,8 +298,12 @@ export default function Noctgram({
     me?.restriction?.mode === 'blocked' ? '' : me?.id || '',
     page === 'messages',
   );
-  const openRoom = useCallback((id: string) => {
-    void appHistory.current?.navigate({ page: 'messages', roomId: id });
+  const openRoom = useCallback((id: string, topic?: string) => {
+    void appHistory.current?.navigate({
+      page: 'messages',
+      roomId: id,
+      ...(topic ? { topic } : {}),
+    });
   }, []);
   const resolveRoomLink = useCallback((id: string) => {
     void appHistory.current?.navigate(
@@ -1120,6 +1124,9 @@ export default function Noctgram({
               (destination.roomId || destination.group || destination.invite)
               ? {
                   ...(destination.roomId ? { roomId: destination.roomId } : {}),
+                  ...(destination.roomId && destination.topic
+                    ? { topic: destination.topic }
+                    : {}),
                   ...(destination.group ? { group: destination.group } : {}),
                   ...(destination.invite ? { invite: destination.invite } : {}),
                 }
@@ -2961,6 +2968,7 @@ export default function Noctgram({
                   disabled={readOnly || accountBlocked}
                   onOpen={resolveRoomLink}
                   onBack={backFromRoom}
+                  onOpenTopic={openRoom}
                   onProfile={(id) => void openProfile(id)}
                   onRoomsChanged={roomList.refresh}
                 />

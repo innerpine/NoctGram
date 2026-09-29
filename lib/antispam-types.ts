@@ -9,6 +9,8 @@ export type SpamPayload = {
   publishAt?: number;
   replyTo?: string | null;
   quote?: string;
+  // Forum topic id of a held group message ('' or absent for «Общее»).
+  topic?: string;
 };
 export type SpamSubmission = {
   kind: SpamKind;

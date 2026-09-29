@@ -1293,6 +1293,8 @@ export const chatRooms = sqliteTable(
     created: integer().notNull(),
     updatedAt: integer().notNull(),
     deletedAt: integer().notNull().default(0),
+    // Groups with topics: messages live in «Общее» or in a named topic.
+    forum: integer().notNull().default(0),
   },
   (t) => [
     uniqueIndex('chat_rooms_username').on(t.username),
@@ -1366,15 +1368,66 @@ export const chatRoomMessages = sqliteTable(
     forwardedFrom: text(),
     replyQuote: text().notNull().default(''),
     postShareId: text(),
+    // Forum topic of the message; '' is «Общее».
+    topicId: text().notNull().default(''),
+    // The first message of the reply thread this message belongs to.
+    threadRootId: text(),
   },
   (t) => [
     index('chat_room_messages_room').on(t.roomId, t.created, t.id),
+    index('chat_room_messages_topic').on(t.roomId, t.topicId, t.created, t.id),
+    index('chat_room_messages_thread').on(
+      t.roomId,
+      t.threadRootId,
+      t.created,
+      t.id,
+    ),
     uniqueIndex('chat_room_messages_giveaway').on(t.giveawayId),
     check(
       'chat_room_message_payload',
       sql`${t.ciphertext} IS NULL OR (${t.text} = '' AND ${t.replyTo} IS NULL)`,
     ),
   ],
+);
+export const chatRoomTopics = sqliteTable(
+  'chat_room_topics',
+  {
+    id: text().primaryKey(),
+    roomId: text()
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    title: text().notNull(),
+    // One of the six Telegram topic colours (0-5).
+    color: integer().notNull().default(0),
+    emoji: text().notNull().default(''),
+    createdBy: text()
+      .notNull()
+      .references(() => users.id),
+    created: integer().notNull(),
+    updatedAt: integer().notNull(),
+    closedAt: integer().notNull().default(0),
+    deletedAt: integer().notNull().default(0),
+  },
+  (t) => [
+    index('chat_room_topics_room').on(t.roomId, t.deletedAt, t.updatedAt),
+    check('chat_room_topics_color', sql`${t.color} BETWEEN 0 AND 5`),
+  ],
+);
+// Per-topic read position of a member ('' is «Общее»).
+export const chatRoomTopicReads = sqliteTable(
+  'chat_room_topic_reads',
+  {
+    roomId: text()
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    topicId: text().notNull(),
+    userId: text()
+      .notNull()
+      .references(() => users.id),
+    lastReadAt: integer().notNull().default(0),
+    lastReadId: text().notNull().default(''),
+  },
+  (t) => [primaryKey({ columns: [t.roomId, t.topicId, t.userId] })],
 );
 // Group attachments are drafted for one room, then bound to their first message.
 export const chatRoomUploads = sqliteTable(

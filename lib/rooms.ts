@@ -31,12 +31,25 @@ import {
 } from './room-access';
 import type {
   RoomDetail,
+  RoomKind,
   RoomMember,
   RoomMessage,
   RoomPreview,
   RoomRole,
   RoomSummary,
 } from './rooms-types';
+import {
+  closeTopic,
+  createTopic,
+  deleteTopic,
+  forumUnreadSql,
+  markTopicRead,
+  readTopics,
+  setForum,
+  topicKey,
+  topicName,
+  updateTopic,
+} from './room-topics';
 
 const PAGE_SIZE = 100;
 const LIMIT = 200;
@@ -55,7 +68,10 @@ const summaryColumns = (actor: string) => `r.id,r.kind,r.ownerId,
   CASE WHEN r.kind='secret' THEN COALESCE((SELECT peer.name FROM chat_room_members pm JOIN users peer ON peer.id=pm.userId WHERE pm.roomId=r.id AND pm.userId<>${actor} AND pm.status='active' LIMIT 1),'Секретный чат') ELSE r.name END AS name,
   r.description,
   CASE WHEN r.kind='secret' THEN COALESCE((SELECT peer.avatar FROM chat_room_members pm JOIN users peer ON peer.id=pm.userId WHERE pm.roomId=r.id AND pm.userId<>${actor} AND pm.status='active' LIMIT 1),'') ELSE r.avatar END AS avatar,
-  r.visibility,r.username,r.created,r.updatedAt`;
+  r.visibility,r.username,r.created,r.updatedAt,(r.kind='group' AND r.forum=1) AS forum`;
+// Unread messages for a member (alias m); a forum counts unread topics.
+const unreadSql = `CASE WHEN r.kind='group' AND r.forum=1 THEN ${forumUnreadSql('r', 'm')} ELSE
+    (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('unreadm')})) END`;
 
 async function keyedRoomId(actor: string, key: string) {
   const bytes = new Uint8Array(
@@ -139,6 +155,8 @@ export type RoomMessageInput = {
   ciphertext: string | null;
   replyTo: string | null;
   quote?: string;
+  // Forum topic ('' is «Общее»); a reply joins its parent's thread.
+  topicId?: string;
   attachments: string[];
   now: number;
 };
@@ -153,14 +171,17 @@ export function roomMessageStatements(
   const ids = JSON.stringify(message.attachments);
   return [
     db()
-      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,ciphertext,replyTo,replyQuote,media,created)
+      .prepare(`INSERT INTO chat_room_messages(id,roomId,sender,text,ciphertext,replyTo,replyQuote,media,created,topicId,threadRootId)
       SELECT ?,r.id,u.id,?,?,?,?,
         (SELECT json_group_array(json(${attachmentJsonSql('up', 'cu')}))
           FROM json_each(?) j JOIN uploads up ON up.id=j.value JOIN chat_room_uploads cu ON cu.uploadId=up.id),
-        MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0))
+        MAX(?,COALESCE((SELECT MAX(previous.created)+1 FROM chat_room_messages previous WHERE previous.roomId=r.id),0)),
+        ?,(SELECT COALESCE(tp.threadRootId,tp.id) FROM chat_room_messages tp WHERE tp.id=? AND tp.roomId=r.id)
       FROM chat_rooms r,users u WHERE r.id=? AND u.id=? AND ${canSend('r', 'u.id')}
       AND r.kind=? AND (? IS NULL OR EXISTS(SELECT 1 FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=r.id AND rp.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('rp')})
-        AND (?='' OR instr(rp.text,?)>0)))
+        AND (?='' OR instr(rp.text,?)>0) AND (r.forum=0 OR rp.topicId=?)))
+      AND (?='' OR (r.forum=1 AND EXISTS(SELECT 1 FROM chat_room_topics t WHERE t.id=? AND t.roomId=r.id AND t.deletedAt=0
+        AND (t.closedAt=0 OR t.createdBy=u.id OR EXISTS(SELECT 1 FROM chat_room_members tm WHERE tm.roomId=r.id AND tm.userId=u.id AND tm.status='active' AND tm.role IN ('owner','admin'))))))
       AND NOT EXISTS(SELECT 1 FROM json_each(?) j WHERE NOT EXISTS(
         SELECT 1 FROM uploads up JOIN chat_room_uploads cu ON cu.uploadId=up.id WHERE up.id=j.value AND up.userId=u.id
           AND up.state='ready' AND cu.roomId=r.id AND cu.messageId IS NULL AND NOT EXISTS(SELECT 1 FROM moderated_uploads mu WHERE mu.uploadId=up.id)))
@@ -174,6 +195,8 @@ export function roomMessageStatements(
         message.quote ?? '',
         ids,
         message.now,
+        message.topicId ?? '',
+        message.replyTo,
         message.roomId,
         message.sender,
         message.kind,
@@ -181,6 +204,9 @@ export function roomMessageStatements(
         message.replyTo,
         message.quote ?? '',
         message.quote ?? '',
+        message.topicId ?? '',
+        message.topicId ?? '',
+        message.topicId ?? '',
         ids,
         ...gateBindings,
       ),
@@ -229,13 +255,14 @@ function preview(row: RoomPreview & { joined: number | boolean }): RoomPreview {
 async function roomRow(me: string, roomId: string): Promise<RoomSummary> {
   const row = await db()
     .prepare(`SELECT ${summaryColumns('m.userId')},m.role,m.archivedAt,${memberCount('r')} AS memberCount,
-    (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('unreadm')})) AS unread
+    ${unreadSql} AS unread
     FROM chat_rooms r JOIN chat_room_members m ON m.roomId=r.id AND m.userId=? WHERE r.id=? AND ${access('r', 'm.userId')}`)
     .bind(me, roomId)
     .first<RoomSummary>();
   if (!row) throw new ApiError(404, 'Чат недоступен');
   return {
     ...row,
+    forum: !!row.forum,
     label: row.kind === 'group' ? 'Группа' : 'Секретный чат',
     lastMessage: null,
   };
@@ -247,7 +274,7 @@ export async function listRooms(
   await actorAllowed(me);
   const result = await db()
     .prepare(`SELECT ${summaryColumns('m.userId')},m.role,m.archivedAt,${memberCount('r')} AS memberCount,
-    (SELECT COUNT(*) FROM chat_room_messages unreadm WHERE unreadm.roomId=r.id AND unreadm.sender<>m.userId AND (unreadm.created>m.lastReadAt OR (unreadm.created=m.lastReadAt AND unreadm.id>m.lastReadId)) AND unreadm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('unreadm')})) AS unread,
+    ${unreadSql} AS unread,
     (SELECT json_object('id',lastm.id,'text',CASE WHEN r.kind='secret' THEN '' ELSE ${messageSummarySql('lastm', { empty: '' })} END,'created',lastm.created,'sender',lastm.sender)
     FROM chat_room_messages lastm WHERE lastm.roomId=r.id AND lastm.deletedAt=0 AND (r.kind='secret' OR ${groupSenderVisible('lastm')}) ORDER BY lastm.created DESC,lastm.id DESC LIMIT 1) AS lastMessage
     FROM chat_rooms r JOIN chat_room_members m ON m.roomId=r.id WHERE m.userId=? AND (m.archivedAt>0)=? AND ${access('r', 'm.userId')}
@@ -257,6 +284,7 @@ export async function listRooms(
   return {
     rooms: result.results.map((r) => ({
       ...r,
+      forum: !!r.forum,
       label: r.kind === 'group' ? 'Группа' : 'Секретный чат',
       lastMessage: r.lastMessage ? JSON.parse(r.lastMessage) : null,
     })),
@@ -326,10 +354,89 @@ export async function resolveRoomInvite(
   if (!row) throw new ApiError(404, 'Приглашение отозвано или недоступно');
   return { room: preview(row) };
 }
+type MessageRow = RoomMessage & {
+  reactionData: string;
+  media: string;
+  forwardedName: string;
+  forwardedFrom: string | null;
+  replyQuote: string;
+  postShareId: string | null;
+  topicId: string;
+  threadRootId: string | null;
+  replyCount: number;
+  replyId: string | null;
+  replySender: string | null;
+  replyName: string | null;
+  replyText: string | null;
+};
+// One message SELECT for the history, a topic, a thread and its root.
+const messageSelect = (where: string) => `SELECT msg.id,msg.roomId,msg.sender,u.name AS senderName,u.avatar AS senderAvatar,msg.text,msg.ciphertext,msg.replyTo,msg.created,msg.deletedAt,msg.giveawayId,
+    CASE WHEN msg.deletedAt=0 THEN msg.media ELSE '[]' END AS media,
+    CASE WHEN msg.deletedAt=0 THEN msg.forwardedName ELSE '' END AS forwardedName,msg.forwardedFrom,
+    CASE WHEN msg.deletedAt=0 THEN msg.replyQuote ELSE '' END AS replyQuote,
+    CASE WHEN msg.deletedAt=0 THEN msg.postShareId END AS postShareId,
+    msg.topicId,msg.threadRootId,
+    CASE WHEN r.kind='group' THEN (SELECT COUNT(*) FROM chat_room_messages tm WHERE tm.roomId=msg.roomId AND tm.threadRootId=msg.id AND tm.deletedAt=0 AND ${groupSenderVisible('tm')}) ELSE 0 END AS replyCount,
+    rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
+    CASE WHEN rp.id IS NULL THEN NULL ELSE ${messageSummarySql('rp', { textLimit: 240 })} END AS replyText,
+    CASE WHEN r.kind='group' AND msg.deletedAt=0 AND msg.ciphertext IS NULL
+      THEN ${reactionSummarySql('chat_room_message_reactions', 'msg.id', ':viewer')} ELSE '[]' END AS reactionData
+    FROM chat_room_messages msg JOIN users u ON u.id=msg.sender JOIN chat_rooms r ON r.id=msg.roomId
+    LEFT JOIN chat_room_messages rp ON rp.id=msg.replyTo AND rp.roomId=msg.roomId AND rp.deletedAt=0 AND rp.ciphertext IS NULL AND ${groupSenderVisible('rp')}
+    LEFT JOIN users ru ON ru.id=rp.sender
+    WHERE msg.roomId=? AND ${access('r', ':viewer')} AND (r.kind='secret' OR ${groupSenderVisible('msg')}) ${where}`;
+function messageView(kind: RoomKind) {
+  return ({
+    reactionData,
+    media,
+    forwardedName,
+    forwardedFrom,
+    replyQuote,
+    postShareId,
+    topicId,
+    threadRootId,
+    replyCount,
+    replyId,
+    replySender,
+    replyName,
+    replyText,
+    ...message
+  }: MessageRow): RoomMessage => ({
+    ...message,
+    attachments: JSON.parse(media) as ChatAttachment[],
+    ...(forwardedName ? { forwardedName, forwardedFrom } : {}),
+    ...(postShareId ? { postShare: { id: postShareId } } : {}),
+    ...(topicId ? { topicId } : {}),
+    ...(threadRootId ? { threadRootId } : {}),
+    ...(replyCount ? { replies: replyCount } : {}),
+    ...(message.replyTo && kind === 'group'
+      ? {
+          reply: {
+            id: message.replyTo,
+            sender: replySender || '',
+            name: replyName || '',
+            text: replyId ? replyText || 'Сообщение' : 'Сообщение недоступно',
+            unavailable: !replyId,
+            ...(replyQuote && replyId ? { quote: replyQuote } : {}),
+          },
+        }
+      : {}),
+    ...(kind === 'group' ? { reactions: parseReactions(reactionData) } : {}),
+  });
+}
+export type RoomReadOptions = {
+  // 'general' or a topic id: only that forum topic.
+  topic?: string | null;
+  // A thread root: its replies, with the root itself as threadRoot.
+  thread?: string | null;
+  // 'topics': a forum's topic list without messages.
+  view?: string | null;
+};
 export async function readRoom(
   me: string,
   roomId: string,
   before?: string | null,
+  options: RoomReadOptions = {},
 ): Promise<RoomDetail> {
   const row = await roomRow(me, id(roomId));
   let cursor: { created: number; id: string } | null = null;
@@ -348,6 +455,11 @@ export async function readRoom(
       throw new ApiError(400, 'Некорректная страница истории');
     }
   }
+  const group = row.kind === 'group';
+  const forum = group && !!row.forum;
+  const thread = group && options.thread ? id(options.thread) : null;
+  const topic = forum && !thread ? topicKey(options.topic) : null;
+  const listOnly = forum && options.view === 'topics' && !thread;
   const members = await viewerQuery(
     `SELECT m.userId,u.name,u.avatar,COALESCE((SELECT h.handle FROM handles h WHERE h.userId=u.id AND h.main=1),'') AS handle,
     m.role,m.status,m.publicKey,m.joinedAt FROM chat_room_members m JOIN users u ON u.id=m.userId JOIN chat_rooms r ON r.id=m.roomId
@@ -358,41 +470,30 @@ export async function readRoom(
   )
     .bind(roomId)
     .all<Omit<RoomMember, 'publicKey'> & { publicKey: string }>();
-  const messages = await viewerQuery(
-    `SELECT msg.id,msg.roomId,msg.sender,u.name AS senderName,u.avatar AS senderAvatar,msg.text,msg.ciphertext,msg.replyTo,msg.created,msg.deletedAt,msg.giveawayId,
-    CASE WHEN msg.deletedAt=0 THEN msg.media ELSE '[]' END AS media,
-    CASE WHEN msg.deletedAt=0 THEN msg.forwardedName ELSE '' END AS forwardedName,msg.forwardedFrom,
-    CASE WHEN msg.deletedAt=0 THEN msg.replyQuote ELSE '' END AS replyQuote,
-    CASE WHEN msg.deletedAt=0 THEN msg.postShareId END AS postShareId,
-    rp.id AS replyId,rp.sender AS replySender,ru.name AS replyName,
-    CASE WHEN rp.id IS NULL THEN NULL ELSE ${messageSummarySql('rp', { textLimit: 240 })} END AS replyText,
-    CASE WHEN r.kind='group' AND msg.deletedAt=0 AND msg.ciphertext IS NULL
-      THEN ${reactionSummarySql('chat_room_message_reactions', 'msg.id', ':viewer')} ELSE '[]' END AS reactionData
-    FROM chat_room_messages msg JOIN users u ON u.id=msg.sender JOIN chat_rooms r ON r.id=msg.roomId
-    LEFT JOIN chat_room_messages rp ON rp.id=msg.replyTo AND rp.roomId=msg.roomId AND rp.deletedAt=0 AND rp.ciphertext IS NULL AND ${groupSenderVisible('rp')}
-    LEFT JOIN users ru ON ru.id=rp.sender
-    WHERE msg.roomId=? AND ${access('r', ':viewer')} AND (r.kind='secret' OR ${groupSenderVisible('msg')}) ${cursor ? 'AND (msg.created<? OR (msg.created=? AND msg.id<?))' : ''}
-    ORDER BY msg.created DESC,msg.id DESC LIMIT ${PAGE_SIZE + 1}`,
-    me,
-  )
-    .bind(
-      roomId,
-      ...(cursor ? [cursor.created, cursor.created, cursor.id] : []),
-    )
-    .all<
-      RoomMessage & {
-        reactionData: string;
-        media: string;
-        forwardedName: string;
-        forwardedFrom: string | null;
-        replyQuote: string;
-        postShareId: string | null;
-        replyId: string | null;
-        replySender: string | null;
-        replyName: string | null;
-        replyText: string | null;
-      }
-    >();
+  const filter = thread
+    ? 'AND msg.threadRootId=?'
+    : topic !== null
+      ? 'AND msg.topicId=?'
+      : '';
+  const messages = listOnly
+    ? { results: [] as MessageRow[] }
+    : await viewerQuery(
+        `${messageSelect(`${filter} ${cursor ? 'AND (msg.created<? OR (msg.created=? AND msg.id<?))' : ''}`)}
+        ORDER BY msg.created DESC,msg.id DESC LIMIT ${PAGE_SIZE + 1}`,
+        me,
+      )
+        .bind(
+          roomId,
+          ...(thread ? [thread] : topic !== null ? [topic] : []),
+          ...(cursor ? [cursor.created, cursor.created, cursor.id] : []),
+        )
+        .all<MessageRow>();
+  const root = thread
+    ? await viewerQuery(messageSelect('AND msg.id=?'), me)
+        .bind(roomId, thread)
+        .first<MessageRow>()
+    : null;
+  if (thread && !root) throw new ApiError(404, 'Ветка недоступна');
   const permission = await viewerQuery(
     `SELECT 1 FROM chat_rooms r WHERE r.id=? AND ${canSend('r', ':viewer')}`,
     me,
@@ -401,6 +502,7 @@ export async function readRoom(
     .first();
   const page = messages.results.slice(0, PAGE_SIZE);
   const oldest = page.at(-1);
+  const view = messageView(row.kind);
   return {
     ...row,
     me,
@@ -408,50 +510,15 @@ export async function readRoom(
       ...m,
       publicKey: m.publicKey ? JSON.parse(m.publicKey) : null,
     })),
-    messages: page
-      .reverse()
-      .map(
-        ({
-          reactionData,
-          media,
-          forwardedName,
-          forwardedFrom,
-          replyQuote,
-          postShareId,
-          replyId,
-          replySender,
-          replyName,
-          replyText,
-          ...message
-        }) => ({
-          ...message,
-          attachments: JSON.parse(media) as ChatAttachment[],
-          ...(forwardedName ? { forwardedName, forwardedFrom } : {}),
-          ...(postShareId ? { postShare: { id: postShareId } } : {}),
-          ...(message.replyTo && row.kind === 'group'
-            ? {
-                reply: {
-                  id: message.replyTo,
-                  sender: replySender || '',
-                  name: replyName || '',
-                  text: replyId
-                    ? replyText || 'Сообщение'
-                    : 'Сообщение недоступно',
-                  unavailable: !replyId,
-                  ...(replyQuote && replyId ? { quote: replyQuote } : {}),
-                },
-              }
-            : {}),
-          ...(row.kind === 'group'
-            ? { reactions: parseReactions(reactionData) }
-            : {}),
-        }),
-      ),
+    messages: page.reverse().map(view),
     canSend: !!permission,
     nextCursor:
       messages.results.length > PAGE_SIZE && oldest
         ? btoa(JSON.stringify({ created: oldest.created, id: oldest.id }))
         : null,
+    ...(forum ? { topics: await readTopics(me, roomId) } : {}),
+    ...(topic !== null ? { topic: topicName(topic) } : {}),
+    ...(root ? { threadRoot: view(root) } : {}),
   };
 }
 
@@ -689,12 +756,40 @@ export async function changeRoom(
   if (action === 'read') {
     if (body.through === undefined) return { ok: true };
     const through = id(body.through);
+    // Forums keep a read position per topic.
+    const topic = row.forum ? topicKey(body.topic) : null;
+    if (topic !== null) {
+      await markTopicRead(me, roomId, topic, through);
+      return { ok: true };
+    }
     await db()
       .prepare(`UPDATE chat_room_members SET lastReadAt=(SELECT created FROM chat_room_messages WHERE id=? AND roomId=chat_room_members.roomId),lastReadId=?
       WHERE roomId=? AND userId=? AND EXISTS(SELECT 1 FROM chat_rooms r WHERE r.id=chat_room_members.roomId AND ${access('r', 'chat_room_members.userId')})
       AND EXISTS(SELECT 1 FROM chat_room_messages seen WHERE seen.id=? AND seen.roomId=chat_room_members.roomId AND (seen.created>lastReadAt OR (seen.created=lastReadAt AND seen.id>lastReadId)))`)
       .bind(through, through, roomId, me, through)
       .run();
+    return { ok: true };
+  }
+  if (action === 'forum') {
+    if (row.kind !== 'group')
+      throw new ApiError(400, 'Темы доступны только в группах');
+    await setForum(me, roomId, body.enabled, now);
+    return readRoom(me, roomId, null, { view: 'topics' });
+  }
+  if (action === 'topicCreate') {
+    if (!row.forum) throw new ApiError(400, 'Сначала включите темы в группе');
+    return createTopic(me, roomId, body, now);
+  }
+  if (action === 'topicUpdate') {
+    await updateTopic(me, roomId, body, now);
+    return { ok: true };
+  }
+  if (action === 'topicClose' || action === 'topicReopen') {
+    await closeTopic(me, roomId, body, action === 'topicClose', now);
+    return { ok: true };
+  }
+  if (action === 'topicDelete') {
+    await deleteTopic(me, roomId, body, now);
     return { ok: true };
   }
   if (action === 'acceptSecret') {
@@ -725,6 +820,7 @@ export async function changeRoom(
       ciphertext: string | null = null,
       replyTo: string | null = null,
       quote = '',
+      topicId = '',
       attachments: string[] = [];
     if (row.kind === 'secret') {
       if (
@@ -732,7 +828,8 @@ export async function changeRoom(
         'media' in body ||
         'attachments' in body ||
         'replyTo' in body ||
-        'quote' in body
+        'quote' in body ||
+        'topic' in body
       )
         throw new ApiError(
           400,
@@ -773,6 +870,9 @@ export async function changeRoom(
         );
       replyTo = body.replyTo == null ? null : id(body.replyTo);
       quote = replyQuoteValue(body.quote, replyTo);
+      topicId = topicKey(body.topic) ?? '';
+      if (topicId && !row.forum)
+        throw new ApiError(400, 'В этой группе не включены темы');
     }
     if (
       row.kind === 'group' &&
@@ -784,15 +884,31 @@ export async function changeRoom(
       const replied = replyTo
         ? await db()
             .prepare(
-              `SELECT rp.text FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=? AND rp.deletedAt=0 AND ${groupSenderVisible('rp')}`,
+              `SELECT rp.text,rp.topicId FROM chat_room_messages rp WHERE rp.id=? AND rp.roomId=? AND rp.deletedAt=0 AND ${groupSenderVisible('rp')}`,
             )
             .bind(replyTo, roomId)
-            .first<{ text: string }>()
+            .first<{ text: string; topicId: string }>()
         : null;
       if (replyTo && !replied)
         throw new ApiError(404, 'Сообщение для ответа недоступно');
       if (quote && !replied?.text.includes(quote))
         throw new ApiError(409, 'Цитируемый текст изменился. Выделите его заново');
+      if (row.forum && replied && replied.topicId !== topicId)
+        throw new ApiError(400, 'Ответ отправляется в тему исходного сообщения');
+      if (topicId) {
+        const topic = await db()
+          .prepare(
+            'SELECT closedAt,createdBy FROM chat_room_topics WHERE id=? AND roomId=? AND deletedAt=0',
+          )
+          .bind(topicId, roomId)
+          .first<{ closedAt: number; createdBy: string }>();
+        if (!topic) throw new ApiError(404, 'Тема удалена или недоступна');
+        if (topic.closedAt && topic.createdBy !== me && row.role === 'member')
+          throw new ApiError(
+            403,
+            'Тема закрыта: писать в неё могут только администраторы',
+          );
+      }
       const held = await reviewSpam({
         kind: 'group',
         targetId: key,
@@ -802,6 +918,7 @@ export async function changeRoom(
           text,
           replyTo,
           ...(quote ? { quote } : {}),
+          ...(topicId ? { topic: topicId } : {}),
           ...(attachments.length
             ? { media: JSON.stringify(attachments.map((file) => ({ id: file }))) }
             : {}),
@@ -819,6 +936,7 @@ export async function changeRoom(
         ciphertext,
         replyTo,
         quote,
+        topicId,
         attachments,
         now,
       }),
@@ -829,7 +947,9 @@ export async function changeRoom(
           `SELECT msg.* FROM chat_room_messages msg JOIN chat_rooms r ON r.id=msg.roomId WHERE msg.id=? AND msg.sender=? AND ${canSend('r', 'msg.sender')}`,
         )
         .bind(key, me)
-        .first<RoomMessage & { media: string; replyQuote: string }>();
+        .first<
+          RoomMessage & { media: string; replyQuote: string; topicId: string }
+        >();
       if (
         !saved ||
         saved.roomId !== roomId ||
@@ -837,6 +957,7 @@ export async function changeRoom(
         saved.ciphertext !== ciphertext ||
         saved.replyTo !== replyTo ||
         saved.replyQuote !== quote ||
+        saved.topicId !== topicId ||
         !sameIds(saved.media, attachments) ||
         saved.deletedAt
       )
@@ -1041,7 +1162,7 @@ export function groupRoomExportSections(
     ],
     [
       'groupMessages',
-      `SELECT msg.id,msg.roomId,msg.sender,msg.text,msg.replyTo,msg.replyQuote,msg.forwardedName,msg.forwardedFrom,msg.postShareId,msg.media,msg.created FROM chat_room_messages msg
+      `SELECT msg.id,msg.roomId,msg.sender,msg.text,msg.replyTo,msg.replyQuote,msg.forwardedName,msg.forwardedFrom,msg.postShareId,msg.topicId,msg.threadRootId,msg.media,msg.created FROM chat_room_messages msg
       JOIN chat_rooms r ON r.id=msg.roomId JOIN chat_room_members m ON m.roomId=r.id
       WHERE m.userId=? AND r.kind='group' AND msg.ciphertext IS NULL AND msg.deletedAt=0 AND ${groupSenderVisible('msg')}
       AND ${access('r', 'm.userId')} AND msg.id>? ORDER BY msg.id LIMIT 100`,

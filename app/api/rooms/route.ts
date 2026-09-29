@@ -25,7 +25,11 @@ export async function GET(req: Request) {
     if (action === 'list')
       result = await listRooms(me, params.get('archived') === '1');
     else if (action === 'room')
-      result = await readRoom(me, params.get('id') || '', params.get('before'));
+      result = await readRoom(me, params.get('id') || '', params.get('before'), {
+        topic: params.get('topic'),
+        thread: params.get('thread'),
+        view: params.get('view'),
+      });
     else if (action === 'search')
       result = await searchRooms(me, params.get('q') || '');
     else if (action === 'resolveGroup')

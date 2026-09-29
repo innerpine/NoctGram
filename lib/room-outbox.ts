@@ -5,6 +5,8 @@ import { roomAction } from './rooms-client';
 
 export type RoomOutgoing = {
   roomId: string;
+  // The forum topic the message is sent to, if any.
+  topic?: string;
   status: 'sending' | 'sent' | 'failed' | 'queued';
   error?: string;
   // Moderation notice for a message held by anti-spam review.
@@ -20,6 +22,8 @@ export type RoomSendBody = {
   attachments: string[];
   replyTo: string | null;
   quote?: string;
+  // Forum topic of the message: 'general' or a topic id.
+  topic?: string;
 };
 type Send = (body: RoomSendBody) => Promise<{ id: string } | QueuedSubmission>;
 type Author = { id: string; name: string; avatar: string };
@@ -52,6 +56,7 @@ export function createRoomOutbox(send: Send) {
         attachments: message.attachments?.map((file) => file.id) ?? [],
         replyTo: message.replyTo,
         ...(message.reply?.quote ? { quote: message.reply.quote } : {}),
+        ...(entry.topic ? { topic: entry.topic } : {}),
       });
       if ('queued' in result)
         update(message.id, {
@@ -93,13 +98,32 @@ export function createRoomOutbox(send: Send) {
       };
     },
     getSnapshot: () => entries,
-    enqueue(author: Author, roomId: string, draft: ChatDraft) {
+    enqueue(
+      author: Author,
+      roomId: string,
+      draft: ChatDraft,
+      context: { topic?: string; thread?: RoomMessage } = {},
+    ) {
       const id = crypto.randomUUID();
       lastCreated = Math.max(Date.now(), lastCreated + 1);
+      // In a thread, a message without its own reply answers the thread root.
+      const root = context.thread;
+      const reply =
+        draft.reply ??
+        (root
+          ? {
+              id: root.id,
+              sender: root.sender,
+              name: root.senderName,
+              text: root.text || 'Сообщение',
+              unavailable: false,
+            }
+          : undefined);
       entries = [
         ...entries,
         {
           roomId,
+          ...(context.topic ? { topic: context.topic } : {}),
           status: 'sending',
           message: {
             id,
@@ -109,11 +133,15 @@ export function createRoomOutbox(send: Send) {
             senderAvatar: author.avatar,
             text: draft.text.trim(),
             ciphertext: null,
-            replyTo: draft.reply?.id ?? null,
+            replyTo: reply?.id ?? null,
             created: lastCreated,
             deletedAt: 0,
             attachments: draft.attachments?.map((file) => ({ ...file })) ?? [],
-            reply: draft.reply ? { ...draft.reply } : undefined,
+            reply: reply ? { ...reply } : undefined,
+            ...(context.topic && context.topic !== 'general'
+              ? { topicId: context.topic }
+              : {}),
+            ...(root ? { threadRootId: root.threadRootId || root.id } : {}),
           },
         },
       ];

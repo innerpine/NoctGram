@@ -152,6 +152,7 @@ export async function deleteAccount(
   for (const table of [
     'message_reactions',
     'chat_room_message_reactions',
+    'chat_room_topic_reads',
     'likes',
     'bookmarks',
     'votes',

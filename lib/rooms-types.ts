@@ -31,6 +31,11 @@ export type RoomMessage = {
   forwardedName?: string;
   forwardedFrom?: string | null;
   postShare?: { id: string };
+  // Forum topic id; absent for «Общее».
+  topicId?: string;
+  // The thread this reply belongs to, and how many replies a message has.
+  threadRootId?: string;
+  replies?: number;
 };
 export type RoomMessageReply = {
   id: string;
@@ -58,6 +63,8 @@ export type RoomPreview = {
 export type RoomSummary = Omit<RoomPreview, 'joined'> & {
   role: RoomRole;
   archivedAt: number;
+  // Groups with topics; unread then counts topics with new messages.
+  forum: boolean;
   unread: number;
   lastMessage: {
     id: string;
@@ -72,4 +79,9 @@ export type RoomDetail = RoomSummary & {
   messages: RoomMessage[];
   nextCursor: string | null;
   canSend: boolean;
+  topics?: import('./room-topic-shared').RoomTopic[];
+  // The topic the messages belong to ('general' or an id), when filtered.
+  topic?: string;
+  // The first message of a thread, when reading its replies.
+  threadRoot?: RoomMessage;
 };

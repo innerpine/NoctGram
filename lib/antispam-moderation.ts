@@ -130,6 +130,7 @@ async function approve(review: StoredReview, me: string, note: string) {
         ciphertext: null,
         replyTo: p.replyTo || null,
         quote: p.quote || '',
+        topicId: p.topic || '',
         attachments: media.map((file) => file.id),
         now,
       },

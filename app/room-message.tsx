@@ -4,6 +4,7 @@ import {
   Check,
   Clock3,
   Forward,
+  MessageCircle,
   MoreHorizontal,
   Quote,
   Reply,
@@ -34,6 +35,14 @@ import { locallyListened, markLocallyListened } from '@/lib/media-playback';
 import { selectionQuote } from '@/lib/message-selection';
 import { Avatar } from './post-card';
 
+export function repliesLabel(count: number) {
+  const form = new Intl.PluralRules('ru').select(count);
+  return (
+    count +
+    ' ' +
+    (form === 'one' ? 'ответ' : form === 'few' ? 'ответа' : 'ответов')
+  );
+}
 const time = (date: number) =>
   new Date(date).toLocaleTimeString('ru', {
     hour: '2-digit',
@@ -60,6 +69,7 @@ export const RoomMessageRow = memo(function RoomMessageRow({
   onJump,
   onReact,
   onRetry,
+  onThread,
 }: {
   message: RoomMessage;
   roomKind: RoomKind;
@@ -81,6 +91,8 @@ export const RoomMessageRow = memo(function RoomMessageRow({
   onJump: (id: string) => void;
   onReact: (message: RoomMessage, emoji: ReactionEmoji | null) => Promise<void>;
   onRetry: (id: string) => void;
+  // Opens the reply thread this message starts or belongs to.
+  onThread?: (message: RoomMessage) => void;
 }) {
   const self = message.sender === meId;
   const deleted = !!message.deletedAt;
@@ -178,6 +190,16 @@ export const RoomMessageRow = memo(function RoomMessageRow({
             </p>
           )
         )}
+        {group && !deleted && !!message.replies && onThread && (
+          <button
+            type="button"
+            className="room-thread-chip"
+            onClick={() => onThread(message)}
+          >
+            <MessageCircle size={14} />
+            {repliesLabel(message.replies)}
+          </button>
+        )}
         {group && !deleted && (
           <MessageReactions
             reactions={message.reactions}
@@ -253,6 +275,12 @@ export const RoomMessageRow = memo(function RoomMessageRow({
               >
                 <Quote size={15} />
                 Ответить с цитатой
+              </DropdownMenuItem>
+            )}
+            {onThread && (!!message.replies || !!message.threadRootId) && (
+              <DropdownMenuItem onClick={() => onThread(message)}>
+                <MessageCircle size={15} />
+                Открыть ветку
               </DropdownMenuItem>
             )}
             {canForward && !giveawayEvent && (
