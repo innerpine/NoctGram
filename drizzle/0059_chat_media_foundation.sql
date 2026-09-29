@@ -39,6 +39,23 @@ CREATE TRIGGER chat_room_messages_media_ready_update BEFORE UPDATE OF media ON c
   )
 ) BEGIN SELECT RAISE(ABORT,'MEDIA_NOT_READY'); END;
 --> statement-breakpoint
+-- Attachments exist only in ordinary groups, never next to ciphertext, and a
+-- file removed by moderation is never attached again, whichever code path
+-- writes the message. This keeps the scope rules of room_media_insert_guard
+-- (0051); draft ownership moved to the send gate in lib/rooms.ts, because a
+-- forwarded copy legitimately shows another person's upload.
+CREATE TRIGGER chat_room_messages_media_scope_insert BEFORE INSERT ON chat_room_messages WHEN NEW.media<>'[]' AND (
+  NEW.ciphertext IS NOT NULL
+  OR NOT EXISTS(SELECT 1 FROM chat_rooms r WHERE r.id=NEW.roomId AND r.kind='group')
+  OR EXISTS(SELECT 1 FROM json_each(NEW.media) m JOIN moderated_uploads mu ON mu.uploadId=json_extract(m.value,'$.id'))
+) BEGIN SELECT RAISE(ABORT,'MEDIA_NOT_ALLOWED'); END;
+--> statement-breakpoint
+CREATE TRIGGER chat_room_messages_media_scope_update BEFORE UPDATE OF media ON chat_room_messages WHEN NEW.media<>OLD.media AND NEW.media<>'[]' AND (
+  NEW.ciphertext IS NOT NULL
+  OR NOT EXISTS(SELECT 1 FROM chat_rooms r WHERE r.id=NEW.roomId AND r.kind='group')
+  OR EXISTS(SELECT 1 FROM json_each(NEW.media) m JOIN moderated_uploads mu ON mu.uploadId=json_extract(m.value,'$.id'))
+) BEGIN SELECT RAISE(ABORT,'MEDIA_NOT_ALLOWED'); END;
+--> statement-breakpoint
 -- Every stored copy of an attachment is indexed, whichever code path wrote it.
 CREATE TRIGGER messages_media_refs_insert AFTER INSERT ON messages WHEN NEW.media<>'[]' BEGIN
   INSERT OR IGNORE INTO chat_media_refs(uploadId,surface,messageId,created)
