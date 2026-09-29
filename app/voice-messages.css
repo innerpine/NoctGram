@@ -30,8 +30,10 @@
     transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
     background-color 150ms;
 }
-.chat-record-button:hover:not(:disabled) {
-  background: #9785ee;
+@media (hover: hover) {
+  .chat-record-button:hover:not(:disabled) {
+    background: #9785ee;
+  }
 }
 .chat-record-button:disabled {
   opacity: 0.5;
@@ -79,7 +81,7 @@
   border-radius: 27px;
   background: #222224;
   color: #f1edf6;
-  font-size: 15px;
+  font-size: 0.9375rem;
   animation: chat-recording-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes chat-recording-in {
@@ -134,7 +136,7 @@
   gap: 2px;
   margin-left: auto;
   color: #ffffff8a;
-  font-size: 14px;
+  font-size: 0.875rem;
   white-space: nowrap;
   transform: translateX(var(--record-shift, 0));
 }
@@ -152,16 +154,20 @@
   color: #ffffffc0;
   cursor: pointer;
 }
-.chat-recording-trash:hover {
-  background: #ef44441f;
-  color: #ff9a9a;
+@media (hover: hover) {
+  .chat-recording-trash:hover {
+    background: #ef44441f;
+    color: #ff9a9a;
+  }
 }
 .chat-recording-stop {
   margin-left: auto;
   color: #ef4444;
 }
-.chat-recording-stop:hover {
-  background: #ef444419;
+@media (hover: hover) {
+  .chat-recording-stop:hover {
+    background: #ef444419;
+  }
 }
 .chat-recording-play {
   background: #8774e1;
@@ -177,7 +183,7 @@
 .chat-recording-preview .chat-recording-time {
   margin-left: auto;
   color: #ffffffb0;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .chat-recording-lock {
   position: absolute;
@@ -219,7 +225,7 @@
   gap: 8px;
   margin: 8px 16px 0;
   color: #d9d2e3;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .chat-recording-upload.failed {
   color: #ffc5bb;
@@ -233,7 +239,7 @@
   border-radius: 14px;
   background: transparent;
   color: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 
@@ -375,7 +381,7 @@
   gap: 6px;
   min-height: 18px;
   color: #ffffff9c;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
 .voice-unlistened {
@@ -391,7 +397,7 @@
   border-radius: 8px;
   background: #ffffff1c;
   color: #fff;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -405,7 +411,7 @@
 .voice-message-fallback small {
   display: block;
   color: #ffffff8f;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .chat-message-files:has(.voice-message) {
   margin-bottom: 2px;
@@ -480,7 +486,7 @@
   border-radius: 11px;
   background: #0000008c;
   color: #fff;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
 .round-video :is(.message-time, .room-message-time) {
@@ -499,7 +505,7 @@
   display: grid;
   place-items: center;
   color: #ffffffb0;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .round-video:focus-visible {
   outline: 2px solid #b6a8f2;
