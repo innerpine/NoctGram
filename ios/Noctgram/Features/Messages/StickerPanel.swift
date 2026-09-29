@@ -297,7 +297,7 @@ private struct StickersPage: View {
         let _ = store.revision
         var list: [PanelSection] = []
         if term.isEmpty {
-            if !store.favorites.isEmpty { list.append(PanelSection(id: "favorites", title: "Избранные", stickers: store.favorites)) }
+            if !store.favorites.isEmpty { list.append(PanelSection(id: "favorites", title: "Избранные стикеры", stickers: store.favorites)) }
             let recent = store.recentStickers
             if !recent.isEmpty { list.append(PanelSection(id: "recent", title: "Недавние", stickers: recent)) }
         }

@@ -701,10 +701,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, rooms_list(q.get("archived") == "1"))
         media_id = os.path.basename(url.path)
         if url.path == "/api/media/voice-sample.wav":
-            return self.send(200, VOICE, "audio/wav", {"Accept-Ranges": "bytes"})
+            return self.send_bytes(VOICE, "audio/wav")
         if url.path.startswith("/api/media/") and media_id in STATE["media"]:
             kind, data = STATE["media"][media_id]
-            return self.send(200, data, kind, {"Accept-Ranges": "bytes"})
+            return self.send_bytes(data, kind)
         if url.path.startswith("/api/media/"):
             path = os.path.join(HERE, "Fixtures", "media", media_id)
         elif url.path.startswith("/assets/"):
@@ -718,6 +718,9 @@ class Handler(BaseHTTPRequestHandler):
         kind = kinds.get(os.path.splitext(path)[1], "image/jpeg")
         with open(path, "rb") as file:
             data = file.read()
+        return self.send_bytes(data, kind)
+
+    def send_bytes(self, data, kind):
         # Byte ranges, as app/api/media/[id]/route.ts serves them: AVPlayer
         # streams a video only from a server that answers them.
         spec = self.headers.get("Range", "")

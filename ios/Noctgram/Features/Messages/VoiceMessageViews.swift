@@ -51,6 +51,12 @@ struct VoiceMessageView: View {
                     Text(Waveform.clock(current && playback.time > 0 ? playback.time : duration))
                         .font(.system(size: 12).monospacedDigit())
                         .foregroundColor(mine ? Color.white.opacity(0.6) : Noct.text48)
+                    if playback.failed.contains(attachment.id), let url = session.api.mediaURL(attachment.path + "?download=1") {
+                        // A browser's WebM or Ogg: iOS does not play it here.
+                        Link("Скачать", destination: url)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(accent)
+                    }
                     if unheard {
                         Circle().fill(accent).frame(width: 5, height: 5)
                     }

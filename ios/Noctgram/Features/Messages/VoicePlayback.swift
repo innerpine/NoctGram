@@ -14,8 +14,11 @@ final class VoicePlayback: ObservableObject {
     @Published private(set) var time: Double = 0
     @Published private(set) var duration: Double = 0
     @Published private(set) var speed: Float = 1
+    /// Recordings the system cannot play (WebM or Ogg from some browsers).
+    @Published private(set) var failed: Set<String> = []
     /// Called once a message has been played through (listened marks).
     var onEnded: ((String) -> Void)?
+    private var itemStatus: NSKeyValueObservation?
 
     private var player: AVPlayer?
     private var timeToken: Any?
@@ -67,6 +70,14 @@ final class VoicePlayback: ObservableObject {
         endToken = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.ended(id) }
         }
+        itemStatus = item.observe(\.status, options: [.new]) { [weak self] item, _ in
+            let broken = item.status == .failed
+            Task { @MainActor in
+                guard broken, let self, self.current == id else { return }
+                self.failed.insert(id)
+                self.stop()
+            }
+        }
         Task { [weak self] in
             guard let seconds = try? await item.asset.load(.duration).seconds, seconds.isFinite, seconds > 0 else { return }
             await MainActor.run {
@@ -102,6 +113,8 @@ final class VoicePlayback: ObservableObject {
         if let timeToken, let player { player.removeTimeObserver(timeToken) }
         if let endToken { NotificationCenter.default.removeObserver(endToken) }
         statusToken?.invalidate()
+        itemStatus?.invalidate()
+        itemStatus = nil
         player?.pause()
         player = nil
         timeToken = nil
